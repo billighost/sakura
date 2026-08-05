@@ -11,11 +11,15 @@ interface FullPlayerProps {
 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
 
   const {
+    queue,
+    upNextQueue,
+    currentIndex,
     currentTrack,
     isPlaying,
     isSeeking,
@@ -119,27 +123,74 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         </button>
       </div>
 
-      <div className={styles.artContainer}>
-        {currentTrack.coverUrl ? (
-          <img
-            className={styles.art}
-            src={currentTrack.coverUrl}
-            alt={currentTrack.title}
-          />
+      <div className={styles.mainContent}>
+        {showQueue ? (
+          <div className={styles.queueContainer}>
+            <div className={styles.queueHeader}>Now Playing</div>
+            <div className={styles.queueRowActive}>
+              <img src={currentTrack.coverUrl || ""} alt="" className={styles.queueArt} />
+              <div className={styles.queueInfo}>
+                <div className={styles.queueTitleActive}>{currentTrack.title}</div>
+                <div className={styles.queueArtist}>{currentTrack.artist}</div>
+              </div>
+            </div>
+
+            {upNextQueue.length > 0 && (
+              <>
+                <div className={styles.queueHeader}>Up Next</div>
+                {upNextQueue.map((t, i) => (
+                  <div key={`upnext-${i}`} className={styles.queueRow}>
+                    <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
+                    <div className={styles.queueInfo}>
+                      <div className={styles.queueTitle}>{t.title}</div>
+                      <div className={styles.queueArtist}>{t.artist}</div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {queue.length - currentIndex - 1 > 0 && (
+              <>
+                <div className={styles.queueHeader}>Next from: {currentTrack.album || "Playlist"}</div>
+                {queue.slice(currentIndex + 1).map((t, i) => (
+                  <div key={`queue-${i}`} className={styles.queueRow}>
+                    <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
+                    <div className={styles.queueInfo}>
+                      <div className={styles.queueTitle}>{t.title}</div>
+                      <div className={styles.queueArtist}>{t.artist}</div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
         ) : (
-          <div className={`${styles.art} ${styles.artFallback}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-            </svg>
+          <div className={styles.artContainer}>
+            {currentTrack.coverUrl ? (
+              <img
+                className={styles.art}
+                src={currentTrack.coverUrl}
+                alt={currentTrack.title}
+              />
+            ) : (
+              <div className={`${styles.art} ${styles.artFallback}`}>
+                <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <div className={styles.controls}>
-        <div className={styles.trackInfo}>
-          <div className={styles.trackTitle}>{currentTrack.title}</div>
-          <div className={styles.trackArtist}>{currentTrack.artist}</div>
-        </div>
+        {!showQueue && (
+          <div className={styles.trackInfo}>
+            <div className={styles.trackTitle}>{currentTrack.title}</div>
+            <div className={styles.trackArtist}>{currentTrack.artist}</div>
+          </div>
+        )}
 
         <div className={styles.seekContainer}>
           <div className={styles.seekTrack}>
@@ -305,7 +356,11 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </svg>
           </button>
 
-          <button className={styles.iconBtn} aria-label="Queue">
+          <button 
+            className={`${styles.iconBtn} ${showQueue ? styles.activeBtn : ""}`} 
+            onClick={() => setShowQueue(!showQueue)} 
+            aria-label="Queue"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
               <line x1="8" y1="6" x2="21" y2="6" />
               <line x1="8" y1="12" x2="21" y2="12" />

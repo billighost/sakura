@@ -14,6 +14,7 @@ interface Track {
 
 interface PlayerContextType {
   queue: Track[];
+  upNextQueue: Track[];
   currentIndex: number;
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -55,6 +56,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seekingRef = useRef(false);
   const [queue, setQueueState] = useState<Track[]>([]);
+  const [upNextQueue, setUpNextQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -69,12 +71,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Use refs to avoid stale closures in event handlers
   const queueRef = useRef(queue);
+  const upNextRef = useRef(upNextQueue);
   const currentIndexRef = useRef(currentIndex);
   const shuffleRef = useRef(shuffle);
   const repeatRef = useRef(repeat);
   const isPlayingRef = useRef(isPlaying);
 
   useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { upNextRef.current = upNextQueue; }, [upNextQueue]);
   useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
   useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
   useEffect(() => { repeatRef.current = repeat; }, [repeat]);
@@ -85,6 +89,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const next = useCallback(() => {
+    const uq = upNextRef.current;
+    if (uq.length > 0) {
+      const nextTrack = uq[0];
+      setUpNextQueue((prev) => prev.slice(1));
+      setQueueState((prev) => {
+        const newQ = [...prev];
+        newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
+        return newQ;
+      });
+      setCurrentIndex((i) => i + 1);
+      return;
+    }
+
     const q = queueRef.current;
     const ci = currentIndexRef.current;
     const sh = shuffleRef.current;
@@ -135,6 +152,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (repeatRef.current === "one") {
           audioRef.current?.play().catch(() => {});
         } else {
+          const uq = upNextRef.current;
+          if (uq.length > 0) {
+            const nextTrack = uq[0];
+            setUpNextQueue((prev) => prev.slice(1));
+            setQueueState((prev) => {
+              const newQ = [...prev];
+              newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
+              return newQ;
+            });
+            setCurrentIndex((i) => i + 1);
+            return;
+          }
+
           // Use refs to avoid stale closure
           const q = queueRef.current;
           const ci = currentIndexRef.current;
@@ -199,15 +229,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const playNext = useCallback((track: Track) => {
-    setQueueState((prev) => {
-      const newQ = [...prev];
-      newQ.splice(currentIndexRef.current + 1, 0, track);
-      return newQ;
-    });
+    setUpNextQueue((prev) => [track, ...prev]);
   }, []);
 
   const addToQueue = useCallback((track: Track) => {
-    setQueueState((prev) => [...prev, track]);
+    setUpNextQueue((prev) => [...prev, track]);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -261,6 +287,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const setQueue = useCallback((tracks: Track[], startIndex = 0) => {
     setQueueState(tracks);
     setCurrentIndex(startIndex);
+    setUpNextQueue([]);
   }, []);
 
   const removeTrack = useCallback((trackId: string) => {
@@ -321,10 +348,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Persist queue to localStorage
   useEffect(() => {
     if (queue.length > 0 && currentTrack) {
-      const data = { queue, currentIndex, volume };
+      const data = { queue, upNextQueue, currentIndex, volume };
       localStorage.setItem("sakura-player", JSON.stringify(data));
     }
-  }, [queue, currentIndex, volume]);
+  }, [queue, upNextQueue, currentIndex, volume]);
 
   // Restore queue from localStorage
   useEffect(() => {
@@ -334,6 +361,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const data = JSON.parse(saved);
         if (data.queue?.length > 0) {
           setQueueState(data.queue);
+          if (data.upNextQueue) setUpNextQueue(data.upNextQueue);
           setCurrentIndex(data.currentIndex || 0);
           setVolumeState(data.volume || 1);
         }
@@ -345,6 +373,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <PlayerContext.Provider
       value={{
         queue,
+        upNextQueue,
         currentIndex,
         currentTrack,
         isPlaying,

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack } from "@/lib/offline-db";
+import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 
 interface TrackRowProps {
   track: {
@@ -21,10 +22,11 @@ interface TrackRowProps {
 }
 
 export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
-  const { currentTrack, isPlaying, play, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, play, togglePlay, addToQueue } = usePlayer();
   const isActive = currentTrack?.id === track.id;
   const [offline, setOffline] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number, y: number } | null>(null);
 
   const cover = track.coverUrl || track.album?.coverUrl;
 
@@ -110,6 +112,10 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
   return (
     <div
       onClick={handlePlay}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuPos({ x: e.clientX, y: e.clientY });
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handlePlay(e as any); }}
@@ -257,6 +263,50 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
         )}
       </button>
+
+      {menuPos && (
+        <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)}>
+          <ContextMenuItem 
+            onClick={() => {
+              setMenuPos(null);
+              handlePlay({ target: document.body } as any);
+            }}
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>}
+          >
+            Play
+          </ContextMenuItem>
+          <ContextMenuItem 
+            onClick={() => {
+              setMenuPos(null);
+              addToQueue({
+                id: track.id,
+                title: track.title,
+                artist: track.artist.name,
+                album: track.album?.title,
+                coverUrl: cover,
+                audioUrl: track.audioUrl,
+                duration: track.duration,
+              });
+            }}
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+          >
+            Add to Queue
+          </ContextMenuItem>
+          <ContextMenuItem 
+            onClick={() => {
+              setMenuPos(null);
+              if (navigator.share) {
+                navigator.share({ title: track.title, url: `${window.location.origin}/track/${track.id}` }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
+              }
+            }}
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
+          >
+            Share
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

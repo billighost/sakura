@@ -154,8 +154,8 @@ export default function PlaylistPage() {
             <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0" }}>
               <div className="skeleton" style={{ width: "1.25rem", height: "0.8125rem" }} />
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
-                <div className="skeleton" style={{ width: `${55 + Math.random() * 35}%`, height: "0.8125rem" }} />
-                <div className="skeleton" style={{ width: `${25 + Math.random() * 20}%`, height: "0.6875rem" }} />
+                <div className="skeleton" style={{ width: `${55 + ((i * 17) % 35)}%`, height: "0.8125rem" }} />
+                <div className="skeleton" style={{ width: `${25 + ((i * 13) % 20)}%`, height: "0.6875rem" }} />
               </div>
             </div>
           ))}
