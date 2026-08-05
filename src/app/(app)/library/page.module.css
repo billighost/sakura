@@ -384,3 +384,217 @@
     transform: rotate(360deg);
   }
 }
+
+.likedSongsCard {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 3vw, 1rem);
+  padding: 0.5rem 0.5rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+  position: relative;
+  margin-bottom: 0.25rem;
+}
+
+.likedSongsCard:hover {
+  background: var(--sakura-hover);
+}
+
+.likedSongsArt {
+  width: clamp(3rem, 10vw, 3.5rem);
+  height: clamp(3rem, 10vw, 3.5rem);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #450eff 0%, #c43ad6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.pinIndicator {
+  color: var(--sakura-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  margin-right: 0.5rem;
+  opacity: 0.8;
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem clamp(0.75rem, 3vw, 1.25rem) 0.5rem;
+}
+
+.sortWrapper {
+  position: relative;
+}
+
+.sortBtn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.sortBtn:hover {
+  color: var(--sakura-text);
+  background: var(--sakura-hover);
+}
+
+.sortBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.sortDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--sakura-surface-2);
+  border: 1px solid var(--sakura-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 11;
+  padding: 0.25rem;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sortOption {
+  all: unset;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--sakura-text-secondary);
+}
+
+.sortOption:hover {
+  background: var(--sakura-hover);
+  color: var(--sakura-text);
+}
+
+.sortOptionActive {
+  color: var(--sakura-accent);
+}
+
+.layoutToggleBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+}
+
+.layoutToggleBtn:hover {
+  color: var(--sakura-text);
+  background: var(--sakura-hover);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 1rem;
+  padding-bottom: 5rem;
+}
+
+.gridItem {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 0.75rem;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.gridItem:hover {
+  background: var(--sakura-hover);
+}
+
+.gridItemArt {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  background: var(--sakura-surface-2);
+  position: relative;
+}
+
+.gridItemArtCircle {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  background: var(--sakura-surface-2);
+  position: relative;
+}
+
+.gridItemArtImg, .gridItemArtImgCircle {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gridItemArtPlaceholder, .gridItemArtPlaceholderCircle {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  background: var(--sakura-surface-2);
+}
+
+.gridItemArtPlaceholderCircle {
+  background: linear-gradient(135deg, var(--sakura-surface-2), var(--sakura-surface));
+}
+
+.gridItemTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sakura-text);
+}
+
+.gridItemSubtitle {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+

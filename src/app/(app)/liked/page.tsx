@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
@@ -14,6 +14,7 @@ interface Track {
   coverUrl?: string;
   audioUrl: string;
   duration: number;
+  likedAt?: string;
 }
 
 type SortKey = "title" | "artist" | "album" | "date";
@@ -49,6 +50,8 @@ export default function LikedPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [sortOpen, setSortOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const { play } = usePlayer();
   const hasLoadedFromCache = useRef(false);
 
@@ -92,19 +95,33 @@ export default function LikedPage() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sortedTracks = [...tracks].sort((a, b) => {
-    switch (sortBy) {
-      case "title":
-        return a.title.localeCompare(b.title);
-      case "artist":
-        return a.artist.name.localeCompare(b.artist.name);
-      case "album":
-        return (a.album?.title || "").localeCompare(b.album?.title || "");
-      case "date":
-      default:
-        return 0;
+  const filteredTracks = useMemo(() => {
+    let list = [...tracks];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist.name.toLowerCase().includes(q) ||
+          (t.album?.title && t.album.title.toLowerCase().includes(q))
+      );
     }
-  });
+    return list.sort((a, b) => {
+      switch (sortBy) {
+        case "title":
+          return a.title.localeCompare(b.title);
+        case "artist":
+          return a.artist.name.localeCompare(b.artist.name);
+        case "album":
+          return (a.album?.title || "").localeCompare(b.album?.title || "");
+        case "date":
+        default:
+          const dateA = a.likedAt ? new Date(a.likedAt).getTime() : 0;
+          const dateB = b.likedAt ? new Date(b.likedAt).getTime() : 0;
+          return dateB - dateA;
+      }
+    });
+  }, [tracks, searchQuery, sortBy]);
 
   function toQueue(t: Track) {
     return {
@@ -120,13 +137,13 @@ export default function LikedPage() {
 
   function handlePlayAll() {
     if (tracks.length === 0) return;
-    const q = sortedTracks.map(toQueue);
+    const q = filteredTracks.map(toQueue);
     play(q[0], q);
   }
 
   function handleShufflePlay() {
     if (tracks.length === 0) return;
-    const shuffled = shuffleArray(sortedTracks);
+    const shuffled = shuffleArray(filteredTracks);
     const q = shuffled.map(toQueue);
     play(q[0], q);
   }
@@ -165,31 +182,68 @@ export default function LikedPage() {
   return (
     <div className={styles.page}>
       <div className={styles.headerGradient}>
-        <div className={styles.header}>
-          <div className={styles.headerArt}>
-            <svg viewBox="0 0 24 24" fill="white" width="clamp(1.5rem, 5vw, 2.25rem)" height="clamp(1.5rem, 5vw, 2.25rem)">
-              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-            </svg>
-          </div>
-          <div className={styles.headerInfo}>
-            <div className={styles.headerLabel}>Playlist</div>
-            <div className={styles.headerTitle}>Liked Songs</div>
-            <div className={styles.headerMeta}>
-              {loading ? (
-                <span className={styles.skeletonTextSmall} />
-              ) : tracks.length > 0 ? (
-                <>
-                  <span>{tracks.length} songs</span>
-                  <span className={styles.dot}>·</span>
-                  <span>{formatTotalDurationLong(tracks)}</span>
-                </>
-              ) : (
-                <span>0 songs</span>
-              )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div className={styles.header}>
+            <div className={styles.headerArt}>
+              <svg viewBox="0 0 24 24" fill="white" width="clamp(1.5rem, 5vw, 2.25rem)" height="clamp(1.5rem, 5vw, 2.25rem)">
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+              </svg>
+            </div>
+            <div className={styles.headerInfo}>
+              <div className={styles.headerLabel}>Playlist</div>
+              <div className={styles.headerTitle}>Liked Songs</div>
+              <div className={styles.headerMeta}>
+                {loading ? (
+                  <span className={styles.skeletonTextSmall} />
+                ) : tracks.length > 0 ? (
+                  <>
+                    <span>{tracks.length} songs</span>
+                    <span className={styles.dot}>·</span>
+                    <span>{formatTotalDurationLong(tracks)}</span>
+                  </>
+                ) : (
+                  <span>0 songs</span>
+                )}
+              </div>
             </div>
           </div>
+          <button
+            className={styles.headerSearchBtn}
+            onClick={() => setSearchOpen(!searchOpen)}
+            title="Search inside liked songs"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {searchOpen && (
+        <div className={styles.searchBar}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search in liked songs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={styles.searchInput}
+            autoFocus
+          />
+          {searchQuery && (
+            <button className={styles.searchClear} onClick={() => setSearchQuery("")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
       {refreshing && (
         <div className={styles.refreshIndicator}>
@@ -272,8 +326,8 @@ export default function LikedPage() {
             </div>
           ))
         ) : (
-          sortedTracks.map((track, i) => (
-            <TrackRow key={track.id} track={track} queue={sortedTracks} index={i} showNumber />
+          filteredTracks.map((track, i) => (
+            <TrackRow key={track.id} track={track} queue={filteredTracks} index={i} showNumber />
           ))
         )}
       </div>

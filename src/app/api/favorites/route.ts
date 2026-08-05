@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const userId = session.user.id!;
   const tracks = await query(
-    `SELECT t.*, json_build_object('name', a.name) as artist, json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album FROM "Favorite" f JOIN "Track" t ON f."trackId" = t.id LEFT JOIN "Artist" a ON t."artistId" = a.id LEFT JOIN "Album" al ON t."albumId" = al.id WHERE f."userId" = $1 ORDER BY f."createdAt" DESC`,
+    `SELECT t.*, f."createdAt" as "likedAt", json_build_object('name', a.name) as artist, json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album FROM "Favorite" f JOIN "Track" t ON f."trackId" = t.id LEFT JOIN "Artist" a ON t."artistId" = a.id LEFT JOIN "Album" al ON t."albumId" = al.id WHERE f."userId" = $1 ORDER BY f."createdAt" DESC`,
     [userId]
   );
 

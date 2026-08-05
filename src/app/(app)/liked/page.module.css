@@ -352,3 +352,88 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  padding: 0.5rem 0.75rem;
+  background: var(--sakura-surface);
+  border-radius: 10px;
+  border: 1px solid var(--sakura-border);
+  animation: searchSlideIn 0.2s ease-out;
+}
+
+@keyframes searchSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.searchBar svg {
+  color: var(--sakura-text-secondary);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  all: unset;
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--sakura-text);
+  min-width: 0;
+}
+
+.searchInput::placeholder {
+  color: var(--sakura-text-secondary);
+  opacity: 0.6;
+}
+
+.searchClear {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.searchClear:hover {
+  color: var(--sakura-text);
+  background: var(--sakura-hover);
+}
+
+.headerSearchBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(2rem, 6vw, 2.25rem);
+  height: clamp(2rem, 6vw, 2.25rem);
+  border-radius: 10px;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.headerSearchBtn:hover {
+  color: var(--sakura-text);
+  background: var(--sakura-hover);
+}
+

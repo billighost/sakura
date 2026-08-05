@@ -52,6 +52,7 @@ interface LibraryCache {
   albums: Album[];
   artists: Artist[];
   playlists: Playlist[];
+  likedCount?: number;
 }
 
 export default function LibraryPage() {
@@ -59,13 +60,23 @@ export default function LibraryPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [likedCount, setLikedCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"name" | "recent" | "tracks">("name");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [sortOpen, setSortOpen] = useState(false);
   const hasLoadedFromCache = useRef(false);
+
+  const sortLabels = {
+    name: "Name",
+    recent: "Recently Added",
+    tracks: "Tracks Count",
+  };
 
   const SMART_FILTERS = [
     { id: "all", label: "All" },
@@ -83,6 +94,9 @@ export default function LibraryPage() {
         setAlbums(cached.albums || []);
         setArtists(cached.artists || []);
         setPlaylists(cached.playlists || []);
+        if (cached.likedCount !== undefined) {
+          setLikedCount(cached.likedCount);
+        }
         setLoading(false);
         hasLoadedFromCache.current = true;
         return true;
@@ -95,17 +109,19 @@ export default function LibraryPage() {
     if (isRefresh) setRefreshing(true);
 
     try {
-      const [tracksRes, albumsRes, artistsRes, playlistsRes] = await Promise.allSettled([
+      const [tracksRes, albumsRes, artistsRes, playlistsRes, favoritesRes] = await Promise.allSettled([
         fetch("/api/tracks?limit=200"),
         fetch("/api/albums?limit=100"),
         fetch("/api/artists?limit=100"),
         fetch("/api/playlists"),
+        fetch("/api/favorites"),
       ]);
 
       let newTracks = tracks;
       let newAlbums = albums;
       let newArtists = artists;
       let newPlaylists = playlists;
+      let newLikedCount = likedCount;
 
       if (tracksRes.status === "fulfilled") {
         const data = await tracksRes.value.json();
@@ -138,12 +154,20 @@ export default function LibraryPage() {
         setPlaylists(newPlaylists);
       }
 
+      if (favoritesRes.status === "fulfilled") {
+        const data = await favoritesRes.value.json();
+        const favTracks = Array.isArray(data) ? data : data.tracks || [];
+        newLikedCount = favTracks.length;
+        setLikedCount(newLikedCount);
+      }
+
       // Update cache in background
       setCachedLibraryData("library-main", {
         tracks: newTracks,
         albums: newAlbums,
         artists: newArtists,
         playlists: newPlaylists,
+        likedCount: newLikedCount,
       });
     } catch {
       /* silent */
@@ -151,7 +175,7 @@ export default function LibraryPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tracks, albums, artists, playlists]);
+  }, [tracks, albums, artists, playlists, likedCount]);
 
   // Load from cache first, then fetch from server
   useEffect(() => {
@@ -221,6 +245,26 @@ export default function LibraryPage() {
     return filtered;
   }, [tracks, albums, artists, playlists, searchQuery, activeFilter]);
 
+  const sortedItems = useMemo((): LibraryItem[] => {
+    let items = [...libraryItems];
+
+    if (sortBy === "name") {
+      items.sort((a, b) => {
+        const nameA = a.type === "downloaded" ? "Downloaded Songs" : a.type === "album" ? a.data.title : a.type === "artist" ? a.data.name : a.data.name;
+        const nameB = b.type === "downloaded" ? "Downloaded Songs" : b.type === "album" ? b.data.title : b.type === "artist" ? b.data.name : b.data.name;
+        return nameA.localeCompare(nameB);
+      });
+    } else if (sortBy === "tracks") {
+      items.sort((a, b) => {
+        const countA = a.type === "downloaded" ? a.trackCount : a.type === "album" ? a.data.trackCount || 0 : a.type === "artist" ? a.data.trackCount || 0 : a.data.trackCount;
+        const countB = b.type === "downloaded" ? b.trackCount : b.type === "album" ? b.data.trackCount || 0 : b.type === "artist" ? b.data.trackCount || 0 : b.data.trackCount;
+        return (countB || 0) - (countA || 0);
+      });
+    }
+
+    return items;
+  }, [libraryItems, sortBy]);
+
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
     if (el.scrollTop === 0 && !refreshing) {
@@ -283,6 +327,49 @@ export default function LibraryPage() {
         ))}
       </div>
 
+      <div className={styles.controlsRow}>
+        <div className={styles.sortWrapper}>
+          <button className={styles.sortBtn} onClick={() => setSortOpen(!sortOpen)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+              <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
+            </svg>
+            Sort by: {sortLabels[sortBy]}
+          </button>
+          {sortOpen && (
+            <>
+              <div className={styles.sortBackdrop} onClick={() => setSortOpen(false)} />
+              <div className={styles.sortDropdown}>
+                {(Object.keys(sortLabels) as Array<keyof typeof sortLabels>).map((key) => (
+                  <button
+                    key={key}
+                    className={`${styles.sortOption} ${sortBy === key ? styles.sortOptionActive : ""}`}
+                    onClick={() => { setSortBy(key); setSortOpen(false); }}
+                  >
+                    {sortLabels[key]}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <button
+          className={styles.layoutToggleBtn}
+          onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
+          title={viewMode === "list" ? "Switch to Grid View" : "Switch to List View"}
+        >
+          {viewMode === "list" ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          )}
+        </button>
+      </div>
+
       <div
         className={styles.content}
         onScroll={handleScroll}
@@ -313,9 +400,59 @@ export default function LibraryPage() {
             <Link href="/search" className={styles.emptyCta}>Browse Music</Link>
           </div>
         ) : (
-          <div className={styles.list}>
-            {libraryItems.map((item) => {
+          <div className={viewMode === "grid" ? styles.grid : styles.list}>
+            {(activeFilter === "all" || activeFilter === "playlists") && !searchQuery && (
+              <Link href="/liked" className={viewMode === "grid" ? styles.gridItem : styles.likedSongsCard}>
+                <div className={viewMode === "grid" ? styles.gridItemArt : styles.likedSongsArt}>
+                  {viewMode === "grid" ? (
+                    <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #450eff 0%, #c43ad6 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="white" width="32" height="32">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  )}
+                </div>
+                {viewMode === "grid" ? (
+                  <>
+                    <div className={styles.gridItemTitle}>Liked Songs</div>
+                    <div className={styles.gridItemSubtitle}>{likedCount} songs</div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.listItemInfo}>
+                      <div className={styles.listItemTitle}>Liked Songs</div>
+                      <div className={styles.listItemSubtitle}>Playlist · {likedCount} song{likedCount !== 1 ? "s" : ""}</div>
+                    </div>
+                    <div className={styles.pinIndicator} title="Pinned to top">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+                      </svg>
+                    </div>
+                  </>
+                )}
+              </Link>
+            )}
+            {sortedItems.map((item) => {
               if (item.type === "downloaded") {
+                if (viewMode === "grid") {
+                  return (
+                    <Link key="downloaded" href="/library/downloaded" className={styles.gridItem}>
+                      <div className={styles.gridItemArt}>
+                        <div className={styles.downloadedPlaceholder}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className={styles.gridItemTitle}>Downloaded</div>
+                      <div className={styles.gridItemSubtitle}>{item.trackCount} songs</div>
+                    </Link>
+                  );
+                }
                 return (
                   <Link key="downloaded" href="/library/downloaded" className={styles.listItem}>
                     <div className={styles.listItemArt}>
@@ -348,6 +485,21 @@ export default function LibraryPage() {
 
               if (item.type === "album") {
                 const album = item.data;
+                if (viewMode === "grid") {
+                  return (
+                    <Link key={album.id} href={`/album/${album.id}`} className={styles.gridItem}>
+                      <div className={styles.gridItemArt}>
+                        {album.coverUrl ? (
+                          <img className={styles.gridItemArtImg} src={album.coverUrl} alt="" />
+                        ) : (
+                          <div className={styles.gridItemArtPlaceholder}><AlbumIcon size={20} /></div>
+                        )}
+                      </div>
+                      <div className={styles.gridItemTitle}>{album.title}</div>
+                      <div className={styles.gridItemSubtitle}>Album · {album.artist.name}</div>
+                    </Link>
+                  );
+                }
                 return (
                   <Link key={album.id} href={`/album/${album.id}`} className={styles.listItem}>
                     <div className={styles.listItemArt}>
@@ -370,6 +522,21 @@ export default function LibraryPage() {
 
               if (item.type === "artist") {
                 const artist = item.data;
+                if (viewMode === "grid") {
+                  return (
+                    <Link key={artist.id} href={`/artist/${artist.id}`} className={styles.gridItem}>
+                      <div className={styles.gridItemArtCircle}>
+                        {artist.imageUrl ? (
+                          <img className={styles.gridItemArtImgCircle} src={artist.imageUrl} alt="" />
+                        ) : (
+                          <div className={styles.gridItemArtPlaceholderCircle}><MicrophoneIcon size={20} /></div>
+                        )}
+                      </div>
+                      <div className={styles.gridItemTitle}>{artist.name}</div>
+                      <div className={styles.gridItemSubtitle}>Artist</div>
+                    </Link>
+                  );
+                }
                 return (
                   <Link key={artist.id} href={`/artist/${artist.id}`} className={styles.listItem}>
                     <div className={styles.listItemArtCircle}>
@@ -392,6 +559,21 @@ export default function LibraryPage() {
 
               if (item.type === "playlist") {
                 const playlist = item.data;
+                if (viewMode === "grid") {
+                  return (
+                    <Link key={playlist.id} href={`/playlist/${playlist.id}`} className={styles.gridItem}>
+                      <div className={styles.gridItemArt}>
+                        {playlist.coverUrl ? (
+                          <img className={styles.gridItemArtImg} src={playlist.coverUrl} alt="" />
+                        ) : (
+                          <div className={styles.gridItemArtPlaceholder}><PlaylistIcon size={20} /></div>
+                        )}
+                      </div>
+                      <div className={styles.gridItemTitle}>{playlist.name}</div>
+                      <div className={styles.gridItemSubtitle}>Playlist</div>
+                    </Link>
+                  );
+                }
                 return (
                   <Link key={playlist.id} href={`/playlist/${playlist.id}`} className={styles.listItem}>
                     <div className={styles.listItemArt}>

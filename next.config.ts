@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [],
   experimental: {
     serverActions: {
-      allowedOrigins: ["sakura-orcin.vercel.app", "localhost:3000"],
+      allowedOrigins: ["172.20.10.3", "sakura-orcin.vercel.app", "localhost:3000"],
     },
   },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import { getAudioBlob } from "@/lib/offline-db";
 
 interface Track {
   id: string;
@@ -42,6 +43,8 @@ interface PlayerContextType {
   reshuffleQueue: () => void;
   isLiked: boolean;
   toggleLiked: () => void;
+  favoriteTrackIds: Set<string>;
+  toggleLikeTrack: (trackId: string) => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -64,10 +67,66 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [volume, setVolumeState] = useState(1);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
-  const [liked, setLiked] = useState(false);
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(new Set());
   const [isSeeking, setIsSeeking] = useState(false);
 
   const currentTrack = queue[currentIndex] || null;
+  const isLiked = currentTrack ? favoriteTrackIds.has(currentTrack.id) : false;
+
+  // Load favorites on mount
+  useEffect(() => {
+    fetch("/api/favorites")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.tracks || [];
+        setFavoriteTrackIds(new Set(list.map((t: any) => t.id)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleLikeTrack = useCallback(async (trackId: string) => {
+    const wasLiked = favoriteTrackIds.has(trackId);
+    // Optimistic update
+    setFavoriteTrackIds((prev) => {
+      const next = new Set(prev);
+      if (wasLiked) {
+        next.delete(trackId);
+      } else {
+        next.add(trackId);
+      }
+      return next;
+    });
+
+    try {
+      if (wasLiked) {
+        await fetch(`/api/favorites/${trackId}`, { method: "DELETE" });
+      } else {
+        await fetch("/api/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackId }),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to toggle liked state", err);
+      // Revert on error
+      setFavoriteTrackIds((prev) => {
+        const next = new Set(prev);
+        if (wasLiked) {
+          next.add(trackId);
+        } else {
+          next.delete(trackId);
+        }
+        return next;
+      });
+    }
+  }, [favoriteTrackIds]);
+
+  const toggleLiked = useCallback(() => {
+    if (currentTrack) {
+      toggleLikeTrack(currentTrack.id);
+    }
+  }, [currentTrack, toggleLikeTrack]);
 
   // Use refs to avoid stale closures in event handlers
   const queueRef = useRef(queue);
@@ -194,14 +253,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (audioRef.current && currentTrack) {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    async function loadAudio() {
+      if (!audioRef.current || !currentTrack) return;
       const wasPlaying = isPlayingRef.current;
-      audioRef.current.src = currentTrack.audioUrl;
+      let src = currentTrack.audioUrl;
+
+      try {
+        const blob = await getAudioBlob(currentTrack.id);
+        if (blob && active) {
+          objectUrl = URL.createObjectURL(blob);
+          src = objectUrl;
+        }
+      } catch (err) {
+        console.error("Offline audio fetch failed, playing default URL", err);
+      }
+
+      if (!active) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      audioRef.current.src = src;
       audioRef.current.load();
       if (wasPlaying) {
         audioRef.current.play().catch(() => {});
       }
     }
+
+    loadAudio();
+
+    return () => {
+      active = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
   }, [currentTrack?.id]);
 
   const play = useCallback((track: Track, newQueue?: Track[]) => {
@@ -343,7 +432,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentIndex(0);
   }, []);
 
-  const toggleLiked = useCallback(() => setLiked((l) => !l), []);
+
 
   // Persist queue to localStorage
   useEffect(() => {
@@ -399,8 +488,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         removeTrack,
         removeTracks,
         reshuffleQueue,
-        isLiked: liked,
+        isLiked,
         toggleLiked,
+        favoriteTrackIds,
+        toggleLikeTrack,
       }}
     >
       {children}

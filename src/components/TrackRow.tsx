@@ -22,7 +22,8 @@ interface TrackRowProps {
 }
 
 export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
-  const { currentTrack, isPlaying, play, togglePlay, addToQueue } = usePlayer();
+  const { currentTrack, isPlaying, play, togglePlay, addToQueue, favoriteTrackIds, toggleLikeTrack } = usePlayer();
+  const liked = favoriteTrackIds?.has(track.id) || false;
   const isActive = currentTrack?.id === track.id;
   const [offline, setOffline] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -235,6 +236,40 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       <span style={{ fontSize: "0.75rem", color: "var(--sakura-text-secondary)", flexShrink: 0 }}>
         {formatDuration(track.duration)}
       </span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleLikeTrack(track.id);
+        }}
+        title={liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "clamp(1.75rem, 5vw, 2rem)",
+          height: "clamp(1.75rem, 5vw, 2rem)",
+          borderRadius: "6px",
+          border: "none",
+          background: "transparent",
+          color: liked ? "var(--sakura-accent)" : "var(--sakura-text-secondary)",
+          cursor: "pointer",
+          flexShrink: 0,
+          transition: "all 0.15s",
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill={liked ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+      </button>
       <button
         data-download-btn
         onClick={handleDownload}

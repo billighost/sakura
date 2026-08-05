@@ -79,12 +79,25 @@ function extractColor(img: HTMLImageElement): string {
 
 export default function AlbumPage() {
   const params = useParams();
-  const { play } = usePlayer();
+  const { play, favoriteTrackIds, toggleLikeTrack } = usePlayer();
   const [album, setAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(false);
   const [bgColor, setBgColor] = useState<string>("#2a1a3a");
   const heroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showPlaylistPicker) {
+      setPlaylistsLoading(true);
+      fetch("/api/playlists")
+        .then((r) => r.json())
+        .then((data) => setPlaylists(data))
+        .catch(() => {})
+        .finally(() => setPlaylistsLoading(false));
+    }
+  }, [showPlaylistPicker]);
 
   useEffect(() => {
     fetch(`/api/albums/${params.id}`)
@@ -128,15 +141,30 @@ export default function AlbumPage() {
     play(q[0], q);
   }
 
-  function handleLikeAll() {
+  async function handleLikeAll() {
     if (!album) return;
     for (const track of album.tracks) {
-      fetch("/api/likes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackId: track.id }),
-      }).catch(() => {});
+      if (favoriteTrackIds && !favoriteTrackIds.has(track.id)) {
+        await toggleLikeTrack(track.id);
+      }
     }
+  }
+
+  async function handleAddToPlaylist(playlistId: string) {
+    if (!album) return;
+    setShowPlaylistPicker(false);
+    for (const track of album.tracks) {
+      try {
+        await fetch(`/api/playlists/${playlistId}/tracks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackId: track.id }),
+        });
+      } catch (err) {
+        console.error("Failed to add track to playlist", err);
+      }
+    }
+    alert("Tracks added to playlist!");
   }
 
   function handleShare() {
@@ -254,6 +282,54 @@ export default function AlbumPage() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalTitle}>Add to Playlist</div>
             <div className={styles.modalText}>Select a playlist to add all tracks from this album.</div>
+            {playlistsLoading ? (
+              <div style={{ textAlign: "center", padding: "1rem" }}>Loading playlists...</div>
+            ) : playlists.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "1rem", color: "var(--sakura-text-secondary)" }}>
+                No playlists found. Create a playlist in your library first.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "250px", overflowY: "auto", margin: "1rem 0" }}>
+                {playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    onClick={() => handleAddToPlaylist(pl.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.625rem",
+                      width: "100%",
+                      textAlign: "left",
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--sakura-text)",
+                      cursor: "pointer",
+                      borderRadius: "8px",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sakura-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div style={{ width: "40px", height: "40px", background: "var(--sakura-surface-2)", borderRadius: "4px", flexShrink: 0, overflow: "hidden" }}>
+                      {pl.coverUrl ? (
+                        <img src={pl.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ color: "var(--sakura-text-secondary)" }}>
+                            <path d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pl.name}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--sakura-text-secondary)" }}>{pl.trackCount || 0} songs</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className={styles.modalActions}>
               <button className={styles.modalCancel} onClick={() => setShowPlaylistPicker(false)}>Close</button>
             </div>

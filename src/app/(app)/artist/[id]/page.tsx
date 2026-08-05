@@ -91,7 +91,41 @@ export default function ArtistPage() {
       .then((data) => setArtist(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Load follow state from localStorage
+    const followedStr = localStorage.getItem("followed-artists");
+    if (followedStr) {
+      try {
+        const followed = JSON.parse(followedStr);
+        if (Array.isArray(followed) && followed.includes(params.id)) {
+          setIsFollowing(true);
+        }
+      } catch {}
+    }
   }, [params.id]);
+
+  const handleFollowToggle = useCallback(() => {
+    const nextState = !isFollowing;
+    setIsFollowing(nextState);
+
+    const followedStr = localStorage.getItem("followed-artists");
+    let followed: string[] = [];
+    if (followedStr) {
+      try {
+        followed = JSON.parse(followedStr);
+        if (!Array.isArray(followed)) followed = [];
+      } catch {}
+    }
+
+    if (nextState) {
+      if (!followed.includes(params.id as string)) {
+        followed.push(params.id as string);
+      }
+    } else {
+      followed = followed.filter((id) => id !== params.id);
+    }
+    localStorage.setItem("followed-artists", JSON.stringify(followed));
+  }, [isFollowing, params.id]);
 
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const color = extractColor(e.currentTarget);
@@ -221,7 +255,7 @@ export default function ArtistPage() {
             <button className={styles.shuffleBtn} onClick={handleShuffle} title="Shuffle">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
             </button>
-            <button className={styles.followBtn} onClick={() => setIsFollowing(!isFollowing)}>
+            <button className={styles.followBtn} onClick={handleFollowToggle}>
               {isFollowing ? (
                 <>
                   <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
