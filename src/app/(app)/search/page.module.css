@@ -6,46 +6,71 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin-bottom: clamp(0.75rem, 2vw, 1rem);
+  margin-bottom: clamp(0.5rem, 1.5vw, 0.75rem);
 }
 
 .searchBox {
   position: relative;
   flex: 1;
+  display: flex;
+  align-items: center;
+  height: clamp(2.75rem, 7.5vw, 3.25rem);
+  background: var(--sakura-glass);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1.5px solid var(--sakura-glass-border);
+  border-radius: 9999px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.searchBox:focus-within {
+  border-color: var(--sakura-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sakura-accent) 14%, transparent);
+  background: var(--sakura-surface);
 }
 
 .searchIcon {
   position: absolute;
-  left: 0.75rem;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--sakura-text-secondary);
   pointer-events: none;
   width: 1.125rem;
   height: 1.125rem;
 }
 
+.searchBox:focus-within .searchIcon {
+  color: var(--sakura-accent);
+}
+
+.spinnerSmall {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--sakura-border);
+  border-top-color: var(--sakura-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .searchInput {
   width: 100%;
-  height: clamp(2.5rem, 7vw, 3rem);
-  padding: 0 2.5rem 0 2.5rem;
-  background: var(--sakura-input-bg);
-  border: 1.5px solid var(--sakura-input-border);
-  border-radius: 12px;
+  height: 100%;
+  padding: 0 2.75rem 0 2.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
   color: var(--sakura-text);
   font-size: 0.9375rem;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .searchInput::placeholder {
   color: var(--sakura-text-secondary);
   opacity: 0.7;
-}
-
-.searchInput:focus {
-  border-color: var(--sakura-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sakura-accent) 15%, transparent);
 }
 
 .clearBtn {
@@ -63,7 +88,7 @@
   color: var(--sakura-text-secondary);
   border-radius: 50%;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, transform 0.1s;
 }
 
 .clearBtn:hover {
@@ -71,11 +96,15 @@
   background: var(--sakura-hover);
 }
 
+.clearBtn:active {
+  transform: translateY(-50%) scale(0.88);
+}
+
 .shortcutHint {
   text-align: center;
   font-size: 0.75rem;
   color: var(--sakura-text-secondary);
-  margin-bottom: clamp(0.75rem, 2vw, 1rem);
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
   opacity: 0.6;
 }
 
@@ -97,21 +126,22 @@
 }
 
 .sectionTitle {
+  font-family: var(--sakura-font-display);
   font-size: 1.125rem;
-  font-weight: 700;
+  font-weight: 600;
   display: block;
   margin-bottom: 0.625rem;
 }
 
 .historySection {
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: clamp(1.25rem, 3.5vw, 1.75rem);
 }
 
 .historyHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .clearHistoryBtn {
@@ -129,29 +159,30 @@
   color: var(--sakura-accent);
 }
 
-.historyList {
+.historyChips {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.historyItem {
+.historyChip {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  width: 100%;
-  padding: 0.5rem 0.5rem;
-  border: none;
-  background: none;
+  gap: 0.4rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+  border: 1px solid var(--sakura-border);
+  background: var(--sakura-surface);
   color: var(--sakura-text);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.1s;
-  text-align: left;
+  border-radius: 9999px;
+  transition: background 0.15s, border-color 0.15s;
+  max-width: 100%;
 }
 
-.historyItem:hover {
+.historyChip:hover {
   background: var(--sakura-hover);
+  border-color: var(--sakura-text-secondary);
 }
 
 .historyIcon {
@@ -159,35 +190,63 @@
   color: var(--sakura-text-secondary);
 }
 
-.historyText {
-  flex: 1;
+.historyChipText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 12rem;
 }
 
-.historyRemove {
+.historyChipRemove {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 1.25rem;
   height: 1.25rem;
-  border: none;
-  background: none;
   color: var(--sakura-text-secondary);
   cursor: pointer;
   border-radius: 50%;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
+  opacity: 0.55;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
 }
 
-.historyItem:hover .historyRemove {
+.historyChipRemove:hover {
   opacity: 1;
+  color: var(--sakura-danger);
+  background: var(--sakura-hover);
 }
 
-.historyRemove:hover {
-  color: var(--sakura-danger);
+.quickPicksSection {
+  margin-bottom: clamp(1.25rem, 3.5vw, 1.75rem);
+}
+
+.quickPicksRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.quickPickChip {
+  padding: 0.5rem 0.9375rem;
+  border: 1.5px solid var(--sakura-border);
+  background: var(--sakura-card-bg);
+  color: var(--sakura-text);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quickPickChip:hover {
+  border-color: var(--sakura-accent);
+  color: var(--sakura-accent);
+  transform: translateY(-1px);
+}
+
+.quickPickChip:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .categoriesSection {
@@ -273,7 +332,7 @@
 .filterRow {
   display: flex;
   gap: 0.375rem;
-  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  margin-bottom: 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -283,8 +342,11 @@
 }
 
 .filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   flex-shrink: 0;
-  height: 1.75rem;
+  height: 1.875rem;
   padding: 0 clamp(0.75rem, 3vw, 1rem);
   border: 1.5px solid var(--sakura-border);
   background: transparent;
@@ -294,6 +356,14 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.filterCount {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
 }
 
 .filterChipActive {
@@ -307,10 +377,21 @@
   color: var(--sakura-text);
 }
 
+.resultsSummary {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
 .results {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.resultRow {
+  opacity: 0;
+  animation: fadeInSkeleton 0.3s ease forwards;
 }
 
 .emptyState {
@@ -333,6 +414,24 @@
   font-size: 0.875rem;
   color: var(--sakura-text-secondary);
   line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.emptyStateCta {
+  border: 1.5px solid var(--sakura-accent);
+  background: transparent;
+  color: var(--sakura-accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.emptyStateCta:hover {
+  background: var(--sakura-accent);
+  color: #fff;
 }
 
 .sectionHeader {
@@ -345,6 +444,124 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.topResultSection {
+  margin-bottom: 0.25rem;
+}
+
+.topResultCard {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem;
+  background: var(--sakura-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--sakura-card-border);
+  border-radius: var(--sakura-radius-lg);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.topResultCard:hover {
+  border-color: var(--sakura-accent);
+}
+
+.topResultCover {
+  width: clamp(3.5rem, 14vw, 4.75rem);
+  height: clamp(3.5rem, 14vw, 4.75rem);
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.topResultInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.topResultTitle {
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1rem, 3vw, 1.1875rem);
+  font-weight: 600;
+  color: var(--sakura-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topResultMeta {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topResultBadge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sakura-accent);
+  background: color-mix(in srgb, var(--sakura-accent) 14%, transparent);
+  padding: 0.1875rem 0.5rem;
+  border-radius: 6px;
+}
+
+.topResultPlayBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--sakura-accent-gradient);
+  color: #1A1620;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 6px 18px rgba(242, 120, 159, 0.35);
+}
+
+.topResultPlayBtn:hover {
+  transform: scale(1.06);
+}
+
+.topResultPlayBtn:active {
+  transform: scale(0.92);
+}
+
+.topResultDownloadBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid var(--sakura-accent);
+  color: var(--sakura-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.topResultDownloadBtn:hover {
+  background: var(--sakura-accent);
+  color: #fff;
+}
+
+.topResultDownloadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .skeletonContainer {
@@ -472,7 +689,7 @@
   cursor: not-allowed;
 }
 
-.deezerResult:not(:disabled):hover {
+.deezerResult:hover {
   background: var(--sakura-hover);
   border-color: var(--sakura-accent);
 }

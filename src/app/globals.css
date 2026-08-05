@@ -25,6 +25,17 @@
   --sakura-gradient-end: #C9A6E0;
   --sakura-scrollbar-track: #1A1620;
   --sakura-scrollbar-thumb: #2A242E;
+
+  /* --- shared player design tokens --- */
+  --sakura-font-display: "Fraunces", ui-serif, Georgia, serif;
+  --sakura-font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  --sakura-glass: rgba(26, 22, 32, 0.62);
+  --sakura-glass-strong: rgba(20, 16, 23, 0.82);
+  --sakura-glass-border: rgba(255, 255, 255, 0.09);
+  --sakura-glass-highlight: rgba(255, 255, 255, 0.06);
+  --sakura-radius-lg: 20px;
+  --sakura-radius-xl: 28px;
   color-scheme: dark;
 }
 
@@ -54,6 +65,16 @@
   --sakura-gradient-end: #9B6FC0;
   --sakura-scrollbar-track: #F0ECF2;
   --sakura-scrollbar-thumb: #C4BCC8;
+
+  --sakura-font-display: "Fraunces", ui-serif, Georgia, serif;
+  --sakura-font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  --sakura-glass: rgba(255, 255, 255, 0.66);
+  --sakura-glass-strong: rgba(255, 255, 255, 0.86);
+  --sakura-glass-border: rgba(20, 10, 20, 0.07);
+  --sakura-glass-highlight: rgba(255, 255, 255, 0.5);
+  --sakura-radius-lg: 20px;
+  --sakura-radius-xl: 28px;
   color-scheme: light;
 }
 
@@ -113,8 +134,7 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  font-family: var(--sakura-font-body);
   background: var(--sakura-bg);
   color: var(--sakura-text);
   overflow: hidden;
@@ -259,6 +279,18 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 *:focus-visible {

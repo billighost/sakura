@@ -2,13 +2,22 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: clamp(3.25rem, 10vh, 4rem);
-  background: var(--sakura-surface-2);
-  border-top: 1px solid var(--sakura-border);
+  height: clamp(3.75rem, 10vh, 4.5rem);
+  background: var(--sakura-glass);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-top: 1px solid var(--sakura-glass-border);
+  border-radius: 14px 14px 0 0;
   cursor: pointer;
   flex-shrink: 0;
   z-index: 49;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.root:active {
+  transform: scale(0.995);
 }
 
 .seekContainer {
@@ -16,24 +25,25 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 6px;
+  height: 8px;
 }
 
 .progressTrack {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  left: 14px;
+  right: 14px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--sakura-glass-border);
   overflow: hidden;
-  top: 1px;
 }
 
 .progressBar {
   height: 100%;
-  background: var(--sakura-accent);
-  transition: width 0.1s linear;
+  border-radius: 2px;
+  background: var(--track-accent, var(--sakura-accent-gradient));
+  transition: width 0.1s linear, background 0.4s ease;
 }
 
 .seekInput {
@@ -42,7 +52,7 @@
   left: 0;
   right: 0;
   width: 100%;
-  height: 10px;
+  height: 14px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -56,9 +66,9 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--sakura-accent);
+  background: #fff;
   cursor: pointer;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 3px rgba(242, 120, 159, 0.35);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -71,10 +81,10 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--sakura-accent);
+  background: #fff;
   cursor: pointer;
   border: none;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 3px rgba(242, 120, 159, 0.35);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -97,16 +107,44 @@
   gap: 0.75rem;
   padding: 0 clamp(0.625rem, 2.5vw, 0.875rem);
   flex: 1;
+  min-height: 0;
+}
+
+.artWrap {
+  position: relative;
+  width: clamp(2.625rem, 8vw, 3.125rem);
+  height: clamp(2.625rem, 8vw, 3.125rem);
+  flex-shrink: 0;
+}
+
+.artGlow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 11px;
+  background: var(--track-accent, var(--sakura-accent-gradient));
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 0.3s ease, background 0.4s ease;
+}
+
+.artWrap.playing .artGlow {
+  opacity: 0.55;
 }
 
 .art {
-  width: clamp(2.5rem, 8vw, 3rem);
-  height: clamp(2.5rem, 8vw, 3rem);
-  border-radius: 6px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 9px;
   object-fit: cover;
   background: var(--sakura-skeleton);
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.art.loaded {
+  opacity: 1;
 }
 
 .artFallback {
@@ -122,8 +160,10 @@
 }
 
 .title {
-  font-size: 0.8125rem;
+  font-family: var(--sakura-font-display);
+  font-size: 0.9375rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,15 +176,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-top: 1px;
 }
 
 .likeBtn {
   all: unset;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.125rem;
+  height: 2.125rem;
   cursor: pointer;
   flex-shrink: 0;
   color: var(--sakura-text-secondary);
@@ -153,11 +195,39 @@
 }
 
 .likeBtn:active {
-  transform: scale(0.85);
+  transform: scale(0.82);
 }
 
 .likedBtn {
-  color: var(--sakura-accent);
+  color: var(--track-accent, var(--sakura-accent));
+}
+
+.petal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 10px;
+  border-radius: 60% 60% 60% 0;
+  background: var(--track-accent, var(--sakura-accent));
+  opacity: 0;
+  pointer-events: none;
+  animation: petalBurst 0.65s ease-out forwards;
+}
+
+.petal:nth-child(2n) {
+  background: var(--sakura-accent-2);
+}
+
+@keyframes petalBurst {
+  0% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-22px) scale(1);
+  }
 }
 
 .playBtn {
@@ -170,12 +240,14 @@
   cursor: pointer;
   flex-shrink: 0;
   border-radius: 50%;
-  color: var(--sakura-text);
-  transition: transform 0.15s, background 0.15s;
+  background: var(--sakura-accent-gradient);
+  color: #1A1620;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 3px 12px rgba(242, 120, 159, 0.35);
 }
 
 .playBtn:hover {
-  background: var(--sakura-active);
+  box-shadow: 0 4px 16px rgba(242, 120, 159, 0.5);
 }
 
 .playBtn:active {
@@ -183,8 +255,8 @@
 }
 
 .playBtn svg {
-  width: clamp(1.25rem, 4vw, 1.5rem);
-  height: clamp(1.25rem, 4vw, 1.5rem);
+  width: clamp(1.125rem, 3.6vw, 1.375rem);
+  height: clamp(1.125rem, 3.6vw, 1.375rem);
 }
 
 .skipBtn {

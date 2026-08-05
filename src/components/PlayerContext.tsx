@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
 import { getAudioBlob } from "@/lib/offline-db";
+import { extractDominantColor } from "@/lib/color";
 
 interface Track {
   id: string;
@@ -45,6 +46,12 @@ interface PlayerContextType {
   toggleLiked: () => void;
   favoriteTrackIds: Set<string>;
   toggleLikeTrack: (trackId: string) => Promise<void>;
+  accentColor: string | null;
+  miniArtRect: DOMRect | null;
+  setMiniArtRect: (rect: DOMRect | null) => void;
+  removeFromUpNext: (trackId: string) => void;
+  reorderUpNext: (fromIndex: number, toIndex: number) => void;
+  reorderQueueTail: (fromIndex: number, toIndex: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -69,9 +76,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(new Set());
   const [isSeeking, setIsSeeking] = useState(false);
+  const [accentColor, setAccentColor] = useState<string | null>(null);
+  const [miniArtRect, setMiniArtRect] = useState<DOMRect | null>(null);
 
   const currentTrack = queue[currentIndex] || null;
   const isLiked = currentTrack ? favoriteTrackIds.has(currentTrack.id) : false;
+
+  // Announce track changes for screen reader users (aria-live region rendered below)
+  const [announcement, setAnnouncement] = useState("");
+  const firstTrackRef = useRef(true);
+  useEffect(() => {
+    if (!currentTrack) return;
+    if (firstTrackRef.current) {
+      firstTrackRef.current = false;
+      return;
+    }
+    setAnnouncement(`Now playing ${currentTrack.title} by ${currentTrack.artist}`);
+  }, [currentTrack?.id]);
+
+  // Derive a per-track "mood" accent color from the cover art
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentTrack?.coverUrl) {
+      setAccentColor(null);
+      return;
+    }
+    extractDominantColor(currentTrack.coverUrl).then((color) => {
+      if (!cancelled) setAccentColor(color);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTrack?.coverUrl]);
 
   // Load favorites on mount
   useEffect(() => {
@@ -417,6 +453,34 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const removeFromUpNext = useCallback((trackId: string) => {
+    setUpNextQueue((prev) => prev.filter((t) => t.id !== trackId));
+  }, []);
+
+  const reorderUpNext = useCallback((fromIndex: number, toIndex: number) => {
+    setUpNextQueue((prev) => {
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= prev.length || toIndex >= prev.length) return prev;
+      const arr = [...prev];
+      const [item] = arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, item);
+      return arr;
+    });
+  }, []);
+
+  // fromIndex/toIndex here are relative to the "rest of queue" slice (after currentIndex)
+  const reorderQueueTail = useCallback((fromIndex: number, toIndex: number) => {
+    setQueueState((prev) => {
+      const base = currentIndexRef.current + 1;
+      const from = base + fromIndex;
+      const to = base + toIndex;
+      if (from === to || from < base || to < base || from >= prev.length || to >= prev.length) return prev;
+      const arr = [...prev];
+      const [item] = arr.splice(from, 1);
+      arr.splice(to, 0, item);
+      return arr;
+    });
+  }, []);
+
   const reshuffleQueue = useCallback(() => {
     setQueueState((prev) => {
       if (prev.length <= 1) return prev;
@@ -492,9 +556,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleLiked,
         favoriteTrackIds,
         toggleLikeTrack,
+        accentColor,
+        miniArtRect,
+        setMiniArtRect,
+        removeFromUpNext,
+        reorderUpNext,
+        reorderQueueTail,
       }}
     >
       {children}
+      <div aria-live="polite" aria-atomic="true" className="srOnly">
+        {announcement}
+      </div>
     </PlayerContext.Provider>
   );
 }

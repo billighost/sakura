@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import styles from "./ContextMenu.module.css";
 
 interface ContextMenuProps {
   x: number;
@@ -12,6 +13,7 @@ interface ContextMenuProps {
 
 export function ContextMenu({ x, y, onClose, children }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -33,15 +35,15 @@ export function ContextMenu({ x, y, onClose, children }: ContextMenuProps) {
       const rect = menuRef.current.getBoundingClientRect();
       const ww = window.innerWidth;
       const wh = window.innerHeight;
-      
+
       let newX = x;
       let newY = y;
       if (x + rect.width > ww) newX = ww - rect.width - 10;
       if (y + rect.height > wh) newY = wh - rect.height - 10;
-      
+
       menuRef.current.style.left = `${newX}px`;
       menuRef.current.style.top = `${newY}px`;
-      menuRef.current.style.opacity = "1";
+      setReady(true);
     }
   }, [x, y]);
 
@@ -50,23 +52,8 @@ export function ContextMenu({ x, y, onClose, children }: ContextMenuProps) {
   return createPortal(
     <div
       ref={menuRef}
-      style={{
-        position: "fixed",
-        left: x,
-        top: y,
-        opacity: 0,
-        backgroundColor: "var(--sakura-surface-2)",
-        border: "1px solid var(--sakura-border)",
-        borderRadius: "8px",
-        padding: "4px 0",
-        minWidth: "160px",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        fontSize: "0.875rem",
-        color: "var(--sakura-text)",
-      }}
+      className={`${styles.menu} ${ready ? styles.menuOpen : ""}`}
+      style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >
       {children}
@@ -75,38 +62,24 @@ export function ContextMenu({ x, y, onClose, children }: ContextMenuProps) {
   );
 }
 
-export function ContextMenuItem({ 
-  onClick, 
-  children, 
-  icon 
-}: { 
-  onClick: () => void; 
+export function ContextMenuItem({
+  onClick,
+  children,
+  icon,
+}: {
+  onClick: () => void;
   children: React.ReactNode;
   icon?: React.ReactNode;
 }) {
   return (
     <button
+      className={styles.item}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        width: "100%",
-        padding: "10px 16px",
-        background: "transparent",
-        border: "none",
-        color: "inherit",
-        textAlign: "left",
-        cursor: "pointer",
-        transition: "background 0.15s",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--sakura-surface-1)")}
-      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
     >
-      {icon && <span style={{ width: "16px", display: "flex", justifyContent: "center" }}>{icon}</span>}
+      {icon && <span className={styles.itemIcon}>{icon}</span>}
       {children}
     </button>
   );

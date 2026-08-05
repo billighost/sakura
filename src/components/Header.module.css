@@ -6,6 +6,7 @@
   height: clamp(2.75rem, 8vh, 3.5rem);
   padding: 0 clamp(0.5rem, 2vw, 1rem);
   background: var(--sakura-bg);
+  border-bottom: 1px solid transparent;
   flex-shrink: 0;
   z-index: 40;
 }
@@ -20,10 +21,17 @@
   cursor: pointer;
   border-radius: 50%;
   flex-shrink: 0;
+  color: var(--sakura-text);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.backBtn:hover {
+  background: var(--sakura-hover);
 }
 
 .backBtn:active {
   background: var(--sakura-active);
+  transform: scale(0.92);
 }
 
 .backBtn svg {
@@ -33,12 +41,15 @@
 
 .title {
   flex: 1;
-  font-size: var(--text-md, 1.0625rem);
-  font-weight: 700;
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1rem, 3vw, 1.125rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--sakura-text);
 }
 
 .action {
@@ -51,10 +62,17 @@
   cursor: pointer;
   border-radius: 50%;
   flex-shrink: 0;
+  color: var(--sakura-text);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.action:hover {
+  background: var(--sakura-hover);
 }
 
 .action:active {
   background: var(--sakura-active);
+  transform: scale(0.92);
 }
 
 .action svg {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useLayoutEffect, useEffect } from "react";
 import { usePlayer } from "./PlayerContext";
 import styles from "./FullPlayer.module.css";
 
@@ -9,12 +9,20 @@ interface FullPlayerProps {
   onClose: () => void;
 }
 
+const PETAL_COUNT = 6;
+const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder targets while dragging
+
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
-  const dragRef = useRef<HTMLDivElement>(null);
-  const startY = useRef(0);
+  const [burstKey, setBurstKey] = useState(0);
+  const [artLoaded, setArtLoaded] = useState(false);
+  const [artFlipStyle, setArtFlipStyle] = useState<React.CSSProperties>({});
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const artShellRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef({ dragging: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
 
   const {
     queue,
@@ -29,6 +37,8 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     shuffle,
     repeat,
     isLiked,
+    accentColor,
+    miniArtRect,
     togglePlay,
     seek,
     beginSeek,
@@ -39,6 +49,10 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     toggleShuffle,
     toggleRepeat,
     toggleLiked,
+    removeFromUpNext,
+    reorderUpNext,
+    removeTrack,
+    reorderQueueTail,
   } = usePlayer();
 
   const formatTime = (s: number) => {
@@ -47,59 +61,169 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY;
+  function handleLike() {
+    if (!isLiked) setBurstKey((k) => k + 1);
+    toggleLiked();
+  }
+
+  useEffect(() => {
+    setArtLoaded(false);
+  }, [currentTrack?.coverUrl]);
+
+  // --- Shared-element "grow from the mini player" transition ---------------
+  useLayoutEffect(() => {
+    if (!open || !artShellRef.current) {
+      return;
+    }
+    if (!miniArtRect) {
+      // No known origin (e.g. deep-linked straight into the full player) — just fade in.
+      setArtFlipStyle({ opacity: 0, transition: "none" });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setArtFlipStyle({ opacity: 1, transition: "opacity 0.35s ease" });
+        });
+      });
+      return;
+    }
+
+    const artRect = artShellRef.current.getBoundingClientRect();
+    const scaleX = miniArtRect.width / artRect.width;
+    const scaleY = miniArtRect.height / artRect.height;
+    const translateX = miniArtRect.left + miniArtRect.width / 2 - (artRect.left + artRect.width / 2);
+    const translateY = miniArtRect.top + miniArtRect.height / 2 - (artRect.top + artRect.height / 2);
+
+    // Snap instantly to the mini player's position/size (no transition)...
+    setArtFlipStyle({
+      transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
+      borderRadius: "9px",
+      transition: "none",
+    });
+
+    // ...then, next paint, animate to the full-size resting position.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setArtFlipStyle({
+          transform: "translate(0px, 0px) scale(1, 1)",
+          borderRadius: "16px",
+          transition: "transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.45s cubic-bezier(0.32, 0.72, 0, 1)",
+        });
+      });
+    });
+  }, [open, miniArtRect]);
+
+  // --- Real drag-to-dismiss physics -----------------------------------------
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    dragState.current = {
+      dragging: true,
+      startY: e.clientY,
+      lastY: e.clientY,
+      lastTime: performance.now(),
+      velocity: 0,
+    };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    if (rootRef.current) rootRef.current.style.transition = "none";
   }, []);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      const delta = e.touches[0].clientY - startY.current;
-      if (delta > 100) onClose();
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    const ds = dragState.current;
+    if (!ds.dragging) return;
+    let delta = e.clientY - ds.startY;
+    if (delta < 0) delta *= 0.25; // rubber-band if dragged upward past the resting position
+
+    const now = performance.now();
+    const dt = Math.max(1, now - ds.lastTime);
+    ds.velocity = (e.clientY - ds.lastY) / dt; // px/ms
+    ds.lastY = e.clientY;
+    ds.lastTime = now;
+
+    if (rootRef.current) {
+      rootRef.current.style.transform = `translateY(${Math.max(0, delta)}px)`;
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      const ds = dragState.current;
+      if (!ds.dragging) return;
+      ds.dragging = false;
+
+      const delta = Math.max(0, e.clientY - ds.startY);
+      const isFastFlick = ds.velocity > 0.55;
+      const isFarEnough = delta > window.innerHeight * 0.4;
+      const shouldClose = isFastFlick || isFarEnough;
+
+      if (rootRef.current) {
+        rootRef.current.style.transition = "";
+        rootRef.current.style.transform = "";
+      }
+
+      if (shouldClose) onClose();
     },
     [onClose]
   );
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    startY.current = e.clientY;
-  }, []);
+  // --- Queue drag-to-reorder -------------------------------------------------
+  const [dragQueueItem, setDragQueueItem] = useState<{
+    list: "upnext" | "tail";
+    index: number;
+    deltaY: number;
+  } | null>(null);
+  const queueDragRef = useRef({ startY: 0 });
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (startY.current === 0) return;
-      const delta = e.clientY - startY.current;
-      if (delta > 100) onClose();
-    },
-    [onClose]
-  );
+  function handleQueueDragStart(list: "upnext" | "tail", index: number, e: React.PointerEvent) {
+    e.stopPropagation();
+    queueDragRef.current.startY = e.clientY;
+    setDragQueueItem({ list, index, deltaY: 0 });
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  }
 
-  const handleMouseUp = useCallback(() => {
-    startY.current = 0;
-  }, []);
+  function handleQueueDragMove(e: React.PointerEvent) {
+    if (!dragQueueItem) return;
+    e.stopPropagation();
+    const deltaY = e.clientY - queueDragRef.current.startY;
+    setDragQueueItem((prev) => (prev ? { ...prev, deltaY } : prev));
+  }
+
+  function handleQueueDragEnd(e: React.PointerEvent) {
+    if (!dragQueueItem) return;
+    e.stopPropagation();
+    const rowsMoved = Math.round(dragQueueItem.deltaY / ROW_HEIGHT);
+    if (rowsMoved !== 0) {
+      const listLength = dragQueueItem.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
+      const to = Math.min(Math.max(dragQueueItem.index + rowsMoved, 0), listLength - 1);
+      if (to !== dragQueueItem.index) {
+        if (dragQueueItem.list === "upnext") reorderUpNext(dragQueueItem.index, to);
+        else reorderQueueTail(dragQueueItem.index, to);
+      }
+    }
+    setDragQueueItem(null);
+  }
 
   if (!currentTrack) return null;
 
   const displayProgress = seekDrag !== null ? seekDrag : progress;
   const progressPercent = duration > 0 ? (displayProgress / duration) * 100 : 0;
+  const tailQueue = queue.slice(currentIndex + 1);
 
   return (
     <div
+      ref={rootRef}
       className={`${styles.root} ${open ? styles.open : ""}`}
-      style={{
-        backgroundImage: currentTrack.coverUrl
-          ? `url(${currentTrack.coverUrl})`
-          : undefined,
-      }}
+      style={
+        {
+          backgroundImage: currentTrack.coverUrl ? `url(${currentTrack.coverUrl})` : undefined,
+          "--track-accent": accentColor || undefined,
+        } as React.CSSProperties
+      }
     >
       <div className={styles.overlay} />
 
       <div
-        ref={dragRef}
         className={styles.dragArea}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
         <div className={styles.dragHandle} />
       </div>
@@ -133,53 +257,126 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <div className={styles.queueTitleActive}>{currentTrack.title}</div>
                 <div className={styles.queueArtist}>{currentTrack.artist}</div>
               </div>
+              {isPlaying && (
+                <div className={styles.nowPlayingBadge} aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
             </div>
 
             {upNextQueue.length > 0 && (
               <>
                 <div className={styles.queueHeader}>Up Next</div>
-                {upNextQueue.map((t, i) => (
-                  <div key={`upnext-${i}`} className={styles.queueRow}>
-                    <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
-                    <div className={styles.queueInfo}>
-                      <div className={styles.queueTitle}>{t.title}</div>
-                      <div className={styles.queueArtist}>{t.artist}</div>
+                {upNextQueue.map((t, i) => {
+                  const isDragging = dragQueueItem?.list === "upnext" && dragQueueItem.index === i;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
+                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)` } : undefined}
+                    >
+                      <button
+                        className={styles.dragHandleBtn}
+                        onPointerDown={(e) => handleQueueDragStart("upnext", i, e)}
+                        onPointerMove={handleQueueDragMove}
+                        onPointerUp={handleQueueDragEnd}
+                        onPointerCancel={handleQueueDragEnd}
+                        aria-label={`Reorder ${t.title}`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
+                          <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
+                          <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
+                        </svg>
+                      </button>
+                      <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
+                      <div className={styles.queueInfo}>
+                        <div className={styles.queueTitle}>{t.title}</div>
+                        <div className={styles.queueArtist}>{t.artist}</div>
+                      </div>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => removeFromUpNext(t.id)}
+                        aria-label={`Remove ${t.title} from queue`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
 
-            {queue.length - currentIndex - 1 > 0 && (
+            {tailQueue.length > 0 && (
               <>
                 <div className={styles.queueHeader}>Next from: {currentTrack.album || "Playlist"}</div>
-                {queue.slice(currentIndex + 1).map((t, i) => (
-                  <div key={`queue-${i}`} className={styles.queueRow}>
-                    <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
-                    <div className={styles.queueInfo}>
-                      <div className={styles.queueTitle}>{t.title}</div>
-                      <div className={styles.queueArtist}>{t.artist}</div>
+                {tailQueue.map((t, i) => {
+                  const isDragging = dragQueueItem?.list === "tail" && dragQueueItem.index === i;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
+                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)` } : undefined}
+                    >
+                      <button
+                        className={styles.dragHandleBtn}
+                        onPointerDown={(e) => handleQueueDragStart("tail", i, e)}
+                        onPointerMove={handleQueueDragMove}
+                        onPointerUp={handleQueueDragEnd}
+                        onPointerCancel={handleQueueDragEnd}
+                        aria-label={`Reorder ${t.title}`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
+                          <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
+                          <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
+                        </svg>
+                      </button>
+                      <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
+                      <div className={styles.queueInfo}>
+                        <div className={styles.queueTitle}>{t.title}</div>
+                        <div className={styles.queueArtist}>{t.artist}</div>
+                      </div>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => removeTrack(t.id)}
+                        aria-label={`Remove ${t.title} from queue`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
         ) : (
           <div className={styles.artContainer}>
-            {currentTrack.coverUrl ? (
-              <img
-                className={styles.art}
-                src={currentTrack.coverUrl}
-                alt={currentTrack.title}
-              />
-            ) : (
-              <div className={`${styles.art} ${styles.artFallback}`}>
-                <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                </svg>
-              </div>
-            )}
+            <div ref={artShellRef} className={styles.artShell} style={artFlipStyle}>
+              {currentTrack.coverUrl ? (
+                <>
+                  {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}
+                  <img
+                    className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
+                    src={currentTrack.coverUrl}
+                    alt={currentTrack.title}
+                    onLoad={() => setArtLoaded(true)}
+                  />
+                </>
+              ) : (
+                <div className={`${styles.art} ${styles.artFallback} ${styles.loaded}`}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                  </svg>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -297,19 +494,27 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         <div className={styles.extras}>
           <button
             className={`${styles.likeBtn} ${isLiked ? styles.likedBtn : ""}`}
-            onClick={toggleLiked}
+            onClick={handleLike}
             aria-label={isLiked ? "Unlike" : "Like"}
           >
             <svg viewBox="0 0 24 24" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
               <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
             </svg>
+            {burstKey > 0 && Array.from({ length: PETAL_COUNT }).map((_, i) => (
+              <span
+                key={`${burstKey}-${i}`}
+                className={styles.petal}
+                style={{ "--rot": `${(360 / PETAL_COUNT) * i}deg` } as React.CSSProperties}
+              />
+            ))}
           </button>
 
           <div className={styles.volumeGroup}>
             <button
               className={styles.iconBtn}
-              onClick={() => setShowVolume(!showVolume)}
+              onClick={() => setShowVolume((v) => !v)}
               aria-label="Volume"
+              aria-expanded={showVolume}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -321,16 +526,19 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 )}
               </svg>
             </button>
-            <input
-              type="range"
-              className={styles.volumeSlider}
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              aria-label="Volume"
-            />
+            <div className={`${styles.volumeSliderWrap} ${showVolume ? styles.volumeOpen : ""}`}>
+              <input
+                type="range"
+                className={styles.volumeSlider}
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                aria-label="Volume"
+                tabIndex={showVolume ? 0 : -1}
+              />
+            </div>
           </div>
 
           <button className={styles.iconBtn} onClick={() => {
