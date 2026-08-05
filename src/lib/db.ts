@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 import { Pool } from "pg";
 
 const pool = globalForPrisma.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL,
 });
 
 if (process.env.NODE_ENV !== "production") {

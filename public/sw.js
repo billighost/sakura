@@ -81,7 +81,7 @@ async function networkFirst(request) {
   try {
     const response = await fetch(request);
     if (response.redirected) {
-      throw new Error("Redirected");
+      return response;
     }
     if (response.ok) {
       cache.put(request, response.clone());
@@ -100,7 +100,7 @@ async function cacheOnPlay(request) {
   if (cached) return cached;
   const response = await fetch(request);
   if (response.redirected) {
-    throw new Error("Redirected");
+    return response;
   }
   if (response.ok) {
     cache.put(request, response.clone());
@@ -114,7 +114,7 @@ async function staleWhileRevalidate(request) {
   const fetchPromise = fetch(request)
     .then((response) => {
       if (response.redirected) {
-        throw new Error("Redirected");
+        return response;
       }
       if (response.ok) {
         cache.put(request, response.clone());
