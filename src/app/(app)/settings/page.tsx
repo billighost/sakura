@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -29,6 +30,7 @@ const audioQualities = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = useState({
     theme: "dark",
     audioQuality: "high",
@@ -128,7 +130,35 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={{ paddingTop: "4.5rem", position: "relative" }}>
+      {/* Floating Glassmorphic Back Button */}
+      <button
+        onClick={() => router.back()}
+        style={{
+          position: "absolute",
+          top: "1.25rem",
+          left: "1.25rem",
+          background: "rgba(0, 0, 0, 0.4)",
+          border: "none",
+          borderRadius: "50%",
+          width: "2.5rem",
+          height: "2.5rem",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          cursor: "pointer",
+          backdropFilter: "blur(4px)",
+          zIndex: 10,
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+        }}
+        aria-label="Go Back"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <div className={styles.sectionIcon}>

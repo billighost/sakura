@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function StaticLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--sakura-bg)" }}>
+    <div style={{ height: "100dvh", overflowY: "auto", background: "var(--sakura-bg)" }}>
       <header style={{
         display: "flex",
         alignItems: "center",

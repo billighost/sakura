@@ -61,6 +61,7 @@ const nextAuthInstance = NextAuth({
 export const { handlers, signIn, signOut } = nextAuthInstance;
 
 export const auth = async (...args: any[]) => {
+  // @ts-ignore
   const session = await nextAuthInstance.auth(...args);
   if (session) return session;
 
