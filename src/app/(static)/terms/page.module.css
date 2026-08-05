@@ -1,0 +1,131 @@
+.page {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
+}
+
+.title {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+  color: var(--sakura-accent);
+}
+
+.lastUpdated {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  opacity: 0.7;
+  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.toc {
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+}
+
+.tocTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--sakura-text);
+  margin-bottom: 0.625rem;
+}
+
+.tocList {
+  list-style: none;
+  counter-reset: toc;
+  padding: 0;
+}
+
+.tocList li {
+  counter-increment: toc;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  margin-bottom: 0.125rem;
+}
+
+.tocList li::before {
+  content: counter(toc) ".";
+  color: var(--sakura-accent);
+  font-weight: 600;
+  margin-right: 0.375rem;
+}
+
+.tocList a {
+  color: var(--sakura-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.tocList a:hover {
+  color: var(--sakura-accent);
+}
+
+.section {
+  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.heading {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--sakura-text);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid var(--sakura-border);
+}
+
+.text {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--sakura-text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.text strong {
+  color: var(--sakura-text);
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.list li {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--sakura-text-secondary);
+  padding-left: 1.25rem;
+  position: relative;
+  margin-bottom: 0.375rem;
+}
+
+.list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+}
+
+.list li strong {
+  color: var(--sakura-text);
+  font-weight: 600;
+}
+
+.link {
+  color: var(--sakura-accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+
+.link:hover {
+  opacity: 0.8;
+}

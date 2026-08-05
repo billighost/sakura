@@ -1,0 +1,315 @@
+.page {
+  padding: clamp(0.75rem, 3vw, 1.25rem);
+}
+
+.avatarSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+}
+
+.avatarWrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+
+.avatar {
+  width: clamp(4.5rem, 18vw, 6rem);
+  height: clamp(4.5rem, 18vw, 6rem);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  border: 3px solid var(--sakura-accent);
+}
+
+.avatarPlaceholder {
+  width: clamp(4.5rem, 18vw, 6rem);
+  height: clamp(4.5rem, 18vw, 6rem);
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 700;
+  color: #fff;
+  border: 3px solid var(--sakura-accent);
+}
+
+.editAvatarBtn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: clamp(1.75rem, 5vw, 2rem);
+  height: clamp(1.75rem, 5vw, 2rem);
+  border-radius: 50%;
+  border: 2px solid var(--sakura-bg);
+  background: var(--sakura-accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.editAvatarBtn:disabled {
+  cursor: wait;
+}
+
+.username {
+  font-size: clamp(1.125rem, 3.5vw, 1.375rem);
+  font-weight: 700;
+}
+
+.bio {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  text-align: center;
+  margin-top: 0.25rem;
+  max-width: 20rem;
+  cursor: pointer;
+  padding: 0.375rem 0.625rem;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.bio:hover {
+  background: var(--sakura-hover);
+}
+
+.bioEdit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.bioInput {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  background: var(--sakura-input-bg);
+  border: 1.5px solid var(--sakura-input-border);
+  border-radius: 10px;
+  color: var(--sakura-text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.bioInput:focus {
+  border-color: var(--sakura-accent);
+}
+
+.bioActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bioCancel {
+  all: unset;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+}
+
+.bioCancel:hover {
+  background: var(--sakura-hover);
+}
+
+.bioSave {
+  all: unset;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--sakura-accent);
+  cursor: pointer;
+}
+
+.bioSave:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.memberSince {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.375rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+}
+
+.statCard {
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  padding: clamp(0.5rem, 2vw, 0.75rem);
+  text-align: center;
+  border: 1px solid var(--sakura-border);
+}
+
+.statValue {
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-weight: 800;
+  color: var(--sakura-accent);
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.125rem;
+}
+
+.section {
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+}
+
+.sectionTitle {
+  font-size: clamp(0.9375rem, 2.5vw, 1.0625rem);
+  font-weight: 700;
+  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+}
+
+.accountCard {
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-border);
+  overflow: hidden;
+}
+
+.accountRow {
+  display: flex;
+  justify-content: space-between;
+  padding: clamp(0.625rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1rem);
+  border-bottom: 1px solid var(--sakura-border);
+}
+
+.accountRow:last-child {
+  border-bottom: none;
+}
+
+.accountLabel {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+}
+
+.accountValue {
+  font-size: 0.875rem;
+}
+
+.exportBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--sakura-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.exportBtn:hover {
+  background: var(--sakura-hover);
+}
+
+.exportBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cropOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.cropModal {
+  background: var(--sakura-surface);
+  border-radius: 16px;
+  padding: 1.25rem;
+  max-width: 22rem;
+  width: 100%;
+}
+
+.cropPreview {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  background: var(--sakura-bg);
+}
+
+.cropImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cropActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cropCancel {
+  all: unset;
+  flex: 1;
+  padding: 0.625rem;
+  text-align: center;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--sakura-text-secondary);
+  background: var(--sakura-bg);
+  cursor: pointer;
+}
+
+.cropCancel:hover {
+  background: var(--sakura-hover);
+}
+
+.cropConfirm {
+  all: unset;
+  flex: 1;
+  padding: 0.625rem;
+  text-align: center;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--sakura-accent);
+  cursor: pointer;
+}
+
+.cropConfirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

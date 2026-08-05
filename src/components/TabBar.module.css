@@ -1,0 +1,43 @@
+.bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-around;
+  height: clamp(3rem, 9vh, 3.75rem);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--sakura-surface);
+  border-top: 1px solid var(--sakura-border);
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0;
+  text-decoration: none;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.item svg {
+  width: clamp(1.25rem, 4vw, 1.5rem);
+  height: clamp(1.25rem, 4vw, 1.5rem);
+}
+
+.item span {
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.active {
+  color: var(--sakura-accent);
+}

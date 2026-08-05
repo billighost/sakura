@@ -1,0 +1,90 @@
+.root {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(0.5rem, 2vw, 0.75rem);
+  padding: clamp(0.5rem, 2vw, 0.625rem) clamp(0.5rem, 2vw, 0.75rem);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.root:hover {
+  background: var(--sakura-hover);
+}
+
+.root:active {
+  background: var(--sakura-active);
+}
+
+.active {
+  background: var(--sakura-active);
+}
+
+.art {
+  width: clamp(2.5rem, 8vw, 3rem);
+  height: clamp(2.5rem, 8vw, 3rem);
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleActive {
+  color: var(--sakura-accent);
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.moreBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(1.75rem, 5vw, 2rem);
+  height: clamp(1.75rem, 5vw, 2rem);
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: var(--sakura-text-secondary);
+}
+
+.moreBtn:active {
+  background: var(--sakura-active);
+}
+
+.number {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  width: clamp(1.25rem, 4vw, 1.5rem);
+  text-align: center;
+  flex-shrink: 0;
+}

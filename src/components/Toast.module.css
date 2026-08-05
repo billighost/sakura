@@ -1,0 +1,33 @@
+.toast {
+  position: fixed;
+  bottom: clamp(5rem, 14vh, 6rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  z-index: 300;
+  background: var(--sakura-surface-2);
+  border: 1px solid var(--sakura-border);
+  border-radius: 12px;
+  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1rem);
+  box-shadow: 0 4px 20px var(--sakura-shadow);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: none;
+}
+
+.visible {
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.accent {
+  border-color: var(--sakura-accent);
+}
+
+.error {
+  border-color: var(--sakura-danger);
+}
+
+.success {
+  border-color: var(--sakura-success);
+}

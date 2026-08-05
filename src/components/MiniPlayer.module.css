@@ -1,0 +1,76 @@
+.root {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.625rem;
+  height: clamp(3rem, 9vh, 3.75rem);
+  padding: 0 clamp(0.5rem, 2vw, 0.75rem);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--sakura-surface-2);
+  border-top: 1px solid var(--sakura-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 49;
+  position: relative;
+}
+
+.art {
+  width: clamp(2.25rem, 7vw, 2.75rem);
+  height: clamp(2.25rem, 7vw, 2.75rem);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artist {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--sakura-accent);
+  transition: width 0.3s linear;
+}
+
+.playBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(2rem, 6vw, 2.5rem);
+  height: clamp(2rem, 6vw, 2.5rem);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.playBtn:active {
+  transform: scale(0.9);
+}
+
+.playBtn svg {
+  width: clamp(1.25rem, 4vw, 1.5rem);
+  height: clamp(1.25rem, 4vw, 1.5rem);
+  color: var(--sakura-text);
+}

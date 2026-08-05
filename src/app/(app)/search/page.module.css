@@ -1,0 +1,400 @@
+.page {
+  padding: clamp(0.75rem, 3vw, 1.25rem);
+}
+
+.topRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: clamp(0.75rem, 2vw, 1rem);
+}
+
+.searchBox {
+  position: relative;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sakura-text-secondary);
+  pointer-events: none;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.searchInput {
+  width: 100%;
+  height: clamp(2.5rem, 7vw, 3rem);
+  padding: 0 2.5rem 0 2.5rem;
+  background: var(--sakura-input-bg);
+  border: 1.5px solid var(--sakura-input-border);
+  border-radius: 12px;
+  color: var(--sakura-text);
+  font-size: 0.9375rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+  border-color: var(--sakura-accent);
+}
+
+.clearBtn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  background: var(--sakura-surface-2);
+  color: var(--sakura-text-secondary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.clearBtn:hover {
+  color: var(--sakura-text);
+  background: var(--sakura-hover);
+}
+
+.shortcutHint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-bottom: clamp(0.75rem, 2vw, 1rem);
+  opacity: 0.6;
+}
+
+.shortcutHint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  background: var(--sakura-surface-2);
+  border: 1px solid var(--sakura-border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--sakura-text-secondary);
+  margin: 0 0.125rem;
+}
+
+.historySection {
+  margin-bottom: clamp(0.75rem, 2vw, 1rem);
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+}
+
+.clearHistoryBtn {
+  border: none;
+  background: none;
+  color: var(--sakura-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.clearHistoryBtn:hover {
+  text-decoration: underline;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.625rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--sakura-text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.historyItem:hover {
+  background: var(--sakura-hover);
+}
+
+.historyIcon {
+  flex-shrink: 0;
+  color: var(--sakura-text-secondary);
+}
+
+.historyText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  background: none;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.historyItem:hover .historyRemove {
+  opacity: 1;
+}
+
+.historyRemove:hover {
+  color: var(--sakura-danger);
+}
+
+.filterRow {
+  display: flex;
+  gap: 0.375rem;
+  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
+}
+
+.filterChip {
+  flex-shrink: 0;
+  height: 1.75rem;
+  padding: 0 clamp(0.75rem, 3vw, 1rem);
+  border: 1.5px solid var(--sakura-border);
+  background: transparent;
+  color: var(--sakura-text-secondary);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterChipActive {
+  background: var(--sakura-accent);
+  border-color: var(--sakura-accent);
+  color: #fff;
+}
+
+.filterChip:not(.filterChipActive):hover {
+  border-color: var(--sakura-text-secondary);
+  color: var(--sakura-text);
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.emptyState {
+  text-align: center;
+  padding: clamp(2rem, 8vh, 4rem) clamp(1rem, 4vw, 2rem);
+}
+
+.emptyIcon {
+  margin-bottom: clamp(1rem, 4vw, 1.5rem);
+  opacity: 0.7;
+}
+
+.emptyText {
+  font-size: clamp(1rem, 2.5vw, 1.125rem);
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+}
+
+.emptySubtext {
+  font-size: 0.875rem;
+  color: var(--sakura-text-secondary);
+}
+
+.offlineState {
+  text-align: center;
+  padding: clamp(2rem, 8vh, 4rem) clamp(1rem, 4vw, 2rem);
+}
+
+.sectionHeader {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sakura-text-secondary);
+  padding: clamp(0.75rem, 2vw, 1rem) 0 clamp(0.375rem, 1vw, 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.skeletonThumb {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 8px;
+  background: var(--sakura-skeleton);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.skeletonThumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeletonLineW70 {
+  width: 70%;
+  height: 0.875rem;
+  border-radius: 4px;
+  background: var(--sakura-skeleton);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonLineW70::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonLineW40 {
+  width: 40%;
+  height: 0.75rem;
+  border-radius: 4px;
+  background: var(--sakura-skeleton);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonLineW40::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.deezerResult {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  text-align: left;
+}
+
+.deezerResult:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deezerResult:not(:disabled):hover {
+  background: var(--sakura-hover);
+}
+
+.deezerCover {
+  width: clamp(2.5rem, 8vw, 3rem);
+  height: clamp(2.5rem, 8vw, 3rem);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  flex-shrink: 0;
+}
+
+.deezerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.deezerTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--sakura-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deezerArtist {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.downloadIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--sakura-accent);
+  flex-shrink: 0;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--sakura-input-border);
+  border-top-color: var(--sakura-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
