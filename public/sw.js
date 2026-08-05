@@ -52,6 +52,10 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
+  // Bypass service worker for cross-origin (except Cloudinary audio), manifest, and vercel routes
+  if (url.origin !== self.location.origin && !isAudioRequest(url)) return;
+  if (url.pathname === "/manifest.json" || url.pathname.includes("vercel") || url.pathname.includes("sso")) return;
+
   if (isApiRequest(url)) {
     event.respondWith(networkFirst(request));
   } else if (isAudioRequest(url)) {
@@ -76,17 +80,17 @@ async function networkFirst(request) {
   const cache = await caches.open(API_CACHE);
   try {
     const response = await fetch(request);
+    if (response.redirected) {
+      throw new Error("Redirected");
+    }
     if (response.ok) {
       cache.put(request, response.clone());
     }
     return response;
-  } catch {
+  } catch (err) {
     const cached = await cache.match(request);
     if (cached) return cached;
-    return new Response(JSON.stringify({ error: "Offline" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+    throw err;
   }
 }
 
@@ -95,6 +99,9 @@ async function cacheOnPlay(request) {
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
+  if (response.redirected) {
+    throw new Error("Redirected");
+  }
   if (response.ok) {
     cache.put(request, response.clone());
   }
@@ -106,11 +113,17 @@ async function staleWhileRevalidate(request) {
   const cached = await cache.match(request);
   const fetchPromise = fetch(request)
     .then((response) => {
+      if (response.redirected) {
+        throw new Error("Redirected");
+      }
       if (response.ok) {
         cache.put(request, response.clone());
       }
       return response;
     })
-    .catch(() => cached);
+    .catch((err) => {
+      if (cached) return cached;
+      throw err;
+    });
   return cached || fetchPromise;
 }
