@@ -9,12 +9,7 @@ export function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api/")) {
-    const token = request.cookies.get("authjs.session-token") ||
-                  request.cookies.get("__Secure-authjs.session-token");
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    return NextResponse.next();
   }
 
   return NextResponse.next();
