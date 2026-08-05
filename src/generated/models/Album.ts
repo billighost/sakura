@@ -40,6 +40,11 @@ export type AlbumMinAggregateOutputType = {
   artistId: string | null
   coverUrl: string | null
   releaseYear: number | null
+  releaseDate: Date | null
+  genre: string | null
+  deezerId: string | null
+  copyright: string | null
+  createdAt: Date | null
 }
 
 export type AlbumMaxAggregateOutputType = {
@@ -48,6 +53,11 @@ export type AlbumMaxAggregateOutputType = {
   artistId: string | null
   coverUrl: string | null
   releaseYear: number | null
+  releaseDate: Date | null
+  genre: string | null
+  deezerId: string | null
+  copyright: string | null
+  createdAt: Date | null
 }
 
 export type AlbumCountAggregateOutputType = {
@@ -56,6 +66,11 @@ export type AlbumCountAggregateOutputType = {
   artistId: number
   coverUrl: number
   releaseYear: number
+  releaseDate: number
+  genre: number
+  deezerId: number
+  copyright: number
+  createdAt: number
   _all: number
 }
 
@@ -74,6 +89,11 @@ export type AlbumMinAggregateInputType = {
   artistId?: true
   coverUrl?: true
   releaseYear?: true
+  releaseDate?: true
+  genre?: true
+  deezerId?: true
+  copyright?: true
+  createdAt?: true
 }
 
 export type AlbumMaxAggregateInputType = {
@@ -82,6 +102,11 @@ export type AlbumMaxAggregateInputType = {
   artistId?: true
   coverUrl?: true
   releaseYear?: true
+  releaseDate?: true
+  genre?: true
+  deezerId?: true
+  copyright?: true
+  createdAt?: true
 }
 
 export type AlbumCountAggregateInputType = {
@@ -90,6 +115,11 @@ export type AlbumCountAggregateInputType = {
   artistId?: true
   coverUrl?: true
   releaseYear?: true
+  releaseDate?: true
+  genre?: true
+  deezerId?: true
+  copyright?: true
+  createdAt?: true
   _all?: true
 }
 
@@ -185,6 +215,11 @@ export type AlbumGroupByOutputType = {
   artistId: string
   coverUrl: string | null
   releaseYear: number | null
+  releaseDate: Date | null
+  genre: string | null
+  deezerId: string | null
+  copyright: string | null
+  createdAt: Date
   _count: AlbumCountAggregateOutputType | null
   _avg: AlbumAvgAggregateOutputType | null
   _sum: AlbumSumAggregateOutputType | null
@@ -216,6 +251,11 @@ export type AlbumWhereInput = {
   artistId?: Prisma.StringFilter<"Album"> | string
   coverUrl?: Prisma.StringNullableFilter<"Album"> | string | null
   releaseYear?: Prisma.IntNullableFilter<"Album"> | number | null
+  releaseDate?: Prisma.DateTimeNullableFilter<"Album"> | Date | string | null
+  genre?: Prisma.StringNullableFilter<"Album"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Album"> | string | null
+  copyright?: Prisma.StringNullableFilter<"Album"> | string | null
+  createdAt?: Prisma.DateTimeFilter<"Album"> | Date | string
   artist?: Prisma.XOR<Prisma.ArtistScalarRelationFilter, Prisma.ArtistWhereInput>
   tracks?: Prisma.TrackListRelationFilter
 }
@@ -226,6 +266,11 @@ export type AlbumOrderByWithRelationInput = {
   artistId?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   releaseYear?: Prisma.SortOrderInput | Prisma.SortOrder
+  releaseDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  genre?: Prisma.SortOrderInput | Prisma.SortOrder
+  deezerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  copyright?: Prisma.SortOrderInput | Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
   artist?: Prisma.ArtistOrderByWithRelationInput
   tracks?: Prisma.TrackOrderByRelationAggregateInput
 }
@@ -239,6 +284,11 @@ export type AlbumWhereUniqueInput = Prisma.AtLeast<{
   artistId?: Prisma.StringFilter<"Album"> | string
   coverUrl?: Prisma.StringNullableFilter<"Album"> | string | null
   releaseYear?: Prisma.IntNullableFilter<"Album"> | number | null
+  releaseDate?: Prisma.DateTimeNullableFilter<"Album"> | Date | string | null
+  genre?: Prisma.StringNullableFilter<"Album"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Album"> | string | null
+  copyright?: Prisma.StringNullableFilter<"Album"> | string | null
+  createdAt?: Prisma.DateTimeFilter<"Album"> | Date | string
   artist?: Prisma.XOR<Prisma.ArtistScalarRelationFilter, Prisma.ArtistWhereInput>
   tracks?: Prisma.TrackListRelationFilter
 }, "id">
@@ -249,6 +299,11 @@ export type AlbumOrderByWithAggregationInput = {
   artistId?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   releaseYear?: Prisma.SortOrderInput | Prisma.SortOrder
+  releaseDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  genre?: Prisma.SortOrderInput | Prisma.SortOrder
+  deezerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  copyright?: Prisma.SortOrderInput | Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
   _count?: Prisma.AlbumCountOrderByAggregateInput
   _avg?: Prisma.AlbumAvgOrderByAggregateInput
   _max?: Prisma.AlbumMaxOrderByAggregateInput
@@ -265,6 +320,11 @@ export type AlbumScalarWhereWithAggregatesInput = {
   artistId?: Prisma.StringWithAggregatesFilter<"Album"> | string
   coverUrl?: Prisma.StringNullableWithAggregatesFilter<"Album"> | string | null
   releaseYear?: Prisma.IntNullableWithAggregatesFilter<"Album"> | number | null
+  releaseDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Album"> | Date | string | null
+  genre?: Prisma.StringNullableWithAggregatesFilter<"Album"> | string | null
+  deezerId?: Prisma.StringNullableWithAggregatesFilter<"Album"> | string | null
+  copyright?: Prisma.StringNullableWithAggregatesFilter<"Album"> | string | null
+  createdAt?: Prisma.DateTimeWithAggregatesFilter<"Album"> | Date | string
 }
 
 export type AlbumCreateInput = {
@@ -272,6 +332,11 @@ export type AlbumCreateInput = {
   title: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutAlbumsInput
   tracks?: Prisma.TrackCreateNestedManyWithoutAlbumInput
 }
@@ -282,6 +347,11 @@ export type AlbumUncheckedCreateInput = {
   artistId: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
   tracks?: Prisma.TrackUncheckedCreateNestedManyWithoutAlbumInput
 }
 
@@ -290,6 +360,11 @@ export type AlbumUpdateInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutAlbumsNestedInput
   tracks?: Prisma.TrackUpdateManyWithoutAlbumNestedInput
 }
@@ -300,6 +375,11 @@ export type AlbumUncheckedUpdateInput = {
   artistId?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tracks?: Prisma.TrackUncheckedUpdateManyWithoutAlbumNestedInput
 }
 
@@ -309,6 +389,11 @@ export type AlbumCreateManyInput = {
   artistId: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
 }
 
 export type AlbumUpdateManyMutationInput = {
@@ -316,6 +401,11 @@ export type AlbumUpdateManyMutationInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type AlbumUncheckedUpdateManyInput = {
@@ -324,6 +414,11 @@ export type AlbumUncheckedUpdateManyInput = {
   artistId?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type AlbumListRelationFilter = {
@@ -342,6 +437,11 @@ export type AlbumCountOrderByAggregateInput = {
   artistId?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
   releaseYear?: Prisma.SortOrder
+  releaseDate?: Prisma.SortOrder
+  genre?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  copyright?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type AlbumAvgOrderByAggregateInput = {
@@ -354,6 +454,11 @@ export type AlbumMaxOrderByAggregateInput = {
   artistId?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
   releaseYear?: Prisma.SortOrder
+  releaseDate?: Prisma.SortOrder
+  genre?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  copyright?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type AlbumMinOrderByAggregateInput = {
@@ -362,6 +467,11 @@ export type AlbumMinOrderByAggregateInput = {
   artistId?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
   releaseYear?: Prisma.SortOrder
+  releaseDate?: Prisma.SortOrder
+  genre?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  copyright?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type AlbumSumOrderByAggregateInput = {
@@ -423,6 +533,10 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
 export type AlbumCreateNestedOneWithoutTracksInput = {
   create?: Prisma.XOR<Prisma.AlbumCreateWithoutTracksInput, Prisma.AlbumUncheckedCreateWithoutTracksInput>
   connectOrCreate?: Prisma.AlbumCreateOrConnectWithoutTracksInput
@@ -444,6 +558,11 @@ export type AlbumCreateWithoutArtistInput = {
   title: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
   tracks?: Prisma.TrackCreateNestedManyWithoutAlbumInput
 }
 
@@ -452,6 +571,11 @@ export type AlbumUncheckedCreateWithoutArtistInput = {
   title: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
   tracks?: Prisma.TrackUncheckedCreateNestedManyWithoutAlbumInput
 }
 
@@ -490,6 +614,11 @@ export type AlbumScalarWhereInput = {
   artistId?: Prisma.StringFilter<"Album"> | string
   coverUrl?: Prisma.StringNullableFilter<"Album"> | string | null
   releaseYear?: Prisma.IntNullableFilter<"Album"> | number | null
+  releaseDate?: Prisma.DateTimeNullableFilter<"Album"> | Date | string | null
+  genre?: Prisma.StringNullableFilter<"Album"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Album"> | string | null
+  copyright?: Prisma.StringNullableFilter<"Album"> | string | null
+  createdAt?: Prisma.DateTimeFilter<"Album"> | Date | string
 }
 
 export type AlbumCreateWithoutTracksInput = {
@@ -497,6 +626,11 @@ export type AlbumCreateWithoutTracksInput = {
   title: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutAlbumsInput
 }
 
@@ -506,6 +640,11 @@ export type AlbumUncheckedCreateWithoutTracksInput = {
   artistId: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
 }
 
 export type AlbumCreateOrConnectWithoutTracksInput = {
@@ -529,6 +668,11 @@ export type AlbumUpdateWithoutTracksInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutAlbumsNestedInput
 }
 
@@ -538,6 +682,11 @@ export type AlbumUncheckedUpdateWithoutTracksInput = {
   artistId?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type AlbumCreateManyArtistInput = {
@@ -545,6 +694,11 @@ export type AlbumCreateManyArtistInput = {
   title: string
   coverUrl?: string | null
   releaseYear?: number | null
+  releaseDate?: Date | string | null
+  genre?: string | null
+  deezerId?: string | null
+  copyright?: string | null
+  createdAt?: Date | string
 }
 
 export type AlbumUpdateWithoutArtistInput = {
@@ -552,6 +706,11 @@ export type AlbumUpdateWithoutArtistInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tracks?: Prisma.TrackUpdateManyWithoutAlbumNestedInput
 }
 
@@ -560,6 +719,11 @@ export type AlbumUncheckedUpdateWithoutArtistInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tracks?: Prisma.TrackUncheckedUpdateManyWithoutAlbumNestedInput
 }
 
@@ -568,6 +732,11 @@ export type AlbumUncheckedUpdateManyWithoutArtistInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   releaseYear?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  releaseDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  copyright?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -607,6 +776,11 @@ export type AlbumSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   artistId?: boolean
   coverUrl?: boolean
   releaseYear?: boolean
+  releaseDate?: boolean
+  genre?: boolean
+  deezerId?: boolean
+  copyright?: boolean
+  createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   tracks?: boolean | Prisma.Album$tracksArgs<ExtArgs>
   _count?: boolean | Prisma.AlbumCountOutputTypeDefaultArgs<ExtArgs>
@@ -618,6 +792,11 @@ export type AlbumSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   artistId?: boolean
   coverUrl?: boolean
   releaseYear?: boolean
+  releaseDate?: boolean
+  genre?: boolean
+  deezerId?: boolean
+  copyright?: boolean
+  createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["album"]>
 
@@ -627,6 +806,11 @@ export type AlbumSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   artistId?: boolean
   coverUrl?: boolean
   releaseYear?: boolean
+  releaseDate?: boolean
+  genre?: boolean
+  deezerId?: boolean
+  copyright?: boolean
+  createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["album"]>
 
@@ -636,9 +820,14 @@ export type AlbumSelectScalar = {
   artistId?: boolean
   coverUrl?: boolean
   releaseYear?: boolean
+  releaseDate?: boolean
+  genre?: boolean
+  deezerId?: boolean
+  copyright?: boolean
+  createdAt?: boolean
 }
 
-export type AlbumOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "artistId" | "coverUrl" | "releaseYear", ExtArgs["result"]["album"]>
+export type AlbumOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "artistId" | "coverUrl" | "releaseYear" | "releaseDate" | "genre" | "deezerId" | "copyright" | "createdAt", ExtArgs["result"]["album"]>
 export type AlbumInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   tracks?: boolean | Prisma.Album$tracksArgs<ExtArgs>
@@ -663,6 +852,11 @@ export type $AlbumPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     artistId: string
     coverUrl: string | null
     releaseYear: number | null
+    releaseDate: Date | null
+    genre: string | null
+    deezerId: string | null
+    copyright: string | null
+    createdAt: Date
   }, ExtArgs["result"]["album"]>
   composites: {}
 }
@@ -1093,6 +1287,11 @@ export interface AlbumFieldRefs {
   readonly artistId: Prisma.FieldRef<"Album", 'String'>
   readonly coverUrl: Prisma.FieldRef<"Album", 'String'>
   readonly releaseYear: Prisma.FieldRef<"Album", 'Int'>
+  readonly releaseDate: Prisma.FieldRef<"Album", 'DateTime'>
+  readonly genre: Prisma.FieldRef<"Album", 'String'>
+  readonly deezerId: Prisma.FieldRef<"Album", 'String'>
+  readonly copyright: Prisma.FieldRef<"Album", 'String'>
+  readonly createdAt: Prisma.FieldRef<"Album", 'DateTime'>
 }
     
 

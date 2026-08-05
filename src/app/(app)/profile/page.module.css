@@ -1,49 +1,65 @@
 .page {
   padding: clamp(0.75rem, 3vw, 1.25rem);
+  padding-bottom: 8rem;
 }
 
-.avatarSection {
+.heroSection {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: clamp(1.25rem, 4vw, 2rem);
+  padding: clamp(1.5rem, 5vw, 2.5rem) clamp(1rem, 3vw, 1.5rem);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.heroGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--sakura-gradient-start) 0%, var(--sakura-accent-2) 50%, var(--sakura-gradient-end) 100%);
+  opacity: 0.12;
+  z-index: 0;
 }
 
 .avatarWrapper {
   position: relative;
   display: inline-block;
   margin-bottom: 0.75rem;
+  z-index: 1;
 }
 
 .avatar {
-  width: clamp(4.5rem, 18vw, 6rem);
-  height: clamp(4.5rem, 18vw, 6rem);
+  width: clamp(5rem, 20vw, 7rem);
+  height: clamp(5rem, 20vw, 7rem);
   border-radius: 50%;
   object-fit: cover;
   background: var(--sakura-skeleton);
   border: 3px solid var(--sakura-accent);
+  box-shadow: 0 4px 24px rgba(242, 120, 159, 0.25);
 }
 
 .avatarPlaceholder {
-  width: clamp(4.5rem, 18vw, 6rem);
-  height: clamp(4.5rem, 18vw, 6rem);
+  width: clamp(5rem, 20vw, 7rem);
+  height: clamp(5rem, 20vw, 7rem);
   border-radius: 50%;
-  background: var(--sakura-accent);
+  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
   font-weight: 700;
   color: #fff;
   border: 3px solid var(--sakura-accent);
+  box-shadow: 0 4px 24px rgba(242, 120, 159, 0.25);
 }
 
 .editAvatarBtn {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: clamp(1.75rem, 5vw, 2rem);
-  height: clamp(1.75rem, 5vw, 2rem);
+  width: clamp(2rem, 6vw, 2.25rem);
+  height: clamp(2rem, 6vw, 2.25rem);
   border-radius: 50%;
   border: 2px solid var(--sakura-bg);
   background: var(--sakura-accent);
@@ -52,28 +68,37 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 0.75rem;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.editAvatarBtn:hover {
+  transform: scale(1.1);
 }
 
 .editAvatarBtn:disabled {
   cursor: wait;
+  opacity: 0.6;
 }
 
 .username {
-  font-size: clamp(1.125rem, 3.5vw, 1.375rem);
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
   font-weight: 700;
+  z-index: 1;
 }
 
 .bio {
+  all: unset;
   font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
   text-align: center;
-  margin-top: 0.25rem;
+  margin-top: 0.375rem;
   max-width: 20rem;
   cursor: pointer;
-  padding: 0.375rem 0.625rem;
-  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
   transition: background 0.15s;
+  display: block;
+  z-index: 1;
 }
 
 .bio:hover {
@@ -88,11 +113,12 @@
   margin-top: 0.5rem;
   width: 100%;
   max-width: 20rem;
+  z-index: 1;
 }
 
 .bioInput {
   width: 100%;
-  padding: 0.5rem 0.625rem;
+  padding: 0.625rem 0.75rem;
   background: var(--sakura-input-bg);
   border: 1.5px solid var(--sakura-input-border);
   border-radius: 10px;
@@ -107,6 +133,12 @@
   border-color: var(--sakura-accent);
 }
 
+.bioCharCount {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  align-self: flex-end;
+}
+
 .bioActions {
   display: flex;
   gap: 0.5rem;
@@ -114,12 +146,13 @@
 
 .bioCancel {
   all: unset;
-  padding: 0.375rem 0.75rem;
-  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--sakura-text-secondary);
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .bioCancel:hover {
@@ -128,13 +161,14 @@
 
 .bioSave {
   all: unset;
-  padding: 0.375rem 0.75rem;
-  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
   font-size: 0.8125rem;
   font-weight: 600;
   color: #fff;
   background: var(--sakura-accent);
   cursor: pointer;
+  transition: opacity 0.15s;
 }
 
 .bioSave:disabled {
@@ -143,31 +177,86 @@
 }
 
 .memberSince {
-  font-size: 0.6875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
   color: var(--sakura-text-secondary);
-  margin-top: 0.375rem;
+  margin-top: 0.5rem;
+  z-index: 1;
 }
 
-.stats {
+.shareBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--sakura-text);
+  cursor: pointer;
+  transition: background 0.15s;
+  z-index: 1;
+}
+
+.shareBtn:hover {
+  background: var(--sakura-hover);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--sakura-text);
+  color: var(--sakura-bg);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  margin-bottom: 0.375rem;
+}
+
+.statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.5rem;
   width: 100%;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: clamp(1.25rem, 4vw, 1.75rem);
 }
 
 .statCard {
   background: var(--sakura-surface);
   border-radius: 12px;
-  padding: clamp(0.5rem, 2vw, 0.75rem);
+  padding: clamp(0.625rem, 2vw, 0.875rem);
   text-align: center;
   border: 1px solid var(--sakura-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statIcon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(242, 120, 159, 0.15), rgba(201, 166, 224, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-accent);
+  margin-bottom: 0.5rem;
 }
 
 .statValue {
-  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-size: clamp(1.125rem, 3.5vw, 1.375rem);
   font-weight: 800;
-  color: var(--sakura-accent);
+  color: var(--sakura-text);
 }
 
 .statLabel {
@@ -177,13 +266,162 @@
 }
 
 .section {
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: clamp(1.25rem, 4vw, 1.75rem);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: clamp(0.625rem, 2vw, 0.875rem);
+  padding: 0 clamp(0.25rem, 1vw, 0.375rem);
 }
 
 .sectionTitle {
   font-size: clamp(0.9375rem, 2.5vw, 1.0625rem);
   font-weight: 700;
-  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+}
+
+.sectionCount {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  background: var(--sakura-surface-2);
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+}
+
+.artistList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.artistItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-border);
+}
+
+.artistRank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--sakura-text-secondary);
+  width: 1.5rem;
+  text-align: center;
+}
+
+.artistAvatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.artistAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artistPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.875rem;
+}
+
+.artistInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.artistName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artistTracks {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-border);
+}
+
+.trackNumber {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--sakura-text-secondary);
+  width: 1.25rem;
+  text-align: center;
+}
+
+.trackCover {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.trackCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.trackPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: var(--sakura-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-text-secondary);
+}
+
+.trackInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.trackTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trackArtist {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
 }
 
 .accountCard {
@@ -196,7 +434,8 @@
 .accountRow {
   display: flex;
   justify-content: space-between;
-  padding: clamp(0.625rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1rem);
+  align-items: center;
+  padding: clamp(0.75rem, 2.5vw, 0.875rem) clamp(0.75rem, 3vw, 1rem);
   border-bottom: 1px solid var(--sakura-border);
 }
 
@@ -205,6 +444,9 @@
 }
 
 .accountLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
 }
@@ -220,7 +462,7 @@
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.875rem 1rem;
   background: var(--sakura-surface);
   border: 1px solid var(--sakura-border);
   border-radius: 12px;
@@ -312,4 +554,15 @@
 .cropConfirm:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .statsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .statsGrid .statCard:nth-child(4),
+  .statsGrid .statCard:nth-child(5) {
+    grid-column: span 1;
+  }
 }

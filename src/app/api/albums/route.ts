@@ -12,9 +12,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+  const downloadedOnly = searchParams.get("downloaded") === "true";
   const offset = (page - 1) * limit;
 
-  const cacheKey = `albums:list:${page}:${limit}`;
+  const cacheKey = `albums:list:${page}:${limit}:${downloadedOnly}`;
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -25,8 +26,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    let whereClause = "";
+    if (downloadedOnly) {
+      whereClause = `WHERE EXISTS (
+        SELECT 1 FROM "Track" t WHERE t."albumId" = al.id
+      )`;
+    }
+
     const countResult = await queryOne<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM "Album"',
+      `SELECT COUNT(*)::text AS count FROM "Album" al ${whereClause}`,
     );
     const total = parseInt(countResult?.count || "0", 10);
 
@@ -38,6 +46,7 @@ export async function GET(req: NextRequest) {
       FROM "Album" al
       LEFT JOIN "Artist" a ON al."artistId" = a.id
       LEFT JOIN "Track" t ON t."albumId" = al.id
+      ${whereClause}
       GROUP BY al.id, a.name, a.id
       ORDER BY al.title ASC
       LIMIT $1 OFFSET $2`,

@@ -402,9 +402,14 @@ export const ModelName = {
   Artist: 'Artist',
   Album: 'Album',
   Track: 'Track',
+  TrackArtist: 'TrackArtist',
   Playlist: 'Playlist',
+  PlaylistFolder: 'PlaylistFolder',
   PlaylistTrack: 'PlaylistTrack',
+  TrackCredit: 'TrackCredit',
+  SampledTrack: 'SampledTrack',
   Favorite: 'Favorite',
+  SnoozedTrack: 'SnoozedTrack',
   ListeningHistory: 'ListeningHistory'
 } as const
 
@@ -421,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "playlist" | "playlistTrack" | "favorite" | "listeningHistory"
+    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -795,6 +800,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TrackArtist: {
+      payload: Prisma.$TrackArtistPayload<ExtArgs>
+      fields: Prisma.TrackArtistFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TrackArtistFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TrackArtistFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        findFirst: {
+          args: Prisma.TrackArtistFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TrackArtistFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        findMany: {
+          args: Prisma.TrackArtistFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>[]
+        }
+        create: {
+          args: Prisma.TrackArtistCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        createMany: {
+          args: Prisma.TrackArtistCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TrackArtistCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>[]
+        }
+        delete: {
+          args: Prisma.TrackArtistDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        update: {
+          args: Prisma.TrackArtistUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        deleteMany: {
+          args: Prisma.TrackArtistDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TrackArtistUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TrackArtistUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>[]
+        }
+        upsert: {
+          args: Prisma.TrackArtistUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackArtistPayload>
+        }
+        aggregate: {
+          args: Prisma.TrackArtistAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTrackArtist>
+        }
+        groupBy: {
+          args: Prisma.TrackArtistGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TrackArtistGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TrackArtistCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TrackArtistCountAggregateOutputType> | number
+        }
+      }
+    }
     Playlist: {
       payload: Prisma.$PlaylistPayload<ExtArgs>
       fields: Prisma.PlaylistFieldRefs
@@ -866,6 +945,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.PlaylistCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.PlaylistCountAggregateOutputType> | number
+        }
+      }
+    }
+    PlaylistFolder: {
+      payload: Prisma.$PlaylistFolderPayload<ExtArgs>
+      fields: Prisma.PlaylistFolderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlaylistFolderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlaylistFolderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        findFirst: {
+          args: Prisma.PlaylistFolderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlaylistFolderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        findMany: {
+          args: Prisma.PlaylistFolderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>[]
+        }
+        create: {
+          args: Prisma.PlaylistFolderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        createMany: {
+          args: Prisma.PlaylistFolderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlaylistFolderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>[]
+        }
+        delete: {
+          args: Prisma.PlaylistFolderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        update: {
+          args: Prisma.PlaylistFolderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        deleteMany: {
+          args: Prisma.PlaylistFolderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlaylistFolderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlaylistFolderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>[]
+        }
+        upsert: {
+          args: Prisma.PlaylistFolderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaylistFolderPayload>
+        }
+        aggregate: {
+          args: Prisma.PlaylistFolderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlaylistFolder>
+        }
+        groupBy: {
+          args: Prisma.PlaylistFolderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlaylistFolderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlaylistFolderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlaylistFolderCountAggregateOutputType> | number
         }
       }
     }
@@ -943,6 +1096,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TrackCredit: {
+      payload: Prisma.$TrackCreditPayload<ExtArgs>
+      fields: Prisma.TrackCreditFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TrackCreditFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TrackCreditFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        findFirst: {
+          args: Prisma.TrackCreditFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TrackCreditFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        findMany: {
+          args: Prisma.TrackCreditFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>[]
+        }
+        create: {
+          args: Prisma.TrackCreditCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        createMany: {
+          args: Prisma.TrackCreditCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TrackCreditCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>[]
+        }
+        delete: {
+          args: Prisma.TrackCreditDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        update: {
+          args: Prisma.TrackCreditUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        deleteMany: {
+          args: Prisma.TrackCreditDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TrackCreditUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TrackCreditUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>[]
+        }
+        upsert: {
+          args: Prisma.TrackCreditUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TrackCreditPayload>
+        }
+        aggregate: {
+          args: Prisma.TrackCreditAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTrackCredit>
+        }
+        groupBy: {
+          args: Prisma.TrackCreditGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TrackCreditGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TrackCreditCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TrackCreditCountAggregateOutputType> | number
+        }
+      }
+    }
+    SampledTrack: {
+      payload: Prisma.$SampledTrackPayload<ExtArgs>
+      fields: Prisma.SampledTrackFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SampledTrackFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SampledTrackFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        findFirst: {
+          args: Prisma.SampledTrackFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SampledTrackFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        findMany: {
+          args: Prisma.SampledTrackFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>[]
+        }
+        create: {
+          args: Prisma.SampledTrackCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        createMany: {
+          args: Prisma.SampledTrackCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SampledTrackCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>[]
+        }
+        delete: {
+          args: Prisma.SampledTrackDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        update: {
+          args: Prisma.SampledTrackUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        deleteMany: {
+          args: Prisma.SampledTrackDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SampledTrackUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SampledTrackUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>[]
+        }
+        upsert: {
+          args: Prisma.SampledTrackUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SampledTrackPayload>
+        }
+        aggregate: {
+          args: Prisma.SampledTrackAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSampledTrack>
+        }
+        groupBy: {
+          args: Prisma.SampledTrackGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SampledTrackGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SampledTrackCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SampledTrackCountAggregateOutputType> | number
+        }
+      }
+    }
     Favorite: {
       payload: Prisma.$FavoritePayload<ExtArgs>
       fields: Prisma.FavoriteFieldRefs
@@ -1014,6 +1315,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FavoriteCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FavoriteCountAggregateOutputType> | number
+        }
+      }
+    }
+    SnoozedTrack: {
+      payload: Prisma.$SnoozedTrackPayload<ExtArgs>
+      fields: Prisma.SnoozedTrackFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SnoozedTrackFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SnoozedTrackFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        findFirst: {
+          args: Prisma.SnoozedTrackFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SnoozedTrackFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        findMany: {
+          args: Prisma.SnoozedTrackFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>[]
+        }
+        create: {
+          args: Prisma.SnoozedTrackCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        createMany: {
+          args: Prisma.SnoozedTrackCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SnoozedTrackCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>[]
+        }
+        delete: {
+          args: Prisma.SnoozedTrackDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        update: {
+          args: Prisma.SnoozedTrackUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        deleteMany: {
+          args: Prisma.SnoozedTrackDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SnoozedTrackUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SnoozedTrackUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>[]
+        }
+        upsert: {
+          args: Prisma.SnoozedTrackUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SnoozedTrackPayload>
+        }
+        aggregate: {
+          args: Prisma.SnoozedTrackAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSnoozedTrack>
+        }
+        groupBy: {
+          args: Prisma.SnoozedTrackGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SnoozedTrackGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SnoozedTrackCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SnoozedTrackCountAggregateOutputType> | number
         }
       }
     }
@@ -1160,7 +1535,11 @@ export type UserSettingsScalarFieldEnum = (typeof UserSettingsScalarFieldEnum)[k
 export const ArtistScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  imageUrl: 'imageUrl'
+  imageUrl: 'imageUrl',
+  bio: 'bio',
+  deezerId: 'deezerId',
+  genres: 'genres',
+  createdAt: 'createdAt'
 } as const
 
 export type ArtistScalarFieldEnum = (typeof ArtistScalarFieldEnum)[keyof typeof ArtistScalarFieldEnum]
@@ -1171,7 +1550,12 @@ export const AlbumScalarFieldEnum = {
   title: 'title',
   artistId: 'artistId',
   coverUrl: 'coverUrl',
-  releaseYear: 'releaseYear'
+  releaseYear: 'releaseYear',
+  releaseDate: 'releaseDate',
+  genre: 'genre',
+  deezerId: 'deezerId',
+  copyright: 'copyright',
+  createdAt: 'createdAt'
 } as const
 
 export type AlbumScalarFieldEnum = (typeof AlbumScalarFieldEnum)[keyof typeof AlbumScalarFieldEnum]
@@ -1191,10 +1575,24 @@ export const TrackScalarFieldEnum = {
   source: 'source',
   telegramFileId: 'telegramFileId',
   telegramMessageId: 'telegramMessageId',
+  deezerId: 'deezerId',
+  isrc: 'isrc',
+  previewUrl: 'previewUrl',
   createdAt: 'createdAt'
 } as const
 
 export type TrackScalarFieldEnum = (typeof TrackScalarFieldEnum)[keyof typeof TrackScalarFieldEnum]
+
+
+export const TrackArtistScalarFieldEnum = {
+  trackId: 'trackId',
+  artistId: 'artistId',
+  role: 'role',
+  position: 'position',
+  addedAt: 'addedAt'
+} as const
+
+export type TrackArtistScalarFieldEnum = (typeof TrackArtistScalarFieldEnum)[keyof typeof TrackArtistScalarFieldEnum]
 
 
 export const PlaylistScalarFieldEnum = {
@@ -1203,10 +1601,21 @@ export const PlaylistScalarFieldEnum = {
   name: 'name',
   description: 'description',
   coverUrl: 'coverUrl',
+  folderId: 'folderId',
   createdAt: 'createdAt'
 } as const
 
 export type PlaylistScalarFieldEnum = (typeof PlaylistScalarFieldEnum)[keyof typeof PlaylistScalarFieldEnum]
+
+
+export const PlaylistFolderScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  createdAt: 'createdAt'
+} as const
+
+export type PlaylistFolderScalarFieldEnum = (typeof PlaylistFolderScalarFieldEnum)[keyof typeof PlaylistFolderScalarFieldEnum]
 
 
 export const PlaylistTrackScalarFieldEnum = {
@@ -1219,6 +1628,28 @@ export const PlaylistTrackScalarFieldEnum = {
 export type PlaylistTrackScalarFieldEnum = (typeof PlaylistTrackScalarFieldEnum)[keyof typeof PlaylistTrackScalarFieldEnum]
 
 
+export const TrackCreditScalarFieldEnum = {
+  id: 'id',
+  trackId: 'trackId',
+  name: 'name',
+  role: 'role',
+  createdAt: 'createdAt'
+} as const
+
+export type TrackCreditScalarFieldEnum = (typeof TrackCreditScalarFieldEnum)[keyof typeof TrackCreditScalarFieldEnum]
+
+
+export const SampledTrackScalarFieldEnum = {
+  id: 'id',
+  trackId: 'trackId',
+  sampledTrackId: 'sampledTrackId',
+  sampleType: 'sampleType',
+  createdAt: 'createdAt'
+} as const
+
+export type SampledTrackScalarFieldEnum = (typeof SampledTrackScalarFieldEnum)[keyof typeof SampledTrackScalarFieldEnum]
+
+
 export const FavoriteScalarFieldEnum = {
   userId: 'userId',
   trackId: 'trackId',
@@ -1226,6 +1657,16 @@ export const FavoriteScalarFieldEnum = {
 } as const
 
 export type FavoriteScalarFieldEnum = (typeof FavoriteScalarFieldEnum)[keyof typeof FavoriteScalarFieldEnum]
+
+
+export const SnoozedTrackScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  snoozedAt: 'snoozedAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type SnoozedTrackScalarFieldEnum = (typeof SnoozedTrackScalarFieldEnum)[keyof typeof SnoozedTrackScalarFieldEnum]
 
 
 export const ListeningHistoryScalarFieldEnum = {
@@ -1486,9 +1927,14 @@ export type GlobalOmitConfig = {
   artist?: Prisma.ArtistOmit
   album?: Prisma.AlbumOmit
   track?: Prisma.TrackOmit
+  trackArtist?: Prisma.TrackArtistOmit
   playlist?: Prisma.PlaylistOmit
+  playlistFolder?: Prisma.PlaylistFolderOmit
   playlistTrack?: Prisma.PlaylistTrackOmit
+  trackCredit?: Prisma.TrackCreditOmit
+  sampledTrack?: Prisma.SampledTrackOmit
   favorite?: Prisma.FavoriteOmit
+  snoozedTrack?: Prisma.SnoozedTrackOmit
   listeningHistory?: Prisma.ListeningHistoryOmit
 }
 

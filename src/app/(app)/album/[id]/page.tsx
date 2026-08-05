@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { DiscIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
 interface Track {
@@ -28,6 +29,7 @@ interface Album {
   artist: { name: string; id: string };
   tracks: Track[];
   otherAlbums?: { id: string; title: string; coverUrl?: string; releaseYear?: number | null }[];
+  copyright?: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -48,12 +50,41 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+function extractColor(img: HTMLImageElement): string {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "#2a1a3a";
+  const size = 32;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.drawImage(img, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+  let r = 0, g = 0, b = 0, count = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    count++;
+  }
+  r = Math.round(r / count);
+  g = Math.round(g / count);
+  b = Math.round(b / count);
+  const max = Math.max(r, g, b);
+  const factor = max > 150 ? 0.55 : 0.7;
+  r = Math.min(255, Math.round(r * factor + 10));
+  g = Math.min(255, Math.round(g * factor + 8));
+  b = Math.min(255, Math.round(b * factor + 15));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export default function AlbumPage() {
   const params = useParams();
   const { play } = usePlayer();
   const [album, setAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
+  const [bgColor, setBgColor] = useState<string>("#2a1a3a");
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`/api/albums/${params.id}`)
@@ -62,6 +93,11 @@ export default function AlbumPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [params.id]);
+
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const color = extractColor(e.currentTarget);
+    setBgColor(color);
+  }, []);
 
   function handlePlay() {
     if (!album || album.tracks.length === 0) return;
@@ -127,13 +163,38 @@ export default function AlbumPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-          <div className="skeleton" style={{ width: "clamp(5rem, 20vw, 7.5rem)", height: "clamp(5rem, 20vw, 7.5rem)", borderRadius: "12px", flexShrink: 0 }} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "6px" }}>
-            <div className="skeleton" style={{ width: "40%", height: "0.75rem" }} />
-            <div className="skeleton" style={{ width: "80%", height: "1rem" }} />
-            <div className="skeleton" style={{ width: "30%", height: "0.75rem" }} />
+        <div className={styles.heroGradient} style={{ "--bg": "#2a1a3a" } as React.CSSProperties}>
+          <div className={styles.hero}>
+            <div className="skeleton" style={{ width: "clamp(8rem, 32vw, 14rem)", height: "clamp(8rem, 32vw, 14rem)", borderRadius: "12px", flexShrink: 0 }} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "8px", padding: "0.5rem 0" }}>
+              <div className="skeleton" style={{ width: "30%", height: "0.6875rem" }} />
+              <div className="skeleton" style={{ width: "90%", height: "clamp(1.25rem, 4vw, 1.75rem)" }} />
+              <div className="skeleton" style={{ width: "40%", height: "0.8125rem" }} />
+              <div className="skeleton" style={{ width: "55%", height: "0.75rem" }} />
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
+                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
+                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
+              </div>
+            </div>
           </div>
+        </div>
+        <div className={styles.actions}>
+          <div className="skeleton" style={{ width: "5.5rem", height: "2.5rem", borderRadius: "9999px" }} />
+          <div className="skeleton" style={{ width: "2.5rem", height: "2.5rem", borderRadius: "9999px" }} />
+          <div className="skeleton" style={{ width: "2.25rem", height: "2.25rem", borderRadius: "9999px" }} />
+        </div>
+        <div style={{ padding: "0 clamp(0.75rem, 3vw, 1.25rem)" }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.625rem 0" }}>
+              <div className="skeleton" style={{ width: "1.25rem", height: "0.8125rem" }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div className="skeleton" style={{ width: `${60 + Math.random() * 30}%`, height: "0.8125rem" }} />
+                <div className="skeleton" style={{ width: `${30 + Math.random() * 20}%`, height: "0.6875rem" }} />
+              </div>
+              <div className="skeleton" style={{ width: "2rem", height: "0.75rem" }} />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -143,12 +204,12 @@ export default function AlbumPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.heroGradient}>
-        <div className={styles.hero}>
+      <div className={styles.heroGradient} style={{ "--bg": bgColor } as React.CSSProperties}>
+        <div className={styles.hero} ref={heroRef}>
           {album.coverUrl ? (
-            <img className={styles.coverArt} src={album.coverUrl} alt="" />
+            <img className={styles.coverArt} src={album.coverUrl} alt="" onLoad={onImageLoad} crossOrigin="anonymous" />
           ) : (
-            <div className={styles.coverArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(1.5rem, 5vw, 2rem)" }}>💿</div>
+            <div className={styles.coverArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}><DiscIcon size={48} /></div>
           )}
           <div className={styles.heroInfo}>
             <div className={styles.heroLabel}>Album</div>
@@ -171,19 +232,19 @@ export default function AlbumPage() {
 
       <div className={styles.actions}>
         <button className={styles.playBtn} onClick={handlePlay}>
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z" /></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M8 5v14l11-7z" /></svg>
           Play
         </button>
-        <button className={styles.shuffleBtn} onClick={handleShuffle}>
+        <button className={styles.shuffleBtn} onClick={handleShuffle} title="Shuffle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
         </button>
-        <button className={styles.iconBtn} onClick={() => setShowPlaylistPicker(true)}>
+        <button className={styles.iconBtn} onClick={() => setShowPlaylistPicker(true)} title="Add to playlist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M12 5v14M5 12h14" /></svg>
         </button>
-        <button className={styles.iconBtn} onClick={handleLikeAll}>
+        <button className={styles.iconBtn} onClick={handleLikeAll} title="Like all">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
         </button>
-        <button className={styles.iconBtn} onClick={handleShare}>
+        <button className={styles.iconBtn} onClick={handleShare} title="Share">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
         </button>
       </div>
@@ -206,6 +267,10 @@ export default function AlbumPage() {
         ))}
       </div>
 
+      {album.copyright && (
+        <div className={styles.copyright}>{album.copyright}</div>
+      )}
+
       {album.otherAlbums && album.otherAlbums.length > 0 && (
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Other Albums by {album.artist.name}</div>
@@ -215,7 +280,7 @@ export default function AlbumPage() {
                 {oa.coverUrl ? (
                   <img className={styles.albumArt} src={oa.coverUrl} alt="" />
                 ) : (
-                  <div className={styles.albumArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>💿</div>
+                  <div className={styles.albumArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}><DiscIcon size={24} /></div>
                 )}
                 <div className={styles.albumTitle}>{oa.title}</div>
                 {oa.releaseYear && <div className={styles.albumYear}>{oa.releaseYear}</div>}

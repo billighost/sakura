@@ -1,26 +1,119 @@
 .root {
+  position: relative;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.625rem;
-  height: clamp(3rem, 9vh, 3.75rem);
-  padding: 0 clamp(0.5rem, 2vw, 0.75rem);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  flex-direction: column;
+  height: clamp(3.25rem, 10vh, 4rem);
   background: var(--sakura-surface-2);
   border-top: 1px solid var(--sakura-border);
   cursor: pointer;
   flex-shrink: 0;
   z-index: 49;
-  position: relative;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.seekContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+
+.progressTrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  top: 1px;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--sakura-accent);
+  transition: width 0.1s linear;
+}
+
+.seekInput {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 10px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.seekInput::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.seekInput:hover::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.seekInput::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.seekInput:hover::-moz-range-thumb {
+  opacity: 1;
+}
+
+.seekInput::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.seekInput::-moz-range-track {
+  background: transparent;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 clamp(0.625rem, 2.5vw, 0.875rem);
+  flex: 1;
 }
 
 .art {
-  width: clamp(2.25rem, 7vw, 2.75rem);
-  height: clamp(2.25rem, 7vw, 2.75rem);
+  width: clamp(2.5rem, 8vw, 3rem);
+  height: clamp(2.5rem, 8vw, 3rem);
   border-radius: 6px;
   object-fit: cover;
   background: var(--sakura-skeleton);
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.artFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-text-secondary);
 }
 
 .info {
@@ -34,6 +127,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--sakura-text);
 }
 
 .artist {
@@ -44,13 +138,26 @@
   white-space: nowrap;
 }
 
-.progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 2px;
-  background: var(--sakura-accent);
-  transition: width 0.3s linear;
+.likeBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: var(--sakura-text-secondary);
+  transition: color 0.15s, transform 0.15s;
+  border-radius: 50%;
+}
+
+.likeBtn:active {
+  transform: scale(0.85);
+}
+
+.likedBtn {
+  color: var(--sakura-accent);
 }
 
 .playBtn {
@@ -58,11 +165,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2rem, 6vw, 2.5rem);
-  height: clamp(2rem, 6vw, 2.5rem);
+  width: clamp(2.25rem, 7vw, 2.75rem);
+  height: clamp(2.25rem, 7vw, 2.75rem);
   cursor: pointer;
   flex-shrink: 0;
   border-radius: 50%;
+  color: var(--sakura-text);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.playBtn:hover {
+  background: var(--sakura-active);
 }
 
 .playBtn:active {
@@ -72,5 +185,23 @@
 .playBtn svg {
   width: clamp(1.25rem, 4vw, 1.5rem);
   height: clamp(1.25rem, 4vw, 1.5rem);
+}
+
+.skipBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(1.75rem, 5vw, 2.25rem);
+  height: clamp(1.75rem, 5vw, 2.25rem);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--sakura-text-secondary);
+  transition: color 0.15s, transform 0.15s;
+}
+
+.skipBtn:active {
+  transform: scale(0.85);
   color: var(--sakura-text);
 }

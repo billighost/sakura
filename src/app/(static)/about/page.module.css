@@ -1,50 +1,277 @@
 .page {
-  max-width: 36rem;
+  max-width: 40rem;
   margin: 0 auto;
   padding: clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
 }
 
-.header {
+.hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+  margin-bottom: clamp(2rem, 5vw, 3rem);
   text-align: center;
+  position: relative;
+}
+
+.heroGlow {
+  position: absolute;
+  width: 12rem;
+  height: 12rem;
+  background: radial-gradient(circle, rgba(242, 120, 159, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  top: -2rem;
+  z-index: 0;
+}
+
+.iconWrapper {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1rem;
 }
 
 .icon {
   border-radius: 1.25rem;
-  margin-bottom: 1rem;
+  box-shadow: 0 8px 32px rgba(242, 120, 159, 0.3);
+}
+
+.iconPulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 1.25rem;
+  border: 2px solid var(--sakura-accent);
+  opacity: 0;
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.05); }
 }
 
 .title {
-  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
   font-weight: 800;
-  margin-bottom: 0.25rem;
-  color: var(--sakura-accent);
+  margin-bottom: 0.375rem;
+  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.version {
-  font-size: 0.8125rem;
+.badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--sakura-accent);
+  background: linear-gradient(135deg, rgba(242, 120, 159, 0.15), rgba(201, 166, 224, 0.15));
+  padding: 0.25rem 0.75rem;
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+}
+
+.subtitle {
+  font-size: 0.9375rem;
+  line-height: 1.6;
   color: var(--sakura-text-secondary);
-  opacity: 0.7;
+  max-width: 28rem;
 }
 
 .section {
-  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
 }
 
 .heading {
-  font-size: 1.0625rem;
+  font-size: clamp(1rem, 2.5vw, 1.125rem);
   font-weight: 700;
   color: var(--sakura-text);
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.375rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--sakura-border);
 }
 
-.text {
+.featuresGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.featureCard {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-border);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.featureCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--sakura-accent);
+}
+
+.featureIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(242, 120, 159, 0.15), rgba(201, 166, 224, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-accent);
+  flex-shrink: 0;
+}
+
+.featureContent {
+  flex: 1;
+}
+
+.featureTitle {
   font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.featureDesc {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--sakura-text-secondary);
+}
+
+.techGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.techItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.875rem 0.5rem;
+  background: var(--sakura-surface);
+  border-radius: 10px;
+  border: 1px solid var(--sakura-border);
+}
+
+.techIcon {
+  font-size: 1.25rem;
+}
+
+.techName {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.roadmapList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.roadmapItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--sakura-surface);
+  border-radius: 10px;
+  border: 1px solid var(--sakura-border);
+}
+
+.roadmapDone {
+  opacity: 0.7;
+}
+
+.roadmapCheck {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.roadmapDone .roadmapCheck {
+  background: var(--sakura-success);
+  color: #fff;
+}
+
+.roadmapEmpty {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--sakura-border);
+}
+
+.roadmapText {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.roadmapDone .roadmapText {
+  text-decoration: line-through;
+  color: var(--sakura-text-secondary);
+}
+
+.howItWorks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--sakura-surface);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-border);
+  width: 100%;
+}
+
+.stepNumber {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.stepConnector {
+  width: 2px;
+  height: 1.5rem;
+  background: var(--sakura-border);
+}
+
+.stepContent {
+  flex: 1;
+}
+
+.stepTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.stepDesc {
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  line-height: 1.5;
+}
+
+.text {
+  font-size: 0.875rem;
   line-height: 1.7;
   color: var(--sakura-text-secondary);
   margin-bottom: 0.75rem;
@@ -55,32 +282,20 @@
   font-weight: 600;
 }
 
-.list {
-  list-style: none;
-  padding: 0;
-}
-
-.list li {
-  font-size: 0.9375rem;
-  line-height: 1.7;
-  color: var(--sakura-text-secondary);
-  padding-left: 1.25rem;
-  position: relative;
-  margin-bottom: 0.375rem;
-}
-
-.list li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-}
-
-.list li strong {
-  color: var(--sakura-text);
-  font-weight: 600;
+@media (max-width: 480px) {
+  .techGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .techItem {
+    padding: 0.625rem 0.375rem;
+  }
+  
+  .techIcon {
+    font-size: 1rem;
+  }
+  
+  .techName {
+    font-size: 0.6875rem;
+  }
 }

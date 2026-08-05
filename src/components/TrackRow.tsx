@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack } from "@/lib/offline-db";
 
 interface TrackRowProps {
   track: {
     id: string;
     title: string;
-    artist: { name: string };
-    album?: { title: string; coverUrl?: string } | null;
+    artist: { name: string; id?: string };
+    album?: { title: string; coverUrl?: string; id?: string } | null;
     coverUrl?: string;
     audioUrl: string;
     duration: number;
@@ -32,34 +34,16 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
   async function checkOffline() {
     try {
-      const db = await openDB();
-      const tx = db.transaction("tracks", "readonly");
-      const stored = await tx.store.get(track.id);
-      setOffline(!!stored);
+      const cached = await isTrackDownloaded(track.id);
+      setOffline(cached);
     } catch {}
-  }
-
-  async function openDB() {
-    const { openDB: idbOpen } = await import("idb");
-    return idbOpen("sakura-offline", 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("tracks")) {
-          db.createObjectStore("tracks", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("audio")) {
-          db.createObjectStore("audio", { keyPath: "id" });
-        }
-      },
-    });
   }
 
   async function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
     if (offline) {
       try {
-        const db = await openDB();
-        await db.delete("tracks", track.id);
-        await db.delete("audio", track.id);
+        await removeOfflineTrack(track.id);
         setOffline(false);
       } catch {}
       return;
@@ -70,18 +54,16 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       const res = await fetch(track.audioUrl);
       const blob = await res.blob();
 
-      const db = await openDB();
-      await db.put("tracks", {
+      await saveTrackOffline({
         id: track.id,
         title: track.title,
         artist: track.artist.name,
         album: track.album?.title,
+        audioUrl: track.audioUrl,
         coverUrl: cover,
         duration: track.duration,
-        audioUrl: track.audioUrl,
-        savedAt: Date.now(),
       });
-      await db.put("audio", { id: track.id, blob });
+      await saveAudioBlob(track.id, blob);
       setOffline(true);
     } catch (err) {
       console.error("Download failed:", err);
@@ -147,22 +129,42 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       }}
     >
       {showNumber && index !== undefined ? (
-        <span style={{ fontSize: "0.8125rem", color: "var(--sakura-text-secondary)", width: "clamp(1.25rem, 4vw, 1.5rem)", textAlign: "center", flexShrink: 0 }}>
-          {isActive ? "♫" : index + 1}
+        <span style={{ fontSize: "0.8125rem", color: "var(--sakura-text-secondary)", width: "clamp(1.25rem, 4vw, 1.5rem)", textAlign: "center", flexShrink: 0, position: "relative" }}>
+          {isActive && isPlaying ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--sakura-accent)" style={{ display: "block", margin: "0 auto" }}>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          ) : isActive ? "♫" : index + 1}
         </span>
       ) : cover ? (
-        <img
-          src={cover}
-          alt=""
-          style={{
-            width: "clamp(2.5rem, 8vw, 3rem)",
-            height: "clamp(2.5rem, 8vw, 3rem)",
+        <div style={{ position: "relative", width: "clamp(2.5rem, 8vw, 3rem)", height: "clamp(2.5rem, 8vw, 3rem)", flexShrink: 0 }}>
+          <img
+            src={cover}
+            alt=""
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "8px",
+              objectFit: "cover",
+              background: "var(--sakura-skeleton)",
+            }}
+          />
+          <div style={{
+            position: "absolute",
+            inset: 0,
             borderRadius: "8px",
-            objectFit: "cover",
-            background: "var(--sakura-skeleton)",
-            flexShrink: 0,
-          }}
-        />
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: isActive && isPlaying ? 1 : 0,
+            transition: "opacity 0.15s",
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
       ) : null}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -173,7 +175,15 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           whiteSpace: "nowrap",
           color: isActive ? "var(--sakura-accent)" : undefined,
         }}>
-          {track.title}
+          <Link
+            href={`/track/${track.id}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: "inherit", textDecoration: "none" }}
+            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+          >
+            {track.title}
+          </Link>
         </div>
         <div style={{
           fontSize: "0.75rem",
@@ -183,8 +193,37 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           whiteSpace: "nowrap",
           marginTop: "1px",
         }}>
-          {track.artist.name}
-          {track.album?.title ? ` · ${track.album.title}` : ""}
+          {track.artist.id ? (
+            <Link
+              href={`/artist/${track.artist.id}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "inherit", textDecoration: "none" }}
+              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+            >
+              {track.artist.name}
+            </Link>
+          ) : (
+            track.artist.name
+          )}
+          {track.album?.title ? (
+            <>
+              {" · "}
+              {track.album.id ? (
+                <Link
+                  href={`/album/${track.album.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ color: "inherit", textDecoration: "none" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                >
+                  {track.album.title}
+                </Link>
+              ) : (
+                track.album.title
+              )}
+            </>
+          ) : ""}
         </div>
       </div>
       <span style={{ fontSize: "0.75rem", color: "var(--sakura-text-secondary)", flexShrink: 0 }}>

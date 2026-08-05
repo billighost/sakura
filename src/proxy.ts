@@ -15,13 +15,11 @@ export function proxy(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    return NextResponse.next();
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|robots.txt).*)"],
+  matcher: ["/api/:path*"],
 };

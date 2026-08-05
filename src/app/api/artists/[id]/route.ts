@@ -17,10 +17,10 @@ export async function GET(
     const artist = await queryOne(
       `SELECT
         a.*,
-        COUNT(DISTINCT t.id)::int AS "trackCount",
+        (SELECT COUNT(DISTINCT t.id) FROM "Track" t WHERE t."artistId" = a.id) +
+        (SELECT COUNT(DISTINCT ta."trackId") FROM "TrackArtist" ta WHERE ta."artistId" = a.id) AS "trackCount",
         COUNT(DISTINCT al.id)::int AS "albumCount"
       FROM "Artist" a
-      LEFT JOIN "Track" t ON t."artistId" = a.id
       LEFT JOIN "Album" al ON al."artistId" = a.id
       WHERE a.id = $1
       GROUP BY a.id`,
@@ -31,7 +31,7 @@ export async function GET(
       return NextResponse.json({ error: "Artist not found" }, { status: 404 });
     }
 
-    const [albums, topTracks] = await Promise.all([
+    const [albums, tracks] = await Promise.all([
       query(
         `SELECT
           al.*,
@@ -46,17 +46,26 @@ export async function GET(
       query(
         `SELECT
           t.id, t.title, t.duration, t."trackNumber", t.genre, t."audioUrl", t."coverUrl",
-          json_build_object('title', al.title, 'coverUrl', al."coverUrl") AS album
+          json_build_object('name', a.name, 'id', a.id) AS artist,
+          json_build_object('title', al.title, 'coverUrl', al."coverUrl", 'id', al.id) AS album,
+          COALESCE(
+            (SELECT json_agg(json_build_object('name', a2.name, 'id', a2.id, 'role', ta.role))
+             FROM "TrackArtist" ta
+             JOIN "Artist" a2 ON ta."artistId" = a2.id
+             WHERE ta."trackId" = t.id),
+            '[]'::json
+          ) AS "otherArtists"
         FROM "Track" t
+        LEFT JOIN "Artist" a ON t."artistId" = a.id
         LEFT JOIN "Album" al ON t."albumId" = al.id
         WHERE t."artistId" = $1
-        ORDER BY t."createdAt" DESC
-        LIMIT 10`,
+           OR EXISTS (SELECT 1 FROM "TrackArtist" ta WHERE ta."trackId" = t.id AND ta."artistId" = $1)
+        ORDER BY t."createdAt" DESC`,
         [id],
       ),
     ]);
 
-    return NextResponse.json({ ...artist, albums, tracks: topTracks });
+    return NextResponse.json({ ...artist, albums, tracks });
   } catch (err) {
     console.error("Failed to fetch artist:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

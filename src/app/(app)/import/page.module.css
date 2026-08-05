@@ -1,7 +1,12 @@
 .page {
   padding: clamp(0.75rem, 3vw, 1.25rem);
-  max-width: 32rem;
+  max-width: 36rem;
   margin: 0 auto;
+}
+
+.heroSection {
+  text-align: center;
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
 }
 
 .title {
@@ -12,9 +17,70 @@
 }
 
 .subtitle {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
-  margin: 0 0 clamp(1rem, 3vw, 1.5rem);
+  margin: 0;
+}
+
+.stepIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+}
+
+.stepCircle {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--sakura-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--sakura-text-secondary);
+  background: var(--sakura-surface);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.stepActive {
+  border-color: var(--sakura-accent);
+  background: var(--sakura-accent);
+  color: #fff;
+}
+
+.stepComplete {
+  border-color: var(--sakura-success);
+  background: var(--sakura-success);
+  color: #fff;
+}
+
+.stepLabel {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  margin-left: 0.375rem;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+
+.stepLabelActive {
+  color: var(--sakura-accent);
+  font-weight: 600;
+}
+
+.stepLine {
+  width: 2rem;
+  height: 1.5px;
+  background: var(--sakura-border);
+  margin: 0 0.375rem;
 }
 
 .inputGroup {
@@ -30,21 +96,32 @@
   align-items: center;
 }
 
+.platformBadge {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .urlInput {
   width: 100%;
-  height: clamp(2.5rem, 7vw, 3rem);
+  height: clamp(2.75rem, 8vw, 3.25rem);
   padding: 0 2.5rem;
+  padding-left: 2.5rem;
   background: var(--sakura-input-bg);
   border: 1.5px solid var(--sakura-input-border);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--sakura-text);
   font-size: 0.875rem;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .urlInput:focus {
   border-color: var(--sakura-accent);
+  box-shadow: 0 0 0 3px rgba(242, 120, 159, 0.1);
 }
 
 .urlInput::placeholder {
@@ -61,7 +138,7 @@
 
 .urlIndicator {
   position: absolute;
-  right: 2rem;
+  right: 2.5rem;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
@@ -76,11 +153,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 6px;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
   color: var(--sakura-text-secondary);
   cursor: pointer;
+  transition: all 0.15s;
 }
 
 .pasteBtn:hover {
@@ -89,16 +167,19 @@
 }
 
 .importBtn {
-  height: clamp(2.5rem, 7vw, 3rem);
-  padding: 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: clamp(2.75rem, 8vw, 3.25rem);
+  padding: 0 1.25rem;
   background: var(--sakura-accent);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all 0.15s;
   white-space: nowrap;
 }
 
@@ -109,6 +190,24 @@
 
 .importBtn:not(:disabled):hover {
   opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.importBtn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.btnSpinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.progressSection {
+  margin-bottom: 1rem;
 }
 
 .progressBar {
@@ -116,15 +215,21 @@
   height: 4px;
   background: var(--sakura-border);
   border-radius: 2px;
-  margin-bottom: 1rem;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: var(--sakura-accent);
+  background: linear-gradient(90deg, var(--sakura-accent), var(--sakura-accent-2));
   border-radius: 2px;
   transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.375rem;
+  text-align: center;
 }
 
 .error {
@@ -132,23 +237,38 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(232, 93, 117, 0.08);
+  border: 1px solid rgba(232, 93, 117, 0.25);
   border-radius: 10px;
   color: var(--sakura-danger);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   margin-bottom: 1rem;
+}
+
+.errorDismiss {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.errorDismiss:hover {
+  opacity: 1;
 }
 
 .results {
   margin-top: 1rem;
 }
 
-.header {
+.resultsHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
   margin-bottom: 0.75rem;
 }
@@ -158,19 +278,33 @@
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .selectAll input[type="checkbox"] {
   accent-color: var(--sakura-accent);
 }
 
+.resultsBadges {
+  display: flex;
+  gap: 0.375rem;
+}
+
 .savedBadge {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  padding: 0.25rem 0.5rem;
+  background: rgba(94, 196, 158, 0.12);
+  color: var(--sakura-success);
+  padding: 0.2rem 0.5rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.errorBadge {
+  background: rgba(232, 93, 117, 0.12);
+  color: var(--sakura-danger);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 
@@ -185,25 +319,28 @@
 .trackItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0.625rem 0.75rem;
-  background: var(--sakura-card-bg);
-  border: 1px solid var(--sakura-card-border);
-  border-radius: 8px;
-  transition: background 0.15s;
+  background: var(--sakura-card-bg, var(--sakura-surface));
+  border: 1px solid var(--sakura-card-border, var(--sakura-border));
+  border-radius: 10px;
+  transition: all 0.15s;
+}
+
+.trackItem:hover {
+  background: var(--sakura-hover);
 }
 
 .trackItem.saved {
-  border-color: rgba(34, 197, 94, 0.3);
+  border-color: rgba(94, 196, 158, 0.3);
 }
 
 .trackItem.exists {
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: rgba(201, 166, 224, 0.3);
 }
 
 .trackItem.error {
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(232, 93, 117, 0.3);
+  background: rgba(232, 93, 117, 0.04);
 }
 
 .trackCheck {
@@ -222,7 +359,7 @@
 }
 
 .trackTitle {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--sakura-text);
   white-space: nowrap;
@@ -231,29 +368,65 @@
 }
 
 .trackArtist {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--sakura-text-secondary);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackDuration {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  margin-left: 0.5rem;
+  flex-shrink: 0;
 }
 
 .trackStatus {
-  font-size: 0.875rem;
-  flex-shrink: 0;
   margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusPending {
+  background: var(--sakura-text-secondary);
+  opacity: 0.4;
+}
+
+.statusSaved {
+  background: var(--sakura-success);
+}
+
+.statusExists {
+  background: var(--sakura-accent-2);
+}
+
+.statusError {
+  background: var(--sakura-danger);
 }
 
 .saveBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   width: 100%;
-  height: clamp(2.5rem, 7vw, 3rem);
+  height: clamp(2.75rem, 8vw, 3.25rem);
   margin-top: 1rem;
   background: var(--sakura-accent);
   color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.9375rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all 0.15s;
 }
 
 .saveBtn:disabled {
@@ -263,35 +436,165 @@
 
 .saveBtn:not(:disabled):hover {
   opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.saveBtn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.doneSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(1.5rem, 5vh, 2.5rem) 1rem;
+  text-align: center;
+}
+
+.doneIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: rgba(94, 196, 158, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.doneText {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--sakura-text);
+  margin-bottom: 1rem;
+}
+
+.importAnotherBtn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  padding: 0 1.25rem;
+  border-radius: 9999px;
+  background: var(--sakura-surface-2);
+  color: var(--sakura-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--sakura-border);
+  transition: all 0.15s;
+}
+
+.importAnotherBtn:hover {
+  background: var(--sakura-hover);
+}
+
+.importAnotherBtn:active {
+  transform: scale(0.97);
+}
+
+.platformsSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: 1rem;
+}
+
+.platformCard {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 12px;
+}
+
+.platformInfo {
+  flex: 1;
+}
+
+.platformName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sakura-text);
+}
+
+.platformDesc {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 2px;
 }
 
 .historySection {
-  margin-top: clamp(1rem, 3vw, 1.5rem);
+  margin-top: clamp(0.75rem, 2vw, 1rem);
   margin-bottom: 1rem;
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 
 .historyTitle {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--sakura-text);
-  margin-bottom: 0.5rem;
+}
+
+.historyClear {
+  all: unset;
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.historyClear:hover {
+  color: var(--sakura-danger);
+  background: rgba(232, 93, 117, 0.08);
 }
 
 .historyItem {
   all: unset;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   width: 100%;
-  padding: 0.625rem 0.75rem;
-  background: var(--sakura-card-bg);
-  border: 1px solid var(--sakura-card-border);
-  border-radius: 8px;
+  padding: 0.75rem;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 10px;
   margin-bottom: 0.375rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
+  box-sizing: border-box;
 }
 
 .historyItem:hover {
   background: var(--sakura-hover);
+  border-color: var(--sakura-text-secondary);
+}
+
+.historyIcon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background: var(--sakura-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.historyContent {
+  flex: 1;
+  min-width: 0;
 }
 
 .historyUrl {
@@ -305,28 +608,56 @@
 .historyMeta {
   font-size: 0.6875rem;
   color: var(--sakura-text-secondary);
-  margin-top: 0.25rem;
+  margin-top: 0.125rem;
 }
 
-.examples {
-  margin-top: clamp(1.5rem, 5vh, 3rem);
+.tipsSection {
+  margin-top: clamp(1rem, 3vw, 1.5rem);
   padding: 1rem;
-  background: var(--sakura-card-bg);
-  border: 1px solid var(--sakura-card-border);
-  border-radius: 10px;
+  background: var(--sakura-surface);
+  border: 1px solid var(--sakura-border);
+  border-radius: 12px;
 }
 
-.examplesTitle {
+.tipsTitle {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--sakura-text);
-  margin: 0 0 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.examplesList {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.75rem;
+.tipItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+
+.tipItem:last-child {
+  margin-bottom: 0;
+}
+
+.tipNumber {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.tipText {
+  font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
-  line-height: 1.75;
+  line-height: 1.5;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

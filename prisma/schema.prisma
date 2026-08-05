@@ -18,7 +18,9 @@ model User {
   
   settings         UserSettings?
   playlists        Playlist[]
+  playlistFolders  PlaylistFolder[]
   favorites        Favorite[]
+  snoozedTracks    SnoozedTrack[]
   listeningHistory ListeningHistory[]
 }
 
@@ -36,27 +38,37 @@ model UserSettings {
 }
 
 model Artist {
-  id       String  @id @default(uuid())
-  name     String  @unique
-  imageUrl String?
-  
-  albums   Album[]
-  tracks   Track[]
+  id         String   @id @default(uuid())
+  name       String   @unique
+  imageUrl   String?
+  bio        String?
+  deezerId   String?
+  genres     String[]
+  createdAt  DateTime @default(now())
+
+  albums        Album[]
+  tracks        Track[]
+  trackArtists  TrackArtist[]
 }
 
 model Album {
-  id          String  @id @default(uuid())
-  title       String
-  artistId    String
-  coverUrl    String?
-  releaseYear Int?
-  
-  artist Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  tracks Track[]
+  id           String    @id @default(uuid())
+  title        String
+  artistId     String
+  coverUrl     String?
+  releaseYear  Int?
+  releaseDate  DateTime?
+  genre        String?
+  deezerId     String?
+  copyright    String?
+  createdAt    DateTime  @default(now())
+
+  artist   Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks   Track[]
 }
 
 model Track {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   title             String
   artistId          String
   albumId           String?
@@ -65,17 +77,45 @@ model Track {
   genre             String?
   audioUrl          String
   coverUrl          String?
-  sourceHash        String?  @unique
-  source            String   @default("telegram")
-  telegramFileId    String?  @unique
+  sourceHash        String?   @unique
+  source            String    @default("telegram")
+  telegramFileId    String?   @unique
   telegramMessageId String?
-  createdAt         DateTime @default(now())
+  deezerId          String?
+  isrc              String?
+  previewUrl        String?
+  createdAt         DateTime  @default(now())
 
   artist           Artist             @relation(fields: [artistId], references: [id], onDelete: Cascade)
   album            Album?             @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  trackArtists     TrackArtist[]
   playlistTracks   PlaylistTrack[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
+  credits          TrackCredit[]
+  samples          SampledTrack[]     @relation("TrackSamples")
+  sampledBy        SampledTrack[]     @relation("TrackSampled")
+  snoozedBy        SnoozedTrack[]
+
+  @@index([artistId])
+  @@index([albumId])
+  @@index([deezerId])
+  @@index([telegramMessageId])
+  @@index([title])
+  @@index([createdAt])
+}
+
+model TrackArtist {
+  trackId    String
+  artistId   String
+  role       String   @default("main")
+  position   Int      @default(0)
+  addedAt    DateTime @default(now())
+
+  track  Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([trackId, artistId])
 }
 
 model Playlist {
@@ -84,10 +124,22 @@ model Playlist {
   name        String
   description String?
   coverUrl    String?
+  folderId    String?
   createdAt   DateTime @default(now())
 
   user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   tracks PlaylistTrack[]
+  folder PlaylistFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+}
+
+model PlaylistFolder {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlists Playlist[]
 }
 
 model PlaylistTrack {
@@ -100,6 +152,34 @@ model PlaylistTrack {
   track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@id([playlistId, trackId])
+  @@index([trackId])
+}
+
+model TrackCredit {
+  id        String   @id @default(uuid())
+  trackId   String
+  name      String
+  role      String   // "producer", "songwriter", "engineer", "mixer", "mastering"
+  createdAt DateTime @default(now())
+
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([trackId])
+}
+
+model SampledTrack {
+  id              String   @id @default(uuid())
+  trackId         String   // the track that contains the sample
+  sampledTrackId  String   // the track being sampled
+  sampleType      String   // "samples", "covered", "remixed", "interpolated"
+  createdAt       DateTime @default(now())
+
+  track        Track @relation("TrackSamples", fields: [trackId], references: [id], onDelete: Cascade)
+  sampledTrack Track @relation("TrackSampled", fields: [sampledTrackId], references: [id], onDelete: Cascade)
+
+  @@unique([trackId, sampledTrackId, sampleType])
+  @@index([trackId])
+  @@index([sampledTrackId])
 }
 
 model Favorite {
@@ -111,6 +191,22 @@ model Favorite {
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@id([userId, trackId])
+  @@index([userId])
+  @@index([trackId])
+}
+
+model SnoozedTrack {
+  userId    String
+  trackId   String
+  snoozedAt DateTime @default(now())
+  expiresAt DateTime
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model ListeningHistory {
@@ -121,4 +217,8 @@ model ListeningHistory {
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([trackId])
+  @@index([playedAt])
 }

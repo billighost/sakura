@@ -43,20 +43,45 @@ export type Album = Prisma.AlbumModel
  */
 export type Track = Prisma.TrackModel
 /**
+ * Model TrackArtist
+ * 
+ */
+export type TrackArtist = Prisma.TrackArtistModel
+/**
  * Model Playlist
  * 
  */
 export type Playlist = Prisma.PlaylistModel
+/**
+ * Model PlaylistFolder
+ * 
+ */
+export type PlaylistFolder = Prisma.PlaylistFolderModel
 /**
  * Model PlaylistTrack
  * 
  */
 export type PlaylistTrack = Prisma.PlaylistTrackModel
 /**
+ * Model TrackCredit
+ * 
+ */
+export type TrackCredit = Prisma.TrackCreditModel
+/**
+ * Model SampledTrack
+ * 
+ */
+export type SampledTrack = Prisma.SampledTrackModel
+/**
  * Model Favorite
  * 
  */
 export type Favorite = Prisma.FavoriteModel
+/**
+ * Model SnoozedTrack
+ * 
+ */
+export type SnoozedTrack = Prisma.SnoozedTrackModel
 /**
  * Model ListeningHistory
  * 

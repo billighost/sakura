@@ -13,8 +13,9 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(100, parseInt(searchParams.get("limit") || "20"));
   const offset = (page - 1) * limit;
+  const downloadedOnly = searchParams.get("downloaded") === "true";
 
-  const cacheKey = `artists:list:${page}:${limit}`;
+  const cacheKey = `artists:list:${page}:${limit}:${downloadedOnly}`;
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -25,19 +26,30 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    let whereClause = "";
+    if (downloadedOnly) {
+      whereClause = `WHERE EXISTS (
+        SELECT 1 FROM "Track" t WHERE t."artistId" = a.id
+        UNION
+        SELECT 1 FROM "TrackArtist" ta WHERE ta."artistId" = a.id
+      )`;
+    }
+
     const countResult = await queryOne<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM "Artist"',
+      `SELECT COUNT(*)::text AS count FROM "Artist" a ${whereClause}`,
     );
     const total = parseInt(countResult?.count || "0", 10);
 
     const artists = await query(
       `SELECT
         a.*,
-        COUNT(DISTINCT t.id)::int AS "trackCount",
+        COUNT(DISTINCT t.id)::int + COUNT(DISTINCT ta."trackId")::int AS "trackCount",
         COUNT(DISTINCT al.id)::int AS "albumCount"
       FROM "Artist" a
       LEFT JOIN "Track" t ON t."artistId" = a.id
+      LEFT JOIN "TrackArtist" ta ON ta."artistId" = a.id
       LEFT JOIN "Album" al ON al."artistId" = a.id
+      ${whereClause}
       GROUP BY a.id
       ORDER BY a.name ASC
       LIMIT $1 OFFSET $2`,

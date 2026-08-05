@@ -50,6 +50,9 @@ export type TrackMinAggregateOutputType = {
   source: string | null
   telegramFileId: string | null
   telegramMessageId: string | null
+  deezerId: string | null
+  isrc: string | null
+  previewUrl: string | null
   createdAt: Date | null
 }
 
@@ -67,6 +70,9 @@ export type TrackMaxAggregateOutputType = {
   source: string | null
   telegramFileId: string | null
   telegramMessageId: string | null
+  deezerId: string | null
+  isrc: string | null
+  previewUrl: string | null
   createdAt: Date | null
 }
 
@@ -84,6 +90,9 @@ export type TrackCountAggregateOutputType = {
   source: number
   telegramFileId: number
   telegramMessageId: number
+  deezerId: number
+  isrc: number
+  previewUrl: number
   createdAt: number
   _all: number
 }
@@ -113,6 +122,9 @@ export type TrackMinAggregateInputType = {
   source?: true
   telegramFileId?: true
   telegramMessageId?: true
+  deezerId?: true
+  isrc?: true
+  previewUrl?: true
   createdAt?: true
 }
 
@@ -130,6 +142,9 @@ export type TrackMaxAggregateInputType = {
   source?: true
   telegramFileId?: true
   telegramMessageId?: true
+  deezerId?: true
+  isrc?: true
+  previewUrl?: true
   createdAt?: true
 }
 
@@ -147,6 +162,9 @@ export type TrackCountAggregateInputType = {
   source?: true
   telegramFileId?: true
   telegramMessageId?: true
+  deezerId?: true
+  isrc?: true
+  previewUrl?: true
   createdAt?: true
   _all?: true
 }
@@ -251,6 +269,9 @@ export type TrackGroupByOutputType = {
   source: string
   telegramFileId: string | null
   telegramMessageId: string | null
+  deezerId: string | null
+  isrc: string | null
+  previewUrl: string | null
   createdAt: Date
   _count: TrackCountAggregateOutputType | null
   _avg: TrackAvgAggregateOutputType | null
@@ -291,12 +312,20 @@ export type TrackWhereInput = {
   source?: Prisma.StringFilter<"Track"> | string
   telegramFileId?: Prisma.StringNullableFilter<"Track"> | string | null
   telegramMessageId?: Prisma.StringNullableFilter<"Track"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Track"> | string | null
+  isrc?: Prisma.StringNullableFilter<"Track"> | string | null
+  previewUrl?: Prisma.StringNullableFilter<"Track"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Track"> | Date | string
   artist?: Prisma.XOR<Prisma.ArtistScalarRelationFilter, Prisma.ArtistWhereInput>
   album?: Prisma.XOR<Prisma.AlbumNullableScalarRelationFilter, Prisma.AlbumWhereInput> | null
+  trackArtists?: Prisma.TrackArtistListRelationFilter
   playlistTracks?: Prisma.PlaylistTrackListRelationFilter
   favorites?: Prisma.FavoriteListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
+  credits?: Prisma.TrackCreditListRelationFilter
+  samples?: Prisma.SampledTrackListRelationFilter
+  sampledBy?: Prisma.SampledTrackListRelationFilter
+  snoozedBy?: Prisma.SnoozedTrackListRelationFilter
 }
 
 export type TrackOrderByWithRelationInput = {
@@ -313,12 +342,20 @@ export type TrackOrderByWithRelationInput = {
   source?: Prisma.SortOrder
   telegramFileId?: Prisma.SortOrderInput | Prisma.SortOrder
   telegramMessageId?: Prisma.SortOrderInput | Prisma.SortOrder
+  deezerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  isrc?: Prisma.SortOrderInput | Prisma.SortOrder
+  previewUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   artist?: Prisma.ArtistOrderByWithRelationInput
   album?: Prisma.AlbumOrderByWithRelationInput
+  trackArtists?: Prisma.TrackArtistOrderByRelationAggregateInput
   playlistTracks?: Prisma.PlaylistTrackOrderByRelationAggregateInput
   favorites?: Prisma.FavoriteOrderByRelationAggregateInput
   listeningHistory?: Prisma.ListeningHistoryOrderByRelationAggregateInput
+  credits?: Prisma.TrackCreditOrderByRelationAggregateInput
+  samples?: Prisma.SampledTrackOrderByRelationAggregateInput
+  sampledBy?: Prisma.SampledTrackOrderByRelationAggregateInput
+  snoozedBy?: Prisma.SnoozedTrackOrderByRelationAggregateInput
 }
 
 export type TrackWhereUniqueInput = Prisma.AtLeast<{
@@ -338,12 +375,20 @@ export type TrackWhereUniqueInput = Prisma.AtLeast<{
   coverUrl?: Prisma.StringNullableFilter<"Track"> | string | null
   source?: Prisma.StringFilter<"Track"> | string
   telegramMessageId?: Prisma.StringNullableFilter<"Track"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Track"> | string | null
+  isrc?: Prisma.StringNullableFilter<"Track"> | string | null
+  previewUrl?: Prisma.StringNullableFilter<"Track"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Track"> | Date | string
   artist?: Prisma.XOR<Prisma.ArtistScalarRelationFilter, Prisma.ArtistWhereInput>
   album?: Prisma.XOR<Prisma.AlbumNullableScalarRelationFilter, Prisma.AlbumWhereInput> | null
+  trackArtists?: Prisma.TrackArtistListRelationFilter
   playlistTracks?: Prisma.PlaylistTrackListRelationFilter
   favorites?: Prisma.FavoriteListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
+  credits?: Prisma.TrackCreditListRelationFilter
+  samples?: Prisma.SampledTrackListRelationFilter
+  sampledBy?: Prisma.SampledTrackListRelationFilter
+  snoozedBy?: Prisma.SnoozedTrackListRelationFilter
 }, "id" | "sourceHash" | "telegramFileId">
 
 export type TrackOrderByWithAggregationInput = {
@@ -360,6 +405,9 @@ export type TrackOrderByWithAggregationInput = {
   source?: Prisma.SortOrder
   telegramFileId?: Prisma.SortOrderInput | Prisma.SortOrder
   telegramMessageId?: Prisma.SortOrderInput | Prisma.SortOrder
+  deezerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  isrc?: Prisma.SortOrderInput | Prisma.SortOrder
+  previewUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.TrackCountOrderByAggregateInput
   _avg?: Prisma.TrackAvgOrderByAggregateInput
@@ -385,6 +433,9 @@ export type TrackScalarWhereWithAggregatesInput = {
   source?: Prisma.StringWithAggregatesFilter<"Track"> | string
   telegramFileId?: Prisma.StringNullableWithAggregatesFilter<"Track"> | string | null
   telegramMessageId?: Prisma.StringNullableWithAggregatesFilter<"Track"> | string | null
+  deezerId?: Prisma.StringNullableWithAggregatesFilter<"Track"> | string | null
+  isrc?: Prisma.StringNullableWithAggregatesFilter<"Track"> | string | null
+  previewUrl?: Prisma.StringNullableWithAggregatesFilter<"Track"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Track"> | Date | string
 }
 
@@ -400,12 +451,20 @@ export type TrackCreateInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
   album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateInput = {
@@ -422,10 +481,18 @@ export type TrackUncheckedCreateInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUpdateInput = {
@@ -440,12 +507,20 @@ export type TrackUpdateInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
   album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateInput = {
@@ -462,10 +537,18 @@ export type TrackUncheckedUpdateInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateManyInput = {
@@ -482,6 +565,9 @@ export type TrackCreateManyInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
 }
 
@@ -497,6 +583,9 @@ export type TrackUpdateManyMutationInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -514,6 +603,9 @@ export type TrackUncheckedUpdateManyInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -541,6 +633,9 @@ export type TrackCountOrderByAggregateInput = {
   source?: Prisma.SortOrder
   telegramFileId?: Prisma.SortOrder
   telegramMessageId?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  isrc?: Prisma.SortOrder
+  previewUrl?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -563,6 +658,9 @@ export type TrackMaxOrderByAggregateInput = {
   source?: Prisma.SortOrder
   telegramFileId?: Prisma.SortOrder
   telegramMessageId?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  isrc?: Prisma.SortOrder
+  previewUrl?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -580,6 +678,9 @@ export type TrackMinOrderByAggregateInput = {
   source?: Prisma.SortOrder
   telegramFileId?: Prisma.SortOrder
   telegramMessageId?: Prisma.SortOrder
+  deezerId?: Prisma.SortOrder
+  isrc?: Prisma.SortOrder
+  previewUrl?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -677,6 +778,20 @@ export type TrackUncheckedUpdateManyWithoutAlbumNestedInput = {
   deleteMany?: Prisma.TrackScalarWhereInput | Prisma.TrackScalarWhereInput[]
 }
 
+export type TrackCreateNestedOneWithoutTrackArtistsInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutTrackArtistsInput, Prisma.TrackUncheckedCreateWithoutTrackArtistsInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutTrackArtistsInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackUpdateOneRequiredWithoutTrackArtistsNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutTrackArtistsInput, Prisma.TrackUncheckedCreateWithoutTrackArtistsInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutTrackArtistsInput
+  upsert?: Prisma.TrackUpsertWithoutTrackArtistsInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutTrackArtistsInput, Prisma.TrackUpdateWithoutTrackArtistsInput>, Prisma.TrackUncheckedUpdateWithoutTrackArtistsInput>
+}
+
 export type TrackCreateNestedOneWithoutPlaylistTracksInput = {
   create?: Prisma.XOR<Prisma.TrackCreateWithoutPlaylistTracksInput, Prisma.TrackUncheckedCreateWithoutPlaylistTracksInput>
   connectOrCreate?: Prisma.TrackCreateOrConnectWithoutPlaylistTracksInput
@@ -691,6 +806,48 @@ export type TrackUpdateOneRequiredWithoutPlaylistTracksNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutPlaylistTracksInput, Prisma.TrackUpdateWithoutPlaylistTracksInput>, Prisma.TrackUncheckedUpdateWithoutPlaylistTracksInput>
 }
 
+export type TrackCreateNestedOneWithoutCreditsInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutCreditsInput, Prisma.TrackUncheckedCreateWithoutCreditsInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutCreditsInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackUpdateOneRequiredWithoutCreditsNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutCreditsInput, Prisma.TrackUncheckedCreateWithoutCreditsInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutCreditsInput
+  upsert?: Prisma.TrackUpsertWithoutCreditsInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutCreditsInput, Prisma.TrackUpdateWithoutCreditsInput>, Prisma.TrackUncheckedUpdateWithoutCreditsInput>
+}
+
+export type TrackCreateNestedOneWithoutSamplesInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSamplesInput, Prisma.TrackUncheckedCreateWithoutSamplesInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSamplesInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackCreateNestedOneWithoutSampledByInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSampledByInput, Prisma.TrackUncheckedCreateWithoutSampledByInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSampledByInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackUpdateOneRequiredWithoutSamplesNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSamplesInput, Prisma.TrackUncheckedCreateWithoutSamplesInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSamplesInput
+  upsert?: Prisma.TrackUpsertWithoutSamplesInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutSamplesInput, Prisma.TrackUpdateWithoutSamplesInput>, Prisma.TrackUncheckedUpdateWithoutSamplesInput>
+}
+
+export type TrackUpdateOneRequiredWithoutSampledByNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSampledByInput, Prisma.TrackUncheckedCreateWithoutSampledByInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSampledByInput
+  upsert?: Prisma.TrackUpsertWithoutSampledByInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutSampledByInput, Prisma.TrackUpdateWithoutSampledByInput>, Prisma.TrackUncheckedUpdateWithoutSampledByInput>
+}
+
 export type TrackCreateNestedOneWithoutFavoritesInput = {
   create?: Prisma.XOR<Prisma.TrackCreateWithoutFavoritesInput, Prisma.TrackUncheckedCreateWithoutFavoritesInput>
   connectOrCreate?: Prisma.TrackCreateOrConnectWithoutFavoritesInput
@@ -703,6 +860,20 @@ export type TrackUpdateOneRequiredWithoutFavoritesNestedInput = {
   upsert?: Prisma.TrackUpsertWithoutFavoritesInput
   connect?: Prisma.TrackWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutFavoritesInput, Prisma.TrackUpdateWithoutFavoritesInput>, Prisma.TrackUncheckedUpdateWithoutFavoritesInput>
+}
+
+export type TrackCreateNestedOneWithoutSnoozedByInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSnoozedByInput, Prisma.TrackUncheckedCreateWithoutSnoozedByInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSnoozedByInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackUpdateOneRequiredWithoutSnoozedByNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutSnoozedByInput, Prisma.TrackUncheckedCreateWithoutSnoozedByInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutSnoozedByInput
+  upsert?: Prisma.TrackUpsertWithoutSnoozedByInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutSnoozedByInput, Prisma.TrackUpdateWithoutSnoozedByInput>, Prisma.TrackUncheckedUpdateWithoutSnoozedByInput>
 }
 
 export type TrackCreateNestedOneWithoutListeningHistoryInput = {
@@ -731,11 +902,19 @@ export type TrackCreateWithoutArtistInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutArtistInput = {
@@ -751,10 +930,18 @@ export type TrackUncheckedCreateWithoutArtistInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutArtistInput = {
@@ -800,6 +987,9 @@ export type TrackScalarWhereInput = {
   source?: Prisma.StringFilter<"Track"> | string
   telegramFileId?: Prisma.StringNullableFilter<"Track"> | string | null
   telegramMessageId?: Prisma.StringNullableFilter<"Track"> | string | null
+  deezerId?: Prisma.StringNullableFilter<"Track"> | string | null
+  isrc?: Prisma.StringNullableFilter<"Track"> | string | null
+  previewUrl?: Prisma.StringNullableFilter<"Track"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Track"> | Date | string
 }
 
@@ -815,11 +1005,19 @@ export type TrackCreateWithoutAlbumInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutAlbumInput = {
@@ -835,10 +1033,18 @@ export type TrackUncheckedCreateWithoutAlbumInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutAlbumInput = {
@@ -867,6 +1073,130 @@ export type TrackUpdateManyWithWhereWithoutAlbumInput = {
   data: Prisma.XOR<Prisma.TrackUpdateManyMutationInput, Prisma.TrackUncheckedUpdateManyWithoutAlbumInput>
 }
 
+export type TrackCreateWithoutTrackArtistsInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+}
+
+export type TrackUncheckedCreateWithoutTrackArtistsInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+}
+
+export type TrackCreateOrConnectWithoutTrackArtistsInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutTrackArtistsInput, Prisma.TrackUncheckedCreateWithoutTrackArtistsInput>
+}
+
+export type TrackUpsertWithoutTrackArtistsInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutTrackArtistsInput, Prisma.TrackUncheckedUpdateWithoutTrackArtistsInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutTrackArtistsInput, Prisma.TrackUncheckedCreateWithoutTrackArtistsInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutTrackArtistsInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutTrackArtistsInput, Prisma.TrackUncheckedUpdateWithoutTrackArtistsInput>
+}
+
+export type TrackUpdateWithoutTrackArtistsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutTrackArtistsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+}
+
 export type TrackCreateWithoutPlaylistTracksInput = {
   id?: string
   title: string
@@ -879,11 +1209,19 @@ export type TrackCreateWithoutPlaylistTracksInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
   album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutPlaylistTracksInput = {
@@ -900,9 +1238,17 @@ export type TrackUncheckedCreateWithoutPlaylistTracksInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutPlaylistTracksInput = {
@@ -933,11 +1279,19 @@ export type TrackUpdateWithoutPlaylistTracksInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
   album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutPlaylistTracksInput = {
@@ -954,9 +1308,389 @@ export type TrackUncheckedUpdateWithoutPlaylistTracksInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackCreateWithoutCreditsInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+}
+
+export type TrackUncheckedCreateWithoutCreditsInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+}
+
+export type TrackCreateOrConnectWithoutCreditsInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutCreditsInput, Prisma.TrackUncheckedCreateWithoutCreditsInput>
+}
+
+export type TrackUpsertWithoutCreditsInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutCreditsInput, Prisma.TrackUncheckedUpdateWithoutCreditsInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutCreditsInput, Prisma.TrackUncheckedCreateWithoutCreditsInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutCreditsInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutCreditsInput, Prisma.TrackUncheckedUpdateWithoutCreditsInput>
+}
+
+export type TrackUpdateWithoutCreditsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutCreditsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackCreateWithoutSamplesInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+}
+
+export type TrackUncheckedCreateWithoutSamplesInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+}
+
+export type TrackCreateOrConnectWithoutSamplesInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSamplesInput, Prisma.TrackUncheckedCreateWithoutSamplesInput>
+}
+
+export type TrackCreateWithoutSampledByInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+}
+
+export type TrackUncheckedCreateWithoutSampledByInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+}
+
+export type TrackCreateOrConnectWithoutSampledByInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSampledByInput, Prisma.TrackUncheckedCreateWithoutSampledByInput>
+}
+
+export type TrackUpsertWithoutSamplesInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutSamplesInput, Prisma.TrackUncheckedUpdateWithoutSamplesInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSamplesInput, Prisma.TrackUncheckedCreateWithoutSamplesInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutSamplesInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutSamplesInput, Prisma.TrackUncheckedUpdateWithoutSamplesInput>
+}
+
+export type TrackUpdateWithoutSamplesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutSamplesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUpsertWithoutSampledByInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutSampledByInput, Prisma.TrackUncheckedUpdateWithoutSampledByInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSampledByInput, Prisma.TrackUncheckedCreateWithoutSampledByInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutSampledByInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutSampledByInput, Prisma.TrackUncheckedUpdateWithoutSampledByInput>
+}
+
+export type TrackUpdateWithoutSampledByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutSampledByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutFavoritesInput = {
@@ -971,11 +1705,19 @@ export type TrackCreateWithoutFavoritesInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
   album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutFavoritesInput = {
@@ -992,9 +1734,17 @@ export type TrackUncheckedCreateWithoutFavoritesInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutFavoritesInput = {
@@ -1025,11 +1775,19 @@ export type TrackUpdateWithoutFavoritesInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
   album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutFavoritesInput = {
@@ -1046,9 +1804,141 @@ export type TrackUncheckedUpdateWithoutFavoritesInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackCreateWithoutSnoozedByInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+}
+
+export type TrackUncheckedCreateWithoutSnoozedByInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+}
+
+export type TrackCreateOrConnectWithoutSnoozedByInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSnoozedByInput, Prisma.TrackUncheckedCreateWithoutSnoozedByInput>
+}
+
+export type TrackUpsertWithoutSnoozedByInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutSnoozedByInput, Prisma.TrackUncheckedUpdateWithoutSnoozedByInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutSnoozedByInput, Prisma.TrackUncheckedCreateWithoutSnoozedByInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutSnoozedByInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutSnoozedByInput, Prisma.TrackUncheckedUpdateWithoutSnoozedByInput>
+}
+
+export type TrackUpdateWithoutSnoozedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutSnoozedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
 }
 
 export type TrackCreateWithoutListeningHistoryInput = {
@@ -1063,11 +1953,19 @@ export type TrackCreateWithoutListeningHistoryInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
   artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
   album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutListeningHistoryInput = {
@@ -1084,9 +1982,17 @@ export type TrackUncheckedCreateWithoutListeningHistoryInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutListeningHistoryInput = {
@@ -1117,11 +2023,19 @@ export type TrackUpdateWithoutListeningHistoryInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
   album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutListeningHistoryInput = {
@@ -1138,9 +2052,17 @@ export type TrackUncheckedUpdateWithoutListeningHistoryInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateManyArtistInput = {
@@ -1156,6 +2078,9 @@ export type TrackCreateManyArtistInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
 }
 
@@ -1171,11 +2096,19 @@ export type TrackUpdateWithoutArtistInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutArtistInput = {
@@ -1191,10 +2124,18 @@ export type TrackUncheckedUpdateWithoutArtistInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateManyWithoutArtistInput = {
@@ -1210,6 +2151,9 @@ export type TrackUncheckedUpdateManyWithoutArtistInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1226,6 +2170,9 @@ export type TrackCreateManyAlbumInput = {
   source?: string
   telegramFileId?: string | null
   telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
   createdAt?: Date | string
 }
 
@@ -1241,11 +2188,19 @@ export type TrackUpdateWithoutAlbumInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutAlbumInput = {
@@ -1261,10 +2216,18 @@ export type TrackUncheckedUpdateWithoutAlbumInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateManyWithoutAlbumInput = {
@@ -1280,6 +2243,9 @@ export type TrackUncheckedUpdateManyWithoutAlbumInput = {
   source?: Prisma.StringFieldUpdateOperationsInput | string
   telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1289,15 +2255,25 @@ export type TrackUncheckedUpdateManyWithoutAlbumInput = {
  */
 
 export type TrackCountOutputType = {
+  trackArtists: number
   playlistTracks: number
   favorites: number
   listeningHistory: number
+  credits: number
+  samples: number
+  sampledBy: number
+  snoozedBy: number
 }
 
 export type TrackCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  trackArtists?: boolean | TrackCountOutputTypeCountTrackArtistsArgs
   playlistTracks?: boolean | TrackCountOutputTypeCountPlaylistTracksArgs
   favorites?: boolean | TrackCountOutputTypeCountFavoritesArgs
   listeningHistory?: boolean | TrackCountOutputTypeCountListeningHistoryArgs
+  credits?: boolean | TrackCountOutputTypeCountCreditsArgs
+  samples?: boolean | TrackCountOutputTypeCountSamplesArgs
+  sampledBy?: boolean | TrackCountOutputTypeCountSampledByArgs
+  snoozedBy?: boolean | TrackCountOutputTypeCountSnoozedByArgs
 }
 
 /**
@@ -1308,6 +2284,13 @@ export type TrackCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extens
    * Select specific fields to fetch from the TrackCountOutputType
    */
   select?: Prisma.TrackCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountTrackArtistsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TrackArtistWhereInput
 }
 
 /**
@@ -1331,6 +2314,34 @@ export type TrackCountOutputTypeCountListeningHistoryArgs<ExtArgs extends runtim
   where?: Prisma.ListeningHistoryWhereInput
 }
 
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountCreditsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TrackCreditWhereInput
+}
+
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountSamplesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SampledTrackWhereInput
+}
+
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountSampledByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SampledTrackWhereInput
+}
+
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountSnoozedByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SnoozedTrackWhereInput
+}
+
 
 export type TrackSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1346,12 +2357,20 @@ export type TrackSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   source?: boolean
   telegramFileId?: boolean
   telegramMessageId?: boolean
+  deezerId?: boolean
+  isrc?: boolean
+  previewUrl?: boolean
   createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   album?: boolean | Prisma.Track$albumArgs<ExtArgs>
+  trackArtists?: boolean | Prisma.Track$trackArtistsArgs<ExtArgs>
   playlistTracks?: boolean | Prisma.Track$playlistTracksArgs<ExtArgs>
   favorites?: boolean | Prisma.Track$favoritesArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.Track$listeningHistoryArgs<ExtArgs>
+  credits?: boolean | Prisma.Track$creditsArgs<ExtArgs>
+  samples?: boolean | Prisma.Track$samplesArgs<ExtArgs>
+  sampledBy?: boolean | Prisma.Track$sampledByArgs<ExtArgs>
+  snoozedBy?: boolean | Prisma.Track$snoozedByArgs<ExtArgs>
   _count?: boolean | Prisma.TrackCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["track"]>
 
@@ -1369,6 +2388,9 @@ export type TrackSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   source?: boolean
   telegramFileId?: boolean
   telegramMessageId?: boolean
+  deezerId?: boolean
+  isrc?: boolean
+  previewUrl?: boolean
   createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   album?: boolean | Prisma.Track$albumArgs<ExtArgs>
@@ -1388,6 +2410,9 @@ export type TrackSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   source?: boolean
   telegramFileId?: boolean
   telegramMessageId?: boolean
+  deezerId?: boolean
+  isrc?: boolean
+  previewUrl?: boolean
   createdAt?: boolean
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   album?: boolean | Prisma.Track$albumArgs<ExtArgs>
@@ -1407,16 +2432,24 @@ export type TrackSelectScalar = {
   source?: boolean
   telegramFileId?: boolean
   telegramMessageId?: boolean
+  deezerId?: boolean
+  isrc?: boolean
+  previewUrl?: boolean
   createdAt?: boolean
 }
 
-export type TrackOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "artistId" | "albumId" | "duration" | "trackNumber" | "genre" | "audioUrl" | "coverUrl" | "sourceHash" | "source" | "telegramFileId" | "telegramMessageId" | "createdAt", ExtArgs["result"]["track"]>
+export type TrackOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "artistId" | "albumId" | "duration" | "trackNumber" | "genre" | "audioUrl" | "coverUrl" | "sourceHash" | "source" | "telegramFileId" | "telegramMessageId" | "deezerId" | "isrc" | "previewUrl" | "createdAt", ExtArgs["result"]["track"]>
 export type TrackInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   artist?: boolean | Prisma.ArtistDefaultArgs<ExtArgs>
   album?: boolean | Prisma.Track$albumArgs<ExtArgs>
+  trackArtists?: boolean | Prisma.Track$trackArtistsArgs<ExtArgs>
   playlistTracks?: boolean | Prisma.Track$playlistTracksArgs<ExtArgs>
   favorites?: boolean | Prisma.Track$favoritesArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.Track$listeningHistoryArgs<ExtArgs>
+  credits?: boolean | Prisma.Track$creditsArgs<ExtArgs>
+  samples?: boolean | Prisma.Track$samplesArgs<ExtArgs>
+  sampledBy?: boolean | Prisma.Track$sampledByArgs<ExtArgs>
+  snoozedBy?: boolean | Prisma.Track$snoozedByArgs<ExtArgs>
   _count?: boolean | Prisma.TrackCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TrackIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1433,9 +2466,14 @@ export type $TrackPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   objects: {
     artist: Prisma.$ArtistPayload<ExtArgs>
     album: Prisma.$AlbumPayload<ExtArgs> | null
+    trackArtists: Prisma.$TrackArtistPayload<ExtArgs>[]
     playlistTracks: Prisma.$PlaylistTrackPayload<ExtArgs>[]
     favorites: Prisma.$FavoritePayload<ExtArgs>[]
     listeningHistory: Prisma.$ListeningHistoryPayload<ExtArgs>[]
+    credits: Prisma.$TrackCreditPayload<ExtArgs>[]
+    samples: Prisma.$SampledTrackPayload<ExtArgs>[]
+    sampledBy: Prisma.$SampledTrackPayload<ExtArgs>[]
+    snoozedBy: Prisma.$SnoozedTrackPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1451,6 +2489,9 @@ export type $TrackPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     source: string
     telegramFileId: string | null
     telegramMessageId: string | null
+    deezerId: string | null
+    isrc: string | null
+    previewUrl: string | null
     createdAt: Date
   }, ExtArgs["result"]["track"]>
   composites: {}
@@ -1848,9 +2889,14 @@ export interface Prisma__TrackClient<T, Null = never, ExtArgs extends runtime.Ty
   readonly [Symbol.toStringTag]: "PrismaPromise"
   artist<T extends Prisma.ArtistDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ArtistDefaultArgs<ExtArgs>>): Prisma.Prisma__ArtistClient<runtime.Types.Result.GetResult<Prisma.$ArtistPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   album<T extends Prisma.Track$albumArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$albumArgs<ExtArgs>>): Prisma.Prisma__AlbumClient<runtime.Types.Result.GetResult<Prisma.$AlbumPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  trackArtists<T extends Prisma.Track$trackArtistsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$trackArtistsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TrackArtistPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   playlistTracks<T extends Prisma.Track$playlistTracksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$playlistTracksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlaylistTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   favorites<T extends Prisma.Track$favoritesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$favoritesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FavoritePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   listeningHistory<T extends Prisma.Track$listeningHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$listeningHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListeningHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  credits<T extends Prisma.Track$creditsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$creditsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TrackCreditPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  samples<T extends Prisma.Track$samplesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$samplesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SampledTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  sampledBy<T extends Prisma.Track$sampledByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$sampledByArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SampledTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  snoozedBy<T extends Prisma.Track$snoozedByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$snoozedByArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SnoozedTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1893,6 +2939,9 @@ export interface TrackFieldRefs {
   readonly source: Prisma.FieldRef<"Track", 'String'>
   readonly telegramFileId: Prisma.FieldRef<"Track", 'String'>
   readonly telegramMessageId: Prisma.FieldRef<"Track", 'String'>
+  readonly deezerId: Prisma.FieldRef<"Track", 'String'>
+  readonly isrc: Prisma.FieldRef<"Track", 'String'>
+  readonly previewUrl: Prisma.FieldRef<"Track", 'String'>
   readonly createdAt: Prisma.FieldRef<"Track", 'DateTime'>
 }
     
@@ -2314,6 +3363,30 @@ export type Track$albumArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 }
 
 /**
+ * Track.trackArtists
+ */
+export type Track$trackArtistsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TrackArtist
+   */
+  select?: Prisma.TrackArtistSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TrackArtist
+   */
+  omit?: Prisma.TrackArtistOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TrackArtistInclude<ExtArgs> | null
+  where?: Prisma.TrackArtistWhereInput
+  orderBy?: Prisma.TrackArtistOrderByWithRelationInput | Prisma.TrackArtistOrderByWithRelationInput[]
+  cursor?: Prisma.TrackArtistWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TrackArtistScalarFieldEnum | Prisma.TrackArtistScalarFieldEnum[]
+}
+
+/**
  * Track.playlistTracks
  */
 export type Track$playlistTracksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2383,6 +3456,102 @@ export type Track$listeningHistoryArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.ListeningHistoryScalarFieldEnum | Prisma.ListeningHistoryScalarFieldEnum[]
+}
+
+/**
+ * Track.credits
+ */
+export type Track$creditsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TrackCredit
+   */
+  select?: Prisma.TrackCreditSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TrackCredit
+   */
+  omit?: Prisma.TrackCreditOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TrackCreditInclude<ExtArgs> | null
+  where?: Prisma.TrackCreditWhereInput
+  orderBy?: Prisma.TrackCreditOrderByWithRelationInput | Prisma.TrackCreditOrderByWithRelationInput[]
+  cursor?: Prisma.TrackCreditWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TrackCreditScalarFieldEnum | Prisma.TrackCreditScalarFieldEnum[]
+}
+
+/**
+ * Track.samples
+ */
+export type Track$samplesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SampledTrack
+   */
+  select?: Prisma.SampledTrackSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SampledTrack
+   */
+  omit?: Prisma.SampledTrackOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SampledTrackInclude<ExtArgs> | null
+  where?: Prisma.SampledTrackWhereInput
+  orderBy?: Prisma.SampledTrackOrderByWithRelationInput | Prisma.SampledTrackOrderByWithRelationInput[]
+  cursor?: Prisma.SampledTrackWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SampledTrackScalarFieldEnum | Prisma.SampledTrackScalarFieldEnum[]
+}
+
+/**
+ * Track.sampledBy
+ */
+export type Track$sampledByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SampledTrack
+   */
+  select?: Prisma.SampledTrackSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SampledTrack
+   */
+  omit?: Prisma.SampledTrackOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SampledTrackInclude<ExtArgs> | null
+  where?: Prisma.SampledTrackWhereInput
+  orderBy?: Prisma.SampledTrackOrderByWithRelationInput | Prisma.SampledTrackOrderByWithRelationInput[]
+  cursor?: Prisma.SampledTrackWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SampledTrackScalarFieldEnum | Prisma.SampledTrackScalarFieldEnum[]
+}
+
+/**
+ * Track.snoozedBy
+ */
+export type Track$snoozedByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SnoozedTrack
+   */
+  select?: Prisma.SnoozedTrackSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SnoozedTrack
+   */
+  omit?: Prisma.SnoozedTrackOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SnoozedTrackInclude<ExtArgs> | null
+  where?: Prisma.SnoozedTrackWhereInput
+  orderBy?: Prisma.SnoozedTrackOrderByWithRelationInput | Prisma.SnoozedTrackOrderByWithRelationInput[]
+  cursor?: Prisma.SnoozedTrackWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SnoozedTrackScalarFieldEnum | Prisma.SnoozedTrackScalarFieldEnum[]
 }
 
 /**

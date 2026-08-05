@@ -3,24 +3,26 @@
 }
 
 .heroGradient {
-  background: linear-gradient(180deg, var(--sakura-accent-2) 0%, var(--sakura-surface) 100%);
-  padding: clamp(0.75rem, 3vw, 1.25rem);
+  background: linear-gradient(180deg, var(--bg, var(--sakura-accent-2)) 0%, var(--sakura-surface) 100%);
+  padding: clamp(1rem, 4vw, 1.5rem);
+  padding-top: clamp(1.25rem, 5vw, 2rem);
 }
 
 .hero {
   display: flex;
-  gap: clamp(0.75rem, 3vw, 1rem);
+  gap: clamp(1rem, 4vw, 1.5rem);
   margin-bottom: clamp(0.75rem, 3vw, 1.25rem);
+  align-items: flex-end;
 }
 
 .coverArt {
-  width: clamp(5rem, 20vw, 7.5rem);
-  height: clamp(5rem, 20vw, 7.5rem);
+  width: clamp(8rem, 32vw, 14rem);
+  height: clamp(8rem, 32vw, 14rem);
   border-radius: 12px;
   object-fit: cover;
   background: var(--sakura-skeleton);
   flex-shrink: 0;
-  box-shadow: 0 4px 20px var(--sakura-shadow);
+  box-shadow: 0 8px 32px var(--sakura-shadow);
 }
 
 .heroInfo {
@@ -29,34 +31,39 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  padding-bottom: 0.25rem;
 }
 
 .heroLabel {
   font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: var(--sakura-text-secondary);
   font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
 .heroTitle {
-  font-size: clamp(1.125rem, 3.5vw, 1.5rem);
+  font-size: clamp(1.25rem, 4vw, 2rem);
   font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .artistLink {
-  font-size: 0.8125rem;
-  color: var(--sakura-accent);
+  font-size: 0.875rem;
+  color: var(--sakura-text);
   text-decoration: none;
   font-weight: 600;
-  margin-top: 0.125rem;
+  margin-top: 0.375rem;
+  transition: color 0.15s;
 }
 
 .artistLink:hover {
   text-decoration: underline;
+  color: var(--sakura-accent);
 }
 
 .heroMeta {
@@ -69,24 +76,24 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.375rem;
-  margin-top: 0.5rem;
+  margin-top: 0.625rem;
 }
 
 .genreTag {
   font-size: 0.6875rem;
   font-weight: 600;
-  padding: 0.25rem 0.625rem;
+  padding: 0.25rem 0.75rem;
   border-radius: 9999px;
-  background: var(--sakura-surface);
-  color: var(--sakura-text-secondary);
-  border: 1px solid var(--sakura-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sakura-text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 clamp(0.75rem, 3vw, 1.25rem);
+  gap: 0.625rem;
+  padding: 0 clamp(1rem, 4vw, 1.5rem);
   margin-bottom: clamp(0.75rem, 2vw, 1rem);
 }
 
@@ -95,14 +102,19 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  height: clamp(2.25rem, 6vw, 2.5rem);
-  padding: 0 clamp(0.75rem, 3vw, 1rem);
+  height: clamp(2.5rem, 7vw, 2.75rem);
+  padding: 0 clamp(1rem, 4vw, 1.5rem);
   border-radius: 9999px;
   background: var(--sakura-accent);
   color: #fff;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform 0.1s, filter 0.15s;
+}
+
+.playBtn:hover {
+  filter: brightness(1.1);
 }
 
 .playBtn:active {
@@ -113,13 +125,19 @@
   all: unset;
   display: inline-flex;
   align-items: center;
-  height: clamp(2.25rem, 6vw, 2.5rem);
-  padding: 0 clamp(0.5rem, 2vw, 0.75rem);
+  justify-content: center;
+  height: clamp(2.5rem, 7vw, 2.75rem);
+  width: clamp(2.5rem, 7vw, 2.75rem);
   border-radius: 9999px;
-  background: var(--sakura-surface);
+  background: var(--sakura-surface-2);
   color: var(--sakura-text);
   border: 1px solid var(--sakura-border);
   cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.shuffleBtn:hover {
+  background: var(--sakura-hover);
 }
 
 .shuffleBtn:active {
@@ -131,15 +149,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2rem, 5vw, 2.25rem);
-  height: clamp(2rem, 5vw, 2.25rem);
+  width: clamp(2.25rem, 6vw, 2.5rem);
+  height: clamp(2.25rem, 6vw, 2.5rem);
   border-radius: 9999px;
-  background: var(--sakura-surface);
-  color: var(--sakura-text);
+  background: var(--sakura-surface-2);
+  color: var(--sakura-text-secondary);
   border: 1px solid var(--sakura-border);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.iconBtn:hover {
+  background: var(--sakura-hover);
+  color: var(--sakura-text);
 }
 
 .iconBtn:active {
@@ -149,29 +172,42 @@
 .trackList {
   display: flex;
   flex-direction: column;
-  padding: 0 clamp(0.75rem, 3vw, 1.25rem);
+  padding: 0 clamp(1rem, 4vw, 1.5rem);
+}
+
+.copyright {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  opacity: 0.7;
+  padding: 1rem clamp(1rem, 4vw, 1.5rem) 0;
+  line-height: 1.5;
 }
 
 .section {
-  padding: clamp(1rem, 3vw, 1.5rem) clamp(0.75rem, 3vw, 1.25rem);
+  padding: clamp(1.25rem, 4vw, 2rem) clamp(1rem, 4vw, 1.5rem);
 }
 
 .sectionTitle {
-  font-size: clamp(0.9375rem, 2.5vw, 1.0625rem);
+  font-size: clamp(1rem, 2.5vw, 1.125rem);
   font-weight: 700;
-  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  margin-bottom: clamp(0.75rem, 2vw, 1rem);
 }
 
 .albumGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(7rem, 28vw, 10rem), 1fr));
-  gap: clamp(0.5rem, 2vw, 0.75rem);
+  gap: clamp(0.75rem, 2vw, 1rem);
 }
 
 .albumCard {
   cursor: pointer;
   text-decoration: none;
   color: inherit;
+  transition: transform 0.15s;
+}
+
+.albumCard:hover {
+  transform: translateY(-2px);
 }
 
 .albumArt {
@@ -180,7 +216,8 @@
   border-radius: 12px;
   object-fit: cover;
   background: var(--sakura-skeleton);
-  margin-bottom: 0.375rem;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 2px 8px var(--sakura-shadow);
 }
 
 .albumTitle {
@@ -194,17 +231,25 @@
 .albumYear {
   font-size: 0.6875rem;
   color: var(--sakura-text-secondary);
+  margin-top: 0.125rem;
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
   padding: 1rem;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
@@ -213,11 +258,12 @@
   border-radius: 16px;
   padding: 1.5rem;
   width: 100%;
-  max-width: 20rem;
+  max-width: 22rem;
+  box-shadow: 0 16px 48px var(--sakura-shadow);
 }
 
 .modalTitle {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
@@ -226,6 +272,7 @@
   font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
   margin-bottom: 1.25rem;
+  line-height: 1.5;
 }
 
 .modalActions {
@@ -239,11 +286,16 @@
   display: inline-flex;
   align-items: center;
   height: 2.25rem;
-  padding: 0 0.875rem;
+  padding: 0 1rem;
   border-radius: 9999px;
   background: var(--sakura-surface-2);
   color: var(--sakura-text);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.modalCancel:hover {
+  background: var(--sakura-hover);
 }

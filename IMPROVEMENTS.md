@@ -1,421 +1,514 @@
-# Sakura Project - Page-by-Page Improvement Plan
+# Sakura — Comprehensive Page-by-Page Improvement Plan
 
-Generated: August 5, 2026
+> Guided by Spotify's UI/UX patterns, accessibility, and modern mobile-first design.
 
 ---
 
-## 1. Login Page (`/login`)
+## 1. Home Page (`/home`)
 
-### Current State
-- Simple card with username/email + password fields
-- Basic error display, loading state
-- Link to register
+### Current Issues
+- Basic greeting + horizontal scroll of recently played / new arrivals only
+- No personalized recommendations based on listening history
+- No "Made for You" or "Quick Picks" sections
+- No recently added albums section
+- No mood/genre-based sections
+- Missing artist-based recommendations
+- Empty state is generic
+- No pull-to-refresh
 
 ### Improvements
-1. **Add sakura logo/icon at top** - Replace text-only "Sakura" with the generated icon + text for branding
-2. **Add input validation feedback** - Show inline validation (e.g., "field required" before submit)
-3. **Add "show password" toggle** - Eye icon to reveal/hide password
-4. **Add keyboard submit** - Already has form submit, but ensure Enter key works consistently
-5. **Add forgot password link** - Even if not implemented yet, placeholder for future
-6. **Add animation on card entrance** - Subtle fade-in/slide-up on mount
-7. **Improve error display** - Use a toast/banner instead of inline text that pushes content
-8. **Add social login placeholders** - Google/GitHub buttons (disabled with "coming soon")
-9. **Add remember me checkbox** - Persist login preference
-10. **Improve mobile spacing** - Better safe area handling for notch devices
-11. **Add page transition animation** - Smooth transition from register page
-12. **Add loading spinner on button** - Replace text with animated spinner during submit
+1. **Spotify-style greeting** with time-based background gradient (morning=warm, afternoon=golden, evening=purple)
+2. **Quick Picks grid** — 2x3 grid of most-played tracks (like Spotify's 6-card grid)
+3. **Recently Played** section with proper horizontal scroll cards showing album art + title + artist
+4. **Made for You** — auto-generated playlist recommendations based on listening patterns (top genres, top artists)
+5. **New Arrivals** — tracks recently added to library
+6. **Your Top Artists** — horizontal scroll of most-played artists with circular avatars
+7. **Jump Back In** — recently played albums/playlists for quick resume
+8. **Popular Playlists** — user's playlists sorted by last updated
+9. **Genre Mood Cards** — colored cards for genre/mood browsing (like Spotify's genre cards)
+10. **Pull-to-refresh** support with haptic feedback
+11. **Smooth section fade-in animations** as user scrolls
+12. **Better empty state** with illustrated mascot and clear CTA
+13. **Listening Stats Banner** — "You've listened to X hours this week"
+14. **Profile avatar click** navigates to profile page
+15. **Accessibility** — proper ARIA labels, screen reader text
 
 ---
 
-## 2. Register Page (`/register`)
+## 2. Search Page (`/search`)
 
-### Current State
-- Username, email, password, confirm password fields
-- Basic validation (password match, minLength)
+### Current Issues
+- Only text search, no categories or browsing
+- No recent searches
+- No trending or discover section
+- Empty state is minimal
+- No search filters visible initially
 
 ### Improvements
-1. **Add sakura logo/icon at top** - Consistent branding with login
-2. **Add password strength indicator** - Visual bar showing weak/medium/strong
-3. **Add "show password" toggle** - For both password fields
-4. **Add username availability check** - Debounced async check as user types
-5. **Add input validation feedback** - Real-time validation messages
-6. **Add terms agreement checkbox** - "I agree to the Terms of Service"
-7. **Add animation on card entrance** - Consistent with login page
-8. **Improve error display** - Toast/banner style
-9. **Add password requirements list** - Show checklist: 6+ chars, uppercase, etc.
-10. **Add transition to login** - Smooth page transition
-11. **Add loading spinner on button** - During account creation
-12. **Add back button** - Navigate to login without browser back
+1. **Browse Categories** — grid of genre/mood categories (Pop, Rock, Hip-Hop, Electronic, etc.) with colored background cards (Spotify-style)
+2. **Recent Searches** — show last 10 search queries with clear option
+3. **Trending Now** — show trending tracks from Deezer
+4. **Quick Filters** — filter chips for Tracks, Artists, Albums, Playlists
+5. **Search Suggestions** — autocomplete dropdown as user types
+6. **Voice Search Button** — Web Speech API integration
+7. **Empty State Redesign** — "What do you want to listen to?" with genre cards
+8. **Keyboard Shortcut** — `/` to focus search input
+9. **Search History in URL** — save last search in URL params
+10. **Debounce improvement** — reduce from 400ms to 300ms
+11. **Result Count Badges** — show counts per section
+12. **Better Loading States** — skeleton loading matching result layout
+13. **No Results State** — "No results for X. Try checking your spelling or use different keywords."
+14. **Offline State** — show cached library search only
+15. **Accessibility** — ARIA live regions for search results
 
 ---
 
-## 3. Home Page (`/home`)
+## 3. Library Page (`/library`)
 
-### Current State
-- "Sakura" greeting header
-- Recently Played horizontal carousel
-- New Arrivals horizontal carousel
-- Empty state with emoji
+### Current Issues
+- Basic tabs (Tracks/Artists/Albums) with simple grid
+- No playlist tab
+- Sort options limited
+- No search within library
+- No filter by recently added, most played
 
 ### Improvements
-1. **Personalized greeting** - "Good evening, {username}" based on time of day
-2. **Add user avatar** - Small avatar in top-right corner linking to profile
-3. **Add pull-to-refresh** - Native-feeling refresh gesture
-4. **Improve empty state** - Add illustration + CTA button to search
-5. **Add quick action buttons** - "Import", "Search", "Create Playlist" shortcuts
-6. **Add shuffle play button** - Play all tracks randomly
-7. **Improve skeleton loading** - More realistic shimmer animation
-8. **Add track count badges** - Show "12 tracks" under section titles
-9. **Add gradient header** - Subtle gradient background for visual depth
-10. **Improve card hover/active states** - Better visual feedback on tap
-11. **Add "Continue Listening" section** - Resume from where you left off
-12. **Add genre/mood categories** - Quick filter chips for different moods
+1. **Add Playlists Tab** — 4th tab for playlists (Tracks/Artists/Albums/Playlists)
+2. **Search Within Library** — inline search bar at top
+3. **Better Sort Options** — Name, Date Added, Recently Played, Most Played, Duration
+4. **Grid/List Toggle** — switch between grid view and list view
+5. **Filter Chips** — filter by "Recently Added", "Most Played", "Favorites"
+6. **Album Art Grid** — larger album art cards with overlay play button
+7. **Artist Circular Cards** — circular artist avatars (like Spotify)
+8. **Swipe Actions** — swipe left to delete, swipe right to add to playlist
+9. **Empty State per Tab** — contextual empty state with specific CTAs
+10. **Count Badges** — show total items per tab
+11. **Sticky Headers** — section headers that stick while scrolling
+12. **Pull-to-refresh** support
+13. **Batch Actions** — select multiple tracks for bulk operations
+14. **Quick Actions Menu** — long-press context menu (like Spotify)
+15. **Alphabetical Sidebar** — improved touch targets and haptic feedback
 
 ---
 
-## 4. Search Page (`/search`)
+## 4. Liked Songs Page (`/liked`)
 
-### Current State
-- Search input with icon
-- Library + Deezer results merged
-- Download button for Deezer tracks
+### Current Issues
+- Basic gradient header with heart icon
+- Play All / Shuffle buttons
+- No sorting options
+- No search within liked
 
 ### Improvements
-1. **Add search history** - Show recent searches below input when focused
-2. **Add trending/popular section** - Before user searches, show popular tracks
-3. **Add filter chips** - Filter by: All, Tracks, Artists, Albums
-4. **Add voice search button** - Microphone icon for voice input
-5. **Add keyboard shortcut** - Cmd/Ctrl+K to focus search
-6. **Improve debounce** - Show results as you type (already 400ms, good)
-7. **Add "no internet" state** - Show offline message when fetch fails
-8. **Add album/artist search tabs** - Separate sections for each result type
-9. **Improve empty state** - Show popular/trending when no query
-10. **Add recent searches** - Clearable list of past queries
-11. **Add search suggestions** - Autocomplete as user types
-12. **Add batch download** - Select multiple Deezer results to download at once
+1. **Spotify-style gradient header** — full-width gradient with playlist artwork
+2. **Sort Options** — by Title, Artist, Album, Date Added, Duration
+3. **Search Within Liked** — filter liked songs
+4. **Total Listening Time** — show total duration prominently
+5. **Recently Liked Section** — highlight recently added liked songs
+6. **Shuffle Play Button** — larger, more prominent
+7. **Download All for Offline** — batch download all liked songs
+8. **Share Playlist** — export as playlist or share link
+9. **Remove from Liked** — swipe to remove
+10. **Duplicate Detection** — show if songs are duplicated
+11. **Better Empty State** — "Songs you like will appear here. Tap the heart on any track."
+12. **Track Count with Pluralization** — "1 song" vs "24 songs"
+13. **Smooth Scroll** — virtual scrolling for large lists
+14. **Now Playing Highlight** — highlight currently playing track
+15. **Pull-to-refresh**
 
 ---
 
-## 5. Library Page (`/library`)
+## 5. Full Player (`/player`)
 
-### Current State
-- Tabs: Tracks, Artists, Albums
-- Grid view for artists/albums, list for tracks
-- Basic skeleton loading
+### Current Issues
+- Basic album art + controls
+- No lyrics section
+- No queue view
+- No share button
+- Volume slider is basic
+- No "Add to Playlist" button
+- No song info link to album/artist
 
 ### Improvements
-1. **Add sort options** - Sort by: Name, Date Added, Recently Played
-2. **Add search within library** - Filter input specific to current tab
-3. **Add grid/list toggle** - Switch between views
-4. **Add empty state per tab** - Different messages for tracks/artists/albums
-5. **Add swipe actions** - Swipe left to delete, right to play
-6. **Add multi-select mode** - Select multiple items for batch operations
-7. **Add alphabetical index** - Quick jump to letter (for large libraries)
-8. **Improve tab animation** - Smooth sliding indicator
-9. **Add pull-to-refresh** - Refresh library data
-10. **Add "Recently Added" tab** - Show newest additions
-11. **Add total duration display** - "2h 34m total" under each tab
-12. **Improve grid responsiveness** - Better column sizing for different screens
+1. **Album Art with Blur Background** — blurred album art as background (Spotify-style)
+2. **Lyrics Section** — scrollable lyrics overlay (toggle with button)
+3. **Queue View** — see upcoming tracks, reorder, remove
+4. **Add to Playlist** — button to add current track to a playlist
+5. **Share Button** — share current track with deep link
+6. **Song Info Link** — tap title/artist to go to album/artist page
+7. **Crossfade Controls** — visual crossfade indicator
+8. **Audio Quality Indicator** — show bitrate/quality
+9. **Sleep Timer** — set auto-stop timer
+10. **Like Button with Animation** — heart animation on like
+11. **Better Seek Bar** — custom styled with album art preview on hover
+12. **Volume Boost** — optional volume boost toggle
+13. **Equalizer Access** — link to audio settings
+14. **Background Play Indicator** — show when playing in background
+15. **Swipe Down to Close** — gesture-based close
 
 ---
 
-## 6. Liked Page (`/liked`)
+## 6. Mini Player
 
-### Current State
-- Header with heart icon and count
-- Play All button
-- Track list with TrackRow components
+### Current Issues
+- Basic art + title + artist + play/pause
+- No next/prev buttons
+- No progress bar visible
 
 ### Improvements
-1. **Add gradient header** - Use gradient background matching the heart theme
-2. **Add shuffle play** - Add shuffle button alongside Play All
-3. **Add sort options** - Sort by: Date Liked, Title, Artist, Duration
-4. **Add total duration** - Show "12 songs · 45 min"
-5. **Add share/export button** - Export liked songs as playlist
-6. **Improve empty state** - Better illustration and CTA
-7. **Add pull-to-refresh** - Refresh favorites
-8. **Add "Remove All" option** - Batch unlike (with confirmation)
-9. **Add animation on like** - Heart animation when liking/unliking
-10. **Add swipe to unlike** - Swipe left to remove from liked
-11. **Add listening stats** - "You've liked X songs this month"
-12. **Add smart playlists** - Auto-generate playlists from liked songs by genre/mood
+1. **Progress Bar** — thin progress line at top (already exists but make more visible)
+2. **Next/Previous Buttons** — add skip controls
+3. **Like Button** — quick like/unlike
+4. **Swipe Up to Expand** — gesture to open full player
+5. **Better Album Art** — larger art with shadow
+6. **Queue Indicator** — small icon showing queue count
+7. **Offline Indicator** — show if track is cached
+8. **Smooth Transitions** — smooth art/title transitions when track changes
+9. **Haptic Feedback** — on play/pause tap
+10. **Long Press Menu** — quick actions (add to playlist, share, etc.)
 
 ---
 
-## 7. Profile Page (`/profile`)
+## 7. Album Detail Page (`/album/[id]`)
 
-### Current State
-- Avatar with upload button
-- Username, bio display
-- Stats: Played, Playlists, Liked
-- Account info section
-
-### Improvements
-1. **Add avatar crop/resize** - Before upload, allow cropping
-2. **Add bio editing** - Inline edit with save button
-3. **Add username editing** - Allow changing username
-4. **Add email editing** - Allow changing email
-5. **Add listening time stat** - Total hours listened
-6. **Add top genre stat** - Most played genre
-7. **Add streak counter** - "Listening streak: 5 days"
-8. **Add share profile button** - Generate shareable link
-9. **Add profile picture removal** - Option to remove avatar
-10. **Add stats visualization** - Mini charts for listening patterns
-11. **Add account deletion option** - Danger zone with confirmation
-12. **Add export data button** - Download all user data as JSON
-
----
-
-## 8. Settings Page (`/settings`)
-
-### Current State
-- Appearance: Theme selector
-- Playback: Audio quality, crossfade, auto-download
-- Links: About, Terms, Privacy
-- Account: Username, Email display
-- Log Out button
-
-### Improvements
-1. **Add crossfade slider** - Currently shows "0s" but no slider to change it
-2. **Add equalizer settings** - Basic bass/treble controls
-3. **Add download quality setting** - Choose quality for offline downloads
-4. **Add storage usage display** - "Using 1.2 GB of local storage"
-5. **Add clear cache button** - Clear audio cache and API cache
-6. **Add notification settings** - Toggle for playback notifications
-7. **Add language selector** - For future i18n
-8. **Add "Check for updates" button** - Force SW update
-9. **Add version info with changelog** - Click version to see changes
-10. **Add dark/light mode preview** - Show preview before applying
-11. **Add export/import settings** - Backup settings to file
-12. **Add developer info section** - GitHub link, tech stack info
-13. **Add storage management** - View/clear individual cached tracks
-
----
-
-## 9. Import Page (`/import`)
-
-### Current State
-- URL input field
-- Import button
-- Track list with status indicators
-- Save All button
-
-### Improvements
-1. **Add drag-and-drop URL** - Drop a URL anywhere on the page
-2. **Add clipboard paste button** - One-tap paste from clipboard
-3. **Add URL validation** - Show valid/invalid URL indicator before import
-4. **Add progress bar** - Show import progress as tracks are saved
-5. **Add individual track selection** - Checkboxes to select specific tracks
-6. **Add "Import Another" button** - After import, easy to start new one
-7. **Add Deezer direct import** - Support deezer.com URLs alongside Spotify
-8. **Add playlist preview** - Show playlist name/description before import
-9. **Add import history** - Show past imports
-10. **Add batch import** - Import multiple URLs at once
-11. **Add duplicate detection** - Already in library indicator
-12. **Add import from file** - Upload a text file with URLs
-
----
-
-## 10. Playlist Detail Page (`/playlist/[id]`)
-
-### Current State
-- Hero with cover art, name, description, track count
-- Play button
+### Current Issues
+- Basic hero with cover + info
+- Play/Shuffle/Add/Like/Share buttons
 - Track list
+- Other albums section
 
 ### Improvements
-1. **Add shuffle play button** - Add shuffle alongside play
-2. **Add edit playlist** - Rename, change description, reorder tracks
-3. **Add delete playlist** - With confirmation dialog
-4. **Add share playlist** - Generate shareable link
-5. **Add add tracks button** - Search and add tracks to playlist
-6. **Add remove tracks** - Swipe or long-press to remove
-7. **Add total duration** - "12 songs · 45 min"
-8. **Add playlist art upload** - Custom cover for playlist
-9. **Add sort tracks** - Manual, alphabetical, date added
-10. **Add export playlist** - Download as text/JSON
-11. **Add duplicate warning** - When adding existing track
-12. **Add playlist statistics** - Total plays, top artist
+1. **Dynamic Gradient Hero** — extract dominant color from album art for gradient
+2. **Release Date Formatting** — "August 5, 2026" format
+3. **Genre Tags** — show genres as pills
+4. **Track Numbers** — proper track numbering
+5. **Duration Total** — show total album duration
+6. **Copyright Info** — show copyright notice
+7. **Add to Playlist** — functional playlist picker
+8. **Like Individual Tracks** — heart icon per track
+9. **Share Album** — share with album art
+10. **Related Albums** — show similar albums
+11. **Play Count** — total plays for this album
+12. **Better Empty State** — when album has no tracks
+13. **Skeleton Loading** — proper skeleton matching layout
+14. **Scroll Progress** — show scroll progress in header
+15. **Back Button** — navigation back to library
 
 ---
 
-## 11. Artist Detail Page (`/artist/[id]`)
+## 8. Artist Detail Page (`/artist/[id]`)
 
-### Current State
-- Hero with avatar, name, track/album count
+### Current Issues
+- Basic hero with avatar + name
 - Albums grid
-- Top tracks list
+- Top tracks
+- No follower count
+- No monthly listeners
 
 ### Improvements
-1. **Add "Play All" button** - Play all tracks by artist
-2. **Add "Shuffle" button** - Shuffle all tracks
-3. **Add "Follow" button** - Follow/unfollow artist
-4. **Add artist bio section** - Brief artist description
-5. **Add genre tags** - Show artist genres
-6. **Add "Fans Also Like" section** - Related artists
-7. **Add album sort** - By year, name, track count
-8. **Add "Appears On" section** - Compilations, features
-9. **Add total play count** - "Played 45 times"
-10. **Add share artist** - Share link to artist
-11. **Add album count display** - "3 albums" in header
-12. **Add track count per album** - In album grid cards
+1. **Dynamic Gradient Hero** — color from artist image
+2. **Monthly Listeners** — show listener count (if available)
+3. **Follow/Unfollow** — follow artist functionality
+4. **Artist Bio** — expandable biography section
+5. **Discography Section** — organize by albums, singles, EPs
+6. **Appears On** — compilations and features
+7. **Related Artists** — similar artists grid
+8. **Top Tracks** — limited to 5 with "Show All"
+9. **Share Artist** — share profile link
+10. **Artist Radio** — generate artist-based playlist
+11. **Concert Dates** — upcoming concerts (API integration)
+12. **Better Empty State** — when artist has no tracks
+13. **Follow Button** — prominent follow/unfollow
+14. **Play Count** — total plays for this artist
+15. **Background Image** — use artist photo as hero background
 
 ---
 
-## 12. Album Detail Page (`/album/[id]`)
+## 9. Playlist Detail Page (`/playlist/[id]`)
 
-### Current State
-- Hero with cover art, title, artist, year, track count
-- Play and Shuffle buttons
-- Track list
+### Current Issues
+- Basic hero with cover + info
+- Add tracks modal is placeholder
+- No edit functionality
+- No collaborative features
 
 ### Improvements
-1. **Add "Add to Playlist" button** - Add album tracks to playlist
-2. **Add "Like All" button** - Like all tracks at once
-3. **Add album notes section** - Track listing with notes
-4. **Add release date display** - Full date, not just year
-5. **Add genre tags** - Album genres
-6. **Add share album** - Share link
-7. **Add "Other Albums by {Artist}" section** - Related albums
-8. **Add track duration total** - "Total: 45:23"
-9. **Add year filter in library** - Filter albums by year
-10. **Add album rating** - Personal rating system
-11. **Add "Recently Played" indicator** - If album was recently played
-12. **Add download all tracks** - Batch offline download
+1. **Dynamic Gradient Hero** — color from playlist cover
+2. **Edit Playlist** — inline editing of name, description
+3. **Add Tracks Modal** — functional search and add to playlist
+4. **Reorder Tracks** — drag and drop to reorder
+5. **Remove Tracks** — swipe to remove individual tracks
+6. **Playlist Description** — show and edit description
+7. **Creator Info** — show who created and when
+8. **Export Playlist** — download as text/JSON
+9. **Duplicate Detection** — warn about duplicates when adding
+10. **Playlist Stats** — total duration, genre breakdown
+11. **Collaborative Playlist** — invite others (future feature)
+12. **Share Playlist** — share with link or as image
+13. **Delete Confirmation** — better styled confirmation dialog
+14. **Empty State** — "This playlist is empty. Add some tracks!"
+15. **Cover Art Upload** — better upload UX with crop tool
 
 ---
 
-## 13. About Page (`/about`)
+## 10. Profile Page (`/profile`)
 
-### Current State
-- 4 paragraphs of basic info
-- Mentions school project
+### Current Issues
+- Basic avatar + bio + stats
+- Account info section
+- Export button
+- No listening insights
 
 ### Improvements
-1. **Add app icon/image** - Visual header with Sakura icon
-2. **Add feature list** - Bullet points of key features
-3. **Add tech stack section** - Technologies used with icons
-4. **Add version info** - Current version number
-5. **Add "What's New" section** - Recent updates/changelog
-6. **Add contact information** - Email, GitHub link
-7. **Add acknowledgments** - Libraries and tools used
-8. **Add roadmap** - Planned features
-9. **Add license information** - MIT or similar
-10. **Add screenshot gallery** - App screenshots
-11. **Add "Built with" badges** - Technology badges
-12. **Add FAQ section** - Common questions and answers
-13. **Add credits section** - Music sources, design inspiration
+1. **Listening Insights** — hours listened, most played track, top genre
+2. **Listening History Timeline** — visual timeline of listening activity
+3. **Top Artists Section** — most played artists with play counts
+4. **Top Tracks Section** — most played tracks with play counts
+5. **Achievements/Badges** — gamification (100 songs, 50 hours, etc.)
+6. **Share Profile** — share profile link
+7. **Edit Profile** — inline editing for username, email
+8. **Theme Selection** — visual theme picker (not just dropdown)
+9. **Notification Settings** — manage notifications
+10. **Connected Accounts** — link Spotify/Deezer
+11. **Account Stats Card** — visual stat cards with icons
+12. **Member Since** — formatted date
+13. **Listening Streak** — consecutive days of listening
+14. **Data Usage** — storage used breakdown
+15. **Danger Zone** — account deletion with confirmation
 
 ---
 
-## 14. Privacy Policy Page (`/privacy`)
+## 11. Settings Page (`/settings`)
 
-### Current State
-- 7 paragraphs covering data collection, storage, audio files, offline data, no tracking, contact
+### Current Issues
+- Basic sections: Appearance, Playback, Storage, Updates, Links, Account, Developer
+- Theme is dropdown
+- No notification settings
+- No language settings
 
 ### Improvements
-1. **Add table of contents** - Clickable section links
-2. **Add "Last reviewed" date** - Separate from "Last updated"
-3. **Add data retention section** - How long data is kept
-4. **Add user rights section** - Right to access, modify, delete data
-5. **Add cookies section** - Detailed cookie policy
-6. **Add third-party services** - List all third-party services used
-7. **Add children's privacy** - COPPA compliance statement
-8. **Add international data transfers** - Where data is stored geographically
-9. **Add security measures** - How data is protected
-10. **Add breach notification** - What happens if data is compromised
-11. **Add policy change notification** - How users are notified of changes
-12. **Add contact email** - Replace placeholder with actual email
-13. **Add effective date** - Clear effective date
-14. **Add downloadable PDF** - PDF version of the policy
+1. **Visual Theme Picker** — card-based theme selection with previews
+2. **Audio Quality Explanation** — explain what each quality level means
+3. **Crossfade Visualization** — visual crossfade demo
+4. **Download Quality** — separate streaming vs download quality
+5. **Notification Settings** — manage push notifications
+6. **Language Settings** — multi-language support
+7. **Storage Breakdown** — detailed storage usage by category
+8. **Auto-Download Settings** — configurable auto-download rules
+9. **Equalizer Access** — audio equalizer settings
+10. **About Section** — app version, build date, licenses
+11. **Help & Support** — FAQ, contact, bug report
+12. **What's New** — changelog for updates
+13. **Accessibility Settings** — font size, contrast, reduce motion
+14. **Cache Management** — selective cache clearing (by track, by date)
+15. **Account Management** — change password, delete account
 
 ---
 
-## 15. Terms of Service Page (`/terms`)
+## 12. Import Page (`/import`)
 
-### Current State
-- 7 paragraphs covering ownership, usage, availability, liability, changes, contact
+### Current Issues
+- Basic URL paste + import
+- History stored in localStorage
+- Progress bar is basic
+- Limited error messages
 
 ### Improvements
-1. **Add table of contents** - Clickable section links
-2. **Add "Last reviewed" date** - Separate from "Last updated"
-3. **Add acceptable use policy** - What users can/cannot do
-4. **Add intellectual property section** - IP ownership details
-5. **Add disclaimer section** - Detailed legal disclaimers
-6. **Add indemnification clause** - User indemnification
-7. **Add governing law** - Jurisdiction for disputes
-8. **Add dispute resolution** - Arbitration/mediation process
-9. **Add termination policy** - How accounts can be terminated
-10. **Add refund policy** - If applicable (even if "no refunds")
-11. **Add accessibility statement** - WCAG compliance
-12. **Add contact email** - Replace placeholder with actual email
-13. **Add effective date** - Clear effective date
-14. **Add downloadable PDF** - PDF version of the terms
+1. **URL Validation Feedback** — real-time URL validation
+2. **Import Preview** — show playlist info before importing
+3. **Duplicate Detection** — warn about existing tracks
+4. **Batch Import** — import multiple URLs at once
+5. **Import Queue** — show import progress for multiple items
+6. **Better Error Messages** — specific error reasons
+7. **Import History** — show with thumbnails and track counts
+8. **Drag & Drop** — drag audio files directly
+9. **Clipboard Auto-Detect** — auto-detect Spotify/Deezer URLs in clipboard
+10. **Import Stats** — tracks imported, failed, skipped
+11. **Supported Platforms** — show Deezer, Spotify, YouTube Music logos
+12. **Import Tips** — helpful tips for best results
+13. **Progress Steps** — step-by-step progress (Fetching → Matching → Downloading → Saving)
+14. **Cancel Import** — ability to cancel ongoing import
+15. **Import Another** — easy reset for next import
 
 ---
 
-## 16. Root Layout (`layout.tsx`)
+## 13. Login Page (`/login`)
 
-### Current State
-- Basic HTML structure
-- Meta tags for PWA
-- SWRegister and OfflineBanner
+### Current Issues
+- Basic form with username/email + password
+- Error handling exists
+- Forgot password link (broken - no page)
+- No social login
 
 ### Improvements
-1. **Add proper favicon references** - Already updated with new icons
-2. **Add Apple touch icon** - Already updated
-3. **Add Open Graph meta tags** - For social sharing
-4. **Add Twitter card meta tags** - For Twitter sharing
-5. **Add canonical URL** - For SEO
-6. **Add structured data** - JSON-LD for app info
-7. **Add viewport meta** - Already present
-8. **Add theme-color meta** - Already present
-9. **Add robots meta** - For search engine control
-10. **Add performance hints** - Preload critical resources
-11. **Add font preloading** - If custom fonts are added
-12. **Add CSP headers** - Content Security Policy
+1. **Branded Header** — larger Sakura logo with animation
+2. **Social Login Buttons** — Google, GitHub, Discord
+3. **Remember Me** — checkbox for persistent session
+4. **Forgot Password** — functional reset flow
+5. **Show Password Toggle** — already exists, keep it
+6. **Form Validation** — real-time validation feedback
+7. **Loading States** — better loading indicators
+8. **Keyboard Navigation** — full keyboard support
+9. **Auto-focus** — auto-focus first input
+10. **Enter to Submit** — submit on Enter key
+11. **Error Animations** — shake animation on error
+12. **Success Transition** — smooth transition to home
+13. **Background Animation** — subtle animated background
+14. **Mobile Optimized** — larger touch targets
+15. **Accessibility** — ARIA labels, error announcements
 
 ---
 
-## 17. Service Worker (`sw.js`)
+## 14. Register Page (`/register`)
 
-### Current State
-- Shell caching
-- API network-first
-- Audio cache-on-play
+### Current Issues
+- Basic form with username, email, password, confirm
+- Password strength indicator
+- Terms checkbox
+- No social registration
 
 ### Improvements
-1. **Update cache versions** - Bump version for new icons
-2. **Add cache invalidation** - Better version management
-3. **Add offline fallback page** - Custom offline page
-4. **Add background sync** - Queue actions when offline
-5. **Add push notifications** - For playback controls
-6. **Add cache size limits** - Prevent unbounded growth
-7. **Add audio cache eviction** - LRU for cached audio
-8. **Add API cache TTL** - Time-based expiration
-9. **Add image caching** - Cache cover art images
-10. **Add font caching** - Cache system fonts
-11. **Add proper error pages** - 404, 500 offline pages
-12. **Add periodic sync** - Background data refresh
+1. **Step-by-Step Registration** — multi-step form (Account → Profile → Done)
+2. **Social Registration** — Google, GitHub, Discord
+3. **Username Availability Check** — real-time username validation
+4. **Password Requirements** — visual checklist of requirements
+5. **Better Password Strength** — color-coded with specific feedback
+6. **Profile Picture Upload** — optional avatar during registration
+7. **Welcome Message** — post-registration welcome screen
+8. **Terms Inline** — show terms inline instead of new page
+9. **Form Progress** — visual progress indicator
+10. **Auto-focus** — auto-focus first input
+11. **Better Error Messages** — specific field errors
+12. **Success Animation** — celebration animation on success
+13. **Email Verification** — send verification email
+14. **Referral Code** — optional referral code field
+15. **Accessibility** — ARIA labels, error announcements
 
 ---
 
-## 18. Manifest (`manifest.json`)
+## 15. TabBar
 
-### Current State
-- Basic PWA manifest
-- Icons already updated
+### Current Issues
+- 4 tabs: Home, Search, Library, Liked
+- Basic icons
+- Active state is color change only
 
 ### Improvements
-1. **Add screenshots** - App screenshots for store listing
-2. **Add shortcuts** - Quick actions (Search, Import, Settings)
-3. **Add related_applications** - Links to app stores if applicable
-4. **Add prefer_related_applications** - false for web-first
-5. **Add scope** - Define app scope
-6. **Add id** - Unique app identifier
-7. **Add categories** - Already has music/entertainment
-8. **Add description** - Already present
-9. **Add lang** - Language declaration
-10. **Add dir** - Text direction
-11. **Add display override** - For better PWA behavior
-12. **Add handle_links** - How links are handled
+1. **Better Icons** — use filled icons for active state
+2. **Active Indicator** — animated pill/dot indicator
+3. **Tab Labels** — add subtle label text
+4. **Haptic Feedback** — on tab switch
+5. **Smooth Transitions** — animated tab switching
+6. **Badge Support** — notification badges on tabs
+7. **Long Press Menu** — quick actions on long press
+8. **Better Spacing** — improve tap targets
+9. **Active Animation** — scale/color animation on active
+10. **Scroll to Top** — tap active tab to scroll to top
+
+---
+
+## 16. Global Styles (`globals.css`)
+
+### Current Issues
+- Dark theme is well-defined
+- Light theme exists but needs polish
+- No custom scrollbar for light theme
+- Missing some utility classes
+
+### Improvements
+1. **Refine Dark Theme** — ensure proper contrast ratios
+2. **Polish Light Theme** — softer shadows, better borders
+3. **Smooth Theme Transition** — CSS transition on theme change
+4. **Custom Scrollbar** — match theme for both modes
+5. **Focus Styles** — visible focus indicators for accessibility
+6. **Animation Utilities** — fade-in, slide-up classes
+7. **Typography Scale** — consistent type scale
+8. **Spacing Utilities** — consistent spacing
+9. **Color Palette** — ensure all colors work in both themes
+10. **Reduced Motion** — respect prefers-reduced-motion
+11. **High Contrast Mode** — support for high contrast
+12. **Print Styles** — hide interactive elements when printing
+
+---
+
+## 17. Component Improvements
+
+### TrackRow Component
+1. **Context Menu** — right-click/long-press menu
+2. **Like Button** — inline like/unlike
+3. **Add to Playlist** — quick add button
+4. **Better Hover State** — smoother hover transition
+5. **Swipe Actions** — swipe left/right for actions
+6. **Drag Handle** — for playlist reordering
+7. **Now Playing Indicator** — animated equalizer bars
+8. **Better Skeleton** — loading skeleton matching layout
+
+### FullPlayer Component
+1. **Drag to Dismiss** — swipe down gesture
+2. **Parallax Album Art** — subtle parallax effect
+3. **Background Gradient** — dynamic gradient from album art
+4. **Lyrics Sync** — highlighted current lyric line
+5. **Queue Peek** — peek at next tracks
+6. **Share Card** — generate shareable image
+
+### MiniPlayer Component
+1. **Swipe Up** — gesture to expand
+2. **Swipe Down** — gesture to dismiss
+3. **Progress Gradient** — color gradient on progress
+4. **Album Art Animation** — subtle rotation/pulse
+
+---
+
+## 18. Wording & Content Fixes
+
+### Throughout App
+- Fix "Recently Played" → "Recently Played" (consistency)
+- Fix "New Arrivals" → "New Arrivals" (proper noun consistency)
+- Fix empty states to be more helpful and inviting
+- Fix error messages to be more specific and helpful
+- Fix button labels to be action-oriented ("Play All" not "Play All Tracks")
+- Fix placeholders to be descriptive and helpful
+- Fix aria-labels for all interactive elements
+- Fix page titles for SEO and navigation
+- Fix loading states to show meaningful progress
+- Fix success messages for user actions
+
+---
+
+## 19. Light Mode Specific
+
+### Issues
+- Light theme shadows too subtle
+- Light theme borders need more contrast
+- Light theme accent color needs more pop
+- Light theme skeleton needs to be more visible
+
+### Fixes
+1. Increase shadow opacity in light mode
+2. Darker border color in light mode
+3. More vibrant accent in light mode
+4. Better skeleton contrast in light mode
+5. Test all pages in light mode
+6. Ensure all text is readable in both modes
+7. Fix any white-on-white issues
+8. Ensure images have proper borders in light mode
+
+---
+
+## 20. Performance & UX
+
+### Improvements
+1. **Virtual Scrolling** — for large lists (>100 items)
+2. **Image Lazy Loading** — load images as they enter viewport
+3. **Preload Next Page** — preload likely next pages
+4. **Optimistic Updates** — update UI before API confirms
+5. **Debounced Search** — reduce API calls
+6. **Cache Strategy** — better cache headers for API
+7. **Error Boundaries** — catch and display errors gracefully
+8. **Offline Fallbacks** — show cached data when offline
+9. **Loading优先** — show content as it loads
+10. **Smooth Animations** — 60fps animations everywhere
+
+---
+
+*Total Improvements: 300+ across 20 categories*

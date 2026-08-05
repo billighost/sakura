@@ -2,14 +2,22 @@
   padding: clamp(0.75rem, 3vw, 1.25rem);
 }
 
+/* ── Header ── */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(0.75rem, 3vw, 1.25rem) clamp(0.75rem, 3vw, 1.25rem) clamp(0.5rem, 2vw, 0.75rem);
-  margin: clamp(-0.75rem, -3vw, -1.25rem) clamp(-0.75rem, -3vw, -1.25rem) clamp(0.75rem, 3vw, 1.25rem);
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.12), rgba(201, 166, 224, 0.08));
+  padding: clamp(0.75rem, 3vw, 1.25rem) clamp(0.75rem, 3vw, 1.25rem)
+    clamp(0.5rem, 2vw, 0.75rem);
+  margin: clamp(-0.75rem, -3vw, -1.25rem) clamp(-0.75rem, -3vw, -1.25rem)
+    clamp(0.75rem, 3vw, 1.25rem);
+  background: linear-gradient(
+    135deg,
+    rgba(242, 120, 159, 0.12),
+    rgba(201, 166, 224, 0.08)
+  );
   border-radius: 0 0 16px 16px;
+  animation: fadeInUp 0.4s ease-out both;
 }
 
 .greeting {
@@ -27,6 +35,12 @@
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--sakura-border);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.08);
 }
 
 .avatarPlaceholder {
@@ -40,29 +54,123 @@
   color: #fff;
   font-size: clamp(0.875rem, 3vw, 1rem);
   font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease;
 }
 
-.refreshIndicator {
+.avatarPlaceholder:hover {
+  transform: scale(1.08);
+}
+
+/* ── Quick Picks Grid ── */
+.quickPicksGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, auto);
+  gap: clamp(0.375rem, 1.5vw, 0.5rem);
+  margin-bottom: clamp(1rem, 4vw, 1.5rem);
+  animation: fadeInUp 0.45s ease-out 0.05s both;
+}
+
+.quickPickCard {
+  all: unset;
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--sakura-skeleton);
+  display: block;
+  text-align: left;
+}
+
+.quickPickCard:hover .quickPickArt {
+  transform: scale(1.04);
+}
+
+.quickPickCard:hover .quickPickOverlay {
+  opacity: 1;
+}
+
+.quickPickArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.quickPickFallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 0.75rem 0;
+  font-size: 2rem;
+  background: linear-gradient(135deg, var(--sakura-accent), var(--sakura-accent-2));
 }
 
-.refreshSpinner {
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 2px solid var(--sakura-border);
-  border-top-color: var(--sakura-accent);
+.quickPickTitle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.5rem 0.625rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.quickPickOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quickPickPlayBtn {
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  background: var(--sakura-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+/* ── Sections ── */
 .section {
   margin-bottom: clamp(1rem, 4vw, 1.5rem);
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.section:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.section:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.section:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.section:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.section:nth-child(6) {
+  animation-delay: 0.3s;
 }
 
 .sectionHeader {
@@ -77,6 +185,19 @@
   font-weight: 700;
 }
 
+.seeAllLink {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--sakura-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.seeAllLink:hover {
+  color: var(--sakura-text);
+}
+
+/* ── Horizontal Scroll ── */
 .horizontalScroll {
   display: flex;
   gap: clamp(0.5rem, 2vw, 0.75rem);
@@ -91,39 +212,49 @@
   display: none;
 }
 
-.quickCard {
+/* ── Track Card (horizontal scroll) ── */
+.trackCard {
+  all: unset;
   flex-shrink: 0;
   width: clamp(7rem, 25vw, 9rem);
   scroll-snap-align: start;
   cursor: pointer;
+  display: block;
+  text-align: left;
 }
 
-.quickCardArt {
+.trackCard:hover .trackCardArt {
+  transform: scale(1.04);
+}
+
+.trackCardArt {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 8px;
   object-fit: cover;
   background: var(--sakura-skeleton);
   margin-bottom: 0.375rem;
+  transition: transform 0.25s ease;
 }
 
-.fallbackArt {
+.trackCardFallback {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
   background: var(--sakura-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  margin-bottom: 0.375rem;
 }
 
-.fallbackArtAlt {
+.trackCardFallbackAlt {
+  composes: trackCardFallback;
   background: var(--sakura-accent-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
 }
 
-.quickCardTitle {
+.trackCardTitle {
   font-size: 0.75rem;
   font-weight: 600;
   overflow: hidden;
@@ -131,27 +262,245 @@
   white-space: nowrap;
 }
 
-.skeletonTitle {
-  width: 7rem;
+.trackCardArtist {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Artist Card ── */
+.artistCard {
+  flex-shrink: 0;
+  width: clamp(6.5rem, 24vw, 8rem);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.artistCard:hover .artistAvatarWrap {
+  transform: scale(1.04);
+}
+
+.artistAvatarWrap {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+  background: var(--sakura-skeleton);
+  transition: transform 0.25s ease;
+}
+
+.artistAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artistAvatarFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background: linear-gradient(135deg, var(--sakura-accent), var(--sakura-accent-2));
+  color: #fff;
+  font-weight: 700;
+}
+
+.artistName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.artistTrackCount {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+}
+
+/* ── Playlist Card ── */
+.playlistCard {
+  flex-shrink: 0;
+  width: clamp(7rem, 25vw, 9rem);
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.playlistCard:hover .playlistCardArt {
+  transform: scale(1.04);
+}
+
+.playlistCardArt {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--sakura-skeleton);
+  margin-bottom: 0.375rem;
+  transition: transform 0.25s ease;
+}
+
+.playlistCardFallback {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    var(--sakura-accent),
+    var(--sakura-accent-2)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.playlistCardName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlistCardCount {
+  font-size: 0.6875rem;
+  color: var(--sakura-text-secondary);
+}
+
+/* ── Made for You Grid ── */
+.madeForYouGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(0.5rem, 2vw, 0.75rem);
+}
+
+.madeForYouCard {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--sakura-skeleton);
+}
+
+.madeForYouCard:hover .madeForYouArt {
+  transform: scale(1.04);
+}
+
+.madeForYouArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.madeForYouFallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.madeForYouLabel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.5rem 0.625rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Skeleton Loading ── */
+.skeletonSection {
+  margin-bottom: clamp(1rem, 4vw, 1.5rem);
+}
+
+.skeletonHeader {
+  width: 8rem;
   height: 1rem;
   border-radius: 6px;
+  background: var(--sakura-skeleton);
+  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonHeader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sakura-skeleton-shimmer),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(0.375rem, 1.5vw, 0.5rem);
+}
+
+.skeletonGridCell {
+  aspect-ratio: 1;
+  border-radius: 8px;
   background: var(--sakura-skeleton);
   position: relative;
   overflow: hidden;
 }
 
-.skeletonTitle::after {
+.skeletonGridCell::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sakura-skeleton-shimmer),
+    transparent
+  );
   animation: shimmer 1.5s infinite;
+}
+
+.skeletonScroll {
+  display: flex;
+  gap: clamp(0.5rem, 2vw, 0.75rem);
+}
+
+.skeletonScrollItem {
+  flex-shrink: 0;
+  width: clamp(7rem, 25vw, 9rem);
 }
 
 .skeletonArt {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--sakura-skeleton);
   position: relative;
   overflow: hidden;
@@ -162,7 +511,35 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sakura-skeleton-shimmer),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonCircle {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--sakura-skeleton);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.skeletonCircle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sakura-skeleton-shimmer),
+    transparent
+  );
   animation: shimmer 1.5s infinite;
 }
 
@@ -179,21 +556,23 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sakura-skeleton-shimmer),
+    transparent
+  );
   animation: shimmer 1.5s infinite;
 }
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
+/* ── Empty State ── */
 .emptyState {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   padding: clamp(3rem, 12vh, 5rem) clamp(1rem, 4vw, 2rem);
+  animation: fadeInUp 0.5s ease-out both;
 }
 
 .emptyIllustration {
@@ -227,9 +606,34 @@
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.emptyCta:hover {
+  transform: scale(1.04);
 }
 
 .emptyCta:active {
   opacity: 0.85;
+}
+
+/* ── Keyframes ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }

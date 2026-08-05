@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const q = searchParams.get("q") || "";
+  const downloadedOnly = searchParams.get("downloaded") === "true";
   const offset = (page - 1) * limit;
 
-  const cacheKey = `tracks:list:${page}:${limit}:${q}`;
+  const cacheKey = `tracks:list:${page}:${limit}:${q}:${downloadedOnly}`;
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -40,8 +41,15 @@ export async function GET(req: NextRequest) {
   const baseQuery = `
     SELECT
       t.id, t.title, t.duration, t."trackNumber", t.genre, t."audioUrl", t."coverUrl",
-      json_build_object('name', a.name) AS artist,
-      json_build_object('title', al.title, 'coverUrl', al."coverUrl") AS album
+      json_build_object('name', a.name, 'id', a.id) AS artist,
+      json_build_object('title', al.title, 'coverUrl', al."coverUrl", 'id', al.id) AS album,
+      COALESCE(
+        (SELECT json_agg(json_build_object('name', a2.name, 'id', a2.id, 'role', ta.role))
+         FROM "TrackArtist" ta
+         JOIN "Artist" a2 ON ta."artistId" = a2.id
+         WHERE ta."trackId" = t.id),
+        '[]'::json
+      ) AS "otherArtists"
     FROM "Track" t
     LEFT JOIN "Artist" a ON t."artistId" = a.id
     LEFT JOIN "Album" al ON t."albumId" = al.id

@@ -200,7 +200,9 @@ export type UserWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   settings?: Prisma.XOR<Prisma.UserSettingsNullableScalarRelationFilter, Prisma.UserSettingsWhereInput> | null
   playlists?: Prisma.PlaylistListRelationFilter
+  playlistFolders?: Prisma.PlaylistFolderListRelationFilter
   favorites?: Prisma.FavoriteListRelationFilter
+  snoozedTracks?: Prisma.SnoozedTrackListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
 }
 
@@ -214,7 +216,9 @@ export type UserOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   settings?: Prisma.UserSettingsOrderByWithRelationInput
   playlists?: Prisma.PlaylistOrderByRelationAggregateInput
+  playlistFolders?: Prisma.PlaylistFolderOrderByRelationAggregateInput
   favorites?: Prisma.FavoriteOrderByRelationAggregateInput
+  snoozedTracks?: Prisma.SnoozedTrackOrderByRelationAggregateInput
   listeningHistory?: Prisma.ListeningHistoryOrderByRelationAggregateInput
 }
 
@@ -231,7 +235,9 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   settings?: Prisma.XOR<Prisma.UserSettingsNullableScalarRelationFilter, Prisma.UserSettingsWhereInput> | null
   playlists?: Prisma.PlaylistListRelationFilter
+  playlistFolders?: Prisma.PlaylistFolderListRelationFilter
   favorites?: Prisma.FavoriteListRelationFilter
+  snoozedTracks?: Prisma.SnoozedTrackListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
 }, "id" | "username" | "email">
 
@@ -271,7 +277,9 @@ export type UserCreateInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
 }
 
@@ -285,7 +293,9 @@ export type UserUncheckedCreateInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -299,7 +309,9 @@ export type UserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
 }
 
@@ -313,7 +325,9 @@ export type UserUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -422,6 +436,20 @@ export type UserUpdateOneRequiredWithoutPlaylistsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPlaylistsInput, Prisma.UserUpdateWithoutPlaylistsInput>, Prisma.UserUncheckedUpdateWithoutPlaylistsInput>
 }
 
+export type UserCreateNestedOneWithoutPlaylistFoldersInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPlaylistFoldersInput, Prisma.UserUncheckedCreateWithoutPlaylistFoldersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPlaylistFoldersInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutPlaylistFoldersNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPlaylistFoldersInput, Prisma.UserUncheckedCreateWithoutPlaylistFoldersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPlaylistFoldersInput
+  upsert?: Prisma.UserUpsertWithoutPlaylistFoldersInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPlaylistFoldersInput, Prisma.UserUpdateWithoutPlaylistFoldersInput>, Prisma.UserUncheckedUpdateWithoutPlaylistFoldersInput>
+}
+
 export type UserCreateNestedOneWithoutFavoritesInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutFavoritesInput, Prisma.UserUncheckedCreateWithoutFavoritesInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutFavoritesInput
@@ -434,6 +462,20 @@ export type UserUpdateOneRequiredWithoutFavoritesNestedInput = {
   upsert?: Prisma.UserUpsertWithoutFavoritesInput
   connect?: Prisma.UserWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFavoritesInput, Prisma.UserUpdateWithoutFavoritesInput>, Prisma.UserUncheckedUpdateWithoutFavoritesInput>
+}
+
+export type UserCreateNestedOneWithoutSnoozedTracksInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSnoozedTracksInput, Prisma.UserUncheckedCreateWithoutSnoozedTracksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSnoozedTracksInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutSnoozedTracksNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSnoozedTracksInput, Prisma.UserUncheckedCreateWithoutSnoozedTracksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSnoozedTracksInput
+  upsert?: Prisma.UserUpsertWithoutSnoozedTracksInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSnoozedTracksInput, Prisma.UserUpdateWithoutSnoozedTracksInput>, Prisma.UserUncheckedUpdateWithoutSnoozedTracksInput>
 }
 
 export type UserCreateNestedOneWithoutListeningHistoryInput = {
@@ -459,7 +501,9 @@ export type UserCreateWithoutSettingsInput = {
   bio?: string | null
   createdAt?: Date | string
   playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
 }
 
@@ -472,7 +516,9 @@ export type UserUncheckedCreateWithoutSettingsInput = {
   bio?: string | null
   createdAt?: Date | string
   playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -501,7 +547,9 @@ export type UserUpdateWithoutSettingsInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
 }
 
@@ -514,7 +562,9 @@ export type UserUncheckedUpdateWithoutSettingsInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -527,7 +577,9 @@ export type UserCreateWithoutPlaylistsInput = {
   bio?: string | null
   createdAt?: Date | string
   settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
 }
 
@@ -540,7 +592,9 @@ export type UserUncheckedCreateWithoutPlaylistsInput = {
   bio?: string | null
   createdAt?: Date | string
   settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -569,7 +623,9 @@ export type UserUpdateWithoutPlaylistsInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
 }
 
@@ -582,7 +638,85 @@ export type UserUncheckedUpdateWithoutPlaylistsInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutPlaylistFoldersInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutPlaylistFoldersInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutPlaylistFoldersInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutPlaylistFoldersInput, Prisma.UserUncheckedCreateWithoutPlaylistFoldersInput>
+}
+
+export type UserUpsertWithoutPlaylistFoldersInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutPlaylistFoldersInput, Prisma.UserUncheckedUpdateWithoutPlaylistFoldersInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutPlaylistFoldersInput, Prisma.UserUncheckedCreateWithoutPlaylistFoldersInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutPlaylistFoldersInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutPlaylistFoldersInput, Prisma.UserUncheckedUpdateWithoutPlaylistFoldersInput>
+}
+
+export type UserUpdateWithoutPlaylistFoldersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutPlaylistFoldersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -596,6 +730,8 @@ export type UserCreateWithoutFavoritesInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
 }
 
@@ -609,6 +745,8 @@ export type UserUncheckedCreateWithoutFavoritesInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
 }
 
@@ -638,6 +776,8 @@ export type UserUpdateWithoutFavoritesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
 }
 
@@ -651,6 +791,84 @@ export type UserUncheckedUpdateWithoutFavoritesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutSnoozedTracksInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutSnoozedTracksInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutSnoozedTracksInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSnoozedTracksInput, Prisma.UserUncheckedCreateWithoutSnoozedTracksInput>
+}
+
+export type UserUpsertWithoutSnoozedTracksInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSnoozedTracksInput, Prisma.UserUncheckedUpdateWithoutSnoozedTracksInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSnoozedTracksInput, Prisma.UserUncheckedCreateWithoutSnoozedTracksInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutSnoozedTracksInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSnoozedTracksInput, Prisma.UserUncheckedUpdateWithoutSnoozedTracksInput>
+}
+
+export type UserUpdateWithoutSnoozedTracksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSnoozedTracksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -664,7 +882,9 @@ export type UserCreateWithoutListeningHistoryInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutListeningHistoryInput = {
@@ -677,7 +897,9 @@ export type UserUncheckedCreateWithoutListeningHistoryInput = {
   createdAt?: Date | string
   settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
   playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutListeningHistoryInput = {
@@ -706,7 +928,9 @@ export type UserUpdateWithoutListeningHistoryInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutListeningHistoryInput = {
@@ -719,7 +943,9 @@ export type UserUncheckedUpdateWithoutListeningHistoryInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
   playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -729,13 +955,17 @@ export type UserUncheckedUpdateWithoutListeningHistoryInput = {
 
 export type UserCountOutputType = {
   playlists: number
+  playlistFolders: number
   favorites: number
+  snoozedTracks: number
   listeningHistory: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   playlists?: boolean | UserCountOutputTypeCountPlaylistsArgs
+  playlistFolders?: boolean | UserCountOutputTypeCountPlaylistFoldersArgs
   favorites?: boolean | UserCountOutputTypeCountFavoritesArgs
+  snoozedTracks?: boolean | UserCountOutputTypeCountSnoozedTracksArgs
   listeningHistory?: boolean | UserCountOutputTypeCountListeningHistoryArgs
 }
 
@@ -759,8 +989,22 @@ export type UserCountOutputTypeCountPlaylistsArgs<ExtArgs extends runtime.Types.
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountPlaylistFoldersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PlaylistFolderWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountFavoritesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.FavoriteWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountSnoozedTracksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SnoozedTrackWhereInput
 }
 
 /**
@@ -781,7 +1025,9 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   settings?: boolean | Prisma.User$settingsArgs<ExtArgs>
   playlists?: boolean | Prisma.User$playlistsArgs<ExtArgs>
+  playlistFolders?: boolean | Prisma.User$playlistFoldersArgs<ExtArgs>
   favorites?: boolean | Prisma.User$favoritesArgs<ExtArgs>
+  snoozedTracks?: boolean | Prisma.User$snoozedTracksArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.User$listeningHistoryArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
@@ -820,7 +1066,9 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   settings?: boolean | Prisma.User$settingsArgs<ExtArgs>
   playlists?: boolean | Prisma.User$playlistsArgs<ExtArgs>
+  playlistFolders?: boolean | Prisma.User$playlistFoldersArgs<ExtArgs>
   favorites?: boolean | Prisma.User$favoritesArgs<ExtArgs>
+  snoozedTracks?: boolean | Prisma.User$snoozedTracksArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.User$listeningHistoryArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -832,7 +1080,9 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     settings: Prisma.$UserSettingsPayload<ExtArgs> | null
     playlists: Prisma.$PlaylistPayload<ExtArgs>[]
+    playlistFolders: Prisma.$PlaylistFolderPayload<ExtArgs>[]
     favorites: Prisma.$FavoritePayload<ExtArgs>[]
+    snoozedTracks: Prisma.$SnoozedTrackPayload<ExtArgs>[]
     listeningHistory: Prisma.$ListeningHistoryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -1239,7 +1489,9 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   settings<T extends Prisma.User$settingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$settingsArgs<ExtArgs>>): Prisma.Prisma__UserSettingsClient<runtime.Types.Result.GetResult<Prisma.$UserSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   playlists<T extends Prisma.User$playlistsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$playlistsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlaylistPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  playlistFolders<T extends Prisma.User$playlistFoldersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$playlistFoldersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlaylistFolderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   favorites<T extends Prisma.User$favoritesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$favoritesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FavoritePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  snoozedTracks<T extends Prisma.User$snoozedTracksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$snoozedTracksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SnoozedTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   listeningHistory<T extends Prisma.User$listeningHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$listeningHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListeningHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1713,6 +1965,30 @@ export type User$playlistsArgs<ExtArgs extends runtime.Types.Extensions.Internal
 }
 
 /**
+ * User.playlistFolders
+ */
+export type User$playlistFoldersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PlaylistFolder
+   */
+  select?: Prisma.PlaylistFolderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PlaylistFolder
+   */
+  omit?: Prisma.PlaylistFolderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PlaylistFolderInclude<ExtArgs> | null
+  where?: Prisma.PlaylistFolderWhereInput
+  orderBy?: Prisma.PlaylistFolderOrderByWithRelationInput | Prisma.PlaylistFolderOrderByWithRelationInput[]
+  cursor?: Prisma.PlaylistFolderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PlaylistFolderScalarFieldEnum | Prisma.PlaylistFolderScalarFieldEnum[]
+}
+
+/**
  * User.favorites
  */
 export type User$favoritesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1734,6 +2010,30 @@ export type User$favoritesArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.FavoriteScalarFieldEnum | Prisma.FavoriteScalarFieldEnum[]
+}
+
+/**
+ * User.snoozedTracks
+ */
+export type User$snoozedTracksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SnoozedTrack
+   */
+  select?: Prisma.SnoozedTrackSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SnoozedTrack
+   */
+  omit?: Prisma.SnoozedTrackOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SnoozedTrackInclude<ExtArgs> | null
+  where?: Prisma.SnoozedTrackWhereInput
+  orderBy?: Prisma.SnoozedTrackOrderByWithRelationInput | Prisma.SnoozedTrackOrderByWithRelationInput[]
+  cursor?: Prisma.SnoozedTrackWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SnoozedTrackScalarFieldEnum | Prisma.SnoozedTrackScalarFieldEnum[]
 }
 
 /**

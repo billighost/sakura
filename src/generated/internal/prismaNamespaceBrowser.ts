@@ -56,9 +56,14 @@ export const ModelName = {
   Artist: 'Artist',
   Album: 'Album',
   Track: 'Track',
+  TrackArtist: 'TrackArtist',
   Playlist: 'Playlist',
+  PlaylistFolder: 'PlaylistFolder',
   PlaylistTrack: 'PlaylistTrack',
+  TrackCredit: 'TrackCredit',
+  SampledTrack: 'SampledTrack',
   Favorite: 'Favorite',
+  SnoozedTrack: 'SnoozedTrack',
   ListeningHistory: 'ListeningHistory'
 } as const
 
@@ -108,7 +113,11 @@ export type UserSettingsScalarFieldEnum = (typeof UserSettingsScalarFieldEnum)[k
 export const ArtistScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  imageUrl: 'imageUrl'
+  imageUrl: 'imageUrl',
+  bio: 'bio',
+  deezerId: 'deezerId',
+  genres: 'genres',
+  createdAt: 'createdAt'
 } as const
 
 export type ArtistScalarFieldEnum = (typeof ArtistScalarFieldEnum)[keyof typeof ArtistScalarFieldEnum]
@@ -119,7 +128,12 @@ export const AlbumScalarFieldEnum = {
   title: 'title',
   artistId: 'artistId',
   coverUrl: 'coverUrl',
-  releaseYear: 'releaseYear'
+  releaseYear: 'releaseYear',
+  releaseDate: 'releaseDate',
+  genre: 'genre',
+  deezerId: 'deezerId',
+  copyright: 'copyright',
+  createdAt: 'createdAt'
 } as const
 
 export type AlbumScalarFieldEnum = (typeof AlbumScalarFieldEnum)[keyof typeof AlbumScalarFieldEnum]
@@ -139,10 +153,24 @@ export const TrackScalarFieldEnum = {
   source: 'source',
   telegramFileId: 'telegramFileId',
   telegramMessageId: 'telegramMessageId',
+  deezerId: 'deezerId',
+  isrc: 'isrc',
+  previewUrl: 'previewUrl',
   createdAt: 'createdAt'
 } as const
 
 export type TrackScalarFieldEnum = (typeof TrackScalarFieldEnum)[keyof typeof TrackScalarFieldEnum]
+
+
+export const TrackArtistScalarFieldEnum = {
+  trackId: 'trackId',
+  artistId: 'artistId',
+  role: 'role',
+  position: 'position',
+  addedAt: 'addedAt'
+} as const
+
+export type TrackArtistScalarFieldEnum = (typeof TrackArtistScalarFieldEnum)[keyof typeof TrackArtistScalarFieldEnum]
 
 
 export const PlaylistScalarFieldEnum = {
@@ -151,10 +179,21 @@ export const PlaylistScalarFieldEnum = {
   name: 'name',
   description: 'description',
   coverUrl: 'coverUrl',
+  folderId: 'folderId',
   createdAt: 'createdAt'
 } as const
 
 export type PlaylistScalarFieldEnum = (typeof PlaylistScalarFieldEnum)[keyof typeof PlaylistScalarFieldEnum]
+
+
+export const PlaylistFolderScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  createdAt: 'createdAt'
+} as const
+
+export type PlaylistFolderScalarFieldEnum = (typeof PlaylistFolderScalarFieldEnum)[keyof typeof PlaylistFolderScalarFieldEnum]
 
 
 export const PlaylistTrackScalarFieldEnum = {
@@ -167,6 +206,28 @@ export const PlaylistTrackScalarFieldEnum = {
 export type PlaylistTrackScalarFieldEnum = (typeof PlaylistTrackScalarFieldEnum)[keyof typeof PlaylistTrackScalarFieldEnum]
 
 
+export const TrackCreditScalarFieldEnum = {
+  id: 'id',
+  trackId: 'trackId',
+  name: 'name',
+  role: 'role',
+  createdAt: 'createdAt'
+} as const
+
+export type TrackCreditScalarFieldEnum = (typeof TrackCreditScalarFieldEnum)[keyof typeof TrackCreditScalarFieldEnum]
+
+
+export const SampledTrackScalarFieldEnum = {
+  id: 'id',
+  trackId: 'trackId',
+  sampledTrackId: 'sampledTrackId',
+  sampleType: 'sampleType',
+  createdAt: 'createdAt'
+} as const
+
+export type SampledTrackScalarFieldEnum = (typeof SampledTrackScalarFieldEnum)[keyof typeof SampledTrackScalarFieldEnum]
+
+
 export const FavoriteScalarFieldEnum = {
   userId: 'userId',
   trackId: 'trackId',
@@ -174,6 +235,16 @@ export const FavoriteScalarFieldEnum = {
 } as const
 
 export type FavoriteScalarFieldEnum = (typeof FavoriteScalarFieldEnum)[keyof typeof FavoriteScalarFieldEnum]
+
+
+export const SnoozedTrackScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  snoozedAt: 'snoozedAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type SnoozedTrackScalarFieldEnum = (typeof SnoozedTrackScalarFieldEnum)[keyof typeof SnoozedTrackScalarFieldEnum]
 
 
 export const ListeningHistoryScalarFieldEnum = {
