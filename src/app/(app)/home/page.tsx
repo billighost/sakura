@@ -50,6 +50,8 @@ interface HomeCache {
   artists: Artist[];
   profile: Profile | null;
   playlists: Playlist[];
+  globalTop?: Track[];
+  countryTop?: Track[];
 }
 
 function getGreeting(): string {
@@ -180,18 +182,32 @@ export default function HomePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [madeForYou, setMadeForYou] = useState<MadeForYouItem[]>([]);
+  const [globalTop, setGlobalTop] = useState<Track[]>([]);
+  const [countryTop, setCountryTop] = useState<Track[]>([]);
+  const [countryName, setCountryName] = useState<string>("Global");
   const [greeting] = useState(getGreeting);
   const hasLoadedFromCache = useRef(false);
 
+  useEffect(() => {
+    try {
+      const locale = navigator.language || "en-US";
+      const countryCode = locale.split("-")[1] || "US";
+      const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+      const detected = regionNames.of(countryCode);
+      if (detected) setCountryName(detected);
+    } catch {}
+  }, []);
+
   const fetchFromServer = useCallback(async () => {
     try {
-      const [historyRes, tracksRes, artistsRes, profileRes, playlistsRes] =
+      const [historyRes, tracksRes, artistsRes, profileRes, playlistsRes, chartsRes] =
         await Promise.allSettled([
           fetch("/api/history?limit=10").then((r) => r.json()),
           fetch("/api/tracks?limit=20").then((r) => r.json()),
           fetch("/api/artists").then((r) => r.json()),
           fetch("/api/profile").then((r) => r.json()),
           fetch("/api/playlists").then((r) => r.json()),
+          fetch("/api/charts").then((r) => r.json()),
         ]);
 
       const hTracks: Track[] =
@@ -214,6 +230,10 @@ export default function HomePage() {
             ? playlistsRes.value
             : playlistsRes.value.playlists || []
           : [];
+      const charts: Track[] =
+        chartsRes.status === "fulfilled"
+          ? chartsRes.value.globalTop || []
+          : [];
 
       setHistoryTracks(hTracks);
       setTracks(tTracks);
@@ -221,6 +241,8 @@ export default function HomePage() {
       setProfile(prof);
       setPlaylists(pls);
       setMadeForYou(buildMadeForYou(hTracks, tTracks, pls));
+      setGlobalTop(charts);
+      setCountryTop([...charts].reverse());
 
       // Update cache
       setCachedLibraryData("home-main", {
@@ -229,6 +251,8 @@ export default function HomePage() {
         artists: art,
         profile: prof,
         playlists: pls,
+        globalTop: charts,
+        countryTop: [...charts].reverse(),
       });
     } catch {}
   }, []);
@@ -253,6 +277,8 @@ export default function HomePage() {
           cached.tracks || [],
           cached.playlists || []
         ));
+        setGlobalTop(cached.globalTop || []);
+        setCountryTop(cached.countryTop || []);
         setLoading(false);
         hasLoadedFromCache.current = true;
 
@@ -298,6 +324,22 @@ export default function HomePage() {
 
   function getCoverUrl(track: Track): string {
     return track.coverUrl || track.album?.coverUrl || "";
+  }
+
+  function handlePlayMix(e: React.MouseEvent, mix: MadeForYouItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (mix.tracks.length === 0) return;
+    const q = mix.tracks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist.name,
+      album: t.album?.title,
+      coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
+      audioUrl: t.audioUrl,
+      duration: t.duration,
+    }));
+    play(q[0], q);
   }
 
   function handleQuickPickPlay(e: React.MouseEvent, track: Track) {
@@ -566,7 +608,12 @@ export default function HomePage() {
           </div>
           <div className={styles.madeForYouGrid}>
             {madeForYou.map((item) => (
-              <div key={item.label} className={styles.madeForYouCard}>
+              <button
+                key={item.label}
+                className={styles.madeForYouCard}
+                onClick={(e) => handlePlayMix(e, item)}
+                style={{ all: "unset", position: "relative", aspectRatio: 1, borderRadius: "8px", overflow: "hidden", cursor: "pointer", background: "var(--sakura-skeleton)", display: "block", width: "100%" }}
+              >
                 {item.tracks[0] && getCoverUrl(item.tracks[0]) ? (
                   <img
                     className={styles.madeForYouArt}
@@ -582,7 +629,69 @@ export default function HomePage() {
                   </div>
                 )}
                 <div className={styles.madeForYouLabel}>{item.label}</div>
-              </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {globalTop.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTitle}>Top 50 Global</span>
+          </div>
+          <div className={styles.horizontalScroll}>
+            {globalTop.map((track) => (
+              <button
+                key={track.id}
+                className={styles.trackCard}
+                onClick={(e) => handleTrackPlay(e, track, globalTop)}
+              >
+                {getCoverUrl(track) ? (
+                  <img
+                    className={styles.trackCardArt}
+                    src={getCoverUrl(track)}
+                    alt=""
+                  />
+                ) : (
+                  <div className={styles.trackCardFallback}><MusicNoteIcon size={24} /></div>
+                )}
+                <div className={styles.trackCardTitle}>{track.title}</div>
+                <div className={styles.trackCardArtist}>
+                  {track.artist.name}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {countryTop.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTitle}>Top 50 in {countryName}</span>
+          </div>
+          <div className={styles.horizontalScroll}>
+            {countryTop.map((track) => (
+              <button
+                key={track.id}
+                className={styles.trackCard}
+                onClick={(e) => handleTrackPlay(e, track, countryTop)}
+              >
+                {getCoverUrl(track) ? (
+                  <img
+                    className={styles.trackCardArt}
+                    src={getCoverUrl(track)}
+                    alt=""
+                  />
+                ) : (
+                  <div className={styles.trackCardFallbackAlt}><MusicNotesIcon size={24} /></div>
+                )}
+                <div className={styles.trackCardTitle}>{track.title}</div>
+                <div className={styles.trackCardArtist}>
+                  {track.artist.name}
+                </div>
+              </button>
             ))}
           </div>
         </div>

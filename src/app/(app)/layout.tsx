@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { TabBar } from "@/components/TabBar";
 import { MiniPlayer } from "@/components/MiniPlayer";
 import { FullPlayer } from "@/components/FullPlayer";
@@ -23,6 +24,38 @@ function ThemeInit() {
 function AppShell({ children }: { children: React.ReactNode }) {
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const { currentTrack } = usePlayer();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      const deltaY = e.changedTouches[0].clientY - touchStartY;
+
+      // Allow swipe back if not on main tabs
+      const mainTabs = ["/home", "/search", "/library", "/profile"];
+      if (mainTabs.includes(pathname)) return;
+
+      if (deltaX > 80 && Math.abs(deltaY) < 40 && touchStartX < 50) {
+        router.back();
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [pathname, router]);
 
   return (
     <div className={styles.root}>
