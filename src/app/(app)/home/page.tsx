@@ -1,44 +1,13 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
 import Link from "next/link";
+import { Suspense } from "react";
 import styles from "./page.module.css";
+import { auth } from "@/lib/auth";
+import { getHomeData } from "@/lib/homeData";
+import { redirect } from "next/navigation";
 
 /* ────────────────────────────────────────────────────────────
-   Types — mirroring the /api/home response shape.
-──────────────────────────────────────────────────────────── */
-type Track = {
-  id: string;
-  title: string;
-  artist: string;
-  coverUrl?: string | null;
-};
-
-type Artist = {
-  id: string;
-  name: string;
-  trackCount: number;
-  avatarUrl?: string | null;
-};
-
-type Playlist = {
-  id: string;
-  name: string;
-  trackCount: number;
-  coverUrl?: string | null;
-};
-
-type HomeData = {
-  user: { name: string; avatarUrl?: string | null };
-  quickPicks: Track[];
-  madeForYou: { id: string; label: string; coverUrl?: string | null; tint: "a" | "b" }[];
-  recentlyPlayed: Track[];
-  topArtists: Artist[];
-  playlists: Playlist[];
-};
-
-/* ────────────────────────────────────────────────────────────
-   Icons — small inline SVGs, no extra dependency required.
+   Icons
 ──────────────────────────────────────────────────────────── */
 function PlayIcon({ size = 20 }: { size?: number }) {
   return (
@@ -58,6 +27,22 @@ function MusicNoteIcon({ size = 28 }: { size?: number }) {
   );
 }
 
+function HeartIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="white">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+    </svg>
+  );
+}
+
+function DownloadIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="white">
+      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+    </svg>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────
    Helpers
 ──────────────────────────────────────────────────────────── */
@@ -68,19 +53,22 @@ function getGreeting(hour: number) {
   return "Good evening";
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((p) => p[0])
+function initials(name?: string) {
+  if (!name) return "?";
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  return trimmed
+    .split(/\s+/)
+    .map((p) => p[0] || "")
     .join("")
     .slice(0, 2)
     .toUpperCase();
 }
 
 /* ────────────────────────────────────────────────────────────
-   Skeleton — shown while data is loading (mirrors loading.tsx)
+   Skeleton & Empty
 ──────────────────────────────────────────────────────────── */
-function HomeSkeleton() {
+export function HomeSkeleton() {
   return (
     <div className={styles.page}>
       <div className={styles.skeletonSection}>
@@ -91,26 +79,10 @@ function HomeSkeleton() {
           ))}
         </div>
       </div>
-      {[...Array(2)].map((_, s) => (
-        <div key={s} className={styles.skeletonSection}>
-          <div className={styles.skeletonHeader} />
-          <div className={styles.skeletonScroll}>
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className={styles.skeletonScrollItem}>
-                <div className={styles.skeletonArt} />
-                <div className={styles.skeletonText} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────
-   Empty state — first-run experience with no listening history
-──────────────────────────────────────────────────────────── */
 function EmptyHome() {
   return (
     <div className={styles.emptyState}>
@@ -123,221 +95,175 @@ function EmptyHome() {
         </svg>
       </div>
       <div className={styles.emptyText}>Nothing playing yet</div>
-      <div className={styles.emptySubtext}>Search for an artist or album to start your library</div>
-      <Link href="/search" className={styles.emptyCta}>
-        Find something to play
-      </Link>
+      <Link href="/search" className={styles.emptyCta}>Find something to play</Link>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────
-   Page
+   Data Components
 ──────────────────────────────────────────────────────────── */
-export default function HomePage() {
-  const [data, setData] = useState<HomeData | null>(null);
-  const [error, setError] = useState(false);
+async function HomeFeed({ userId }: { userId: string }) {
+  const data = await getHomeData(userId);
+  const isEmpty = data.quickPicks.length === 0 && data.recentlyPlayed.length === 0;
 
-  useEffect(() => {
-    let cancelled = false;
+  if (isEmpty) return <EmptyHome />;
 
-    fetch("/api/home")
-      .then((res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        return res.json() as Promise<HomeData>;
-      })
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const greeting = useMemo(() => getGreeting(new Date().getHours()), []);
-
-  if (!data && !error) return <HomeSkeleton />;
-
-  // On error or truly empty library, show the empty state
-  if (error || !data) {
-    return (
-      <div className={styles.page}>
-        <header className={styles.header}>
-          <h1 className={styles.greeting}>{greeting}</h1>
-        </header>
-        <EmptyHome />
+  return (
+    <>
+      {/* Top Row Collections */}
+      <div className={styles.topRowGrid}>
+        <Link href="/library/liked" className={styles.topRowCard}>
+          <div className={styles.topRowIconWrap} style={{ background: 'linear-gradient(135deg, #4f46e5, #ec4899)' }}>
+            <HeartIcon />
+          </div>
+          <span className={styles.topRowTitle}>Liked Songs</span>
+        </Link>
+        <Link href="/library/downloaded" className={styles.topRowCard}>
+          <div className={styles.topRowIconWrap} style={{ background: 'linear-gradient(135deg, #10b981, #3b82f6)' }}>
+            <DownloadIcon />
+          </div>
+          <span className={styles.topRowTitle}>Downloaded</span>
+        </Link>
+        {data.playlists.slice(0, 4).map(pl => (
+          <Link key={pl.id} href={`/playlist/${pl.id}`} className={styles.topRowCard}>
+            {pl.coverUrl ? (
+              <img src={pl.coverUrl} alt="" className={styles.topRowIconWrap} style={{ padding: 0 }} />
+            ) : (
+              <div className={styles.topRowIconWrap} style={{ background: 'var(--sakura-bg-hover)' }}>
+                <MusicNoteIcon size={20} />
+              </div>
+            )}
+            <span className={styles.topRowTitle}>{pl.name}</span>
+          </Link>
+        ))}
       </div>
-    );
-  }
 
-  const isEmpty =
-    data.quickPicks.length === 0 && data.recentlyPlayed.length === 0;
+      {/* Made For You (Custom Mixes) */}
+      {data.madeForYou && data.madeForYou.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Made for you</h2>
+            <Link href="/library/made-for-you" className={styles.seeAllLink}>See all</Link>
+          </div>
+          <div className={styles.madeForYouGrid}>
+            {data.madeForYou.map((mix) => (
+              <Link
+                key={mix.id}
+                href={`/mix/${mix.id}`}
+                className={styles.madeForYouCard}
+                style={!mix.coverUrl ? {
+                  background: mix.tint === "a"
+                    ? "linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-accent-2))"
+                    : "linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end))"
+                } : undefined}
+              >
+                {mix.coverUrl && <img src={mix.coverUrl} alt="" className={styles.madeForYouArt} />}
+                <span className={styles.madeForYouLabel}>{mix.label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Top Charts */}
+      {data.systemPlaylists && data.systemPlaylists.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Top Charts</h2>
+          </div>
+          <div className={styles.horizontalScroll}>
+            {data.systemPlaylists.map((pl) => (
+              <Link key={pl.id} href={`/playlist/system/${pl.systemId}`} className={styles.playlistCard}>
+                {pl.coverUrl ? (
+                  <img src={pl.coverUrl} alt="" className={styles.playlistCardArt} />
+                ) : (
+                  <div className={styles.playlistCardFallback} style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
+                    <MusicNoteIcon size={32} />
+                  </div>
+                )}
+                <div className={styles.playlistCardName}>{pl.name}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recently Played */}
+      {data.recentlyPlayed.length > 0 && (
+          <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Recently played</h2>
+          </div>
+          <div className={styles.horizontalScroll}>
+            {data.recentlyPlayed.map((track) => (
+              <Link key={track.id} href={`/track/${track.id}`} className={styles.trackCard}>
+                {track.coverUrl ? (
+                  <img src={track.coverUrl} alt="" className={styles.trackCardArt} />
+                ) : (
+                  <div className={styles.trackCardFallback}><MusicNoteIcon size={22} /></div>
+                )}
+                <div className={styles.trackCardTitle}>{track.title}</div>
+                <div className={styles.trackCardArtist}>{track.artist}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Top Artists */}
+      {data.topArtists.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Your top artists</h2>
+          </div>
+          <div className={styles.horizontalScroll}>
+            {data.topArtists.map((artist) => (
+              <Link key={artist.id} href={`/artist/${artist.id}`} className={styles.artistCard}>
+                <div className={styles.artistAvatarWrap}>
+                  {artist.avatarUrl ? (
+                    <img src={artist.avatarUrl} alt="" className={styles.artistAvatar} />
+                  ) : (
+                    <div className={styles.artistAvatarFallback}>{initials(artist.name)}</div>
+                  )}
+                </div>
+                <div className={styles.artistName}>{artist.name}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   Page (Server Component)
+──────────────────────────────────────────────────────────── */
+export default async function HomePage() {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
+  const greeting = getGreeting(new Date().getHours());
+  const user = session.user;
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.greeting}>
-          {greeting}, {data.user.name}
+          {greeting}, {user.name}
         </h1>
         <Link href="/profile" className={styles.avatarCol} aria-label="Open your profile">
-          {data.user.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={data.user.avatarUrl} alt="" className={styles.avatar} />
+          {user.image ? (
+            <img src={user.image} alt="" className={styles.avatar} />
           ) : (
-            <div className={styles.avatarPlaceholder}>{initials(data.user.name)}</div>
+            <div className={styles.avatarPlaceholder}>{initials(user.name || "?")}</div>
           )}
         </Link>
       </header>
-
-      {isEmpty ? (
-        <EmptyHome />
-      ) : (
-        <>
-          {data.quickPicks.length > 0 && (
-            <div className={styles.quickPicksGrid}>
-              {data.quickPicks.map((track) => (
-                <button key={track.id} type="button" className={styles.quickPickCard} aria-label={`Play ${track.title}`}>
-                  {track.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={track.coverUrl} alt="" className={styles.quickPickArt} />
-                  ) : (
-                    <div className={styles.quickPickFallback}>
-                      <MusicNoteIcon />
-                    </div>
-                  )}
-                  <div className={styles.quickPickOverlay}>
-                    <span className={styles.quickPickPlayBtn}>
-                      <PlayIcon />
-                    </span>
-                  </div>
-                  <span className={styles.quickPickTitle}>{track.title}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {data.madeForYou.length > 0 && (
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Made for you</h2>
-                <Link href="/library/made-for-you" className={styles.seeAllLink}>
-                  See all
-                </Link>
-              </div>
-              <div className={styles.madeForYouGrid}>
-                {data.madeForYou.map((mix) => (
-                  <button
-                    key={mix.id}
-                    type="button"
-                    className={styles.madeForYouCard}
-                    style={
-                      !mix.coverUrl
-                        ? {
-                            background:
-                              mix.tint === "a"
-                                ? "linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-accent-2))"
-                                : "linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end))",
-                          }
-                        : undefined
-                    }
-                  >
-                    {mix.coverUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={mix.coverUrl} alt="" className={styles.madeForYouArt} />
-                    )}
-                    <span className={styles.madeForYouLabel}>{mix.label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {data.recentlyPlayed.length > 0 && (
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Recently played</h2>
-                <Link href="/library/history" className={styles.seeAllLink}>
-                  See all
-                </Link>
-              </div>
-              <div className={styles.horizontalScroll}>
-                {data.recentlyPlayed.map((track) => (
-                  <button key={track.id} type="button" className={styles.trackCard} aria-label={`Play ${track.title}`}>
-                    {track.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={track.coverUrl} alt="" className={styles.trackCardArt} />
-                    ) : (
-                      <div className={styles.trackCardFallback}>
-                        <MusicNoteIcon size={22} />
-                      </div>
-                    )}
-                    <div className={styles.trackCardTitle}>{track.title}</div>
-                    <div className={styles.trackCardArtist}>{track.artist}</div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {data.topArtists.length > 0 && (
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Your top artists</h2>
-                <Link href="/library/artists" className={styles.seeAllLink}>
-                  See all
-                </Link>
-              </div>
-              <div className={styles.horizontalScroll}>
-                {data.topArtists.map((artist) => (
-                  <Link key={artist.id} href={`/artist/${artist.id}`} className={styles.artistCard}>
-                    <div className={styles.artistAvatarWrap}>
-                      {artist.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={artist.avatarUrl} alt="" className={styles.artistAvatar} />
-                      ) : (
-                        <div className={styles.artistAvatarFallback}>{initials(artist.name)}</div>
-                      )}
-                    </div>
-                    <div className={styles.artistName}>{artist.name}</div>
-                    <div className={styles.artistTrackCount}>{artist.trackCount} tracks</div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {data.playlists.length > 0 && (
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Your playlists</h2>
-                <Link href="/library/playlists" className={styles.seeAllLink}>
-                  See all
-                </Link>
-              </div>
-              <div className={styles.horizontalScroll}>
-                {data.playlists.map((pl) => (
-                  <Link key={pl.id} href={`/playlist/${pl.id}`} className={styles.playlistCard}>
-                    {pl.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={pl.coverUrl} alt="" className={styles.playlistCardArt} />
-                    ) : (
-                      <div className={styles.playlistCardFallback}>
-                        <MusicNoteIcon size={22} />
-                      </div>
-                    )}
-                    <div className={styles.playlistCardName}>{pl.name}</div>
-                    <div className={styles.playlistCardCount}>{pl.trackCount} tracks</div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-        </>
-      )}
+      <Suspense fallback={<HomeSkeleton />}>
+        <HomeFeed userId={user.id!} />
+      </Suspense>
     </div>
   );
 }

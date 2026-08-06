@@ -86,33 +86,52 @@
   transform: scale(1.08) rotate(-2deg);
 }
 
-/* ── Quick Picks Grid ── */
-.quickPicksGrid {
+/* ── Top Row Grid ── */
+.topRowGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(3, auto);
   gap: clamp(0.5rem, 2vw, 0.75rem);
   margin-bottom: clamp(1.5rem, 5vw, 2rem);
   animation: fadeInUp 0.55s cubic-bezier(.16,1,.3,1) 0.05s both;
 }
 
-.quickPickCard {
+.topRowCard {
   all: unset;
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  background: var(--sakura-skeleton);
+  border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: var(--sakura-skeleton);
-  display: block;
-  text-align: left;
-  box-shadow: 0 2px 10px var(--sakura-shadow);
-  transition: box-shadow 0.25s ease, transform 0.25s cubic-bezier(.16,1,.3,1);
+  box-shadow: 0 2px 8px var(--sakura-shadow);
+  transition: transform 0.2s cubic-bezier(.16,1,.3,1), background 0.2s;
+  height: clamp(3.5rem, 10vw, 4rem);
 }
 
-.quickPickCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 28px rgba(242, 120, 159, 0.22);
+.topRowCard:hover {
+  background: var(--sakura-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(242, 120, 159, 0.15);
+}
+
+.topRowIconWrap {
+  width: clamp(3.5rem, 10vw, 4rem);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.topRowTitle {
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
 }
 
 .quickPickCard:hover .quickPickArt {

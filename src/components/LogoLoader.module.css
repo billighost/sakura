@@ -1,0 +1,213 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: var(--sakura-bg);
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  overflow: hidden;
+}
+
+.overlay.exiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- ambient background glow ---------- */
+
+.glowA,
+.glowB {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.glowA {
+  background: var(--sakura-gradient-start);
+  top: -22%;
+  left: -18%;
+  animation: driftA 9s ease-in-out infinite;
+}
+
+.glowB {
+  background: var(--sakura-gradient-end);
+  bottom: -22%;
+  right: -18%;
+  animation: driftB 11s ease-in-out infinite;
+}
+
+@keyframes driftA {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(4%, 3%);
+  }
+}
+
+@keyframes driftB {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-3%, -4%);
+  }
+}
+
+/* ---------- logo ---------- */
+
+.logoWrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  cursor: default;
+}
+
+.svg {
+  width: clamp(96px, 22vw, 168px);
+  height: clamp(96px, 22vw, 168px);
+  overflow: visible;
+}
+
+.bloomGroup {
+  transform-origin: center;
+  animation: bloomPulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1550ms both;
+}
+
+@keyframes bloomPulse {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.14);
+    filter: brightness(1.12);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.petal {
+  transform-origin: 0px 0px;
+  transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.3);
+  opacity: 0;
+  animation: assemblePetal 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay);
+}
+
+@keyframes assemblePetal {
+  0% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.3);
+    opacity: 0;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.centerDot {
+  opacity: 0;
+  transform-origin: center;
+  animation: popIn 500ms ease-out 1250ms both;
+}
+
+.stamenDot {
+  opacity: 0;
+  transform-origin: center;
+  animation: popIn 400ms ease-out 1400ms both;
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.wordmark {
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1.1rem, 4vw, 1.5rem);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--sakura-text);
+  opacity: 0;
+  animation: fadeIn 600ms ease 1900ms both;
+}
+
+/* ---------- skip ---------- */
+
+.skipButton {
+  position: absolute;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  z-index: 1;
+  background: none;
+  border: none;
+  color: var(--sakura-text-secondary);
+  font-family: var(--sakura-font-body);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeIn 500ms ease 800ms both;
+}
+
+.skipButton:hover,
+.skipButton:focus-visible {
+  color: var(--sakura-accent);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    transition: opacity 300ms ease;
+  }
+
+  .glowA,
+  .glowB,
+  .bloomGroup,
+  .petal,
+  .centerDot,
+  .stamenDot,
+  .wordmark,
+  .skipButton {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}

@@ -410,7 +410,9 @@ export const ModelName = {
   SampledTrack: 'SampledTrack',
   Favorite: 'Favorite',
   SnoozedTrack: 'SnoozedTrack',
-  ListeningHistory: 'ListeningHistory'
+  ListeningHistory: 'ListeningHistory',
+  UserMix: 'UserMix',
+  SystemPlaylist: 'SystemPlaylist'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -426,7 +428,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory"
+    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "userMix" | "systemPlaylist"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1466,6 +1468,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    UserMix: {
+      payload: Prisma.$UserMixPayload<ExtArgs>
+      fields: Prisma.UserMixFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.UserMixFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.UserMixFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        findFirst: {
+          args: Prisma.UserMixFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.UserMixFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        findMany: {
+          args: Prisma.UserMixFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>[]
+        }
+        create: {
+          args: Prisma.UserMixCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        createMany: {
+          args: Prisma.UserMixCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.UserMixCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>[]
+        }
+        delete: {
+          args: Prisma.UserMixDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        update: {
+          args: Prisma.UserMixUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        deleteMany: {
+          args: Prisma.UserMixDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.UserMixUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.UserMixUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>[]
+        }
+        upsert: {
+          args: Prisma.UserMixUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserMixPayload>
+        }
+        aggregate: {
+          args: Prisma.UserMixAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUserMix>
+        }
+        groupBy: {
+          args: Prisma.UserMixGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserMixGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.UserMixCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserMixCountAggregateOutputType> | number
+        }
+      }
+    }
+    SystemPlaylist: {
+      payload: Prisma.$SystemPlaylistPayload<ExtArgs>
+      fields: Prisma.SystemPlaylistFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SystemPlaylistFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SystemPlaylistFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        findFirst: {
+          args: Prisma.SystemPlaylistFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SystemPlaylistFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        findMany: {
+          args: Prisma.SystemPlaylistFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>[]
+        }
+        create: {
+          args: Prisma.SystemPlaylistCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        createMany: {
+          args: Prisma.SystemPlaylistCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SystemPlaylistCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>[]
+        }
+        delete: {
+          args: Prisma.SystemPlaylistDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        update: {
+          args: Prisma.SystemPlaylistUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        deleteMany: {
+          args: Prisma.SystemPlaylistDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SystemPlaylistUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SystemPlaylistUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>[]
+        }
+        upsert: {
+          args: Prisma.SystemPlaylistUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemPlaylistPayload>
+        }
+        aggregate: {
+          args: Prisma.SystemPlaylistAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSystemPlaylist>
+        }
+        groupBy: {
+          args: Prisma.SystemPlaylistGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SystemPlaylistGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SystemPlaylistCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SystemPlaylistCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1523,8 +1673,15 @@ export const UserSettingsScalarFieldEnum = {
   userId: 'userId',
   theme: 'theme',
   audioQuality: 'audioQuality',
+  downloadQuality: 'downloadQuality',
   crossfadeSeconds: 'crossfadeSeconds',
   autoDownloadLiked: 'autoDownloadLiked',
+  gaplessPlayback: 'gaplessPlayback',
+  normalizeVolume: 'normalizeVolume',
+  explicitContent: 'explicitContent',
+  privateSession: 'privateSession',
+  pushNotifications: 'pushNotifications',
+  newReleaseAlerts: 'newReleaseAlerts',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1673,10 +1830,40 @@ export const ListeningHistoryScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   trackId: 'trackId',
-  playedAt: 'playedAt'
+  playedAt: 'playedAt',
+  skipped: 'skipped'
 } as const
 
 export type ListeningHistoryScalarFieldEnum = (typeof ListeningHistoryScalarFieldEnum)[keyof typeof ListeningHistoryScalarFieldEnum]
+
+
+export const UserMixScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  label: 'label',
+  description: 'description',
+  coverUrl: 'coverUrl',
+  tint: 'tint',
+  trackIds: 'trackIds',
+  generatedAt: 'generatedAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type UserMixScalarFieldEnum = (typeof UserMixScalarFieldEnum)[keyof typeof UserMixScalarFieldEnum]
+
+
+export const SystemPlaylistScalarFieldEnum = {
+  id: 'id',
+  systemId: 'systemId',
+  name: 'name',
+  description: 'description',
+  coverUrl: 'coverUrl',
+  trackIds: 'trackIds',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SystemPlaylistScalarFieldEnum = (typeof SystemPlaylistScalarFieldEnum)[keyof typeof SystemPlaylistScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1936,6 +2123,8 @@ export type GlobalOmitConfig = {
   favorite?: Prisma.FavoriteOmit
   snoozedTrack?: Prisma.SnoozedTrackOmit
   listeningHistory?: Prisma.ListeningHistoryOmit
+  userMix?: Prisma.UserMixOmit
+  systemPlaylist?: Prisma.SystemPlaylistOmit
 }
 
 /* Types for Logging */

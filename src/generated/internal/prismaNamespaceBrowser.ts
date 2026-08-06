@@ -64,7 +64,9 @@ export const ModelName = {
   SampledTrack: 'SampledTrack',
   Favorite: 'Favorite',
   SnoozedTrack: 'SnoozedTrack',
-  ListeningHistory: 'ListeningHistory'
+  ListeningHistory: 'ListeningHistory',
+  UserMix: 'UserMix',
+  SystemPlaylist: 'SystemPlaylist'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -101,8 +103,15 @@ export const UserSettingsScalarFieldEnum = {
   userId: 'userId',
   theme: 'theme',
   audioQuality: 'audioQuality',
+  downloadQuality: 'downloadQuality',
   crossfadeSeconds: 'crossfadeSeconds',
   autoDownloadLiked: 'autoDownloadLiked',
+  gaplessPlayback: 'gaplessPlayback',
+  normalizeVolume: 'normalizeVolume',
+  explicitContent: 'explicitContent',
+  privateSession: 'privateSession',
+  pushNotifications: 'pushNotifications',
+  newReleaseAlerts: 'newReleaseAlerts',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -251,10 +260,40 @@ export const ListeningHistoryScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   trackId: 'trackId',
-  playedAt: 'playedAt'
+  playedAt: 'playedAt',
+  skipped: 'skipped'
 } as const
 
 export type ListeningHistoryScalarFieldEnum = (typeof ListeningHistoryScalarFieldEnum)[keyof typeof ListeningHistoryScalarFieldEnum]
+
+
+export const UserMixScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  label: 'label',
+  description: 'description',
+  coverUrl: 'coverUrl',
+  tint: 'tint',
+  trackIds: 'trackIds',
+  generatedAt: 'generatedAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type UserMixScalarFieldEnum = (typeof UserMixScalarFieldEnum)[keyof typeof UserMixScalarFieldEnum]
+
+
+export const SystemPlaylistScalarFieldEnum = {
+  id: 'id',
+  systemId: 'systemId',
+  name: 'name',
+  description: 'description',
+  coverUrl: 'coverUrl',
+  trackIds: 'trackIds',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SystemPlaylistScalarFieldEnum = (typeof SystemPlaylistScalarFieldEnum)[keyof typeof SystemPlaylistScalarFieldEnum]
 
 
 export const SortOrder = {

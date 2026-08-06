@@ -222,6 +222,7 @@ model ListeningHistory {
   userId   String
   trackId  String
   playedAt DateTime @default(now())
+  skipped  Boolean  @default(false)
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
@@ -250,4 +251,20 @@ model UserMix {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// ── System Playlists (Top 50 Global, Nigeria, Africa, etc.) ──────────────────
+// Populated from third-party APIs (Last.fm, RapidAPI, Deezer).
+// Updated daily via the first API request of the day.
+model SystemPlaylist {
+  id          String   @id @default(uuid())
+  systemId    String   @unique // e.g., "top-50-global", "top-50-nigeria", "top-50-africa"
+  name        String
+  description String?
+  coverUrl    String?
+  trackIds    String[] // ordered list of track IDs
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([systemId])
 }

@@ -87,3 +87,13 @@ export type SnoozedTrack = Prisma.SnoozedTrackModel
  * 
  */
 export type ListeningHistory = Prisma.ListeningHistoryModel
+/**
+ * Model UserMix
+ * 
+ */
+export type UserMix = Prisma.UserMixModel
+/**
+ * Model SystemPlaylist
+ * 
+ */
+export type SystemPlaylist = Prisma.SystemPlaylistModel

@@ -39,8 +39,15 @@ export type UserSettingsMinAggregateOutputType = {
   userId: string | null
   theme: string | null
   audioQuality: string | null
+  downloadQuality: string | null
   crossfadeSeconds: number | null
   autoDownloadLiked: boolean | null
+  gaplessPlayback: boolean | null
+  normalizeVolume: boolean | null
+  explicitContent: boolean | null
+  privateSession: boolean | null
+  pushNotifications: boolean | null
+  newReleaseAlerts: boolean | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -50,8 +57,15 @@ export type UserSettingsMaxAggregateOutputType = {
   userId: string | null
   theme: string | null
   audioQuality: string | null
+  downloadQuality: string | null
   crossfadeSeconds: number | null
   autoDownloadLiked: boolean | null
+  gaplessPlayback: boolean | null
+  normalizeVolume: boolean | null
+  explicitContent: boolean | null
+  privateSession: boolean | null
+  pushNotifications: boolean | null
+  newReleaseAlerts: boolean | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -61,8 +75,15 @@ export type UserSettingsCountAggregateOutputType = {
   userId: number
   theme: number
   audioQuality: number
+  downloadQuality: number
   crossfadeSeconds: number
   autoDownloadLiked: number
+  gaplessPlayback: number
+  normalizeVolume: number
+  explicitContent: number
+  privateSession: number
+  pushNotifications: number
+  newReleaseAlerts: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -82,8 +103,15 @@ export type UserSettingsMinAggregateInputType = {
   userId?: true
   theme?: true
   audioQuality?: true
+  downloadQuality?: true
   crossfadeSeconds?: true
   autoDownloadLiked?: true
+  gaplessPlayback?: true
+  normalizeVolume?: true
+  explicitContent?: true
+  privateSession?: true
+  pushNotifications?: true
+  newReleaseAlerts?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -93,8 +121,15 @@ export type UserSettingsMaxAggregateInputType = {
   userId?: true
   theme?: true
   audioQuality?: true
+  downloadQuality?: true
   crossfadeSeconds?: true
   autoDownloadLiked?: true
+  gaplessPlayback?: true
+  normalizeVolume?: true
+  explicitContent?: true
+  privateSession?: true
+  pushNotifications?: true
+  newReleaseAlerts?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -104,8 +139,15 @@ export type UserSettingsCountAggregateInputType = {
   userId?: true
   theme?: true
   audioQuality?: true
+  downloadQuality?: true
   crossfadeSeconds?: true
   autoDownloadLiked?: true
+  gaplessPlayback?: true
+  normalizeVolume?: true
+  explicitContent?: true
+  privateSession?: true
+  pushNotifications?: true
+  newReleaseAlerts?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -202,8 +244,15 @@ export type UserSettingsGroupByOutputType = {
   userId: string
   theme: string
   audioQuality: string
+  downloadQuality: string
   crossfadeSeconds: number
   autoDownloadLiked: boolean
+  gaplessPlayback: boolean
+  normalizeVolume: boolean
+  explicitContent: boolean
+  privateSession: boolean
+  pushNotifications: boolean
+  newReleaseAlerts: boolean
   createdAt: Date
   updatedAt: Date
   _count: UserSettingsCountAggregateOutputType | null
@@ -236,8 +285,15 @@ export type UserSettingsWhereInput = {
   userId?: Prisma.StringFilter<"UserSettings"> | string
   theme?: Prisma.StringFilter<"UserSettings"> | string
   audioQuality?: Prisma.StringFilter<"UserSettings"> | string
+  downloadQuality?: Prisma.StringFilter<"UserSettings"> | string
   crossfadeSeconds?: Prisma.IntFilter<"UserSettings"> | number
   autoDownloadLiked?: Prisma.BoolFilter<"UserSettings"> | boolean
+  gaplessPlayback?: Prisma.BoolFilter<"UserSettings"> | boolean
+  normalizeVolume?: Prisma.BoolFilter<"UserSettings"> | boolean
+  explicitContent?: Prisma.BoolFilter<"UserSettings"> | boolean
+  privateSession?: Prisma.BoolFilter<"UserSettings"> | boolean
+  pushNotifications?: Prisma.BoolFilter<"UserSettings"> | boolean
+  newReleaseAlerts?: Prisma.BoolFilter<"UserSettings"> | boolean
   createdAt?: Prisma.DateTimeFilter<"UserSettings"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"UserSettings"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -248,8 +304,15 @@ export type UserSettingsOrderByWithRelationInput = {
   userId?: Prisma.SortOrder
   theme?: Prisma.SortOrder
   audioQuality?: Prisma.SortOrder
+  downloadQuality?: Prisma.SortOrder
   crossfadeSeconds?: Prisma.SortOrder
   autoDownloadLiked?: Prisma.SortOrder
+  gaplessPlayback?: Prisma.SortOrder
+  normalizeVolume?: Prisma.SortOrder
+  explicitContent?: Prisma.SortOrder
+  privateSession?: Prisma.SortOrder
+  pushNotifications?: Prisma.SortOrder
+  newReleaseAlerts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -263,8 +326,15 @@ export type UserSettingsWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.UserSettingsWhereInput | Prisma.UserSettingsWhereInput[]
   theme?: Prisma.StringFilter<"UserSettings"> | string
   audioQuality?: Prisma.StringFilter<"UserSettings"> | string
+  downloadQuality?: Prisma.StringFilter<"UserSettings"> | string
   crossfadeSeconds?: Prisma.IntFilter<"UserSettings"> | number
   autoDownloadLiked?: Prisma.BoolFilter<"UserSettings"> | boolean
+  gaplessPlayback?: Prisma.BoolFilter<"UserSettings"> | boolean
+  normalizeVolume?: Prisma.BoolFilter<"UserSettings"> | boolean
+  explicitContent?: Prisma.BoolFilter<"UserSettings"> | boolean
+  privateSession?: Prisma.BoolFilter<"UserSettings"> | boolean
+  pushNotifications?: Prisma.BoolFilter<"UserSettings"> | boolean
+  newReleaseAlerts?: Prisma.BoolFilter<"UserSettings"> | boolean
   createdAt?: Prisma.DateTimeFilter<"UserSettings"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"UserSettings"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -275,8 +345,15 @@ export type UserSettingsOrderByWithAggregationInput = {
   userId?: Prisma.SortOrder
   theme?: Prisma.SortOrder
   audioQuality?: Prisma.SortOrder
+  downloadQuality?: Prisma.SortOrder
   crossfadeSeconds?: Prisma.SortOrder
   autoDownloadLiked?: Prisma.SortOrder
+  gaplessPlayback?: Prisma.SortOrder
+  normalizeVolume?: Prisma.SortOrder
+  explicitContent?: Prisma.SortOrder
+  privateSession?: Prisma.SortOrder
+  pushNotifications?: Prisma.SortOrder
+  newReleaseAlerts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserSettingsCountOrderByAggregateInput
@@ -294,8 +371,15 @@ export type UserSettingsScalarWhereWithAggregatesInput = {
   userId?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
   theme?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
   audioQuality?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
+  downloadQuality?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
   crossfadeSeconds?: Prisma.IntWithAggregatesFilter<"UserSettings"> | number
   autoDownloadLiked?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  gaplessPlayback?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  normalizeVolume?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  explicitContent?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  privateSession?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  pushNotifications?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
+  newReleaseAlerts?: Prisma.BoolWithAggregatesFilter<"UserSettings"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"UserSettings"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"UserSettings"> | Date | string
 }
@@ -304,8 +388,15 @@ export type UserSettingsCreateInput = {
   id?: string
   theme?: string
   audioQuality?: string
+  downloadQuality?: string
   crossfadeSeconds?: number
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutSettingsInput
@@ -316,8 +407,15 @@ export type UserSettingsUncheckedCreateInput = {
   userId: string
   theme?: string
   audioQuality?: string
+  downloadQuality?: string
   crossfadeSeconds?: number
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -326,8 +424,15 @@ export type UserSettingsUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutSettingsNestedInput
@@ -338,8 +443,15 @@ export type UserSettingsUncheckedUpdateInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -349,8 +461,15 @@ export type UserSettingsCreateManyInput = {
   userId: string
   theme?: string
   audioQuality?: string
+  downloadQuality?: string
   crossfadeSeconds?: number
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -359,8 +478,15 @@ export type UserSettingsUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -370,8 +496,15 @@ export type UserSettingsUncheckedUpdateManyInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -386,8 +519,15 @@ export type UserSettingsCountOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   theme?: Prisma.SortOrder
   audioQuality?: Prisma.SortOrder
+  downloadQuality?: Prisma.SortOrder
   crossfadeSeconds?: Prisma.SortOrder
   autoDownloadLiked?: Prisma.SortOrder
+  gaplessPlayback?: Prisma.SortOrder
+  normalizeVolume?: Prisma.SortOrder
+  explicitContent?: Prisma.SortOrder
+  privateSession?: Prisma.SortOrder
+  pushNotifications?: Prisma.SortOrder
+  newReleaseAlerts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -401,8 +541,15 @@ export type UserSettingsMaxOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   theme?: Prisma.SortOrder
   audioQuality?: Prisma.SortOrder
+  downloadQuality?: Prisma.SortOrder
   crossfadeSeconds?: Prisma.SortOrder
   autoDownloadLiked?: Prisma.SortOrder
+  gaplessPlayback?: Prisma.SortOrder
+  normalizeVolume?: Prisma.SortOrder
+  explicitContent?: Prisma.SortOrder
+  privateSession?: Prisma.SortOrder
+  pushNotifications?: Prisma.SortOrder
+  newReleaseAlerts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -412,8 +559,15 @@ export type UserSettingsMinOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   theme?: Prisma.SortOrder
   audioQuality?: Prisma.SortOrder
+  downloadQuality?: Prisma.SortOrder
   crossfadeSeconds?: Prisma.SortOrder
   autoDownloadLiked?: Prisma.SortOrder
+  gaplessPlayback?: Prisma.SortOrder
+  normalizeVolume?: Prisma.SortOrder
+  explicitContent?: Prisma.SortOrder
+  privateSession?: Prisma.SortOrder
+  pushNotifications?: Prisma.SortOrder
+  newReleaseAlerts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -470,8 +624,15 @@ export type UserSettingsCreateWithoutUserInput = {
   id?: string
   theme?: string
   audioQuality?: string
+  downloadQuality?: string
   crossfadeSeconds?: number
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -480,8 +641,15 @@ export type UserSettingsUncheckedCreateWithoutUserInput = {
   id?: string
   theme?: string
   audioQuality?: string
+  downloadQuality?: string
   crossfadeSeconds?: number
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -506,8 +674,15 @@ export type UserSettingsUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -516,8 +691,15 @@ export type UserSettingsUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   theme?: Prisma.StringFieldUpdateOperationsInput | string
   audioQuality?: Prisma.StringFieldUpdateOperationsInput | string
+  downloadQuality?: Prisma.StringFieldUpdateOperationsInput | string
   crossfadeSeconds?: Prisma.IntFieldUpdateOperationsInput | number
   autoDownloadLiked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  gaplessPlayback?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  normalizeVolume?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  explicitContent?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  privateSession?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pushNotifications?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  newReleaseAlerts?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -529,8 +711,15 @@ export type UserSettingsSelect<ExtArgs extends runtime.Types.Extensions.Internal
   userId?: boolean
   theme?: boolean
   audioQuality?: boolean
+  downloadQuality?: boolean
   crossfadeSeconds?: boolean
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -541,8 +730,15 @@ export type UserSettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   userId?: boolean
   theme?: boolean
   audioQuality?: boolean
+  downloadQuality?: boolean
   crossfadeSeconds?: boolean
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -553,8 +749,15 @@ export type UserSettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   userId?: boolean
   theme?: boolean
   audioQuality?: boolean
+  downloadQuality?: boolean
   crossfadeSeconds?: boolean
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -565,13 +768,20 @@ export type UserSettingsSelectScalar = {
   userId?: boolean
   theme?: boolean
   audioQuality?: boolean
+  downloadQuality?: boolean
   crossfadeSeconds?: boolean
   autoDownloadLiked?: boolean
+  gaplessPlayback?: boolean
+  normalizeVolume?: boolean
+  explicitContent?: boolean
+  privateSession?: boolean
+  pushNotifications?: boolean
+  newReleaseAlerts?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "theme" | "audioQuality" | "crossfadeSeconds" | "autoDownloadLiked" | "createdAt" | "updatedAt", ExtArgs["result"]["userSettings"]>
+export type UserSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "theme" | "audioQuality" | "downloadQuality" | "crossfadeSeconds" | "autoDownloadLiked" | "gaplessPlayback" | "normalizeVolume" | "explicitContent" | "privateSession" | "pushNotifications" | "newReleaseAlerts" | "createdAt" | "updatedAt", ExtArgs["result"]["userSettings"]>
 export type UserSettingsInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -592,8 +802,15 @@ export type $UserSettingsPayload<ExtArgs extends runtime.Types.Extensions.Intern
     userId: string
     theme: string
     audioQuality: string
+    downloadQuality: string
     crossfadeSeconds: number
     autoDownloadLiked: boolean
+    gaplessPlayback: boolean
+    normalizeVolume: boolean
+    explicitContent: boolean
+    privateSession: boolean
+    pushNotifications: boolean
+    newReleaseAlerts: boolean
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["userSettings"]>
@@ -1024,8 +1241,15 @@ export interface UserSettingsFieldRefs {
   readonly userId: Prisma.FieldRef<"UserSettings", 'String'>
   readonly theme: Prisma.FieldRef<"UserSettings", 'String'>
   readonly audioQuality: Prisma.FieldRef<"UserSettings", 'String'>
+  readonly downloadQuality: Prisma.FieldRef<"UserSettings", 'String'>
   readonly crossfadeSeconds: Prisma.FieldRef<"UserSettings", 'Int'>
   readonly autoDownloadLiked: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly gaplessPlayback: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly normalizeVolume: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly explicitContent: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly privateSession: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly pushNotifications: Prisma.FieldRef<"UserSettings", 'Boolean'>
+  readonly newReleaseAlerts: Prisma.FieldRef<"UserSettings", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"UserSettings", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"UserSettings", 'DateTime'>
 }
