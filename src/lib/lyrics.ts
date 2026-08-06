@@ -3,6 +3,7 @@ import { getCachedLyrics, setCachedLyrics } from "./offline-db";
 export interface LyricLine {
   time: number;
   text: string;
+  transliterated?: string;
 }
 
 export interface LyricData {
@@ -54,7 +55,8 @@ export async function getLyrics(track: {
       if (result && (result.syncedLyrics || result.plainLyrics)) {
         const lrcData = formatLyricResponse({
           syncedLyrics: result.syncedLyrics,
-          plainLyrics: result.plainLyrics
+          plainLyrics: result.plainLyrics,
+          timedLyrics: result.timedLyrics
         });
         await setCachedLyrics(track.id, lrcData);
         return lrcData;
@@ -70,7 +72,17 @@ export async function getLyrics(track: {
 function formatLyricResponse(data: any): LyricData {
   const syncedLyrics = data.syncedLyrics || "";
   const lyrics = data.plainLyrics || data.lyrics || "";
-  const lines = syncedLyrics ? parseLrc(syncedLyrics) : [];
+  let lines: LyricLine[] = [];
+
+  if (data.timedLyrics && Array.isArray(data.timedLyrics)) {
+    lines = data.timedLyrics.map((lyric: any) => ({
+      time: lyric.start_time / 1000,
+      text: lyric.text,
+      transliterated: lyric.romanized
+    }));
+  } else if (syncedLyrics) {
+    lines = parseLrc(syncedLyrics);
+  }
 
   return {
     lyrics: lyrics || undefined,

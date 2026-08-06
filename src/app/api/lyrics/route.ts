@@ -42,25 +42,51 @@ export async function GET(req: NextRequest) {
     const titleEncoded = encodeURIComponent(title);
     const artistEncoded = encodeURIComponent(artist);
 
-    // 1. Try LRCLib direct get — most reliable for exact matches with duration
+    let timedLyrics: any = null;
+
+    // 0. Try Lyrica API first
     try {
-      let lrcUrl = `https://lrclib.net/api/get?artist_name=${artistEncoded}&track_name=${titleEncoded}`;
-      if (album) lrcUrl += `&album_name=${encodeURIComponent(album)}`;
-      if (durSec) lrcUrl += `&duration=${durSec}`;
-      const response = await fetch(lrcUrl, {
+      let lyricaUrl = `https://wilooper-lyrica.hf.space/lyrics/?artist=${artistEncoded}&song=${titleEncoded}&timestamps=true&romanize=true&language=en`;
+      const response = await fetch(lyricaUrl, {
         headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000),
       });
       if (response.ok) {
-        const data = await response.json();
-        if (data && !data.error) {
-          syncedLyrics = data.syncedLyrics || "";
-          plainLyrics = data.plainLyrics || data.lyrics || "";
-          source = "lrclib-direct";
+        const result = await response.json();
+        if (result.status === "success" && result.data) {
+          syncedLyrics = result.data.syncedLyrics || "";
+          plainLyrics = result.data.lyrics || "";
+          timedLyrics = result.data.timed_lyrics || null;
+          if (syncedLyrics || plainLyrics) {
+            source = "lyrica";
+          }
         }
       }
     } catch (e) {
-      console.warn("[Lyrics API Server] LRCLib specific get failed:", e);
+      console.warn("[Lyrics API Server] Lyrica API failed:", e);
+    }
+
+    // 1. Try LRCLib direct get — most reliable for exact matches with duration
+    if (!syncedLyrics && !plainLyrics) {
+      try {
+        let lrcUrl = `https://lrclib.net/api/get?artist_name=${artistEncoded}&track_name=${titleEncoded}`;
+        if (album) lrcUrl += `&album_name=${encodeURIComponent(album)}`;
+        if (durSec) lrcUrl += `&duration=${durSec}`;
+        const response = await fetch(lrcUrl, {
+          headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && !data.error) {
+            syncedLyrics = data.syncedLyrics || "";
+            plainLyrics = data.plainLyrics || data.lyrics || "";
+            source = "lrclib-direct";
+          }
+        }
+      } catch (e) {
+        console.warn("[Lyrics API Server] LRCLib specific get failed:", e);
+      }
     }
 
     // 2. Try LRCLib search if no synced lyrics — search is fuzzier and finds more results
@@ -131,6 +157,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         syncedLyrics: syncedLyrics || null,
         plainLyrics: plainLyrics || null,
+        timedLyrics: timedLyrics || null,
         source: source || "unknown",
       });
     }

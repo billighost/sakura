@@ -728,17 +728,29 @@
   display: none;
 }
 
+.lyricLineGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transform-origin: left center;
+  transition: transform 0.3s ease;
+  margin: 1.5rem 0;
+}
+
+.lyricLineGroupActive {
+  transform: scale(1.05);
+}
+
 .lyricLine {
   font-size: clamp(1.2rem, 3.8vw, 1.7rem);
   font-weight: 700;
   line-height: 1.5;
-  margin: 1.5rem 0;
   color: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
-  transition: color 0.3s ease, transform 0.3s ease;
-  transform-origin: left center;
+  transition: color 0.3s ease;
 }
 
+.lyricLineGroup:hover .lyricLine,
 .lyricLine:hover {
   color: rgba(255, 255, 255, 0.8);
 }
@@ -746,7 +758,22 @@
 .lyricLineActive {
   color: #fff;
   text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
-  transform: scale(1.05);
+}
+
+.lyricLineTransliterated {
+  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.3s ease;
+}
+
+.lyricLineGroup:hover .lyricLineTransliterated {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.lyricLineTransliteratedActive {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .lyricLineRow {

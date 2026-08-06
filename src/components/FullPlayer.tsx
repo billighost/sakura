@@ -591,12 +591,19 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                       key={idx}
                       className={`${styles.lyricLineRow} ${idx === activeLineIndex ? styles.lyricLineRowActive : ""}`}
                     >
-                      <p
-                        className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
+                      <div
+                        className={`${styles.lyricLineGroup} ${idx === activeLineIndex ? styles.lyricLineGroupActive : ""}`}
                         onClick={() => seekTo(line.time)}
                       >
-                        {line.text}
-                      </p>
+                        <p className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}>
+                          {line.text}
+                        </p>
+                        {line.transliterated && (
+                          <p className={`${styles.lyricLineTransliterated} ${idx === activeLineIndex ? styles.lyricLineTransliteratedActive : ""}`}>
+                            {line.transliterated}
+                          </p>
+                        )}
+                      </div>
                       <button
                         className={styles.lyricShareBtn}
                         onClick={(e) => {
