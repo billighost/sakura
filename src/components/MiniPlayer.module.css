@@ -2,7 +2,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: clamp(4.5rem, 12vh, 5.25rem);
+  height: clamp(3.5rem, 9vh, 4.125rem);
   background: var(--sakura-glass);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
@@ -13,32 +13,46 @@
   z-index: 49;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.root:active {
-  transform: scale(0.995);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s ease, opacity 0.28s ease;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .scrubRow {
   flex-shrink: 0;
-  height: 20px;
-  padding-top: 2px;
+  height: 14px;
+  padding-top: 1px;
+}
+
+.lyricTicker {
+  flex-shrink: 0;
+  height: 13px;
+  line-height: 13px;
+  padding: 0 clamp(0.75rem, 3vw, 1rem);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--track-accent, var(--sakura-accent));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+  animation: fadeIn 0.25s ease;
 }
 
 .content {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0 clamp(0.625rem, 2.5vw, 0.875rem);
+  gap: 0.625rem;
+  padding: 0 clamp(0.5rem, 2.5vw, 0.75rem);
   flex: 1;
   min-height: 0;
 }
 
 .artWrap {
   position: relative;
-  width: clamp(2.625rem, 8vw, 3.125rem);
-  height: clamp(2.625rem, 8vw, 3.125rem);
+  width: clamp(2.25rem, 7vw, 2.625rem);
+  height: clamp(2.25rem, 7vw, 2.625rem);
   flex-shrink: 0;
 }
 
@@ -86,7 +100,7 @@
 
 .title {
   font-family: var(--sakura-font-display);
-  font-size: 0.9375rem;
+  font-size: 0.8438rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   overflow: hidden;
@@ -96,7 +110,7 @@
 }
 
 .artist {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--sakura-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,8 +124,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.125rem;
-  height: 2.125rem;
+  width: 1.875rem;
+  height: 1.875rem;
   cursor: pointer;
   flex-shrink: 0;
   color: var(--sakura-text-secondary);
@@ -160,8 +174,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2.25rem, 7vw, 2.75rem);
-  height: clamp(2.25rem, 7vw, 2.75rem);
+  width: clamp(1.875rem, 6vw, 2.25rem);
+  height: clamp(1.875rem, 6vw, 2.25rem);
   cursor: pointer;
   flex-shrink: 0;
   border-radius: 50%;
@@ -180,25 +194,8 @@
 }
 
 .playBtn svg {
-  width: clamp(1.125rem, 3.6vw, 1.375rem);
-  height: clamp(1.125rem, 3.6vw, 1.375rem);
+  width: clamp(0.9375rem, 3vw, 1.125rem);
+  height: clamp(0.9375rem, 3vw, 1.125rem);
 }
 
-.skipBtn {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(1.75rem, 5vw, 2.25rem);
-  height: clamp(1.75rem, 5vw, 2.25rem);
-  cursor: pointer;
-  flex-shrink: 0;
-  border-radius: 50%;
-  color: var(--sakura-text-secondary);
-  transition: color 0.15s, transform 0.15s;
-}
 
-.skipBtn:active {
-  transform: scale(0.85);
-  color: var(--sakura-text);
-}

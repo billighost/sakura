@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
-import { getLyrics, LyricData, LyricLine } from "@/lib/lyrics";
 import { Scrubber } from "./Scrubber";
 import styles from "./FullPlayer.module.css";
 
@@ -19,8 +18,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showArtLyrics, setShowArtLyrics] = useState(false);
-  const [lyrics, setLyrics] = useState<LyricData | null>(null);
-  const [loadingLyrics, setLoadingLyrics] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [burstKey, setBurstKey] = useState(0);
@@ -31,7 +28,18 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const artShellRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef({ dragging: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
+  const dragState = useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    lastTime: 0,
+    velocityX: 0,
+    velocityY: 0,
+    axis: null as "x" | "y" | null,
+    allowX: false,
+  });
 
   const {
     queue,
@@ -49,9 +57,10 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     accentColor,
     miniArtRect,
     togglePlay,
-    seek,
+    seekTo,
     beginSeek,
-    endSeek,
+    lyrics,
+    loadingLyrics,
     setVolume,
     next,
     prev,
@@ -77,24 +86,16 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
   useEffect(() => {
     setArtLoaded(false);
-    setLyrics(null);
     setLyricsExpanded(false);
-    if (!currentTrack) return;
-
-    setLoadingLyrics(true);
-    getLyrics(currentTrack)
-      .then((data) => {
-        setLyrics(data);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingLyrics(false));
+    setShowArtLyrics(false);
   }, [currentTrack?.id]);
 
-  // Sync scroll for the lyrics container
+  // Sync scroll for the lyrics container. Lyrics data itself now lives in
+  // PlayerContext (shared with MiniPlayer's ticker line); this just tracks which
+  // line is active, using the live drag preview while the user is scrubbing.
   const activeLineIndex = useMemo(() => {
     if (!lyrics || !lyrics.lines) return -1;
     const currentProgress = seekDrag !== null ? seekDrag : progress;
-    // Find largest time less than or equal to current progress
     let index = -1;
     for (let i = 0; i < lyrics.lines.length; i++) {
       if (lyrics.lines[i].time <= currentProgress) {
@@ -107,12 +108,12 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   }, [lyrics, progress, seekDrag]);
 
   useEffect(() => {
-    if (activeLineIndex !== -1 && lyricsContainerRef.current && !lyricsExpanded) {
+    if (activeLineIndex !== -1 && lyricsExpanded && lyricsContainerRef.current) {
       const activeEl = lyricsContainerRef.current.children[activeLineIndex] as HTMLElement;
       if (activeEl) {
         lyricsContainerRef.current.scrollTo({
           top: activeEl.offsetTop - lyricsContainerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
-          behavior: "smooth"
+          behavior: "smooth",
         });
       }
     }
@@ -159,36 +160,75 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     });
   }, [open, miniArtRect]);
 
-  // --- Real drag-to-dismiss physics -----------------------------------------
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // Only drag to dismiss if we are scrolled to the very top
-    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
+  // --- Real drag-to-dismiss / swipe-to-skip physics --------------------------
+  // A single gesture recognizer covers the whole player: drag down anywhere to
+  // dismiss (like the app's real bottom sheet), or swipe the album art left/right
+  // to skip tracks. Interactive chrome (buttons, links, the scrubber, queue rows,
+  // scrollable lyrics/credits) opts out via the elementIsGestureBlocked check so
+  // this never steals a tap, a seek, or a queue reorder.
+  function elementIsGestureBlocked(el: HTMLElement) {
+    return !!el.closest('button, a, input, [role="slider"], [data-block-drag]');
+  }
 
-    dragState.current = {
-      dragging: true,
-      startY: e.clientY,
-      lastY: e.clientY,
-      lastTime: performance.now(),
-      velocity: 0,
-    };
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    if (rootRef.current) rootRef.current.style.transition = "none";
-  }, []);
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (showQueue) return; // the queue has its own long-press reorder gesture
+      if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
+      if (elementIsGestureBlocked(e.target as HTMLElement)) return;
+
+      const allowX = !!artShellRef.current && artShellRef.current.contains(e.target as Node);
+
+      dragState.current = {
+        dragging: true,
+        startX: e.clientX,
+        startY: e.clientY,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        lastTime: performance.now(),
+        velocityX: 0,
+        velocityY: 0,
+        axis: null,
+        allowX,
+      };
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      if (rootRef.current) rootRef.current.style.transition = "none";
+    },
+    [showQueue]
+  );
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const ds = dragState.current;
     if (!ds.dragging) return;
-    let delta = e.clientY - ds.startY;
-    if (delta < 0) delta *= 0.25; // rubber-band if dragged upward past the resting position
+
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+
+    if (!ds.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      ds.axis = ds.allowX && Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
 
     const now = performance.now();
     const dt = Math.max(1, now - ds.lastTime);
-    ds.velocity = (e.clientY - ds.lastY) / dt; // px/ms
+    ds.velocityX = (e.clientX - ds.lastX) / dt;
+    ds.velocityY = (e.clientY - ds.lastY) / dt;
+    ds.lastX = e.clientX;
     ds.lastY = e.clientY;
     ds.lastTime = now;
 
-    if (rootRef.current) {
+    if (!rootRef.current) return;
+
+    if (ds.axis === "y") {
+      let delta = dy;
+      if (delta < 0) delta *= 0.25; // rubber-band past the resting position
       rootRef.current.style.transform = `translateY(${Math.max(0, delta)}px)`;
+    } else {
+      // Rubber-band the swipe so it never fully leaves the frame before release.
+      const damped = dx * 0.6;
+      rootRef.current.style.transform = `translateX(${damped}px)`;
+      if (artShellRef.current) {
+        artShellRef.current.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 260));
+      }
     }
   }, []);
 
@@ -198,19 +238,29 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
       if (!ds.dragging) return;
       ds.dragging = false;
 
-      const delta = Math.max(0, e.clientY - ds.startY);
-      const isFastFlick = ds.velocity > 0.55;
-      const isFarEnough = delta > window.innerHeight * 0.4;
-      const shouldClose = isFastFlick || isFarEnough;
-
       if (rootRef.current) {
         rootRef.current.style.transition = "";
         rootRef.current.style.transform = "";
       }
+      if (artShellRef.current) artShellRef.current.style.opacity = "";
 
-      if (shouldClose) onClose();
+      if (ds.axis === "y") {
+        const delta = Math.max(0, e.clientY - ds.startY);
+        const isFastFlick = ds.velocityY > 0.55;
+        const isFarEnough = delta > window.innerHeight * 0.4;
+        if (isFastFlick || isFarEnough) onClose();
+      } else if (ds.axis === "x") {
+        const dx = e.clientX - ds.startX;
+        const isFastFlick = Math.abs(ds.velocityX) > 0.5;
+        const isFarEnough = Math.abs(dx) > 70;
+        if (isFastFlick || isFarEnough) {
+          if (dx < 0) next();
+          else prev();
+        }
+      }
+      ds.axis = null;
     },
-    [onClose]
+    [onClose, next, prev]
   );
 
   // --- Queue drag-to-reorder -------------------------------------------------
@@ -356,16 +406,14 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
           "--track-accent": accentColor || undefined,
         } as React.CSSProperties
       }
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       <div className={styles.overlay} />
 
-      <div
-        className={styles.dragArea}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
+      <div className={styles.dragArea}>
         <div className={styles.dragHandle} />
       </div>
 
@@ -494,6 +542,38 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 </>
               )}
             </div>
+          ) : lyricsExpanded && (lyrics?.lines || lyrics?.lyrics) ? (
+            <div className={styles.fullLyricsContainer} data-block-drag>
+              <div className={styles.fullLyricsHeader}>
+                <span>Lyrics</span>
+                <button className={styles.closeLyricsBtn} onClick={() => setLyricsExpanded(false)} aria-label="Collapse lyrics">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              {loadingLyrics ? (
+                <div className={styles.lyricsStatus}>Loading lyrics...</div>
+              ) : lyrics?.lines ? (
+                <div ref={lyricsContainerRef} className={styles.lyricsList}>
+                  {lyrics.lines.map((line, idx) => (
+                    <p
+                      key={idx}
+                      className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
+                      onClick={() => seekTo(line.time)}
+                    >
+                      {line.text}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.plainLyricsText}>
+                  {lyrics!.lyrics!.split("\n").map((line, i) => (
+                    <p key={i}>{line || "\u00A0"}</p>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className={styles.artContainer}>
               <div
@@ -549,10 +629,38 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
         <div className={styles.controls}>
           {!showQueue && (
-            <div className={styles.trackInfo}>
-              <div className={styles.trackTitle}>{currentTrack.title}</div>
-              <div className={styles.trackArtist}>{currentTrack.artist}</div>
-            </div>
+            lyricsExpanded ? (
+              <div className={styles.trackInfoCompact}>
+                {currentTrack.coverUrl ? (
+                  <img src={currentTrack.coverUrl} alt="" className={styles.trackInfoCompactArt} />
+                ) : (
+                  <div className={`${styles.trackInfoCompactArt} ${styles.artFallback}`}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                  </div>
+                )}
+                <div className={styles.trackInfoCompactText}>
+                  <div className={styles.trackInfoCompactTitle}>{currentTrack.title}</div>
+                  <div className={styles.trackInfoCompactArtist}>{currentTrack.artist}</div>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.trackInfo}>
+                <div className={styles.trackTitle}>{currentTrack.title}</div>
+                <div className={styles.trackArtist}>{currentTrack.artist}</div>
+                {(lyrics?.lines || lyrics?.lyrics) && (
+                  <button className={styles.currentLyricBtn} onClick={() => setLyricsExpanded(true)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                      <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                    </svg>
+                    <span className={styles.currentLyricBtnText}>
+                      {lyrics?.lines ? lyrics.lines[activeLineIndex]?.text || "Tap for lyrics" : "View lyrics"}
+                    </span>
+                  </button>
+                )}
+              </div>
+            )
           )}
 
           <Scrubber
@@ -564,8 +672,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             onScrubStart={beginSeek}
             onScrubMove={(t) => setSeekDrag(t)}
             onSeek={(t) => {
-              seek(t);
-              endSeek(t);
+              seekTo(t);
               setSeekDrag(null);
             }}
           />
@@ -713,46 +820,9 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </button>
           </div>
 
-          {/* Spotify-style Lyrics Box (Scrolldown, Truncated/Expandable inline) */}
-          {(lyrics?.lines || lyrics?.lyrics) && (
-            <div className={`${styles.inlineLyricsBox} ${lyricsExpanded ? styles.inlineLyricsExpanded : ""}`}>
-              <div className={styles.inlineLyricsHeader}>
-                <span>Lyrics</span>
-                <button
-                  className={styles.inlineExpandBtn}
-                  onClick={() => setLyricsExpanded(!lyricsExpanded)}
-                >
-                  {lyricsExpanded ? "Collapse" : "Expand"}
-                </button>
-              </div>
-              <div ref={lyricsContainerRef} className={styles.inlineLyricsScroll}>
-                {loadingLyrics ? (
-                  <div className={styles.lyricsStatus}>Loading lyrics...</div>
-                ) : lyrics?.lines ? (
-                  <div className={styles.lyricsList}>
-                    {lyrics.lines.map((line, idx) => (
-                      <p
-                        key={idx}
-                        className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
-                        onClick={() => seek(line.time)}
-                      >
-                        {line.text}
-                      </p>
-                    ))}
-                  </div>
-                ) : lyrics?.lyrics ? (
-                  <div className={styles.plainLyricsText}>
-                    {lyrics.lyrics.split("\n").map((line, i) => (
-                      <p key={i}>{line}</p>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {/* Artist Card & Song Credits */}
-          <ArtistCreditsPanel currentTrack={currentTrack} />
+          {/* Artist Card & Song Credits — hidden while the lyrics view is open so it
+              doesn't compete for space with the thing the user just asked to see. */}
+          {!lyricsExpanded && <ArtistCreditsPanel currentTrack={currentTrack} />}
         </div>
       </div>
     </div>
@@ -810,40 +880,41 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
 
   if (!currentTrack) return null;
 
+  if (!artist && credits.length === 0 && samples.length === 0) return null;
+
   return (
-    <div className={styles.artistCreditsWrap}>
-      {/* Artist Profile Section */}
+    <div className={styles.artistCreditsWrap} data-block-drag>
+      <div className={styles.creditsDivider} />
+
+      {/* Artist hero card — the artist's photo fills the card with the name and a
+          "view artist" affordance overlaid, like a small poster rather than a form row. */}
       {artist && (
-        <div className={styles.artistProfileCard}>
-          <div className={styles.artistProfileHeader}>
-            {artist.imageUrl ? (
-              <img src={artist.imageUrl} alt="" className={styles.artistProfileAvatar} />
-            ) : (
-              <div className={styles.artistProfileAvatarFallback}>
-                {artist.name[0]?.toUpperCase()}
-              </div>
-            )}
-            <div className={styles.artistProfileInfo}>
-              <div className={styles.artistProfileLabel}>About the Artist</div>
-              <Link href={`/artist/${artist.id}`} className={styles.artistProfileName}>
-                {artist.name}
-              </Link>
-            </div>
+        <Link href={`/artist/${artist.id}`} className={styles.artistHeroCard}>
+          {artist.imageUrl ? (
+            <img src={artist.imageUrl} alt="" className={styles.artistHeroImg} />
+          ) : (
+            <div className={styles.artistHeroImgFallback}>{artist.name[0]?.toUpperCase()}</div>
+          )}
+          <div className={styles.artistHeroOverlay} />
+          <div className={styles.artistHeroContent}>
+            <div className={styles.artistProfileLabel}>About the artist</div>
+            <div className={styles.artistHeroName}>{artist.name}</div>
           </div>
-          {artist.bio && (
-            <div className={styles.artistProfileBioWrap}>
-              <p className={`${styles.artistProfileBio} ${bioExpanded ? styles.bioExpanded : ""}`}>
-                {artist.bio}
-              </p>
-              {artist.bio.length > 120 && (
-                <button
-                  className={styles.bioReadMoreBtn}
-                  onClick={() => setBioExpanded(!bioExpanded)}
-                >
-                  {bioExpanded ? "Show Less" : "Read More"}
-                </button>
-              )}
-            </div>
+          <span className={styles.artistHeroChevron} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </span>
+        </Link>
+      )}
+
+      {artist?.bio && (
+        <div className={styles.artistProfileBioWrap}>
+          <p className={`${styles.artistProfileBio} ${bioExpanded ? styles.bioExpanded : ""}`}>{artist.bio}</p>
+          {artist.bio.length > 120 && (
+            <button className={styles.bioReadMoreBtn} onClick={() => setBioExpanded(!bioExpanded)}>
+              {bioExpanded ? "Show less" : "Read more"}
+            </button>
           )}
         </div>
       )}
@@ -851,10 +922,19 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
       {/* Song Credits Section */}
       {credits.length > 0 && (
         <div className={styles.songCreditsCard}>
-          <h3 className={styles.creditsSectionTitle}>Song Credits</h3>
+          <h3 className={styles.creditsSectionTitle}>
+            <span className={styles.creditsSectionIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
+              </svg>
+            </span>
+            Song Credits
+          </h3>
           <div className={styles.creditsList}>
             {credits.map((credit) => (
               <div key={credit.id} className={styles.creditRow}>
+                <span className={styles.creditAvatar} aria-hidden="true">{credit.name[0]?.toUpperCase()}</span>
                 <span className={styles.creditName}>{credit.name}</span>
                 <span className={styles.creditRole}>{credit.role}</span>
               </div>
@@ -866,13 +946,19 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
       {/* Samples Section */}
       {samples.length > 0 && (
         <div className={styles.songCreditsCard}>
-          <h3 className={styles.creditsSectionTitle}>Samples / Inclusions</h3>
+          <h3 className={styles.creditsSectionTitle}>
+            <span className={styles.creditsSectionIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                <path d="M3 12h3l3-9 4 18 3-9h5" />
+              </svg>
+            </span>
+            Samples &amp; Interpolations
+          </h3>
           <div className={styles.creditsList}>
             {samples.map((sample, idx) => (
               <div key={idx} className={styles.creditRow}>
-                <span className={styles.creditName}>
-                  {sample.trackTitle}
-                </span>
+                <span className={styles.creditAvatar} aria-hidden="true">♪</span>
+                <span className={styles.creditName}>{sample.trackTitle}</span>
                 <span className={styles.creditRole}>
                   {sample.sampleType === "samples" ? "Samples" : "Interpolated"}
                 </span>

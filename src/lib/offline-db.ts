@@ -48,7 +48,7 @@ let dbPromise: Promise<IDBPDatabase<SakuraDB>> | null = null;
 function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<SakuraDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion) {
+      upgrade(db, oldVersion, newVersion, transaction) {
         if (oldVersion < 1) {
           const trackStore = db.createObjectStore("tracks", { keyPath: "id" });
           trackStore.createIndex("by-artist", "artist");
@@ -73,8 +73,7 @@ function getDB() {
 
           // Add a user-device index to tracks store to query only this device's songs
           if (db.objectStoreNames.contains("tracks")) {
-            const tx = db.transaction("tracks", "versionchange");
-            const store = tx.store;
+            const store = transaction.objectStore("tracks");
             if (!store.indexNames.contains("by-user-device")) {
               store.createIndex("by-user-device", ["userId", "deviceId"]);
             }

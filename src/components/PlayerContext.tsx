@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { getAudioBlob, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
+import { getLyrics, LyricData } from "@/lib/lyrics";
 
 interface Track {
   id: string;
@@ -35,6 +36,11 @@ interface PlayerContextType {
   seek: (time: number) => void;
   beginSeek: () => void;
   endSeek: (time?: number) => void;
+  seekTo: (time: number) => void;
+  lyrics: LyricData | null;
+  loadingLyrics: boolean;
+  activeLyricIndex: number;
+  activeLyricLine: string | null;
   setVolume: (vol: number) => void;
   next: () => void;
   prev: () => void;
@@ -80,6 +86,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isSeeking, setIsSeeking] = useState(false);
   const [accentColor, setAccentColor] = useState<string | null>(null);
   const [miniArtRect, setMiniArtRect] = useState<DOMRect | null>(null);
+  const [lyrics, setLyrics] = useState<LyricData | null>(null);
+  const [loadingLyrics, setLoadingLyrics] = useState(false);
 
   const currentTrack = queue[currentIndex] || null;
   const isLiked = currentTrack ? favoriteTrackIds.has(currentTrack.id) : false;
@@ -110,6 +118,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [currentTrack?.coverUrl]);
+
+  // Load lyrics for the current track. Lifted up to context (rather than living only
+  // inside FullPlayer) so MiniPlayer can also show a live "now playing" lyric line.
+  useEffect(() => {
+    let cancelled = false;
+    setLyrics(null);
+    if (!currentTrack) return;
+    setLoadingLyrics(true);
+    getLyrics(currentTrack)
+      .then((data) => {
+        if (!cancelled) setLyrics(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingLyrics(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTrack?.id]);
+
+  const activeLyricIndex = useMemo(() => {
+    if (!lyrics?.lines?.length) return -1;
+    let index = -1;
+    for (let i = 0; i < lyrics.lines.length; i++) {
+      if (lyrics.lines[i].time <= progress) {
+        index = i;
+      } else {
+        break;
+      }
+    }
+    return index;
+  }, [lyrics, progress]);
+
+  const activeLyricLine = useMemo(() => {
+    if (!lyrics?.lines?.length) return null;
+    return lyrics.lines[activeLyricIndex]?.text || null;
+  }, [lyrics, activeLyricIndex]);
 
   // Load favorites on mount
   useEffect(() => {
@@ -384,7 +430,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const prevSrc = audioRef.current.src;
+      // Guard: if this exact source is already loaded (e.g. an effect re-run that
+      // didn't actually change tracks), skip the reload entirely — calling
+      // `.load()` on an already-current src is what snaps playback back to 0.
+      const resolvedSrc = new URL(src, window.location.href).href;
+      if (audioRef.current.src === resolvedSrc) {
+        return;
+      }
+
       audioRef.current.src = src;
       audioRef.current.load();
 
@@ -476,6 +529,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsSeeking(false);
     }, 50);
   }, []);
+
+  // One-shot seek helper for anything that isn't a drag gesture (tapping a lyric line,
+  // tapping a queue row's timestamp, etc). Wrapping begin/end around it keeps the
+  // `timeupdate` listener from racing a stale currentTime against the new one.
+  const seekTo = useCallback(
+    (time: number) => {
+      seekingRef.current = true;
+      setIsSeeking(true);
+      if (audioRef.current) {
+        audioRef.current.currentTime = time;
+        setProgress(time);
+      }
+      setTimeout(() => {
+        seekingRef.current = false;
+        setIsSeeking(false);
+      }, 50);
+    },
+    []
+  );
 
   const setVolume = useCallback((vol: number) => {
     setVolumeState(vol);
@@ -626,6 +698,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         seek,
         beginSeek,
         endSeek,
+        seekTo,
+        lyrics,
+        loadingLyrics,
+        activeLyricIndex,
+        activeLyricLine,
         setVolume,
         next,
         prev,
