@@ -238,17 +238,15 @@ export default function LibraryPage() {
     let cancelled = false;
 
     async function init() {
+      // 1. Instantly read user cache ID
       const activeUserId = getCachedUserId();
+      
+      // 2. Load IndexedDB cache instantly
       const hasCache = await loadFromCache(activeUserId);
       if (cancelled) return;
 
-      if (hasCache) {
-        // Cache loaded, now refresh from server in background silently
-        fetchFromServer(false, activeUserId);
-      } else {
-        // No cache, fetch from server (shows skeleton)
-        fetchFromServer(false, activeUserId);
-      }
+      // 3. Trigger server background check
+      fetchFromServer(false, activeUserId);
     }
 
     init();

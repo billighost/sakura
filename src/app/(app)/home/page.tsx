@@ -281,14 +281,12 @@ export default function HomePage() {
         setCountryTop(cached.countryTop || []);
         setLoading(false);
         hasLoadedFromCache.current = true;
-
-        // 2. Refresh from server in background
-        fetchFromServer();
-      } else {
-        // No cache, fetch from server
-        await fetchFromServer();
-        setLoading(false);
       }
+
+      // 2. Refresh from server in background immediately
+      fetchFromServer().then(() => {
+        if (!cancelled) setLoading(false);
+      });
     }
 
     init();

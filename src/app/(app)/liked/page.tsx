@@ -96,11 +96,10 @@ export default function LikedPage() {
         setTracks(cached.tracks);
         setLoading(false);
         hasLoadedFromCache.current = true;
-        // Refresh from server silently in the background
-        fetchFromServer(false, activeUserId);
-      } else {
-        await fetchFromServer(false, activeUserId);
       }
+      
+      // Refresh from server silently in the background immediately
+      fetchFromServer(false, activeUserId);
     }
 
     init();

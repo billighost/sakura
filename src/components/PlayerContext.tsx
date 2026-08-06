@@ -303,12 +303,67 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Hydrate player settings and queue from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedQueue = localStorage.getItem("sakura-player-queue");
+      const savedIndex = localStorage.getItem("sakura-player-index");
+      const savedProgress = localStorage.getItem("sakura-player-progress");
+      const savedVolume = localStorage.getItem("sakura-player-volume");
+      const savedShuffle = localStorage.getItem("sakura-player-shuffle");
+      const savedRepeat = localStorage.getItem("sakura-player-repeat");
+
+      if (savedQueue) setQueueState(JSON.parse(savedQueue));
+      if (savedIndex) setCurrentIndex(Number(savedIndex));
+      if (savedProgress) setProgress(Number(savedProgress));
+      if (savedVolume) {
+        const vol = Number(savedVolume);
+        setVolumeState(vol);
+        if (audioRef.current) audioRef.current.volume = vol;
+      }
+      if (savedShuffle) setShuffle(savedShuffle === "true");
+      if (savedRepeat) setRepeat(savedRepeat as any);
+    } catch (e) {
+      console.error("Failed to restore player state:", e);
+    }
+  }, []);
+
+  // Persist state updates to localStorage
+  useEffect(() => {
+    localStorage.setItem("sakura-player-queue", JSON.stringify(queue));
+  }, [queue]);
+
+  useEffect(() => {
+    localStorage.setItem("sakura-player-index", String(currentIndex));
+  }, [currentIndex]);
+
+  useEffect(() => {
+    localStorage.setItem("sakura-player-volume", String(volume));
+  }, [volume]);
+
+  useEffect(() => {
+    localStorage.setItem("sakura-player-shuffle", String(shuffle));
+  }, [shuffle]);
+
+  useEffect(() => {
+    localStorage.setItem("sakura-player-repeat", repeat);
+  }, [repeat]);
+
+  // Periodic progress saving (e.g., every 3s to minimize disk writes, plus updates on unload)
+  useEffect(() => {
+    if (seekingRef.current) return;
+    localStorage.setItem("sakura-player-progress", String(progress));
+  }, [progress]);
+
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
+    let isInitialLoad = true;
 
     async function loadAudio() {
       if (!audioRef.current || !currentTrack) return;
+      
+      // Determine if we should play. Only play if we are changing tracks *after* hydration
       const wasPlaying = isPlayingRef.current;
       let src = currentTrack.audioUrl;
 
@@ -329,9 +384,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const prevSrc = audioRef.current.src;
       audioRef.current.src = src;
       audioRef.current.load();
-      if (wasPlaying) {
+
+      // If initial load of the session, restore the saved timestamp progress
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        const savedProgress = localStorage.getItem("sakura-player-progress");
+        if (savedProgress) {
+          const time = Number(savedProgress);
+          audioRef.current.currentTime = time;
+          setProgress(time);
+        }
+      } else if (wasPlaying) {
         audioRef.current.play().catch(() => {});
       }
     }

@@ -123,12 +123,25 @@
 .artContainer {
   position: relative;
   z-index: 2;
-  flex: 1;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: clamp(0.75rem, 3.5vw, 1.75rem);
   min-height: 0;
+}
+
+.scrollContainer {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  position: relative;
+  z-index: 2;
+}
+
+.scrollContainer::-webkit-scrollbar {
+  display: none;
 }
 
 .artShell {
@@ -163,22 +176,58 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+.inlineLyricsBox {
+  margin: 1.5rem auto;
+  width: 90%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.inlineLyricsBox:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inlineLyricsExpanded {
+  background: rgba(0, 0, 0, 0.2);
+  cursor: default;
+}
+
+.inlineLyricsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.inlineExpandBtn {
+  all: unset;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
+.inlineLyricsScroll {
+  max-height: 200px;
+  overflow-y: auto;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 .controls {
   position: relative;
   z-index: 2;
   flex-shrink: 0;
-  /* Intentionally NOT var(--sakura-glass-strong): this sheet sits over the
-     blurred, darkened album art in both themes (like Spotify/Apple Music's
-     now-playing screen), so it needs its own fixed dark glass regardless of
-     site theme — otherwise it goes near-white in light mode and swallows
-     the white text/icons below. */
   background: rgba(20, 16, 23, 0.82);
   backdrop-filter: blur(28px) saturate(1.3);
   -webkit-backdrop-filter: blur(28px) saturate(1.3);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px 24px 0 0;
-  padding: clamp(1rem, 3.5vw, 1.5rem) clamp(1rem, 4vw, 1.5rem) 0;
-  padding-bottom: calc(clamp(1rem, 4vw, 1.5rem) + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px;
+  padding: clamp(1rem, 3.5vw, 1.5rem) clamp(1rem, 4vw, 1.5rem);
+  margin-top: 1.5rem;
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.3);
 }
 
