@@ -83,6 +83,8 @@ interface PlayerContextType {
   // Download Manager fields
   downloadQueue: DownloadItem[];
   downloadStates: Record<string, "idle" | "queued" | "downloading" | "completed" | "failed">;
+  downloadProgress: Record<string, number>;
+  downloadSpeed: Record<string, string>;
   addToDownloadQueue: (tracks: Omit<DownloadItem, "priority">[], priorityBoost?: boolean) => void;
   removeFromDownloadQueue: (trackId: string) => void;
 }
@@ -136,7 +138,57 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Centralized Download Queue States
   const [downloadQueue, setDownloadQueue] = useState<DownloadItem[]>([]);
   const [downloadStates, setDownloadStates] = useState<Record<string, "idle" | "queued" | "downloading" | "completed" | "failed">>({});
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [downloadSpeed, setDownloadSpeed] = useState<Record<string, string>>({});
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
+  const [downloadPaused, setDownloadPaused] = useState(false);
+
+  // Sync downloadQueue to localStorage
+  useEffect(() => {
+    localStorage.setItem("sakura-player-download-queue", JSON.stringify(downloadQueue));
+  }, [downloadQueue]);
+
+  // Battery and Visibility Checker
+  useEffect(() => {
+    let checkInterval: NodeJS.Timeout | null = null;
+
+    async function checkBatteryAndVisibility() {
+      const isHidden = document.visibilityState === "hidden";
+      if (!isHidden) {
+        setDownloadPaused(false);
+        return;
+      }
+
+      try {
+        if ("getBattery" in navigator) {
+          const battery: any = await (navigator as any).getBattery();
+          if (battery.level < 0.2 && !battery.charging) {
+            setDownloadPaused(true);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Battery check failed", e);
+      }
+      setDownloadPaused(false);
+    }
+
+    const handleVisibility = () => {
+      checkBatteryAndVisibility();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    checkInterval = setInterval(() => {
+      if (document.visibilityState === "hidden") {
+        checkBatteryAndVisibility();
+      }
+    }, 15000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, []);
 
   // Helper to add tracks to queue
   const addToDownloadQueue = useCallback((tracks: Omit<DownloadItem, "priority">[], priorityBoost = false) => {
@@ -180,7 +232,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Background sequential download loop
   useEffect(() => {
-    if (activeDownloadId || downloadQueue.length === 0) return;
+    if (activeDownloadId || downloadQueue.length === 0 || downloadPaused) return;
 
     const item = downloadQueue[0];
     setActiveDownloadId(item.id);
@@ -226,7 +278,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
         const blobRes = await fetch(finalAudioUrl!);
         if (!blobRes.ok) throw new Error("Failed to fetch audio stream");
-        const blob = await blobRes.blob();
+
+        const contentLength = blobRes.headers.get("content-length");
+        const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+        
+        const reader = blobRes.body!.getReader();
+        const chunks: BlobPart[] = [];
+        let bytesLoaded = 0;
+        const startTime = Date.now();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value as BlobPart);
+          bytesLoaded += value.length;
+
+          if (totalBytes > 0) {
+            const progressPct = Math.round((bytesLoaded / totalBytes) * 100);
+            setDownloadProgress((prev) => ({ ...prev, [item.id]: progressPct, [finalId]: progressPct }));
+          }
+
+          const elapsedSec = (Date.now() - startTime) / 1000;
+          if (elapsedSec > 0) {
+            const bytesPerSec = bytesLoaded / elapsedSec;
+            const speedText = bytesPerSec > 1024 * 1024
+              ? `${(bytesPerSec / (1024 * 1024)).toFixed(1)}M/s`
+              : `${(bytesPerSec / 1024).toFixed(0)}K/s`;
+            setDownloadSpeed((prev) => ({ ...prev, [item.id]: speedText, [finalId]: speedText }));
+          }
+        }
+
+        const blob = new Blob(chunks, { type: blobRes.headers.get("content-type") || "audio/mpeg" });
 
         await saveTrackOffline({
           id: finalId,
@@ -250,7 +333,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     startDownload();
-  }, [downloadQueue, activeDownloadId]);
+  }, [downloadQueue, activeDownloadId, downloadPaused]);
 
   // Priority boost for upcoming tracks in the play queue
   useEffect(() => {
@@ -662,6 +745,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const savedVolume = localStorage.getItem("sakura-player-volume");
       const savedShuffle = localStorage.getItem("sakura-player-shuffle");
       const savedRepeat = localStorage.getItem("sakura-player-repeat");
+      const savedDownloadQueue = localStorage.getItem("sakura-player-download-queue");
 
       const savedUpNext = localStorage.getItem("sakura-player-upnext");
       if (savedQueue) setQueueState(JSON.parse(savedQueue));
@@ -675,6 +759,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       if (savedShuffle) setShuffle(savedShuffle === "true");
       if (savedRepeat) setRepeat(savedRepeat as any);
+
+      if (savedDownloadQueue) {
+        const parsed = JSON.parse(savedDownloadQueue) as DownloadItem[];
+        setDownloadQueue(parsed);
+        const states: Record<string, "idle" | "queued" | "downloading" | "completed" | "failed"> = {};
+        for (const item of parsed) {
+          states[item.id] = "queued";
+        }
+        setDownloadStates(states);
+      }
     } catch (e) {
       console.error("Failed to restore player state:", e);
     }
@@ -1111,6 +1205,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setSleepTimer,
         downloadQueue,
         downloadStates,
+        downloadProgress,
+        downloadSpeed,
         addToDownloadQueue,
         removeFromDownloadQueue,
       }}

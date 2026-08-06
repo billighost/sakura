@@ -24,23 +24,36 @@ interface TrackRowProps {
   showNumber?: boolean;
 }
 
-function CircularProgress({ progress }: { progress: number }) {
-  const radius = 8;
+function CircularProgress({ progress, speed }: { progress: number; speed?: string }) {
+  const radius = 10;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" className={styles.circularLoader}>
-      <circle cx="12" cy="12" r={radius} stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
+    <svg width="28" height="28" viewBox="0 0 28 28" className={styles.circularLoader}>
+      <circle cx="14" cy="14" r={radius} stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
       <circle 
-        cx="12" cy="12" r={radius} 
+        cx="14" cy="14" r={radius} 
         stroke="currentColor" strokeWidth="2" fill="none"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap="round"
-        transform="rotate(-90 12 12)"
+        transform="rotate(-90 14 14)"
         style={{ transition: "stroke-dashoffset 0.3s ease" }}
       />
+      {speed && (
+        <text 
+          x="14" 
+          y="16.5" 
+          fill="currentColor" 
+          fontSize="6px" 
+          fontWeight="bold" 
+          textAnchor="middle"
+          style={{ letterSpacing: "-0.5px" }}
+        >
+          {speed.replace("/s", "")}
+        </text>
+      )}
     </svg>
   );
 }
@@ -56,6 +69,8 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     toggleLikeTrack, 
     showToast,
     downloadStates,
+    downloadProgress,
+    downloadSpeed,
     addToDownloadQueue
   } = usePlayer();
   const liked = favoriteTrackIds?.has(track.id) || false;
@@ -272,9 +287,9 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           aria-label="Play"
         >
           {effectiveDownloadState === "telegram" ? (
-            <CircularProgress progress={50} />
+            <CircularProgress progress={downloadProgress[track.id] ?? 30} speed={downloadSpeed[track.id]} />
           ) : effectiveDownloadState === "device" ? (
-            <CircularProgress progress={90} />
+            <CircularProgress progress={downloadProgress[track.id] ?? 70} speed={downloadSpeed[track.id]} />
           ) : isActive && isPlaying ? (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
