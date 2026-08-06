@@ -19,14 +19,6 @@ interface Track {
 
 type SortKey = "title" | "artist" | "album" | "date";
 
-function formatTotalDuration(tracks: Track[]): string {
-  const totalSec = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  if (h > 0) return `${tracks.length} songs · ${h} hr ${m} min`;
-  return `${tracks.length} songs · ${m} min`;
-}
-
 function formatTotalDurationLong(tracks: Track[]): string {
   const totalSec = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
   const h = Math.floor(totalSec / 3600);
@@ -47,7 +39,6 @@ function shuffleArray<T>(arr: T[]): T[] {
 export default function LikedPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [sortOpen, setSortOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,7 +46,6 @@ export default function LikedPage() {
   const { play } = usePlayer();
   const hasLoadedFromCache = useRef(false);
 
-  // Restore sorting preference
   useEffect(() => {
     const savedSort = localStorage.getItem("sakura-liked-sort") as SortKey;
     if (savedSort) setSortBy(savedSort);
@@ -66,24 +56,20 @@ export default function LikedPage() {
     localStorage.setItem("sakura-liked-sort", newSort);
   }, []);
 
-  const fetchFromServer = useCallback(async (isRefresh = false, userId = getCachedUserId()) => {
-    if (isRefresh) setRefreshing(true);
+  const fetchFromServer = useCallback(async (userId = getCachedUserId()) => {
     try {
       const res = await fetch("/api/favorites");
       const data = await res.json();
       const newTracks = data.tracks || data || [];
       setTracks(newTracks);
-
-      // Update cache isolated by user ID
       setCachedLibraryData("liked-main", { tracks: newTracks }, userId);
     } catch {
+      /* silent — cache already shown if present */
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
-  // Cache-first loading
   useEffect(() => {
     let cancelled = false;
 
@@ -97,9 +83,8 @@ export default function LikedPage() {
         setLoading(false);
         hasLoadedFromCache.current = true;
       }
-      
-      // Refresh from server silently in the background immediately
-      fetchFromServer(false, activeUserId);
+
+      fetchFromServer(activeUserId);
     }
 
     init();
@@ -126,10 +111,11 @@ export default function LikedPage() {
         case "album":
           return (a.album?.title || "").localeCompare(b.album?.title || "");
         case "date":
-        default:
+        default: {
           const dateA = a.likedAt ? new Date(a.likedAt).getTime() : 0;
           const dateB = b.likedAt ? new Date(b.likedAt).getTime() : 0;
           return dateB - dateA;
+        }
       }
     });
   }, [tracks, searchQuery, sortBy]);
@@ -147,13 +133,13 @@ export default function LikedPage() {
   }
 
   function handlePlayAll() {
-    if (tracks.length === 0) return;
+    if (filteredTracks.length === 0) return;
     const q = filteredTracks.map(toQueue);
     play(q[0], q);
   }
 
   function handleShufflePlay() {
-    if (tracks.length === 0) return;
+    if (filteredTracks.length === 0) return;
     const shuffled = shuffleArray(filteredTracks);
     const q = shuffled.map(toQueue);
     play(q[0], q);
@@ -184,31 +170,31 @@ export default function LikedPage() {
   }
 
   const sortLabels: Record<SortKey, string> = {
+    date: "Date Added",
     title: "Title",
     artist: "Artist",
     album: "Album",
-    date: "Date Added",
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.headerGradient}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "1rem" }}>
           <div className={styles.header}>
             <div className={styles.headerArt}>
-              <svg viewBox="0 0 24 24" fill="white" width="clamp(1.5rem, 5vw, 2.25rem)" height="clamp(1.5rem, 5vw, 2.25rem)">
+              <svg viewBox="0 0 24 24" fill="white" width="clamp(1.75rem, 6vw, 2.75rem)" height="clamp(1.75rem, 6vw, 2.75rem)">
                 <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
               </svg>
             </div>
             <div className={styles.headerInfo}>
-              <div className={styles.headerLabel}>Playlist</div>
-              <div className={styles.headerTitle}>Liked Songs</div>
+              <span className={styles.headerLabel}>Playlist</span>
+              <h1 className={styles.headerTitle}>Liked Songs</h1>
               <div className={styles.headerMeta}>
                 {loading ? (
                   <span className={styles.skeletonTextSmall} />
                 ) : tracks.length > 0 ? (
                   <>
-                    <span>{tracks.length} songs</span>
+                    <span>{tracks.length} song{tracks.length !== 1 ? "s" : ""}</span>
                     <span className={styles.dot}>·</span>
                     <span>{formatTotalDurationLong(tracks)}</span>
                   </>
@@ -220,8 +206,9 @@ export default function LikedPage() {
           </div>
           <button
             className={styles.headerSearchBtn}
-            onClick={() => setSearchOpen(!searchOpen)}
-            title="Search inside liked songs"
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label="Search inside liked songs"
+            aria-pressed={searchOpen}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
@@ -239,14 +226,14 @@ export default function LikedPage() {
           </svg>
           <input
             type="text"
-            placeholder="Search in liked songs..."
+            placeholder="Search in liked songs"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={styles.searchInput}
             autoFocus
           />
           {searchQuery && (
-            <button className={styles.searchClear} onClick={() => setSearchQuery("")}>
+            <button className={styles.searchClear} onClick={() => setSearchQuery("")} aria-label="Clear search">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -263,7 +250,7 @@ export default function LikedPage() {
               <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              Play All
+              Play
             </button>
             <button className={styles.shuffleBtn} onClick={handleShufflePlay}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
@@ -277,7 +264,7 @@ export default function LikedPage() {
             </button>
           </div>
           <div className={styles.rightControls}>
-            <button className={styles.downloadAllBtn} onClick={handleDownloadAll} title="Download all for offline">
+            <button className={styles.downloadAllBtn} onClick={handleDownloadAll} aria-label="Download all for offline" title="Download all for offline">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
@@ -285,7 +272,7 @@ export default function LikedPage() {
               </svg>
             </button>
             <div className={styles.sortWrapper}>
-              <button className={styles.sortBtn} onClick={() => setSortOpen(!sortOpen)}>
+              <button className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={sortOpen}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
                   <line x1="4" y1="6" x2="20" y2="6" />
                   <line x1="4" y1="12" x2="16" y2="12" />
@@ -296,12 +283,14 @@ export default function LikedPage() {
               {sortOpen && (
                 <>
                   <div className={styles.sortBackdrop} onClick={() => setSortOpen(false)} />
-                  <div className={styles.sortDropdown}>
+                  <div className={styles.sortDropdown} role="listbox">
                     {(Object.keys(sortLabels) as SortKey[]).map((key) => (
                       <button
                         key={key}
                         className={`${styles.sortOption} ${sortBy === key ? styles.sortOptionActive : ""}`}
                         onClick={() => { handleSortChange(key); setSortOpen(false); }}
+                        role="option"
+                        aria-selected={sortBy === key}
                       >
                         {sortLabels[key]}
                         {sortBy === key && (
@@ -321,7 +310,7 @@ export default function LikedPage() {
 
       <div className={styles.trackList}>
         {loading ? (
-          [...Array(5)].map((_, i) => (
+          [...Array(6)].map((_, i) => (
             <div key={i} className={styles.skeletonRow}>
               <div className={styles.skeletonThumb} />
               <div className={styles.skeletonCol}>
@@ -330,6 +319,8 @@ export default function LikedPage() {
               </div>
             </div>
           ))
+        ) : filteredTracks.length === 0 && searchQuery ? (
+          <div className={styles.noResults}>No songs match &ldquo;{searchQuery}&rdquo;</div>
         ) : (
           filteredTracks.map((track, i) => (
             <TrackRow key={track.id} track={track} queue={filteredTracks} index={i} showNumber />
