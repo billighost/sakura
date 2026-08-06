@@ -1,8 +1,8 @@
-const SHELL_CACHE = "sakura-shell-v1";
-const API_CACHE = "sakura-api-v1";
+const SHELL_CACHE = "sakura-shell-v2";
+const API_CACHE = "sakura-api-v2";
 const AUDIO_CACHE = "sakura-audio-v1";
-const IMAGE_CACHE = "sakura-images-v1";
-const FONT_CACHE = "sakura-fonts-v1";
+const IMAGE_CACHE = "sakura-images-v2";
+const FONT_CACHE = "sakura-fonts-v2";
 
 const SHELL_ASSETS = [
   "/",
@@ -152,13 +152,12 @@ async function networkFirstWithFallback(request, isNav) {
     const cached = await shellCache.match(cacheKey);
     if (cached) return cached;
 
-    // Fall back to the cached /home or / shell for page navigations when offline
     if (isNav) {
       const fallbackShell =
         (await shellCache.match("/home")) || (await shellCache.match("/"));
       if (fallbackShell) return fallbackShell;
     }
-    throw err;
+    return new Response("Offline (Network Error)", { status: 480, statusText: "Offline" });
   }
 }
 
@@ -211,7 +210,10 @@ async function networkFirst(request) {
   } catch (err) {
     const cached = await cache.match(request);
     if (cached) return cached;
-    throw err;
+    return new Response(JSON.stringify({ error: "Offline" }), { 
+      status: 503, 
+      headers: { "Content-Type": "application/json" } 
+    });
   }
 }
 
@@ -259,7 +261,7 @@ async function staleWhileRevalidate(cacheName, request) {
     })
     .catch((err) => {
       if (cached) return cached;
-      throw err;
+      return new Response("Network failure", { status: 480 });
     });
   return cached || fetchPromise;
 }
