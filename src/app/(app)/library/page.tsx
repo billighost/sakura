@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiBatch } from "@/lib/apiBatch";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
+import { PlaylistModal } from "@/components/PlaylistModal";
 import styles from "./page.module.css";
 
 /**
@@ -59,6 +60,7 @@ export default function LibraryPage() {
   const [view, setView] = useState<ViewMode>("list");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
   const hasLoadedFromCache = useRef(false);
 
   useEffect(() => {
@@ -184,6 +186,17 @@ export default function LibraryPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Your Library</h1>
         <div className={styles.headerActions}>
+          <button
+            className={styles.iconBtn}
+            onClick={() => setPlaylistModalOpen(true)}
+            aria-label="New Playlist"
+            title="New Playlist"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
           <button
             className={styles.iconBtn}
             onClick={() => setSearchOpen((v) => !v)}
@@ -416,6 +429,12 @@ export default function LibraryPage() {
           )}
         </div>
       </div>
+      
+      <PlaylistModal 
+        isOpen={playlistModalOpen} 
+        onClose={() => setPlaylistModalOpen(false)} 
+        onSuccess={() => fetchFromServer(true)}
+      />
     </div>
   );
 }

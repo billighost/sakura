@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
   const body = await req.json();
   const { url } = body;
 
   if (!url || typeof url !== "string") {
-    return NextResponse.json(
-      { error: "Provide a Spotify or Deezer playlist/track URL" },
+    return new Response(
+      JSON.stringify({ error: "Provide a Spotify or Deezer playlist/track URL" }),
       { status: 400 }
     );
   }
@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
   const isDeezer = url.includes("deezer.com");
 
   if (!isSpotify && !isDeezer) {
-    return NextResponse.json(
-      { error: "Only Spotify and Deezer URLs are supported" },
+    return new Response(
+      JSON.stringify({ error: "Only Spotify and Deezer URLs are supported" }),
       { status: 400 }
     );
   }
@@ -33,25 +33,40 @@ export async function POST(req: NextRequest) {
     const client = getTelegramClient();
     await client.init();
 
-    // Send the URL to the bot - it will auto-download all tracks
-    const tracks = await client.importPlaylist(url, (track) => {
-      console.log(`[Import] Received: ${track.artist} - ${track.title}`);
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await client.importPlaylist(url, (track) => {
+            console.log(`[Import] Received: ${track.artist} - ${track.title}`);
+            const data = JSON.stringify({
+              title: track.title,
+              artist: track.artist,
+              duration: track.duration,
+              messageId: track.messageId,
+            });
+            controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+          });
+          controller.enqueue(new TextEncoder().encode(`event: done\ndata: {}\n\n`));
+          controller.close();
+        } catch (err: any) {
+          console.error("[Import Playlist Stream Error]", err);
+          controller.error(err);
+        }
+      },
     });
 
-    return NextResponse.json({
-      tracks: tracks.map((t) => ({
-        title: t.title,
-        artist: t.artist,
-        duration: t.duration,
-        messageId: t.messageId,
-      })),
-      count: tracks.length,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+      },
     });
   } catch (error) {
     console.error("[Import Playlist]", error);
-    return NextResponse.json(
-      { error: "Failed to import playlist. Make sure the URL is valid and the bot is responding." },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: "Failed to import playlist." }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
+import { AddToPlaylistModal } from "./AddToPlaylistModal";
 import styles from "./TrackRow.module.css";
 
 interface TrackRowProps {
@@ -52,6 +53,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
   const [offline, setOffline] = useState(false);
   const [downloadState, setDownloadState] = useState<"idle" | "telegram" | "device">("idle");
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [addPlaylistModalOpen, setAddPlaylistModalOpen] = useState(false);
 
   const cover = track.coverUrl || track.album?.coverUrl;
 
@@ -302,6 +304,20 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           >
             {liked ? "Remove from Liked Songs" : "Add to Liked Songs"}
           </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => {
+              setMenuPos(null);
+              setAddPlaylistModalOpen(true);
+            }}
+            icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            }
+          >
+            Add to Playlist
+          </ContextMenuItem>
           {offline && (
             <ContextMenuItem
               onClick={() => {
@@ -349,6 +365,12 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           </ContextMenuItem>
         </ContextMenu>
       )}
+
+      <AddToPlaylistModal
+        isOpen={addPlaylistModalOpen}
+        onClose={() => setAddPlaylistModalOpen(false)}
+        trackId={track.id}
+      />
     </div>
   );
 }
