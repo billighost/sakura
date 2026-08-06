@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cacheGet, cacheSet, cacheDel, cacheKey, TTL } from "@/lib/cache";
 
 export async function GET(
   req: NextRequest,
@@ -13,6 +14,12 @@ export async function GET(
 
   const { id } = await params;
   const userId = session.user.id!;
+  const key = cacheKey("playlist", id);
+
+  const cached = await cacheGet(key);
+  if (cached) {
+    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  }
 
   const playlist = await queryOne(
     `SELECT * FROM "Playlist" WHERE id = $1 AND "userId" = $2`,
@@ -24,11 +31,22 @@ export async function GET(
   }
 
   const tracks = await query(
-    `SELECT t.*, json_build_object('name', a.name) as artist, json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album, pt.position FROM "PlaylistTrack" pt JOIN "Track" t ON pt."trackId" = t.id LEFT JOIN "Artist" a ON t."artistId" = a.id LEFT JOIN "Album" al ON t."albumId" = al.id WHERE pt."playlistId" = $1 ORDER BY pt.position ASC`,
+    `SELECT t.id, t.title, t.duration, t."audioUrl", t."coverUrl", 
+       json_build_object('name', a.name) as artist, 
+       json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album, 
+       pt.position 
+     FROM "PlaylistTrack" pt 
+     JOIN "Track" t ON pt."trackId" = t.id 
+     LEFT JOIN "Artist" a ON t."artistId" = a.id 
+     LEFT JOIN "Album" al ON t."albumId" = al.id 
+     WHERE pt."playlistId" = $1 
+     ORDER BY pt.position ASC`,
     [id]
   );
 
-  return NextResponse.json({ ...playlist, tracks });
+  const result = { ...playlist, tracks };
+  await cacheSet(key, result, TTL.PLAYLIST);
+  return NextResponse.json(result);
 }
 
 export async function PATCH(
@@ -53,6 +71,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
+  await cacheDel(cacheKey("playlist", id), cacheKey("playlists", userId));
   return NextResponse.json({ ok: true });
 }
 
@@ -77,5 +96,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
+  await cacheDel(cacheKey("playlist", id), cacheKey("playlists", userId));
   return NextResponse.json({ ok: true });
 }

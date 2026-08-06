@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
 
 export async function GET(
   req: NextRequest,
@@ -12,8 +13,14 @@ export async function GET(
   }
 
   const { id } = await params;
+  const key = cacheKey("album", id);
 
   try {
+    const cached = await cacheGet(key);
+    if (cached) {
+      return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+    }
+
     const album = await queryOne(
       `SELECT
         al.*,
@@ -30,7 +37,7 @@ export async function GET(
 
     const tracks = await query(
       `SELECT
-        t.id, t.title, t.duration, t."trackNumber", t.genre, t."audioUrl", t."coverUrl",
+        t.id, t.title, t.duration, t."trackNumber", t."audioUrl", t."coverUrl",
         json_build_object('name', ar.name) AS artist
       FROM "Track" t
       LEFT JOIN "Artist" ar ON t."artistId" = ar.id
@@ -39,7 +46,9 @@ export async function GET(
       [id],
     );
 
-    return NextResponse.json({ ...album, tracks });
+    const result = { ...album, tracks };
+    await cacheSet(key, result, TTL.ALBUM);
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Failed to fetch album:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

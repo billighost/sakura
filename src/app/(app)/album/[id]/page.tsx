@@ -315,7 +315,7 @@ export default function AlbumPage() {
                 )}
                 <div className={styles.albumTitle}>{rel.title}</div>
                 {rel.year && <div className={styles.albumYear}>{rel.year}</div>}
-              </button>
+              </Link>
             ))}
           </div>
         </div>

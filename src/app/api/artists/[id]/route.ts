@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
 
 export async function GET(
   req: NextRequest,
@@ -12,18 +13,29 @@ export async function GET(
   }
 
   const { id } = await params;
+  const key = cacheKey("artist", id);
 
   try {
+    const cached = await cacheGet(key);
+    if (cached) {
+      return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+    }
+
     const artist = await queryOne(
-      `SELECT
+      `WITH track_counts AS (
+         SELECT 
+           (SELECT COUNT(DISTINCT id) FROM "Track" WHERE "artistId" = $1) +
+           (SELECT COUNT(DISTINCT "trackId") FROM "TrackArtist" WHERE "artistId" = $1) AS "trackCount"
+       )
+       SELECT
         a.*,
-        (SELECT COUNT(DISTINCT t.id) FROM "Track" t WHERE t."artistId" = a.id) +
-        (SELECT COUNT(DISTINCT ta."trackId") FROM "TrackArtist" ta WHERE ta."artistId" = a.id) AS "trackCount",
+        tc."trackCount"::int AS "trackCount",
         COUNT(DISTINCT al.id)::int AS "albumCount"
       FROM "Artist" a
       LEFT JOIN "Album" al ON al."artistId" = a.id
+      CROSS JOIN track_counts tc
       WHERE a.id = $1
-      GROUP BY a.id`,
+      GROUP BY a.id, tc."trackCount"`,
       [id],
     );
 
@@ -65,7 +77,9 @@ export async function GET(
       ),
     ]);
 
-    return NextResponse.json({ ...artist, albums, tracks });
+    const result = { ...artist, albums, tracks };
+    await cacheSet(key, result, TTL.ARTIST);
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Failed to fetch artist:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

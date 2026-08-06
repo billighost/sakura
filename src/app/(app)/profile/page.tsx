@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { apiBatch } from "@/lib/apiBatch";
 import styles from "./page.module.css";
 
 interface Profile {
@@ -49,33 +50,27 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/profile")
-      .then((r) => r.json())
-      .then((data) => {
-        setProfile(data);
-        if (data && data.id) {
-          localStorage.setItem("sakura-user-id", data.id);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiBatch("profile", "/api/profile"),
+      apiBatch("history", "/api/history?limit=100"),
+      apiBatch("artists", "/api/artists?limit=5"),
+    ]).then(([profileData, historyData, artistsData]) => {
+      if (profileData && profileData.id) {
+        setProfile(profileData);
+        localStorage.setItem("sakura-user-id", profileData.id);
+      }
+      
+      const tracks = Array.isArray(historyData) ? historyData : (historyData?.tracks || []);
+      setTopTracks(tracks.slice(0, 5));
+      const totalSec = tracks.reduce((sum: number, t: { duration?: number }) => sum + (t.duration || 0), 0);
+      setListeningHours(Math.round(totalSec / 3600));
 
-    fetch("/api/history?limit=100")
-      .then((r) => r.json())
-      .then((data) => {
-        // history API returns a plain array
-        const tracks = Array.isArray(data) ? data : (data.tracks || []);
-        setTopTracks(tracks.slice(0, 5));
-        // Estimate listening hours from track durations
-        const totalSec = tracks.reduce((sum: number, t: { duration?: number }) => sum + (t.duration || 0), 0);
-        setListeningHours(Math.round(totalSec / 3600));
-      })
-      .catch(() => {});
-
-    fetch("/api/artists?limit=5")
-      .then((r) => r.json())
-      .then((data) => setTopArtists(data.artists || []))
-      .catch(() => {});
+      setTopArtists(artistsData?.artists || []);
+      
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
   }, []);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {

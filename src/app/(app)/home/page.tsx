@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiBatch } from "@/lib/apiBatch";
 import { usePlayer } from "@/components/PlayerContext";
 import { FireIcon, PlaylistIcon, SparklesIcon, HeartIcon, MusicNoteIcon, MusicNotesIcon } from "@/components/Icons";
 import { getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
@@ -202,17 +203,17 @@ export default function HomePage() {
     try {
       const [historyRes, tracksRes, artistsRes, profileRes, playlistsRes, chartsRes] =
         await Promise.allSettled([
-          fetch("/api/history?limit=10").then((r) => r.json()),
-          fetch("/api/tracks?limit=20").then((r) => r.json()),
-          fetch("/api/artists").then((r) => r.json()),
-          fetch("/api/profile").then((r) => r.json()),
-          fetch("/api/playlists").then((r) => r.json()),
-          fetch("/api/charts").then((r) => r.json()),
+          apiBatch("history", "/api/history?limit=10"),
+          apiBatch("tracks", "/api/tracks?limit=20"),
+          apiBatch("artists", "/api/artists"),
+          apiBatch("profile", "/api/profile"),
+          apiBatch("playlists", "/api/playlists"),
+          apiBatch("charts", "/api/charts"),
         ]);
 
       const hTracks: Track[] =
         historyRes.status === "fulfilled"
-          ? Array.isArray(historyRes.value) ? historyRes.value : (historyRes.value.tracks || [])
+          ? Array.isArray(historyRes.value) ? historyRes.value : (historyRes.value?.tracks || [])
           : [];
       const tTracks: Track[] =
         tracksRes.status === "fulfilled"

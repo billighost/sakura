@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiBatch } from "@/lib/apiBatch";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -81,9 +82,9 @@ export default function LibraryPage() {
     if (isRefresh) setRefreshing(true);
     try {
       const [playlistsRes, albumsRes, artistsRes] = await Promise.allSettled([
-        fetch("/api/playlists").then((r) => r.json()),
-        fetch("/api/albums").then((r) => r.json()),
-        fetch("/api/artists").then((r) => r.json()),
+        apiBatch("playlists", "/api/playlists"),
+        apiBatch("albums", "/api/albums"),
+        apiBatch("artists", "/api/artists"),
       ]);
 
       const playlists: LibraryItem[] =

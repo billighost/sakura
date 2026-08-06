@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cacheDel, cacheKey } from "@/lib/cache";
 
 export async function DELETE(
   req: NextRequest,
@@ -12,14 +13,17 @@ export async function DELETE(
   }
 
   const { trackId } = await params;
+  const userId = session.user.id!;
+  
   const { rowCount } = await execute(
     `DELETE FROM "Favorite" WHERE "userId" = $1 AND "trackId" = $2`,
-    [session.user.id!, trackId]
+    [userId, trackId]
   );
 
   if (rowCount === 0) {
     return NextResponse.json({ error: "Not liked" }, { status: 404 });
   }
 
+  await cacheDel(cacheKey("favorites", userId));
   return NextResponse.json({ liked: false });
 }
