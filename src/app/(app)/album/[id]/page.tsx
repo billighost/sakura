@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
 /**
@@ -77,21 +77,42 @@ export default function AlbumPage() {
   const [downloading, setDownloading] = useState(false);
 
   const loadAlbum = useCallback(async () => {
+    let cancelled = false;
+    const cacheKey = `album-${params.id}`;
+    const uId = getCachedUserId();
+
     setLoading(true);
-    try {
-      const res = await fetch(`/api/albums/${params.id}`);
-      const data: AlbumDetail = await res.json();
-      setAlbum(data);
-      setLiked(!!data.liked);
-    } catch {
-      setAlbum(null);
-    } finally {
+
+    const cached = await getCachedLibraryData<AlbumDetail>(cacheKey, uId);
+    if (cancelled) return;
+    if (cached) {
+      setAlbum(cached);
+      setLiked(!!cached.liked);
       setLoading(false);
     }
+
+    try {
+      const res = await fetch(`/api/albums/${params.id}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const data: AlbumDetail = await res.json();
+      if (cancelled) return;
+      setAlbum(data);
+      setLiked(!!data.liked);
+      setCachedLibraryData(cacheKey, data, uId);
+    } catch {
+      if (!cached && !cancelled) setAlbum(null);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+
+    return () => { cancelled = true; };
   }, [params.id]);
 
   useEffect(() => {
-    loadAlbum();
+    const cleanup = loadAlbum();
+    return () => {
+      cleanup.then(fn => fn?.());
+    };
   }, [loadAlbum]);
 
   const playerQueue = useMemo(() => {

@@ -144,7 +144,8 @@ export async function GET(
         if (dTop.data) {
           const mergedTracks = [...finalTracks];
           for (const dt of dTop.data) {
-            if (!mergedTracks.find(t => t.deezerId === dt.id.toString())) {
+            // Deduplicate by deezerId OR title (case insensitive)
+            if (!mergedTracks.find(t => t.deezerId === dt.id.toString() || t.title.toLowerCase() === dt.title.toLowerCase())) {
               mergedTracks.push({
                 id: `deezer-${dt.id}`,
                 deezerId: dt.id.toString(),
@@ -168,7 +169,13 @@ export async function GET(
       return NextResponse.json({ error: "Artist not found" }, { status: 404 });
     }
 
-    const result = { ...finalArtist, albums: finalAlbums, tracks: finalTracks };
+    const result = { 
+      ...finalArtist, 
+      albums: finalAlbums, 
+      tracks: finalTracks,
+      trackCount: finalTracks.length,
+      albumCount: finalAlbums.length
+    };
     await cacheSet(key, result, TTL.ARTIST);
     return NextResponse.json(result);
   } catch (err) {

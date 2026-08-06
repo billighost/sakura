@@ -99,7 +99,7 @@ export async function GET(
 
           for (const dt of deezerTracks) {
             // Find if we already have it downloaded
-            const existing = finalTracks.find(t => t.deezerId === dt.id.toString());
+            const existing = finalTracks.find(t => t.deezerId === dt.id.toString() || t.title.toLowerCase() === dt.title.toLowerCase());
             if (existing) {
               mergedTracks.push(existing);
             } else {

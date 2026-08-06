@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSwipeBack } from "@/lib/useSwipeBack";
+import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
 import { DiscIcon } from "@/components/Icons";
@@ -63,11 +64,33 @@ export default function ArtistPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/artists/${params.id}`)
-      .then((r) => r.json())
-      .then((data) => setArtist(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const cacheKey = `artist-${params.id}`;
+    
+    async function load() {
+      const uId = getCachedUserId();
+      const cached = await getCachedLibraryData<Artist>(cacheKey, uId);
+      if (cancelled) return;
+      if (cached) {
+        setArtist(cached);
+        setLoading(false);
+      }
+
+      try {
+        const res = await fetch(`/api/artists/${params.id}`);
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        if (cancelled) return;
+        setArtist(data);
+        setCachedLibraryData(cacheKey, data, uId);
+      } catch (err) {
+        // ignore
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
 
     const followedStr = localStorage.getItem("followed-artists");
     if (followedStr) {
@@ -78,6 +101,8 @@ export default function ArtistPage() {
         }
       } catch {}
     }
+    
+    return () => { cancelled = true; };
   }, [params.id]);
 
   useEffect(() => {
