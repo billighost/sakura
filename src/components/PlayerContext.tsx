@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
+import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob, findDownloadedTrackByMetadata, cloneDownloadedTrack } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { Toast } from "./Toast";
@@ -247,6 +247,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setDownloadQueue((prev) => prev.filter((q) => q.id !== item.id));
         setActiveDownloadId(null);
         return;
+      }
+
+      // Check if we already have this song downloaded under a different database ID (match by title + artist)
+      const existingMatch = await findDownloadedTrackByMetadata(item.title, item.artist, uId, dId);
+      if (existingMatch) {
+        const cloned = await cloneDownloadedTrack(existingMatch.id, item.id, {
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          coverUrl: item.coverUrl,
+          audioUrl: item.audioUrl || existingMatch.audioUrl,
+          duration: item.duration,
+        }, uId, dId);
+        
+        if (cloned) {
+          setDownloadStates((prev) => ({ ...prev, [item.id]: "completed" }));
+          setDownloadQueue((prev) => prev.filter((q) => q.id !== item.id));
+          setActiveDownloadId(null);
+          return;
+        }
       }
 
       setDownloadStates((prev) => ({ ...prev, [item.id]: "downloading" }));
