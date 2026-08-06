@@ -16,7 +16,7 @@ export function Toast({
   type = "accent",
   visible,
   onClose,
-  duration = 3000,
+  duration = 2000,
 }: ToastProps) {
   useEffect(() => {
     if (!visible) return;
@@ -40,6 +40,8 @@ export function Toast({
       className={`${styles.toast} ${visible ? styles.visible : ""} ${typeClass}`}
       role="alert"
       aria-live="assertive"
+      onClick={onClose}
+      style={{ cursor: "pointer" }}
     >
       {message}
     </div>
