@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const features = [
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <polygon points="5 3 19 12 5 21 5 3" />
       </svg>
     ),
@@ -19,7 +19,7 @@ const features = [
   },
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
       </svg>
     ),
@@ -28,7 +28,7 @@ const features = [
   },
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="11" cy="11" r="8" />
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
@@ -38,7 +38,7 @@ const features = [
   },
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M9 18V5l12-2v13" />
         <circle cx="6" cy="18" r="3" />
         <circle cx="18" cy="16" r="3" />
@@ -49,7 +49,7 @@ const features = [
   },
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 18v-6a9 9 0 0118 0v6" />
         <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
       </svg>
@@ -59,7 +59,7 @@ const features = [
   },
   {
     icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
         <path d="M13.73 21a2 2 0 01-3.46 0" />
       </svg>
@@ -96,17 +96,16 @@ export default function AboutPage() {
   return (
     <div className={styles.page}>
       <div className={styles.hero}>
-        <div className={styles.heroGlow} />
+        <div className={styles.bloom} aria-hidden="true" />
         <div className={styles.iconWrapper}>
           <Image
             src="/icons/icon-transparent-192.png"
             alt="Sakura icon"
-            width={80}
-            height={80}
+            width={72}
+            height={72}
             className={styles.icon}
             priority
           />
-          <div className={styles.iconPulse} />
         </div>
         <h1 className={styles.title}>Sakura</h1>
         <div className={styles.badge}>v0.1.0</div>
@@ -135,7 +134,7 @@ export default function AboutPage() {
         <div className={styles.techGrid}>
           {techStack.map((tech, i) => (
             <div key={i} className={styles.techItem}>
-              <span className={styles.techIcon}>{tech.icon}</span>
+              <span className={styles.techIconBadge}>{tech.icon}</span>
               <span className={styles.techName}>{tech.name}</span>
             </div>
           ))}

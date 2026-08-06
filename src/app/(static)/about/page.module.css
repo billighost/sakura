@@ -1,88 +1,102 @@
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(1.5rem, -1rem) scale(1.06); }
+}
+
 .page {
   max-width: 40rem;
   margin: 0 auto;
-  padding: clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
+  padding: clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem) clamp(3rem, 6vw, 4rem);
 }
 
 .hero {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: clamp(2rem, 5vw, 3rem);
+  margin-bottom: clamp(2.25rem, 6vw, 3.25rem);
   text-align: center;
-  position: relative;
+  padding-top: 0.5rem;
 }
 
-.heroGlow {
+.bloom {
   position: absolute;
-  width: 12rem;
-  height: 12rem;
-  background: radial-gradient(circle, rgba(242, 120, 159, 0.2) 0%, transparent 70%);
+  width: 20rem;
+  height: 20rem;
   border-radius: 50%;
-  top: -2rem;
+  background: var(--sakura-accent-gradient);
+  filter: blur(80px);
+  opacity: 0.28;
+  top: -4rem;
   z-index: 0;
+  animation: drift 18s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .iconWrapper {
   position: relative;
   z-index: 1;
-  margin-bottom: 1rem;
+  margin-bottom: 1.125rem;
+  padding: 0.625rem;
+  border-radius: 22px;
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+  box-shadow: 0 12px 32px var(--sakura-shadow);
 }
 
 .icon {
-  border-radius: 1.25rem;
-  box-shadow: 0 8px 32px rgba(242, 120, 159, 0.3);
-}
-
-.iconPulse {
-  position: absolute;
-  inset: -4px;
-  border-radius: 1.25rem;
-  border: 2px solid var(--sakura-accent);
-  opacity: 0;
-  animation: pulse 3s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(1.05); }
+  display: block;
+  border-radius: 16px;
 }
 
 .title {
-  font-size: clamp(1.75rem, 6vw, 2.25rem);
-  font-weight: 800;
-  margin-bottom: 0.375rem;
-  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  position: relative;
+  z-index: 1;
+  font-family: var(--sakura-font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(2rem, 7vw, 2.75rem);
+  margin-bottom: 0.5rem;
+  background: var(--sakura-accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .badge {
+  position: relative;
+  z-index: 1;
   display: inline-block;
+  font-family: var(--sakura-font-body);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   color: var(--sakura-accent);
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.15), rgba(201, 166, 224, 0.15));
-  padding: 0.25rem 0.75rem;
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+  padding: 0.3rem 0.8rem;
   border-radius: 10px;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.875rem;
 }
 
 .subtitle {
+  position: relative;
+  z-index: 1;
+  font-family: var(--sakura-font-body);
   font-size: 0.9375rem;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--sakura-text-secondary);
   max-width: 28rem;
 }
 
 .section {
-  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: clamp(1.75rem, 4.5vw, 2.5rem);
 }
 
 .heading {
-  font-size: clamp(1rem, 2.5vw, 1.125rem);
-  font-weight: 700;
+  font-family: var(--sakura-font-display);
+  font-weight: 600;
+  font-size: clamp(1.0625rem, 2.5vw, 1.25rem);
   color: var(--sakura-text);
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -98,10 +112,12 @@
 .featureCard {
   display: flex;
   gap: 1rem;
-  padding: 1rem;
-  background: var(--sakura-surface);
-  border-radius: 12px;
-  border: 1px solid var(--sakura-border);
+  padding: 1.125rem;
+  background: var(--sakura-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--sakura-radius-lg);
+  border: 1px solid var(--sakura-glass-border);
   transition: transform 0.15s, border-color 0.15s;
 }
 
@@ -111,14 +127,14 @@
 }
 
 .featureIcon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.15), rgba(201, 166, 224, 0.15));
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 12px;
+  background: var(--sakura-accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sakura-accent);
+  color: #fff;
   flex-shrink: 0;
 }
 
@@ -127,14 +143,17 @@
 }
 
 .featureTitle {
+  font-family: var(--sakura-font-body);
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 0.25rem;
+  color: var(--sakura-text);
 }
 
 .featureDesc {
+  font-family: var(--sakura-font-body);
   font-size: 0.8125rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--sakura-text-secondary);
 }
 
@@ -150,19 +169,30 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.875rem 0.5rem;
-  background: var(--sakura-surface);
-  border-radius: 10px;
-  border: 1px solid var(--sakura-border);
+  background: var(--sakura-glass);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-glass-border);
 }
 
-.techIcon {
-  font-size: 1.25rem;
+.techIconBadge {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  background: var(--sakura-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--sakura-accent);
 }
 
 .techName {
+  font-family: var(--sakura-font-body);
   font-size: 0.75rem;
   font-weight: 500;
   text-align: center;
+  color: var(--sakura-text);
 }
 
 .roadmapList {
@@ -176,13 +206,13 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: var(--sakura-surface);
-  border-radius: 10px;
-  border: 1px solid var(--sakura-border);
+  background: var(--sakura-glass);
+  border-radius: 12px;
+  border: 1px solid var(--sakura-glass-border);
 }
 
 .roadmapDone {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .roadmapCheck {
@@ -208,8 +238,10 @@
 }
 
 .roadmapText {
+  font-family: var(--sakura-font-body);
   font-size: 0.875rem;
   font-weight: 500;
+  color: var(--sakura-text);
 }
 
 .roadmapDone .roadmapText {
@@ -228,10 +260,10 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  padding: 1rem;
-  background: var(--sakura-surface);
-  border-radius: 12px;
-  border: 1px solid var(--sakura-border);
+  padding: 1.125rem;
+  background: var(--sakura-glass);
+  border-radius: var(--sakura-radius-lg);
+  border: 1px solid var(--sakura-glass-border);
   width: 100%;
 }
 
@@ -239,10 +271,11 @@
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
+  background: var(--sakura-accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--sakura-font-body);
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
@@ -259,18 +292,22 @@
 }
 
 .stepTitle {
+  font-family: var(--sakura-font-body);
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 0.25rem;
+  color: var(--sakura-text);
 }
 
 .stepDesc {
+  font-family: var(--sakura-font-body);
   font-size: 0.8125rem;
   color: var(--sakura-text-secondary);
   line-height: 1.5;
 }
 
 .text {
+  font-family: var(--sakura-font-body);
   font-size: 0.875rem;
   line-height: 1.7;
   color: var(--sakura-text-secondary);
@@ -286,15 +323,11 @@
   .techGrid {
     grid-template-columns: repeat(4, 1fr);
   }
-  
+
   .techItem {
     padding: 0.625rem 0.375rem;
   }
-  
-  .techIcon {
-    font-size: 1rem;
-  }
-  
+
   .techName {
     font-size: 0.6875rem;
   }

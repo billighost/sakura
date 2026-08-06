@@ -42,23 +42,29 @@ export default function LoginPage() {
 
   return (
     <div className={styles.container}>
+      <div className={`${styles.bloom} ${styles.bloomOne}`} aria-hidden="true" />
+      <div className={`${styles.bloom} ${styles.bloomTwo}`} aria-hidden="true" />
+
       <div className={styles.card}>
         <div className={styles.iconWrap}>
-          <Image
-            src="/icons/icon-transparent-128.png"
-            alt="Sakura"
-            width={64}
-            height={64}
-            priority
-            className={styles.icon}
-          />
+          <div className={styles.iconRing}>
+            <Image
+              src="/icons/icon-transparent-128.png"
+              alt="Sakura"
+              width={56}
+              height={56}
+              priority
+              className={styles.icon}
+            />
+          </div>
         </div>
-        <h1 className={styles.logo}>Sakura</h1>
-        <p className={styles.subtitle}>Your personal music library</p>
+        <span className={styles.eyebrow}>Welcome back</span>
+        <h1 className={styles.wordmark}>Sakura</h1>
+        <p className={styles.subtitle}>Sign in to keep listening</p>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form className={styles.form} onSubmit={handleSubmit} noValidate>
           {error && (
-            <div className={styles.errorBox}>
+            <div className={styles.errorBox} role="alert">
               <svg className={styles.errorIcon} viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10 14a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
@@ -66,30 +72,45 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className={styles.inputGroup}>
+          <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="identifier">
-              Username or Email
+              Username or email
             </label>
-            <input
-              id="identifier"
-              className={styles.input}
-              type="text"
-              autoComplete="username"
-              placeholder="Enter your username or email"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              required
-            />
+            <div className={styles.inputShell}>
+              <span className={styles.inputIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </span>
+              <input
+                id="identifier"
+                className={styles.input}
+                type="text"
+                autoComplete="username"
+                autoFocus
+                placeholder="Enter your username or email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
-          <div className={styles.inputGroup}>
+          <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="password">
               Password
             </label>
-            <div className={styles.inputWrap}>
+            <div className={styles.inputShell}>
+              <span className={styles.inputIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
+                  <rect x="3" y="11" width="18" height="10" rx="2" />
+                  <path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+              </span>
               <input
                 id="password"
-                className={styles.input}
+                className={`${styles.input} ${styles.inputWithToggle}`}
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="Enter your password"
@@ -138,7 +159,7 @@ export default function LoginPage() {
                 <path d="M12 2a10 10 0 019.5 6.75" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
               </svg>
             )}
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 

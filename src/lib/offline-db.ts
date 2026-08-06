@@ -175,6 +175,51 @@ export async function isTrackDownloaded(id: string, userId = getCachedUserId(), 
   return track.userId === userId && track.deviceId === deviceId;
 }
 
+export async function findDownloadedTrackByMetadata(
+  title: string,
+  artist: string,
+  userId = getCachedUserId(),
+  deviceId = getDeviceId()
+) {
+  const db = await getDB();
+  const all = await db.getAll("tracks");
+  const normTitle = title.toLowerCase().trim();
+  const normArtist = artist.toLowerCase().trim();
+
+  return all.find(
+    (t) =>
+      t.userId === userId &&
+      t.deviceId === deviceId &&
+      t.title.toLowerCase().trim() === normTitle &&
+      t.artist.toLowerCase().trim() === normArtist
+  );
+}
+
+export async function cloneDownloadedTrack(
+  existingTrackId: string,
+  newTrackId: string,
+  newTrackData: { title: string; artist: string; album?: string; coverUrl?: string; duration: number; audioUrl: string },
+  userId = getCachedUserId(),
+  deviceId = getDeviceId()
+) {
+  const db = await getDB();
+  const blob = await getAudioBlob(existingTrackId, userId, deviceId);
+  if (!blob) return false;
+
+  await saveTrackOffline({
+    id: newTrackId,
+    title: newTrackData.title,
+    artist: newTrackData.artist,
+    album: newTrackData.album,
+    coverUrl: newTrackData.coverUrl,
+    audioUrl: newTrackData.audioUrl,
+    duration: newTrackData.duration,
+  }, userId, deviceId);
+
+  await saveAudioBlob(newTrackId, blob, userId, deviceId);
+  return true;
+}
+
 export async function getAllDownloadedTracks(userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
   const all = await db.getAll("tracks");
