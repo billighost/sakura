@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SWRegister } from "@/components/SWRegister";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { LogoLoader } from "@/components/LogoLoader";
 
 export const metadata: Metadata = {
   title: "Sakura",
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="appRoot">
+        <LogoLoader />
         <SWRegister />
         <OfflineBanner />
         {children}

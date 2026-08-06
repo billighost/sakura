@@ -6,17 +6,19 @@ import styles from "./LogoLoader.module.css";
 /**
  * Full-screen "petals forming a blossom" loader.
  *
- * Sequence: 5 petals scatter in from off-center → assemble into the
- * sakura shape → center + stamens pop in → whole flower blooms with a
- * soft scale/brightness pulse → wordmark + skip fade in → overlay
- * dismisses (tap/click, Escape, or after `minDurationMs`).
+ * Sequence: 5 petals arc in from off-center along a curved, spring-
+ * overshoot path (with a soft focus-pull blur) → assemble into the
+ * sakura shape → center + stamens pop in → flower blooms with a
+ * scale/brightness pulse + expanding ripple ring + sparkle twinkles →
+ * wordmark settles in with a letter-spacing reveal → overlay dismisses
+ * (tap/click, Escape, or after `minDurationMs`).
  *
  * Pure SVG + CSS animation, no libraries — cheap enough to run while
  * audio/assets keep loading underneath it.
  */
 
 interface LogoLoaderProps {
-  /** Total time before auto-dismiss once mounted (ms). Default 2600ms. */
+  /** Total time before auto-dismiss once mounted (ms). Default 2800ms, tuned to this animation's timing. */
   minDurationMs?: number;
   /** Allow tap/click/Escape to skip early. Default true. */
   skippable?: boolean;
@@ -24,18 +26,31 @@ interface LogoLoaderProps {
   onComplete?: () => void;
 }
 
+// dx/dy: scattered starting offset. mx/my: lateral drift added mid-flight,
+// so the petal arcs in on a curve rather than a straight line. os: the
+// small spring-back rotation (opposite sign to rot) used for overshoot.
 const PETALS = [
-  { dx: -130, dy: -150, rot: -150, delay: 0 },
-  { dx: 150, dy: -120, rot: 170, delay: 90 },
-  { dx: 170, dy: 70, rot: -120, delay: 180 },
-  { dx: -50, dy: 175, rot: 210, delay: 270 },
-  { dx: -175, dy: 30, rot: -200, delay: 360 },
+  { dx: -130, dy: -150, rot: -150, os: 10, mx: 35, my: -25, delay: 0 },
+  { dx: 150, dy: -120, rot: 170, os: -10, mx: -30, my: 35, delay: 70 },
+  { dx: 170, dy: 70, rot: -120, os: 8, mx: -35, my: -20, delay: 130 },
+  { dx: -50, dy: 175, rot: 210, os: -12, mx: 30, my: -30, delay: 220 },
+  { dx: -175, dy: 30, rot: -200, os: 10, mx: 25, my: 30, delay: 300 },
 ] as const;
 
 const STAMEN_ANGLES = [0, 60, 120, 180, 240, 300];
 
+// [angle deg, radius, delay ms] — brief twinkles fired around the bloom peak.
+const SPARKLES = [
+  [35, 55, 0],
+  [95, 50, 60],
+  [150, 55, 110],
+  [210, 55, 30],
+  [280, 52, 150],
+  [320, 50, 90],
+] as const;
+
 export function LogoLoader({
-  minDurationMs = 2600,
+  minDurationMs = 2800,
   skippable = true,
   onComplete,
 }: LogoLoaderProps) {
@@ -98,6 +113,14 @@ export function LogoLoader({
           </defs>
 
           <g transform="translate(100 100)">
+            <circle
+              className={styles.ripple}
+              r="14"
+              fill="none"
+              stroke="var(--sakura-accent)"
+              strokeWidth="1.5"
+            />
+
             <g className={styles.bloomGroup}>
               {PETALS.map((p, i) => (
                 <g key={i} transform={`rotate(${i * 72})`}>
@@ -107,7 +130,10 @@ export function LogoLoader({
                       {
                         "--dx": `${p.dx}px`,
                         "--dy": `${p.dy}px`,
+                        "--mx": `${p.mx}px`,
+                        "--my": `${p.my}px`,
                         "--rot": `${p.rot}deg`,
+                        "--os": `${p.os}deg`,
                         "--delay": `${p.delay}ms`,
                       } as React.CSSProperties
                     }
@@ -132,6 +158,21 @@ export function LogoLoader({
                 />
               ))}
             </g>
+
+            {SPARKLES.map(([angle, radius, delay], i) => {
+              const rad = (angle * Math.PI) / 180;
+              return (
+                <circle
+                  key={i}
+                  className={styles.sparkle}
+                  r="1.6"
+                  fill="var(--sakura-accent)"
+                  cx={(Math.cos(rad) * radius).toFixed(1)}
+                  cy={(Math.sin(rad) * radius).toFixed(1)}
+                  style={{ "--sdelay": `${delay}ms` } as React.CSSProperties}
+                />
+              );
+            })}
           </g>
         </svg>
 

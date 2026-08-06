@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background: var(--sakura-bg);
+  background: radial-gradient(circle at 50% 40%, var(--sakura-surface) 0%, var(--sakura-bg) 68%);
   cursor: pointer;
   opacity: 1;
   transition: opacity 0.5s ease;
@@ -86,16 +86,17 @@
 
 .bloomGroup {
   transform-origin: center;
-  animation: bloomPulse 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1550ms both;
+  animation: bloomPulse 800ms cubic-bezier(0.34, 1.4, 0.4, 1) 1550ms both;
 }
 
 @keyframes bloomPulse {
   0% {
     transform: scale(1);
+    filter: brightness(1);
   }
   55% {
-    transform: scale(1.14);
-    filter: brightness(1.12);
+    transform: scale(1.1);
+    filter: brightness(1.08);
   }
   100% {
     transform: scale(1);
@@ -103,25 +104,89 @@
   }
 }
 
+.ripple {
+  opacity: 0;
+  transform-origin: center;
+  transform: scale(1);
+  animation: rippleOut 900ms ease-out 1550ms both;
+}
+
+@keyframes rippleOut {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(4.2);
+  }
+}
+
+.sparkle {
+  opacity: 0;
+  transform-origin: center;
+  animation: sparklePop 650ms ease-out both;
+  animation-delay: calc(1550ms + var(--sdelay));
+}
+
+@keyframes sparklePop {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
 .petal {
   transform-origin: 0px 0px;
-  transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.3);
+  transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.25);
   opacity: 0;
-  animation: assemblePetal 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  filter: blur(4px);
+  animation: assemblePetal 1250ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--delay);
 }
 
+/*
+  Flight has 3 phases, not a straight line:
+  0%   scattered, blurred, tiny (start)
+  55%  mid-flight, nudged sideways by --mx/--my for an arced path
+  80%  spring overshoot — passes just beyond the final spot, rotated
+       slightly the "wrong" way, before settling
+  100% resting in formed position
+*/
 @keyframes assemblePetal {
   0% {
-    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.3);
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.25);
     opacity: 0;
+    filter: blur(4px);
   }
-  65% {
+  10% {
     opacity: 1;
+  }
+  55% {
+    transform: translate(
+        calc(var(--dx) * 0.22 + var(--mx)),
+        calc(var(--dy) * 0.22 + var(--my))
+      )
+      rotate(calc(var(--rot) * 0.15)) scale(0.85);
+    filter: blur(1px);
+  }
+  80% {
+    transform: translate(calc(var(--dx) * -0.03), calc(var(--dy) * -0.03))
+      rotate(var(--os)) scale(1.05);
+    filter: blur(0);
   }
   100% {
     transform: translate(0, 0) rotate(0deg) scale(1);
     opacity: 1;
+    filter: blur(0);
   }
 }
 
@@ -152,10 +217,24 @@
   font-family: var(--sakura-font-display);
   font-size: clamp(1.1rem, 4vw, 1.5rem);
   font-weight: 500;
-  letter-spacing: 0.08em;
   color: var(--sakura-text);
   opacity: 0;
-  animation: fadeIn 600ms ease 1900ms both;
+  transform: translateY(6px);
+  letter-spacing: 0.02em;
+  animation: wordmarkIn 700ms cubic-bezier(0.16, 1, 0.3, 1) 1950ms both;
+}
+
+@keyframes wordmarkIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+    letter-spacing: 0.02em;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: 0.08em;
+  }
 }
 
 /* ---------- skip ---------- */
@@ -173,12 +252,13 @@
   padding: 8px 16px;
   cursor: pointer;
   opacity: 0;
-  animation: fadeIn 500ms ease 800ms both;
+  animation: fadeIn 500ms ease 1000ms both;
 }
 
 .skipButton:hover,
 .skipButton:focus-visible {
   color: var(--sakura-accent);
+  transform: translateY(-1px);
 }
 
 @keyframes fadeIn {
@@ -204,10 +284,17 @@
   .centerDot,
   .stamenDot,
   .wordmark,
-  .skipButton {
+  .skipButton,
+  .ripple,
+  .sparkle {
     animation: none !important;
     transform: none !important;
     opacity: 1 !important;
     filter: none !important;
+  }
+
+  .ripple,
+  .sparkle {
+    opacity: 0 !important;
   }
 }
