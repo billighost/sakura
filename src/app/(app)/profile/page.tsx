@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 
 /* ────────────────────────────────────────────────────────────
@@ -114,37 +114,20 @@ function initials(name: string) {
   return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
-const MOCK: ProfileData = {
-  name: "Yuki Tanaka",
-  bio: "Always chasing the next favorite song. Lo-fi, dream pop, and long walks.",
-  email: "yuki@example.com",
-  plan: "Free",
-  memberSince: "March 2023",
-  stats: [
-    { label: "Hours", value: "482" },
-    { label: "Tracks", value: "1.2k" },
-    { label: "Artists", value: "310" },
-    { label: "Playlists", value: "24" },
-    { label: "Streak", value: "18d" },
-  ],
-  topArtists: [
-    { id: "a1", name: "Nao Kobayashi", trackCount: 42 },
-    { id: "a2", name: "The Paper Kites", trackCount: 31 },
-    { id: "a3", name: "Kiko Aoki", trackCount: 18 },
-  ],
-  topTracks: [
-    { id: "t1", title: "Midnight Bloom", artist: "Nao Kobayashi" },
-    { id: "t2", title: "Glass Rain", artist: "The Paper Kites" },
-    { id: "t3", title: "Neon Static", artist: "Kiko Aoki" },
-  ],
-};
+// Removed MOCK data
 
 const STAT_ICONS = [ClockIcon, DiscIcon, HeadphonesIcon, ListIcon, StreakIcon];
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<ProfileData>(MOCK);
+  const router = import("next/navigation").then(m => m.useRouter).catch(() => (() => ({ push: () => {} })));
+  const [routerPush, setRouterPush] = useState<any>(null);
+  useEffect(() => {
+    import("next/navigation").then(m => setRouterPush(() => m.useRouter().push));
+  }, []);
+
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [editingBio, setEditingBio] = useState(false);
-  const [bioDraft, setBioDraft] = useState(profile.bio);
+  const [bioDraft, setBioDraft] = useState("");
   const [savingBio, setSavingBio] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -154,6 +137,15 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const bioMax = 160;
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        setProfile(data);
+        setBioDraft(data.bio || "");
+      });
+  }, []);
 
   function handleAvatarPick() {
     fileInputRef.current?.click();
@@ -171,23 +163,40 @@ export default function ProfilePage() {
   async function confirmCrop() {
     if (!cropSrc) return;
     setUploading(true);
-    // Wire this up to your real upload endpoint.
-    await new Promise((r) => setTimeout(r, 600));
-    setProfile((p) => ({ ...p, avatarUrl: cropSrc }));
-    setUploading(false);
-    setCropSrc(null);
+    try {
+      const res = await fetch(cropSrc);
+      const blob = await res.blob();
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: {
+          "Content-Type": blob.type,
+        },
+        body: blob,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProfile((p) => p ? { ...p, avatarUrl: data.avatarUrl } : null);
+      }
+    } finally {
+      setUploading(false);
+      setCropSrc(null);
+    }
   }
 
   async function saveBio() {
     setSavingBio(true);
-    // Wire this up to your real update endpoint.
-    await new Promise((r) => setTimeout(r, 400));
-    setProfile((p) => ({ ...p, bio: bioDraft }));
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bio: bioDraft }),
+    });
+    setProfile((p) => p ? { ...p, bio: bioDraft } : null);
     setSavingBio(false);
     setEditingBio(false);
   }
 
   async function handleShare() {
+    if (!profile) return;
     try {
       await navigator.clipboard.writeText(`https://sakura.app/u/${profile.name.toLowerCase().replace(/\s+/g, "-")}`);
       setShareCopied(true);
@@ -199,16 +208,26 @@ export default function ProfilePage() {
 
   async function handleExport() {
     setExporting(true);
-    // Wire this up to your real data-export endpoint.
-    await new Promise((r) => setTimeout(r, 900));
-    setExporting(false);
+    try {
+      const a = document.createElement("a");
+      a.href = "/api/export";
+      a.download = "sakura-export.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function handleLogout() {
     setLoggingOut(true);
-    // Wire this up to your real sign-out call.
-    await new Promise((r) => setTimeout(r, 500));
-    setLoggingOut(false);
+    await fetch("/api/auth/signout", { method: "POST" });
+    if (routerPush) routerPush("/login");
+  }
+
+  if (!profile) {
+    return <div className={styles.page}>Loading...</div>;
   }
 
   return (

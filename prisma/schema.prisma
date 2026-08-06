@@ -22,17 +22,25 @@ model User {
   favorites        Favorite[]
   snoozedTracks    SnoozedTrack[]
   listeningHistory ListeningHistory[]
+  mixes            UserMix[]
 }
 
 model UserSettings {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  theme             String   @default("dark")
-  audioQuality      String   @default("high")
-  crossfadeSeconds  Int      @default(0)
-  autoDownloadLiked Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  theme                String   @default("dark")
+  audioQuality         String   @default("high")
+  downloadQuality      String   @default("high")
+  crossfadeSeconds     Int      @default(0)
+  autoDownloadLiked    Boolean  @default(false)
+  gaplessPlayback      Boolean  @default(true)
+  normalizeVolume      Boolean  @default(true)
+  explicitContent      Boolean  @default(true)
+  privateSession       Boolean  @default(false)
+  pushNotifications    Boolean  @default(true)
+  newReleaseAlerts     Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -221,4 +229,25 @@ model ListeningHistory {
   @@index([userId])
   @@index([trackId])
   @@index([playedAt])
+}
+
+// ── User Mixes ("Made for you" / Discover Weekly etc.) ──────────────────────
+// Populated server-side from listening history + favourites.
+// Re-generated on demand (or via a cron). Each mix holds an ordered list of
+// track IDs stored as a simple array; no join table needed at this scale.
+model UserMix {
+  id          String   @id @default(uuid())
+  userId      String
+  label       String                // e.g. "Discover Weekly", "Daily Mix 1"
+  description String?
+  coverUrl    String?
+  tint        String   @default("a") // "a" | "b" — gradient variant
+  trackIds    String[]               // ordered list of track IDs
+  generatedAt DateTime @default(now())
+  expiresAt   DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

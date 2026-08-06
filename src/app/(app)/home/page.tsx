@@ -5,33 +5,33 @@ import Link from "next/link";
 import styles from "./page.module.css";
 
 /* ────────────────────────────────────────────────────────────
-   Types — swap these for your real API/DB shapes.
+   Types — mirroring the /api/home response shape.
 ──────────────────────────────────────────────────────────── */
 type Track = {
   id: string;
   title: string;
   artist: string;
-  coverUrl?: string;
+  coverUrl?: string | null;
 };
 
 type Artist = {
   id: string;
   name: string;
   trackCount: number;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
 };
 
 type Playlist = {
   id: string;
   name: string;
   trackCount: number;
-  coverUrl?: string;
+  coverUrl?: string | null;
 };
 
 type HomeData = {
-  user: { name: string; avatarUrl?: string };
+  user: { name: string; avatarUrl?: string | null };
   quickPicks: Track[];
-  madeForYou: { id: string; label: string; coverUrl?: string; tint: "a" | "b" }[];
+  madeForYou: { id: string; label: string; coverUrl?: string | null; tint: "a" | "b" }[];
   recentlyPlayed: Track[];
   topArtists: Artist[];
   playlists: Playlist[];
@@ -59,49 +59,8 @@ function MusicNoteIcon({ size = 28 }: { size?: number }) {
 }
 
 /* ────────────────────────────────────────────────────────────
-   Mock fetch — replace with your real data source.
+   Helpers
 ──────────────────────────────────────────────────────────── */
-async function getHomeData(): Promise<HomeData> {
-  return {
-    user: { name: "Yuki" },
-    quickPicks: [
-      { id: "1", title: "Midnight Bloom", artist: "Nao Kobayashi" },
-      { id: "2", title: "Glass Rain", artist: "The Paper Kites" },
-      { id: "3", title: "Neon Static", artist: "Kiko Aoki" },
-      { id: "4", title: "Slow Tide", artist: "Marina Ito" },
-      { id: "5", title: "Paper Lanterns", artist: "Hana Sato" },
-      { id: "6", title: "Blue Hour", artist: "Ren Fujita" },
-    ],
-    madeForYou: [
-      { id: "m1", label: "Discover Weekly", tint: "a" },
-      { id: "m2", label: "Daily Mix 1", tint: "b" },
-      { id: "m3", label: "Chill Focus", tint: "a" },
-      { id: "m4", label: "Rewind: 2024", tint: "b" },
-    ],
-    recentlyPlayed: [
-      { id: "r1", title: "Evening Static", artist: "Kiko Aoki" },
-      { id: "r2", title: "Home Movies", artist: "The Paper Kites" },
-      { id: "r3", title: "Sakura Season", artist: "Nao Kobayashi" },
-      { id: "r4", title: "Low Light", artist: "Marina Ito" },
-      { id: "r5", title: "Departures", artist: "Ren Fujita" },
-      { id: "r6", title: "After Hours", artist: "Hana Sato" },
-    ],
-    topArtists: [
-      { id: "a1", name: "Nao Kobayashi", trackCount: 42 },
-      { id: "a2", name: "The Paper Kites", trackCount: 31 },
-      { id: "a3", name: "Kiko Aoki", trackCount: 18 },
-      { id: "a4", name: "Marina Ito", trackCount: 27 },
-      { id: "a5", name: "Ren Fujita", trackCount: 15 },
-    ],
-    playlists: [
-      { id: "p1", name: "Rainy Day Focus", trackCount: 48 },
-      { id: "p2", name: "Late Night Drive", trackCount: 22 },
-      { id: "p3", name: "Sunday Morning", trackCount: 34 },
-      { id: "p4", name: "Workout Energy", trackCount: 29 },
-    ],
-  };
-}
-
 function getGreeting(hour: number) {
   if (hour < 5) return "Good night";
   if (hour < 12) return "Good morning";
@@ -177,12 +136,23 @@ function EmptyHome() {
 ──────────────────────────────────────────────────────────── */
 export default function HomePage() {
   const [data, setData] = useState<HomeData | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getHomeData().then((d) => {
-      if (!cancelled) setData(d);
-    });
+
+    fetch("/api/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json() as Promise<HomeData>;
+      })
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -190,9 +160,22 @@ export default function HomePage() {
 
   const greeting = useMemo(() => getGreeting(new Date().getHours()), []);
 
-  if (!data) return <HomeSkeleton />;
+  if (!data && !error) return <HomeSkeleton />;
 
-  const isEmpty = data.quickPicks.length === 0 && data.recentlyPlayed.length === 0;
+  // On error or truly empty library, show the empty state
+  if (error || !data) {
+    return (
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1 className={styles.greeting}>{greeting}</h1>
+        </header>
+        <EmptyHome />
+      </div>
+    );
+  }
+
+  const isEmpty =
+    data.quickPicks.length === 0 && data.recentlyPlayed.length === 0;
 
   return (
     <div className={styles.page}>

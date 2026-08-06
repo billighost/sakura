@@ -130,6 +130,13 @@ const THEMES: { id: "dark" | "light" | "system"; name: string; preview: string }
 const AUDIO_QUALITIES = ["Low (96 kbps)", "Normal (160 kbps)", "High (320 kbps)", "Lossless"];
 
 export default function SettingsPage() {
+  const router = import("next/navigation").then(m => m.useRouter).catch(() => (() => ({ push: () => {} })));
+  const [routerPush, setRouterPush] = useState<any>(null);
+  useEffect(() => {
+    import("next/navigation").then(m => setRouterPush(() => m.useRouter().push));
+  }, []);
+
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
   const [quality, setQuality] = useState("High (320 kbps)");
   const [downloadQuality, setDownloadQuality] = useState("High (320 kbps)");
@@ -143,12 +150,36 @@ export default function SettingsPage() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("sakura-theme") as "dark" | "light" | "system" | null;
-    if (saved) setTheme(saved);
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        setTheme(data.theme || "dark");
+        setQuality(data.audioQuality || "High (320 kbps)");
+        setDownloadQuality(data.downloadQuality || "High (320 kbps)");
+        setCrossfade(data.crossfadeSeconds || 0);
+        setGaplessPlayback(data.gaplessPlayback ?? true);
+        setNormalizeVolume(data.normalizeVolume ?? true);
+        setExplicitContent(data.explicitContent ?? true);
+        setPrivateSession(data.privateSession ?? false);
+        setPushNotifications(data.pushNotifications ?? true);
+        setNewReleaseAlerts(data.newReleaseAlerts ?? true);
+        
+        setSettingsLoaded(true);
+      });
   }, []);
+
+  function updateSetting(key: string, value: any) {
+    if (!settingsLoaded) return;
+    fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: value }),
+    });
+  }
 
   function applyTheme(next: "dark" | "light" | "system") {
     setTheme(next);
+    updateSetting("theme", next);
     localStorage.setItem("sakura-theme", next);
     if (next === "system") {
       document.documentElement.removeAttribute("data-theme");
@@ -159,9 +190,8 @@ export default function SettingsPage() {
 
   async function handleLogout() {
     setLoggingOut(true);
-    // Wire this up to your real sign-out call.
-    await new Promise((r) => setTimeout(r, 500));
-    setLoggingOut(false);
+    await fetch("/api/auth/signout", { method: "POST" });
+    if (routerPush) routerPush("/login");
   }
 
   const storageUsedGb = 3.4;
@@ -206,7 +236,10 @@ export default function SettingsPage() {
           <Row
             label="Streaming quality"
             control={
-              <select className={styles.select} value={quality} onChange={(e) => setQuality(e.target.value)}>
+              <select className={styles.select} value={quality} onChange={(e) => {
+                setQuality(e.target.value);
+                updateSetting("audioQuality", e.target.value);
+              }}>
                 {AUDIO_QUALITIES.map((q) => (
                   <option key={q} value={q}>
                     {q}
@@ -218,7 +251,10 @@ export default function SettingsPage() {
           <Row
             label="Download quality"
             control={
-              <select className={styles.select} value={downloadQuality} onChange={(e) => setDownloadQuality(e.target.value)}>
+              <select className={styles.select} value={downloadQuality} onChange={(e) => {
+                setDownloadQuality(e.target.value);
+                updateSetting("downloadQuality", e.target.value);
+              }}>
                 {AUDIO_QUALITIES.map((q) => (
                   <option key={q} value={q}>
                     {q}
@@ -227,8 +263,8 @@ export default function SettingsPage() {
               </select>
             }
           />
-          <Row label="Gapless playback" control={<Toggle on={gaplessPlayback} onChange={setGaplessPlayback} label="Gapless playback" />} />
-          <Row label="Normalize volume" control={<Toggle on={normalizeVolume} onChange={setNormalizeVolume} label="Normalize volume" />} />
+          <Row label="Gapless playback" control={<Toggle on={gaplessPlayback} onChange={(v) => { setGaplessPlayback(v); updateSetting("gaplessPlayback", v); }} label="Gapless playback" />} />
+          <Row label="Normalize volume" control={<Toggle on={normalizeVolume} onChange={(v) => { setNormalizeVolume(v); updateSetting("normalizeVolume", v); }} label="Normalize volume" />} />
         </div>
         <div className={styles.qualityInfo}>Higher quality uses more data and storage.</div>
 
@@ -242,7 +278,10 @@ export default function SettingsPage() {
               min={0}
               max={12}
               value={crossfade}
-              onChange={(e) => setCrossfade(Number(e.target.value))}
+              onChange={(e) => {
+                setCrossfade(Number(e.target.value));
+                updateSetting("crossfadeSeconds", Number(e.target.value));
+              }}
               className={styles.crossfadeSlider}
               aria-label="Crossfade duration"
             />
@@ -264,10 +303,10 @@ export default function SettingsPage() {
           <h2 className={styles.sectionTitle}>Privacy</h2>
         </div>
         <div className={styles.group}>
-          <Row label="Allow explicit content" control={<Toggle on={explicitContent} onChange={setExplicitContent} label="Allow explicit content" />} />
+          <Row label="Allow explicit content" control={<Toggle on={explicitContent} onChange={(v) => { setExplicitContent(v); updateSetting("explicitContent", v); }} label="Allow explicit content" />} />
           <Row
             label="Private session"
-            control={<Toggle on={privateSession} onChange={setPrivateSession} label="Private session" />}
+            control={<Toggle on={privateSession} onChange={(v) => { setPrivateSession(v); updateSetting("privateSession", v); }} label="Private session" />}
           />
         </div>
       </section>
@@ -281,8 +320,8 @@ export default function SettingsPage() {
           <h2 className={styles.sectionTitle}>Notifications</h2>
         </div>
         <div className={styles.group}>
-          <Row label="Push notifications" control={<Toggle on={pushNotifications} onChange={setPushNotifications} label="Push notifications" />} />
-          <Row label="New release alerts" control={<Toggle on={newReleaseAlerts} onChange={setNewReleaseAlerts} label="New release alerts" />} />
+          <Row label="Push notifications" control={<Toggle on={pushNotifications} onChange={(v) => { setPushNotifications(v); updateSetting("pushNotifications", v); }} label="Push notifications" />} />
+          <Row label="New release alerts" control={<Toggle on={newReleaseAlerts} onChange={(v) => { setNewReleaseAlerts(v); updateSetting("newReleaseAlerts", v); }} label="New release alerts" />} />
         </div>
       </section>
 

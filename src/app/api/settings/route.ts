@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 
+const ALLOWED_FIELDS = [
+  "theme",
+  "audioQuality",
+  "downloadQuality",
+  "crossfadeSeconds",
+  "autoDownloadLiked",
+  "gaplessPlayback",
+  "normalizeVolume",
+  "explicitContent",
+  "privateSession",
+  "pushNotifications",
+  "newReleaseAlerts",
+] as const;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
@@ -12,6 +26,23 @@ export async function GET() {
     `SELECT * FROM "UserSettings" WHERE "userId" = $1`,
     [session.user.id!]
   );
+
+  // Return null-safe defaults when the row doesn't exist yet (first-time user)
+  if (!settings) {
+    return NextResponse.json({
+      theme: "dark",
+      audioQuality: "high",
+      downloadQuality: "high",
+      crossfadeSeconds: 0,
+      autoDownloadLiked: false,
+      gaplessPlayback: true,
+      normalizeVolume: true,
+      explicitContent: true,
+      privateSession: false,
+      pushNotifications: true,
+      newReleaseAlerts: true,
+    });
+  }
 
   return NextResponse.json(settings);
 }
@@ -24,10 +55,9 @@ export async function PATCH(req: NextRequest) {
 
   const userId = session.user.id!;
   const body = await req.json();
-  const allowed = ["theme", "audioQuality", "crossfadeSeconds", "autoDownloadLiked"];
   const data: Record<string, unknown> = {};
 
-  for (const key of allowed) {
+  for (const key of ALLOWED_FIELDS) {
     if (key in body) data[key] = body[key];
   }
 
@@ -36,7 +66,9 @@ export async function PATCH(req: NextRequest) {
     const setClauses = keys.map((k, i) => `"${k}" = $${i + 2}`);
     const values = keys.map((k) => data[k]);
     await execute(
-      `INSERT INTO "UserSettings" ("userId", ${keys.map((k) => `"${k}"`).join(", ")}) VALUES ($1, ${keys.map((_, i) => `$${i + 2}`).join(", ")}) ON CONFLICT ("userId") DO UPDATE SET ${setClauses.join(", ")}`,
+      `INSERT INTO "UserSettings" ("userId", ${keys.map((k) => `"${k}"`).join(", ")})
+       VALUES ($1, ${keys.map((_, i) => `$${i + 2}`).join(", ")})
+       ON CONFLICT ("userId") DO UPDATE SET ${setClauses.join(", ")}`,
       [userId, ...values]
     );
   }
