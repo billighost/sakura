@@ -136,8 +136,11 @@ export default function AlbumPage() {
     const next = !liked;
     setLiked(next);
     try {
-      await fetch(`/api/albums/${album.id}/like`, {
+      const trackIds = album.tracks.map(t => t.id);
+      await fetch(`/api/favorites/batch`, {
         method: next ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds }),
       });
     } catch {
       setLiked(!next);
@@ -146,24 +149,62 @@ export default function AlbumPage() {
 
   async function handleDownloadAll() {
     if (!album || downloading) return;
+    
+    if (album.tracks.length > 50) {
+      if (!window.confirm(`This album has ${album.tracks.length} tracks. Downloading them all might take some time and storage space. Do you want to proceed?`)) {
+        return;
+      }
+    }
+
     setDownloading(true);
     try {
       for (const track of album.tracks) {
         try {
-          const existing = await isTrackDownloaded(track.id);
-          if (existing) continue;
-          const res = await fetch(track.audioUrl);
-          const blob = await res.blob();
-          await saveTrackOffline({
-            id: track.id,
-            title: track.title,
-            artist: track.artist.name,
-            album: album.title,
-            audioUrl: track.audioUrl,
-            coverUrl: track.coverUrl || album.coverUrl,
-            duration: track.duration,
-          });
-          await saveAudioBlob(track.id, blob);
+          // If we already have audioUrl, it's either in DB or locally available
+          if (track.audioUrl) {
+            const existing = await isTrackDownloaded(track.id);
+            if (existing) continue;
+            const res = await fetch(track.audioUrl);
+            const blob = await res.blob();
+            await saveTrackOffline({
+              id: track.id,
+              title: track.title,
+              artist: track.artist.name,
+              album: album.title,
+              audioUrl: track.audioUrl,
+              coverUrl: track.coverUrl || album.coverUrl,
+              duration: track.duration,
+            });
+            await saveAudioBlob(track.id, blob);
+          } else {
+            // Need to download from Deezer/Telegram source
+            const res = await fetch("/api/music/download", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: track.title,
+                artist: track.artist.name,
+                duration: track.duration,
+                albumId: album.id,
+              }),
+            });
+            const data = await res.json();
+            if (data.error || !data.audioUrl) continue;
+            
+            // Now we have the stream URL, cache the stream blob locally
+            const streamRes = await fetch(data.audioUrl);
+            const blob = await streamRes.blob();
+            await saveTrackOffline({
+              id: data.id,
+              title: data.title,
+              artist: data.artist,
+              album: album.title,
+              audioUrl: data.audioUrl,
+              coverUrl: data.coverUrl || track.coverUrl || album.coverUrl,
+              duration: data.duration,
+            });
+            await saveAudioBlob(data.id, blob);
+          }
         } catch {
           continue;
         }

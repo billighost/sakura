@@ -143,6 +143,92 @@ export default function ArtistPage() {
     play(q[0], q);
   }
 
+  const [downloading, setDownloading] = useState(false);
+  const [likedAll, setLikedAll] = useState(false);
+
+  async function handleLikeAllSongs() {
+    if (!artist) return;
+    const next = !likedAll;
+    setLikedAll(next);
+    try {
+      const trackIds = artist.tracks.map((t) => t.id);
+      await fetch(`/api/favorites/batch`, {
+        method: next ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds }),
+      });
+    } catch {
+      setLikedAll(!next);
+    }
+  }
+
+  async function handleDownloadAll() {
+    if (!artist || downloading) return;
+    
+    if (artist.tracks.length > 50) {
+      if (!window.confirm(`This artist has ${artist.tracks.length} tracks listed. Downloading them all might take significant time and storage space. Do you want to proceed?`)) {
+        return;
+      }
+    }
+
+    setDownloading(true);
+    try {
+      for (const track of artist.tracks) {
+        try {
+          // Note: we'll import isTrackDownloaded, saveTrackOffline, saveAudioBlob from offline-db
+          const { isTrackDownloaded, saveTrackOffline, saveAudioBlob } = await import("@/lib/offline-db");
+          
+          if (track.audioUrl) {
+            const existing = await isTrackDownloaded(track.id);
+            if (existing) continue;
+            const res = await fetch(track.audioUrl);
+            const blob = await res.blob();
+            await saveTrackOffline({
+              id: track.id,
+              title: track.title,
+              artist: track.artist.name,
+              album: track.album?.title,
+              audioUrl: track.audioUrl,
+              coverUrl: track.coverUrl || track.album?.coverUrl,
+              duration: track.duration,
+            });
+            await saveAudioBlob(track.id, blob);
+          } else {
+            const res = await fetch("/api/music/download", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: track.title,
+                artist: track.artist.name,
+                duration: track.duration,
+                albumId: track.album?.id,
+              }),
+            });
+            const data = await res.json();
+            if (data.error || !data.audioUrl) continue;
+            
+            const streamRes = await fetch(data.audioUrl);
+            const blob = await streamRes.blob();
+            await saveTrackOffline({
+              id: data.id,
+              title: data.title,
+              artist: data.artist,
+              album: track.album?.title,
+              audioUrl: data.audioUrl,
+              coverUrl: data.coverUrl || track.coverUrl || track.album?.coverUrl,
+              duration: data.duration,
+            });
+            await saveAudioBlob(data.id, blob);
+          }
+        } catch {
+          continue;
+        }
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   function handleShare() {
     if (navigator.share) {
       navigator.share({ title: artist?.name, url: window.location.href });
@@ -264,6 +350,35 @@ export default function ArtistPage() {
             </button>
             <button className={styles.shuffleBtn} onClick={handleShuffle} title="Shuffle" aria-label="Shuffle play">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+            </button>
+            <button
+              className={`${styles.followBtn} ${likedAll ? styles.following : ""}`}
+              onClick={handleLikeAllSongs}
+              title="Like All Songs"
+              aria-pressed={likedAll}
+              style={{ padding: "0 0.75rem" }}
+            >
+              <svg viewBox="0 0 24 24" fill={likedAll ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+              </svg>
+            </button>
+            <button
+              className={styles.iconBtn}
+              onClick={handleDownloadAll}
+              title={downloading ? "Downloading all..." : "Download all songs"}
+              aria-label="Download all"
+            >
+              {downloading ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              )}
             </button>
             <button
               className={`${styles.followBtn} ${isFollowing ? styles.following : ""}`}
