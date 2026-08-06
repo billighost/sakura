@@ -43,6 +43,7 @@ export default function LikedPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [allDownloaded, setAllDownloaded] = useState(false);
   const { play } = usePlayer();
   const hasLoadedFromCache = useRef(false);
 
@@ -69,6 +70,27 @@ export default function LikedPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (tracks.length === 0) {
+      if (active) setAllDownloaded(true);
+      return;
+    }
+
+    async function checkDownloads() {
+      let allDl = true;
+      for (const t of tracks) {
+        if (!(await isTrackDownloaded(t.id))) {
+          allDl = false;
+          break;
+        }
+      }
+      if (active) setAllDownloaded(allDl);
+    }
+    checkDownloads();
+    return () => { active = false; };
+  }, [tracks]);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,13 +286,15 @@ export default function LikedPage() {
             </button>
           </div>
           <div className={styles.rightControls}>
-            <button className={styles.downloadAllBtn} onClick={handleDownloadAll} aria-label="Download all for offline" title="Download all for offline">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </button>
+            {!allDownloaded && (
+              <button className={styles.downloadAllBtn} onClick={handleDownloadAll} aria-label="Download all for offline" title="Download all for offline">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            )}
             <div className={styles.sortWrapper}>
               <button className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={sortOpen}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">

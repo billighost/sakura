@@ -73,6 +73,7 @@ export default function AlbumPage() {
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [allDownloaded, setAllDownloaded] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -114,6 +115,27 @@ export default function AlbumPage() {
       cleanup.then(fn => fn?.());
     };
   }, [loadAlbum]);
+
+  useEffect(() => {
+    let active = true;
+    if (!album || album.tracks.length === 0) {
+      if (active) setAllDownloaded(true);
+      return;
+    }
+
+    async function checkDownloads() {
+      let allDl = true;
+      for (const t of album!.tracks) {
+        if (!(await isTrackDownloaded(t.id))) {
+          allDl = false;
+          break;
+        }
+      }
+      if (active) setAllDownloaded(allDl);
+    }
+    checkDownloads();
+    return () => { active = false; };
+  }, [album]);
 
   const playerQueue = useMemo(() => {
     if (!album) return [];
@@ -181,7 +203,6 @@ export default function AlbumPage() {
     try {
       for (const track of album.tracks) {
         try {
-          // If we already have audioUrl, it's either in DB or locally available
           if (track.audioUrl) {
             const existing = await isTrackDownloaded(track.id);
             if (existing) continue;
@@ -198,7 +219,6 @@ export default function AlbumPage() {
             });
             await saveAudioBlob(track.id, blob);
           } else {
-            // Need to download from Deezer/Telegram source
             const res = await fetch("/api/music/download", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -212,7 +232,6 @@ export default function AlbumPage() {
             const data = await res.json();
             if (data.error || !data.audioUrl) continue;
             
-            // Now we have the stream URL, cache the stream blob locally
             const streamRes = await fetch(data.audioUrl);
             const blob = await streamRes.blob();
             await saveTrackOffline({
@@ -325,19 +344,21 @@ export default function AlbumPage() {
             <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
           </svg>
         </button>
-        <button className={styles.iconBtn} onClick={handleDownloadAll} aria-label="Download album for offline" title={downloading ? "Downloading…" : "Download for offline"}>
-          {downloading ? (
-            <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
-              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          )}
-        </button>
+        {!allDownloaded && (
+          <button className={styles.iconBtn} onClick={handleDownloadAll} aria-label="Download album for offline" title={downloading ? "Downloading…" : "Download for offline"}>
+            {downloading ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+          </button>
+        )}
         <div className={styles.spacer} />
         <div style={{ position: "relative" }}>
           <button className={styles.iconBtn} onClick={() => setMoreOpen((v) => !v)} aria-label="More options" aria-haspopup="menu" aria-expanded={moreOpen}>

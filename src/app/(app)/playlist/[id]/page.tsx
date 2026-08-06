@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSwipeBack } from "@/lib/useSwipeBack";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
 import styles from "./page.module.css";
@@ -56,6 +57,8 @@ export default function PlaylistPage() {
   const [showAddTracks, setShowAddTracks] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [allDownloaded, setAllDownloaded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,6 +78,27 @@ export default function PlaylistPage() {
     );
     observer.observe(node);
     return () => observer.disconnect();
+  }, [playlist]);
+
+  useEffect(() => {
+    let active = true;
+    if (!playlist || playlist.tracks.length === 0) {
+      if (active) setAllDownloaded(true);
+      return;
+    }
+
+    async function checkDownloads() {
+      let allDl = true;
+      for (const t of playlist!.tracks) {
+        if (!(await isTrackDownloaded(t.id))) {
+          allDl = false;
+          break;
+        }
+      }
+      if (active) setAllDownloaded(allDl);
+    }
+    checkDownloads();
+    return () => { active = false; };
   }, [playlist]);
 
   function handlePlay() {
@@ -139,6 +163,84 @@ export default function PlaylistPage() {
     } catch {
     } finally {
       setUploadingCover(false);
+    }
+  }
+
+  async function handleDownloadAll() {
+    if (!playlist || downloading) return;
+    
+    const undownloaded = [];
+    for (const t of playlist.tracks) {
+      if (!(await isTrackDownloaded(t.id))) undownloaded.push(t);
+    }
+    if (undownloaded.length === 0) return;
+
+    if (undownloaded.length > 5) {
+      if (!window.confirm(`This playlist has ${undownloaded.length} undownloaded tracks. Downloading them all might take some time and storage space. Do you want to proceed?`)) {
+        return;
+      }
+    }
+
+    setDownloading(true);
+    let successCount = 0;
+    try {
+      for (const track of playlist.tracks) {
+        try {
+          if (track.audioUrl) {
+            const existing = await isTrackDownloaded(track.id);
+            if (existing) continue;
+            
+            const isApi = track.audioUrl.startsWith("/api/");
+            if (!isApi) {
+              const streamRes = await fetch(track.audioUrl);
+              const blob = await streamRes.blob();
+              await saveTrackOffline({
+                id: track.id,
+                title: track.title,
+                artist: track.artist.name,
+                album: track.album?.title,
+                audioUrl: track.audioUrl,
+                coverUrl: track.coverUrl || track.album?.coverUrl,
+                duration: track.duration,
+              });
+              await saveAudioBlob(track.id, blob);
+              successCount++;
+            } else {
+              const res = await fetch("/api/music/download", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: track.title,
+                  artist: track.artist.name,
+                  duration: track.duration,
+                }),
+              });
+              const data = await res.json();
+              if (data.error || !data.audioUrl) continue;
+              
+              const streamRes = await fetch(data.audioUrl);
+              const blob = await streamRes.blob();
+              await saveTrackOffline({
+                id: data.id || track.id,
+                title: data.title || track.title,
+                artist: data.artist || track.artist.name,
+                album: track.album?.title,
+                audioUrl: data.audioUrl,
+                coverUrl: data.coverUrl || track.coverUrl || track.album?.coverUrl,
+                duration: data.duration || track.duration,
+              });
+              await saveAudioBlob(data.id || track.id, blob);
+              successCount++;
+            }
+          }
+        } catch {
+          // ignore individual track fail
+        }
+      }
+    } finally {
+      setDownloading(false);
+      // Trigger a re-check of download status
+      setAllDownloaded(successCount === undownloaded.length);
     }
   }
 
@@ -262,6 +364,21 @@ export default function PlaylistPage() {
         <button className={styles.iconBtn} onClick={() => setShowAddTracks(true)} title="Add tracks" aria-label="Add tracks">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
         </button>
+        {!allDownloaded && playlist.tracks.length > 0 && (
+          <button className={styles.iconBtn} onClick={handleDownloadAll} aria-label="Download playlist for offline" title={downloading ? "Downloading…" : "Download for offline"}>
+            {downloading ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+          </button>
+        )}
         <Link href={`/playlist/${params.id}/edit`} className={styles.iconBtn} title="Edit playlist" aria-label="Edit playlist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
         </Link>
