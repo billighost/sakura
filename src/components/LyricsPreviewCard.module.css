@@ -1,0 +1,111 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 1.75rem;
+  color: white;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.card {
+  all: unset;
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 152px;
+  padding: 20px 20px 60px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.card:active {
+  transform: scale(0.995);
+}
+
+.cardLoading {
+  min-height: 92px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.loadingText {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.syncedPreview,
+.plainPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.line {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.lineActive {
+  color: #fff;
+  font-size: 17px;
+}
+
+.lineDim {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.fadeBottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 76px;
+  background: linear-gradient(to bottom, transparent, rgba(20, 16, 23, 0.92) 70%);
+  pointer-events: none;
+}
+
+.showBtn {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #14101B;
+  font-size: 13px;
+  font-weight: 700;
+}

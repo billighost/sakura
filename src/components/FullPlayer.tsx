@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
 import { LyricShareCard } from "./LyricShareCard";
 import { CreditsSection } from "./CreditsSection";
+import { LyricsPreviewCard } from "./LyricsPreviewCard";
+import { QueueModal } from "./QueueModal";
+import { LyricsModal } from "./LyricsModal";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -19,7 +21,6 @@ const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
-  const [showArtLyrics, setShowArtLyrics] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [burstKey, setBurstKey] = useState(0);
@@ -30,7 +31,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({
     dragging: false,
     startX: 0,
@@ -93,12 +93,11 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   useEffect(() => {
     setArtLoaded(false);
     setLyricsExpanded(false);
-    setShowArtLyrics(false);
   }, [currentTrack?.id]);
 
-  // Sync scroll for the lyrics container. Lyrics data itself now lives in
-  // PlayerContext (shared with MiniPlayer's ticker line); this just tracks which
-  // line is active, using the live drag preview while the user is scrubbing.
+  // The active synced-lyric line, shared by the preview card and the full
+  // lyrics modal — uses the live drag-preview value while scrubbing so both
+  // stay in sync with what the user is about to seek to.
   const activeLineIndex = useMemo(() => {
     if (!lyrics || !lyrics.lines) return -1;
     const currentProgress = seekDrag !== null ? seekDrag : progress;
@@ -112,18 +111,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     }
     return index;
   }, [lyrics, progress, seekDrag]);
-
-  useEffect(() => {
-    if (activeLineIndex !== -1 && lyricsExpanded && lyricsContainerRef.current) {
-      const activeEl = lyricsContainerRef.current.children[activeLineIndex] as HTMLElement;
-      if (activeEl) {
-        lyricsContainerRef.current.scrollTo({
-          top: activeEl.offsetTop - lyricsContainerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
-          behavior: "smooth",
-        });
-      }
-    }
-  }, [activeLineIndex, lyricsExpanded]);
 
   // --- Shared-element "grow from the mini player" transition ---------------
   useLayoutEffect(() => {
@@ -170,15 +157,16 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   // A single gesture recognizer covers the whole player: drag down anywhere to
   // dismiss (like the app's real bottom sheet), or swipe the album art left/right
   // to skip tracks. Interactive chrome (buttons, links, the scrubber, queue rows,
-  // scrollable lyrics/credits) opts out via the elementIsGestureBlocked check so
-  // this never steals a tap, a seek, or a queue reorder.
+  // scrollable lyrics/credits, and now the Queue/Lyrics modals) opts out via the
+  // elementIsGestureBlocked check so this never steals a tap, a seek, or a queue
+  // reorder.
   function elementIsGestureBlocked(el: HTMLElement) {
     return !!el.closest('button, a, input, [role="slider"], [data-block-drag]');
   }
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (showQueue) return; // the queue has its own long-press reorder gesture
+      if (showQueue || lyricsExpanded) return; // modals have their own dismiss affordances
       if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
       if (elementIsGestureBlocked(e.target as HTMLElement)) return;
 
@@ -199,7 +187,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
       (e.target as Element).setPointerCapture?.(e.pointerId);
       if (rootRef.current) rootRef.current.style.transition = "none";
     },
-    [showQueue]
+    [showQueue, lyricsExpanded]
   );
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -450,273 +438,34 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
       <div ref={scrollContainerRef} className={styles.scrollContainer}>
         <div className={styles.mainContent}>
-          {showQueue ? (
-            <div className={styles.queueContainer}>
-              <div className={styles.queueHeader}>Now Playing</div>
-              <div className={styles.queueRowActive}>
-                <img src={currentTrack.coverUrl || ""} alt="" className={styles.queueArt} />
-                <div className={styles.queueInfo}>
-                  <div className={styles.queueTitleActive}>{currentTrack.title}</div>
-                  <div className={styles.queueArtist}>{currentTrack.artist}</div>
-                </div>
-                {isPlaying && (
-                  <div className={styles.nowPlayingBadge} aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                )}
-              </div>
-
-              {upNextQueue.length > 0 && (
+          <div className={styles.artContainer}>
+            <div ref={artShellRef} className={styles.artShell} style={artFlipStyle}>
+              {currentTrack.coverUrl ? (
                 <>
-                  <div className={styles.queueHeader}>Up Next</div>
-                  {upNextQueue.map((t, i) => {
-                    const isDragging = dragQueueItem?.list === "upnext" && dragQueueItem.index === i;
-                    return (
-                      <div
-                        key={t.id}
-                        className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
-                        style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)`, transition: "none" } : undefined}
-                        onPointerDown={(e) => handleRowPointerDown("upnext", i, e)}
-                        onPointerMove={handleRowPointerMove}
-                        onPointerUp={handleRowPointerUp}
-                        onPointerCancel={handleRowPointerCancel}
-                        onClick={() => {
-                          if (!dragQueueItem) {
-                            // Insert the upNext item right after current and jump to it
-                            const insertIdx = currentIndex + 1;
-                            goToQueueItem(insertIdx);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Play ${t.title} by ${t.artist}`}
-                      >
-                        <span className={styles.dragGrip} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                            <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
-                            <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
-                            <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
-                          </svg>
-                        </span>
-                        <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
-                        <div className={styles.queueInfo}>
-                          <div className={styles.queueTitle}>{t.title}</div>
-                          <div className={styles.queueArtist}>{t.artist}</div>
-                        </div>
-                        <button
-                          data-no-drag
-                          className={styles.removeBtn}
-                          onClick={() => removeFromUpNext(t.id)}
-                          aria-label={`Remove ${t.title} from queue`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}
+                  <img
+                    className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
+                    src={currentTrack.coverUrl}
+                    alt={currentTrack.title}
+                    onLoad={() => setArtLoaded(true)}
+                  />
                 </>
-              )}
-
-              {tailQueue.length > 0 && (
-                <>
-                  <div className={styles.queueHeader}>Next from: {currentTrack.album || "Playlist"}</div>
-                  {tailQueue.map((t, i) => {
-                    const isDragging = dragQueueItem?.list === "tail" && dragQueueItem.index === i;
-                    const absoluteIndex = currentIndex + 1 + i;
-                    return (
-                      <div
-                        key={t.id}
-                        className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
-                        style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)`, transition: "none" } : undefined}
-                        onPointerDown={(e) => handleRowPointerDown("tail", i, e)}
-                        onPointerMove={handleRowPointerMove}
-                        onPointerUp={handleRowPointerUp}
-                        onPointerCancel={handleRowPointerCancel}
-                        onClick={() => {
-                          if (!dragQueueItem) {
-                            goToQueueItem(absoluteIndex);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Play ${t.title} by ${t.artist}`}
-                      >
-                        <span className={styles.dragGrip} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                            <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
-                            <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
-                            <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
-                          </svg>
-                        </span>
-                        <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
-                        <div className={styles.queueInfo}>
-                          <div className={styles.queueTitle}>{t.title}</div>
-                          <div className={styles.queueArtist}>{t.artist}</div>
-                        </div>
-                        <button
-                          data-no-drag
-                          className={styles.removeBtn}
-                          onClick={() => removeTrack(t.id)}
-                          aria-label={`Remove ${t.title} from queue`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          ) : lyricsExpanded && (lyrics?.lines || lyrics?.lyrics) ? (
-            <div className={styles.fullLyricsContainer} data-block-drag>
-              <div className={styles.fullLyricsHeader}>
-                <span>Lyrics</span>
-                <button className={styles.closeLyricsBtn} onClick={() => setLyricsExpanded(false)} aria-label="Collapse lyrics">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              {loadingLyrics ? (
-                <div className={styles.lyricsStatus}>Loading lyrics...</div>
-              ) : lyrics?.lines ? (
-                <div ref={lyricsContainerRef} className={styles.lyricsList}>
-                  {lyrics.lines.map((line, idx) => (
-                    <div
-                      key={idx}
-                      className={`${styles.lyricLineRow} ${idx === activeLineIndex ? styles.lyricLineRowActive : ""}`}
-                    >
-                      <div
-                        className={`${styles.lyricLineGroup} ${idx === activeLineIndex ? styles.lyricLineGroupActive : ""}`}
-                        onClick={() => seekTo(line.time)}
-                      >
-                        <p className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}>
-                          {line.text}
-                        </p>
-                        {line.transliterated && (
-                          <p className={`${styles.lyricLineTransliterated} ${idx === activeLineIndex ? styles.lyricLineTransliteratedActive : ""}`}>
-                            {line.transliterated}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        className={styles.lyricShareBtn}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedLyricShare(line.text);
-                        }}
-                        aria-label="Share this lyric line"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-                          <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
               ) : (
-                <div className={styles.plainLyricsText}>
-                  {lyrics!.lyrics!.split("\n").map((line, i) => (
-                    <p key={i}>{line || "\u00A0"}</p>
-                  ))}
+                <div className={`${styles.art} ${styles.artFallback} ${styles.loaded}`}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                  </svg>
                 </div>
               )}
             </div>
-          ) : (
-            <div className={styles.artContainer}>
-              <div
-                ref={artShellRef}
-                className={styles.artShell}
-                style={artFlipStyle}
-                onClick={() => {
-                  if (lyrics?.lines || lyrics?.lyrics) {
-                    setShowArtLyrics(!showArtLyrics);
-                  }
-                }}
-              >
-                {showArtLyrics && (lyrics?.lines || lyrics?.lyrics) ? (
-                  // Line-by-line album art overlay
-                  <div className={styles.artLyricsOverlay}>
-                    {lyrics?.lines ? (
-                      <div className={styles.rollingLyricWrap}>
-                        <p className={styles.rollingLyricLineActive}>
-                          {lyrics.lines[activeLineIndex]?.text || "♪"}
-                        </p>
-                        <p className={styles.rollingLyricLineNext}>
-                          {lyrics.lines[activeLineIndex + 1]?.text || ""}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className={styles.rollingLyricWrap}>
-                        <p className={styles.rollingLyricLineActive}>Plain text lyrics loaded</p>
-                        <p className={styles.rollingLyricLineNext}>Tap player icon to view full text</p>
-                      </div>
-                    )}
-                  </div>
-                ) : currentTrack.coverUrl ? (
-                  <>
-                    {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}
-                    <img
-                      className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
-                      src={currentTrack.coverUrl}
-                      alt={currentTrack.title}
-                      onLoad={() => setArtLoaded(true)}
-                    />
-                  </>
-                ) : (
-                  <div className={`${styles.art} ${styles.artFallback} ${styles.loaded}`}>
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         <div className={styles.controls}>
-          {!showQueue && (
-            lyricsExpanded ? (
-              <div className={styles.trackInfoCompact}>
-                {currentTrack.coverUrl ? (
-                  <img src={currentTrack.coverUrl} alt="" className={styles.trackInfoCompactArt} />
-                ) : (
-                  <div className={`${styles.trackInfoCompactArt} ${styles.artFallback}`}>
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                    </svg>
-                  </div>
-                )}
-                <div className={styles.trackInfoCompactText}>
-                  <div className={styles.trackInfoCompactTitle}>{currentTrack.title}</div>
-                  <div className={styles.trackInfoCompactArtist}>{currentTrack.artist}</div>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.trackInfo}>
-                <div className={styles.trackTitle}>{currentTrack.title}</div>
-                <div className={styles.trackArtist}>{currentTrack.artist}</div>
-                {(lyrics?.lines || lyrics?.lyrics) && (
-                  <button className={styles.currentLyricBtn} onClick={() => setLyricsExpanded(true)}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
-                      <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                    </svg>
-                    <span className={styles.currentLyricBtnText}>
-                      {lyrics?.lines ? lyrics.lines[activeLineIndex]?.text || "Tap for lyrics" : "View lyrics"}
-                    </span>
-                  </button>
-                )}
-              </div>
-            )
-          )}
+          <div className={styles.trackInfo}>
+            <div className={styles.trackTitle}>{currentTrack.title}</div>
+            <div className={styles.trackArtist}>{currentTrack.artist}</div>
+          </div>
 
           <Scrubber
             progress={progress}
@@ -888,15 +637,64 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </button>
           </div>
 
-          {!lyricsExpanded && currentTrack && (
-            <CreditsSection 
-              trackId={currentTrack.id} 
-              artistName={currentTrack.artist} 
-              artistId={currentTrack.artistId}
-            />
-          )}
+          <LyricsPreviewCard
+            lyrics={lyrics}
+            loadingLyrics={loadingLyrics}
+            activeLineIndex={activeLineIndex}
+            onOpen={() => setLyricsExpanded(true)}
+          />
+
+          <CreditsSection
+            trackId={currentTrack.id}
+            artistName={currentTrack.artist}
+            artistId={currentTrack.artistId}
+          />
         </div>
       </div>
+
+      <QueueModal
+        open={showQueue}
+        onClose={() => setShowQueue(false)}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        albumLabel={currentTrack.album || "Playlist"}
+        currentIndex={currentIndex}
+        upNextQueue={upNextQueue}
+        tailQueue={tailQueue}
+        dragQueueItem={dragQueueItem}
+        onRowPointerDown={handleRowPointerDown}
+        onRowPointerMove={handleRowPointerMove}
+        onRowPointerUp={handleRowPointerUp}
+        onRowPointerCancel={handleRowPointerCancel}
+        onGoToQueueItem={goToQueueItem}
+        onRemoveFromUpNext={removeFromUpNext}
+        onRemoveTrack={removeTrack}
+      />
+
+      <LyricsModal
+        open={lyricsExpanded}
+        onClose={() => setLyricsExpanded(false)}
+        track={currentTrack}
+        lyrics={lyrics}
+        loadingLyrics={loadingLyrics}
+        activeLineIndex={activeLineIndex}
+        accentColor={accentColor}
+        onLineClick={(t) => seekTo(t)}
+        onShareLine={(text) => setSelectedLyricShare(text)}
+        progress={displayProgress}
+        duration={duration}
+        isPlaying={isPlaying}
+        onTogglePlay={togglePlay}
+        onNext={next}
+        onPrev={prev}
+        onScrubStart={beginSeek}
+        onScrubMove={(t) => setSeekDrag(t)}
+        onSeek={(t) => {
+          seekTo(t);
+          setSeekDrag(null);
+        }}
+        formatTime={formatTime}
+      />
 
       {selectedLyricShare && (
         <LyricShareCard
