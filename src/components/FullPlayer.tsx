@@ -941,7 +941,7 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
       fetch(`/api/artists/${currentTrack.artistId}`)
         .then(res => res.json())
         .then(data => {
-          if (data) {
+          if (data && !data.error && data.name) {
             setArtist({
               id: data.id,
               name: data.name,
@@ -969,7 +969,7 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
           {artist.imageUrl ? (
             <img src={artist.imageUrl} alt="" className={styles.artistHeroImg} />
           ) : (
-            <div className={styles.artistHeroImgFallback}>{artist.name[0]?.toUpperCase()}</div>
+            <div className={styles.artistHeroImgFallback}>{artist.name?.[0]?.toUpperCase() || "?"}</div>
           )}
           <div className={styles.artistHeroOverlay} />
           <div className={styles.artistHeroContent}>
@@ -1010,7 +1010,7 @@ function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
           <div className={styles.creditsList}>
             {credits.map((credit) => (
               <div key={credit.id} className={styles.creditRow}>
-                <span className={styles.creditAvatar} aria-hidden="true">{credit.name[0]?.toUpperCase()}</span>
+                <span className={styles.creditAvatar} aria-hidden="true">{credit.name?.[0]?.toUpperCase() || "?"}</span>
                 <span className={styles.creditName}>{credit.name}</span>
                 <span className={styles.creditRole}>{credit.role}</span>
               </div>
