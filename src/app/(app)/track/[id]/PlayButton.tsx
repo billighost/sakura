@@ -1,6 +1,7 @@
 "use client";
 
 import { usePlayer } from "@/components/PlayerContext";
+import styles from "./page.module.css";
 
 interface PlayButtonProps {
   trackId: string;
@@ -28,10 +29,7 @@ export function PlayButton({ trackId, audioUrl, title, artistName, coverUrl, dur
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className="flex items-center gap-2 px-6 py-2.5 bg-[var(--accent)] hover:brightness-110 text-white rounded-full font-semibold text-sm transition-all active:scale-95"
-    >
+    <button className={styles.playBtn} onClick={handleClick}>
       {isCurrentTrack && isPlaying ? (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <rect x="6" y="4" width="4" height="16" />

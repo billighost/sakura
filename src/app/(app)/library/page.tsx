@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -79,9 +80,46 @@ export default function LibraryPage() {
   const fetchFromServer = useCallback(async (isRefresh = false, userId = getCachedUserId()) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const res = await fetch("/api/library");
-      const data = await res.json();
-      const newItems: LibraryItem[] = data.items || data || [];
+      const [playlistsRes, albumsRes, artistsRes] = await Promise.allSettled([
+        fetch("/api/playlists").then((r) => r.json()),
+        fetch("/api/albums").then((r) => r.json()),
+        fetch("/api/artists").then((r) => r.json()),
+      ]);
+
+      const playlists: LibraryItem[] =
+        playlistsRes.status === "fulfilled"
+          ? (Array.isArray(playlistsRes.value) ? playlistsRes.value : []).map((p: { id: string; name: string; coverUrl?: string; createdAt?: string }) => ({
+              id: p.id,
+              type: "playlist" as const,
+              title: p.name,
+              coverUrl: p.coverUrl,
+              addedAt: p.createdAt,
+            }))
+          : [];
+
+      const albums: LibraryItem[] =
+        albumsRes.status === "fulfilled"
+          ? (albumsRes.value.albums || []).map((a: { id: string; title: string; coverUrl?: string; createdAt?: string; artist?: { name: string } }) => ({
+              id: a.id,
+              type: "album" as const,
+              title: a.title,
+              subtitle: a.artist?.name,
+              coverUrl: a.coverUrl,
+              addedAt: a.createdAt,
+            }))
+          : [];
+
+      const artists: LibraryItem[] =
+        artistsRes.status === "fulfilled"
+          ? (artistsRes.value.artists || []).map((a: { id: string; name: string; imageUrl?: string }) => ({
+              id: a.id,
+              type: "artist" as const,
+              title: a.name,
+              coverUrl: a.imageUrl,
+            }))
+          : [];
+
+      const newItems: LibraryItem[] = [...playlists, ...albums, ...artists];
       setItems(newItems);
       setCachedLibraryData("library-main", { items: newItems }, userId);
     } catch {
@@ -226,7 +264,7 @@ export default function LibraryPage() {
 
           {showPinned && (
             <div className={styles.pinnedGrid}>
-              <button className={styles.pinnedCard} onClick={() => router.push("/liked")}>
+              <Link href="/liked" className={styles.pinnedCard}>
                 <div className={`${styles.pinnedArt} ${styles.pinnedArtLiked}`}>
                   <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
                     <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
@@ -236,8 +274,8 @@ export default function LibraryPage() {
                   <div className={styles.pinnedTitle}>Liked Songs</div>
                   <div className={styles.pinnedSubtitle}>Playlist</div>
                 </div>
-              </button>
-              <button className={styles.pinnedCard} onClick={() => router.push("/downloaded")}>
+              </Link>
+              <Link href="/library/downloaded" className={styles.pinnedCard}>
                 <div className={`${styles.pinnedArt} ${styles.pinnedArtDownloaded}`}>
                   <svg viewBox="0 0 24 24" fill="white" width="22" height="22">
                     <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
@@ -247,7 +285,7 @@ export default function LibraryPage() {
                   <div className={styles.pinnedTitle}>Downloaded</div>
                   <div className={styles.pinnedSubtitle}>Offline songs</div>
                 </div>
-              </button>
+              </Link>
             </div>
           )}
 
@@ -329,14 +367,14 @@ export default function LibraryPage() {
               <p className={styles.emptyDesc}>
                 Save playlists, albums, and artists you love and they&apos;ll show up here.
               </p>
-              <button className={styles.emptyCta} onClick={() => router.push("/search")}>
+              <Link href="/search" className={styles.emptyCta}>
                 Find something to save
-              </button>
+              </Link>
             </div>
           ) : view === "list" ? (
             <div className={styles.list}>
               {filteredItems.map((item) => (
-                <button key={item.id} className={styles.listItem} onClick={() => router.push(routeFor(item))}>
+                <Link href={routeFor(item)} key={item.id} className={styles.listItem}>
                   <div className={`${styles.listItemArt} ${item.type === "artist" ? styles.listItemArtCircle : ""}`}>
                     {item.coverUrl ? (
                       <img src={item.coverUrl} alt="" className={styles.listItemArtImg} />
@@ -353,13 +391,13 @@ export default function LibraryPage() {
                       {item.subtitle && <><span>·</span><span>{item.subtitle}</span></>}
                     </div>
                   </div>
-                </button>
+                </Link>
               ))}
             </div>
           ) : (
             <div className={styles.grid}>
               {filteredItems.map((item) => (
-                <button key={item.id} className={styles.gridItem} onClick={() => router.push(routeFor(item))}>
+                <Link href={routeFor(item)} key={item.id} className={styles.gridItem}>
                   <div className={`${styles.gridItemArt} ${item.type === "artist" ? styles.gridItemArtCircle : ""}`}>
                     {item.coverUrl ? (
                       <img src={item.coverUrl} alt="" className={styles.gridItemArtImg} />
@@ -371,7 +409,7 @@ export default function LibraryPage() {
                   </div>
                   <div className={styles.gridItemTitle}>{item.title}</div>
                   {item.subtitle && <div className={styles.gridItemSubtitle}>{item.subtitle}</div>}
-                </button>
+                </Link>
               ))}
             </div>
           )}

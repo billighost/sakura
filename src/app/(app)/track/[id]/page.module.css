@@ -1,0 +1,340 @@
+.page {
+  min-height: 100%;
+  position: relative;
+}
+
+.container {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 1.5rem) clamp(6rem, 15vw, 8rem);
+}
+
+/* ---------- Back button ---------- */
+
+.backBtn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  left: 1rem;
+  z-index: 100;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--sakura-glass-border);
+  background: var(--sakura-glass-strong);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  color: var(--sakura-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--sakura-shadow);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.backBtn:hover {
+  background: var(--sakura-hover);
+}
+
+.backBtn:active {
+  transform: scale(0.92);
+}
+
+/* ---------- Hero ---------- */
+
+.heroSection {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(3.5rem, 10vw, 4.5rem) clamp(1rem, 4vw, 1.5rem) clamp(1.5rem, 4vw, 2rem);
+}
+
+.heroBleed {
+  position: absolute;
+  inset: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  filter: blur(70px) saturate(1.6) brightness(0.85);
+  transform: scale(1.1);
+  opacity: 0.6;
+  z-index: -2;
+}
+
+.heroBleedFallback {
+  position: absolute;
+  inset: 0;
+  background: var(--sakura-accent-gradient);
+  opacity: 0.4;
+  z-index: -2;
+}
+
+.heroSection::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, var(--sakura-bg) 92%);
+  z-index: -1;
+}
+
+.hero {
+  max-width: 44rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.25rem, 4vw, 1.75rem);
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .hero {
+    flex-direction: row;
+    align-items: flex-end;
+    text-align: left;
+  }
+}
+
+.coverWrap {
+  width: clamp(9rem, 40vw, 12.5rem);
+  height: clamp(9rem, 40vw, 12.5rem);
+  border-radius: var(--sakura-radius-lg);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--sakura-accent-gradient);
+  box-shadow: 0 20px 50px -12px var(--sakura-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coverFallback {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+}
+
+.heroInfo {
+  min-width: 0;
+  padding-bottom: 0.125rem;
+}
+
+.eyebrow {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sakura-text-secondary);
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+}
+
+.title {
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1.375rem, 5vw, 2.25rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .byline {
+    justify-content: flex-start;
+  }
+}
+
+.artistLink {
+  color: var(--sakura-text);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.artistLink:hover {
+  color: var(--sakura-accent);
+}
+
+.dot {
+  color: var(--sakura-text-secondary);
+  opacity: 0.6;
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.375rem;
+}
+
+.playRow {
+  margin-top: clamp(1.25rem, 4vw, 1.5rem);
+  display: flex;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .playRow {
+    justify-content: flex-start;
+  }
+}
+
+.playBtn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.875rem;
+  padding: 0 1.75rem;
+  border-radius: 9999px;
+  background: var(--sakura-accent-gradient);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -8px var(--sakura-accent);
+  transition: transform 0.12s, filter 0.15s, box-shadow 0.15s;
+}
+
+.playBtn:hover {
+  filter: brightness(1.08);
+}
+
+.playBtn:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Sections ---------- */
+
+.section {
+  margin-top: clamp(2rem, 6vw, 2.5rem);
+}
+
+.sectionTitle {
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1.0625rem, 3vw, 1.25rem);
+  font-weight: 600;
+  margin-bottom: clamp(0.875rem, 2.5vw, 1.125rem);
+}
+
+.subTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sakura-text-secondary);
+  margin-bottom: 0.625rem;
+}
+
+.subSection + .subSection {
+  margin-top: 1.25rem;
+}
+
+.creditChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.creditChip {
+  padding: 0.4375rem 0.875rem;
+  border-radius: 9999px;
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+  backdrop-filter: blur(8px);
+  font-size: 0.8125rem;
+}
+
+.creditName {
+  color: var(--sakura-text);
+  font-weight: 600;
+}
+
+.creditRole {
+  color: var(--sakura-text-secondary);
+  margin-left: 0.25rem;
+}
+
+.sampleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--sakura-radius-lg);
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+}
+
+.sampleRow + .sampleRow {
+  margin-top: 0.5rem;
+}
+
+.sampleIcon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  background: var(--sakura-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-text-secondary);
+  flex-shrink: 0;
+}
+
+.sampleTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sakura-text);
+}
+
+.sampleMeta {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  margin-top: 0.0625rem;
+}
+
+.infoCard {
+  border-radius: var(--sakura-radius-lg);
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+  padding: 0.25rem 1rem;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  font-size: 0.8438rem;
+}
+
+.infoRow + .infoRow {
+  border-top: 1px solid var(--sakura-border);
+}
+
+.infoLabel {
+  color: var(--sakura-text-secondary);
+}
+
+.infoValue {
+  color: var(--sakura-text);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+}

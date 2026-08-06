@@ -42,7 +42,6 @@ export default function ProfilePage() {
   const [bioDraft, setBioDraft] = useState("");
   const [savingBio, setSavingBio] = useState(false);
   const [listeningHours, setListeningHours] = useState(0);
-  const [streak, setStreak] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [topArtists, setTopArtists] = useState<Artist[]>([]);
   const [topTracks, setTopTracks] = useState<Track[]>([]);
@@ -61,24 +60,21 @@ export default function ProfilePage() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    fetch("/api/stats/listening-time")
+    fetch("/api/history?limit=100")
       .then((r) => r.json())
-      .then((data) => setListeningHours(data.hours || 0))
-      .catch(() => {});
-
-    fetch("/api/stats/streak")
-      .then((r) => r.json())
-      .then((data) => setStreak(data.streak || 0))
+      .then((data) => {
+        // history API returns a plain array
+        const tracks = Array.isArray(data) ? data : (data.tracks || []);
+        setTopTracks(tracks.slice(0, 5));
+        // Estimate listening hours from track durations
+        const totalSec = tracks.reduce((sum: number, t: { duration?: number }) => sum + (t.duration || 0), 0);
+        setListeningHours(Math.round(totalSec / 3600));
+      })
       .catch(() => {});
 
     fetch("/api/artists?limit=5")
       .then((r) => r.json())
       .then((data) => setTopArtists(data.artists || []))
-      .catch(() => {});
-
-    fetch("/api/history?limit=5")
-      .then((r) => r.json())
-      .then((data) => setTopTracks(data || []))
       .catch(() => {});
   }, []);
 
@@ -376,15 +372,7 @@ export default function ProfilePage() {
           <div className={styles.statValue}>{listeningHours}h</div>
           <div className={styles.statLabel}>Listening</div>
         </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-          </div>
-          <div className={styles.statValue}>{streak}</div>
-          <div className={styles.statLabel}>Day Streak</div>
-        </div>
+         
       </div>
 
       {topArtists.length > 0 && (

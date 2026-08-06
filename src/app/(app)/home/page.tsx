@@ -212,7 +212,7 @@ export default function HomePage() {
 
       const hTracks: Track[] =
         historyRes.status === "fulfilled"
-          ? historyRes.value.tracks || []
+          ? Array.isArray(historyRes.value) ? historyRes.value : (historyRes.value.tracks || [])
           : [];
       const tTracks: Track[] =
         tracksRes.status === "fulfilled"

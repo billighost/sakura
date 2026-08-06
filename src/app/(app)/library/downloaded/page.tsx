@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
 import { getAllDownloadedTracks, getCachedUserId, getDeviceId } from "@/lib/offline-db";
@@ -196,9 +197,9 @@ export default function DownloadedPage() {
           </div>
           <p className={styles.emptyTitle}>No downloaded songs</p>
           <p className={styles.emptySubtext}>Songs you download for offline listening will appear here.</p>
-          <button className={styles.emptyCta} onClick={() => router.push("/liked")}>
-            Browse your liked songs
-          </button>
+          <Link href="/liked" className={styles.emptyCta}>
+            Go to Liked Songs
+          </Link>
         </div>
       )}
     </div>

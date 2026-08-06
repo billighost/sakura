@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
@@ -215,9 +216,9 @@ export default function AlbumPage() {
           <div className={styles.heroInfo}>
             <div className={styles.heroLabel}>Album</div>
             <h1 className={styles.heroTitle}>{album.title}</h1>
-            <button className={styles.artistLink} onClick={() => router.push(`/artist/${album.artist.id}`)}>
+            <Link href={`/artist/${album.artist.id}`} className={styles.artistLink}>
               {album.artist.name}
-            </button>
+            </Link>
             <div className={styles.heroMeta}>
               {album.year && <span>{album.year}</span>}
               {album.year && <span>·</span>}
@@ -306,7 +307,7 @@ export default function AlbumPage() {
           <h2 className={styles.sectionTitle}>More by {album.artist.name}</h2>
           <div className={styles.albumGrid}>
             {album.relatedAlbums.map((rel) => (
-              <button key={rel.id} className={styles.albumCard} onClick={() => router.push(`/album/${rel.id}`)}>
+              <Link key={rel.id} href={`/album/${rel.id}`} className={styles.albumCard}>
                 {rel.coverUrl ? (
                   <img src={rel.coverUrl} alt="" className={styles.albumArt} />
                 ) : (
