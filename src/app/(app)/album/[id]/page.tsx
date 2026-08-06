@@ -93,7 +93,20 @@ export default function AlbumPage() {
     loadAlbum();
   }, [loadAlbum]);
 
-  const queue = useMemo(() => {
+  const playerQueue = useMemo(() => {
+    if (!album) return [];
+    return album.tracks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist.name,
+      album: album.title,
+      coverUrl: t.coverUrl || album.coverUrl,
+      audioUrl: t.audioUrl,
+      duration: t.duration,
+    }));
+  }, [album]);
+
+  const displayTracks = useMemo(() => {
     if (!album) return [];
     return album.tracks.map((t) => ({
       id: t.id,
@@ -107,13 +120,13 @@ export default function AlbumPage() {
   }, [album]);
 
   function handlePlay() {
-    if (queue.length === 0) return;
-    play(queue[0], queue);
+    if (playerQueue.length === 0) return;
+    play(playerQueue[0], playerQueue);
   }
 
   function handleShuffle() {
-    if (queue.length === 0) return;
-    const shuffled = shuffleArray(queue);
+    if (playerQueue.length === 0) return;
+    const shuffled = shuffleArray(playerQueue);
     play(shuffled[0], shuffled);
   }
 
@@ -275,19 +288,11 @@ export default function AlbumPage() {
       </div>
 
       <div className={styles.trackList}>
-        {album.tracks.map((track, i) => (
+        {displayTracks.map((track, i) => (
           <TrackRow
             key={track.id}
-            track={{
-              id: track.id,
-              title: track.title,
-              artist: track.artist,
-              album: { title: album.title, coverUrl: album.coverUrl },
-              coverUrl: track.coverUrl || album.coverUrl,
-              audioUrl: track.audioUrl,
-              duration: track.duration,
-            }}
-            queue={queue}
+            track={track}
+            queue={displayTracks}
             index={i}
             showNumber
           />
