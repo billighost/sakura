@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } fr
 import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
+import { LyricShareCard } from "./LyricShareCard";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -23,6 +24,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
   const [artFlipStyle, setArtFlipStyle] = useState<React.CSSProperties>({});
+  const [selectedLyricShare, setSelectedLyricShare] = useState<string | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
@@ -248,12 +250,16 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         const delta = Math.max(0, e.clientY - ds.startY);
         const isFastFlick = ds.velocityY > 0.55;
         const isFarEnough = delta > window.innerHeight * 0.4;
-        if (isFastFlick || isFarEnough) onClose();
+        if (isFastFlick || isFarEnough) {
+          import("@/lib/haptics").then((h) => h.vibrate(8));
+          onClose();
+        }
       } else if (ds.axis === "x") {
         const dx = e.clientX - ds.startX;
         const isFastFlick = Math.abs(ds.velocityX) > 0.5;
         const isFarEnough = Math.abs(dx) > 70;
         if (isFastFlick || isFarEnough) {
+          import("@/lib/haptics").then((h) => h.vibrate(10));
           if (dx < 0) next();
           else prev();
         }
@@ -299,6 +305,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             const listLength = current.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
             const to = Math.min(Math.max(current.index + rowsMoved, 0), Math.max(0, listLength - 1));
             if (to !== current.index) {
+              import("@/lib/haptics").then((h) => h.vibrate(10));
               if (current.list === "upnext") reorderUpNext(current.index, to);
               else reorderQueueTail(current.index, to);
             }
@@ -557,13 +564,30 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               ) : lyrics?.lines ? (
                 <div ref={lyricsContainerRef} className={styles.lyricsList}>
                   {lyrics.lines.map((line, idx) => (
-                    <p
+                    <div
                       key={idx}
-                      className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
-                      onClick={() => seekTo(line.time)}
+                      className={`${styles.lyricLineRow} ${idx === activeLineIndex ? styles.lyricLineRowActive : ""}`}
                     >
-                      {line.text}
-                    </p>
+                      <p
+                        className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
+                        onClick={() => seekTo(line.time)}
+                      >
+                        {line.text}
+                      </p>
+                      <button
+                        className={styles.lyricShareBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLyricShare(line.text);
+                        }}
+                        aria-label="Share this lyric line"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                          <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -825,6 +849,15 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
           {!lyricsExpanded && <ArtistCreditsPanel currentTrack={currentTrack} />}
         </div>
       </div>
+
+      {selectedLyricShare && (
+        <LyricShareCard
+          track={currentTrack}
+          lyric={selectedLyricShare}
+          accentColor={accentColor}
+          onClose={() => setSelectedLyricShare(null)}
+        />
+      )}
     </div>
   );
 }

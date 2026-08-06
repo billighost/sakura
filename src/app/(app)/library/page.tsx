@@ -5,6 +5,8 @@ import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { MusicNoteIcon, AlbumIcon, MicrophoneIcon, PlaylistIcon } from "@/components/Icons";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId, setCachedUserId } from "@/lib/offline-db";
+import { usePullToRefresh } from "@/lib/usePullToRefresh";
+import { PullToRefreshSpinner } from "@/components/PullToRefreshSpinner";
 import styles from "./page.module.css";
 
 interface Track {
@@ -312,6 +314,12 @@ export default function LibraryPage() {
     return items;
   }, [libraryItems, sortBy]);
 
+  // Wire pull to refresh gestures
+  const ptr = usePullToRefresh({
+    onRefresh: () => fetchFromServer(true),
+    threshold: 70,
+  });
+
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
     if (el.scrollTop === 0 && !refreshing) {
@@ -319,6 +327,48 @@ export default function LibraryPage() {
       fetchFromServer(false);
     }
   }
+
+  // Pointer Down hook setup
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (ptr.refreshing) return;
+    const container = e.currentTarget;
+    if (container.scrollTop !== 0) return;
+    if (e.button !== undefined && e.button !== 0) return;
+
+    ptr.startYRef.current = e.clientY;
+    ptr.currentYRef.current = e.clientY;
+    ptr.setActive(true);
+    container.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!ptr.active || ptr.refreshing) return;
+    ptr.currentYRef.current = e.clientY;
+    const dy = e.clientY - ptr.startYRef.current;
+    if (dy > 0) {
+      const distance = dy > 70 ? 70 + (dy - 70) * 0.25 : dy;
+      ptr.setPullDistance(distance);
+    } else {
+      ptr.setPullDistance(0);
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!ptr.active || ptr.refreshing) return;
+    ptr.setActive(false);
+    const dy = ptr.currentYRef.current - ptr.startYRef.current;
+    if (dy >= 70) {
+      ptr.setRefreshing(true);
+      import("@/lib/haptics").then((h) => h.vibrate(12));
+      fetchFromServer(true).finally(() => {
+        ptr.setRefreshing(false);
+        ptr.setPullDistance(0);
+      });
+    } else {
+      ptr.setPullDistance(0);
+    }
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   return (
     <div className={styles.page}>
@@ -421,7 +471,16 @@ export default function LibraryPage() {
       <div
         className={styles.content}
         onScroll={handleScroll}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ position: "relative" }}
       >
+        <PullToRefreshSpinner
+          pullDistance={ptr.pullDistance}
+          refreshing={ptr.refreshing}
+        />
         {loading ? (
           <div className={styles.list}>
             {[...Array(8)].map((_, i) => (

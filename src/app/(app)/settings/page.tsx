@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { usePlayer } from "@/components/PlayerContext";
 import styles from "./page.module.css";
 
 const BUILD_DATE = typeof __BUILD_DATE__ !== "undefined" ? __BUILD_DATE__ : new Date().toISOString().slice(0, 10);
@@ -63,6 +64,8 @@ export default function SettingsPage() {
     estimateStorage();
   }, []);
 
+  const { showToast } = usePlayer();
+
   function estimateStorage() {
     if ("storage" in navigator && "estimate" in navigator.storage) {
       navigator.storage.estimate().then((est) => {
@@ -73,6 +76,64 @@ export default function SettingsPage() {
         setStorageUsed(`${usedMB} MB`);
         setStorageTotal(`${totalGB} GB`);
       });
+    }
+  }
+
+  // Sequentially downloads liked songs that aren't already downloaded.
+  // Respects storage caps (stops/warns if used storage is >80% of quota).
+  async function downloadLikedSongs() {
+    try {
+      const res = await fetch("/api/favorites");
+      const tracks = await res.json();
+      const list: any[] = Array.isArray(tracks) ? tracks : tracks.tracks || [];
+
+      const { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getStorageEstimate, getCachedUserId, getDeviceId } = await import("@/lib/offline-db");
+
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
+
+      showToast(`Starting offline sync for ${list.length} liked tracks...`, "accent");
+
+      for (let i = 0; i < list.length; i++) {
+        const track = list[i];
+        
+        // Quota check: limit download if space is > 80% full
+        const est = await getStorageEstimate();
+        if (est.quota > 0 && est.used / est.quota > 0.8) {
+          showToast("Storage quota limit reached (>80%). Stopping auto-downloads.", "error");
+          break;
+        }
+
+        const isDownloaded = await isTrackDownloaded(track.id, uId, dId);
+        if (!isDownloaded) {
+          try {
+            const audioRes = await fetch(track.audioUrl);
+            const blob = await audioRes.blob();
+            
+            await saveTrackOffline({
+              id: track.id,
+              title: track.title,
+              artist: track.artist.name || track.artist,
+              album: track.album?.title || track.album,
+              audioUrl: track.audioUrl,
+              coverUrl: track.coverUrl || track.album?.coverUrl,
+              duration: track.duration,
+            }, uId, dId);
+            
+            await saveAudioBlob(track.id, blob, uId, dId);
+          } catch (err) {
+            console.error(`Failed to auto-download ${track.title}:`, err);
+          }
+          // Delay to prevent thread choking
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      }
+      
+      estimateStorage();
+      showToast("Offline liked tracks sync completed successfully.", "success");
+    } catch (e) {
+      console.error("Auto download process failed:", e);
+      showToast("Auto-downloading liked tracks failed.", "error");
     }
   }
 
@@ -90,6 +151,10 @@ export default function SettingsPage() {
     if (patch.theme) {
       document.documentElement.setAttribute("data-theme", patch.theme);
       localStorage.setItem("sakura-theme", patch.theme);
+    }
+
+    if (patch.autoDownloadLiked === true) {
+      downloadLikedSongs();
     }
   }
 
@@ -245,6 +310,46 @@ export default function SettingsPage() {
             >
               <div className={`${styles.toggleKnob} ${settings.autoDownloadLiked ? styles.toggleKnobOn : ""}`} />
             </button>
+          </div>
+        </div>
+
+        <div className={styles.group}>
+          <div className={styles.row}>
+            <span className={styles.rowLabel}>Lock Accent Color</span>
+            <span className={styles.rowValue} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {["#F2789F", "#C9A6E0", "#5EC49E", "#E8A84C", "#E85D75"].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => {
+                    const activeLocked = localStorage.getItem("sakura-player-custom-accent");
+                    if (activeLocked === c) {
+                      localStorage.removeItem("sakura-player-custom-accent");
+                      showToast("Bypassed custom accent. Dynamic mood accent active.", "success");
+                    } else {
+                      localStorage.setItem("sakura-player-custom-accent", c);
+                      showToast(`Accent color locked to ${c}.`, "success");
+                    }
+                    // Force refresh view states by updating settings state mildly
+                    updateSettings({});
+                  }}
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "50%",
+                    backgroundColor: c,
+                    border: typeof window !== "undefined" && localStorage.getItem("sakura-player-custom-accent") === c ? "2px solid #FFFFFF" : "none",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.25)",
+                    padding: 0
+                  }}
+                  title={`Pin ${c}`}
+                  aria-label={`Pin ${c}`}
+                />
+              ))}
+            </span>
+          </div>
+          <div className={styles.qualityInfo}>
+            Tap a color to pin it. Tap again to unlock dynamic cover art accent color extraction.
           </div>
         </div>
       </div>

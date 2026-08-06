@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useRef, useEffect, useCallback, us
 import { getAudioBlob, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
+import { Toast } from "./Toast";
 
 interface Track {
   id: string;
@@ -60,6 +61,9 @@ interface PlayerContextType {
   removeFromUpNext: (trackId: string) => void;
   reorderUpNext: (fromIndex: number, toIndex: number) => void;
   reorderQueueTail: (fromIndex: number, toIndex: number) => void;
+  toast: { message: string; type: "accent" | "error" | "success"; visible: boolean } | null;
+  showToast: (message: string, type?: "accent" | "error" | "success") => void;
+  hideToast: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -73,6 +77,14 @@ export function usePlayer() {
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seekingRef = useRef(false);
+  // Tracks whether we've already applied the saved "resume where you left off"
+  // position once this session. Must live at component scope (a ref, not a
+  // local variable inside the load effect) — otherwise it resets to true on
+  // *every* track change, not just the page's first load, and skipping to the
+  // next track would wrongly re-seek to an old saved position instead of playing.
+  const hasRestoredProgressRef = useRef(false);
+  const lastProgressSaveRef = useRef(0);
+  const loadedTrackIdRef = useRef<string | null>(null);
   const [queue, setQueueState] = useState<Track[]>([]);
   const [upNextQueue, setUpNextQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -83,6 +95,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ message: string; type: "accent" | "error" | "success"; visible: boolean } | null>(null);
+
+  const showToast = useCallback((message: string, type: "accent" | "error" | "success" = "accent") => {
+    setToast({ message, type, visible: true });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast((prev) => prev ? { ...prev, visible: false } : null);
+  }, []);
   const [isSeeking, setIsSeeking] = useState(false);
   const [accentColor, setAccentColor] = useState<string | null>(null);
   const [miniArtRect, setMiniArtRect] = useState<DOMRect | null>(null);
@@ -106,6 +127,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Derive a per-track "mood" accent color from the cover art
   useEffect(() => {
+    const lockedAccent = localStorage.getItem("sakura-player-custom-accent");
+    if (lockedAccent) {
+      setAccentColor(lockedAccent);
+      return;
+    }
+
     let cancelled = false;
     if (!currentTrack?.coverUrl) {
       setAccentColor(null);
@@ -346,8 +373,60 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       audio.addEventListener("play", () => setIsPlaying(true));
       audio.addEventListener("pause", () => setIsPlaying(false));
+      
+      // Auto-skip on stream playback failure with toast notification
+      audio.addEventListener("error", (e) => {
+        console.error("Audio playback error occurred:", e);
+        showToast("Playback failure. Skipping to next track.", "error");
+        
+        // Skip track using ended event handler sequential logic
+        const uq = upNextRef.current;
+        if (uq.length > 0) {
+          const nextTrack = uq[0];
+          setUpNextQueue((prev) => prev.slice(1));
+          setQueueState((prev) => {
+            const newQ = [...prev];
+            newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
+            return newQ;
+          });
+          setCurrentIndex((i) => i + 1);
+          setTimeout(() => {
+            audioRef.current?.play().catch(() => {});
+          }, 50);
+          return;
+        }
+
+        const q = queueRef.current;
+        const ci = currentIndexRef.current;
+        const sh = shuffleRef.current;
+        const rp = repeatRef.current;
+
+        if (q.length === 0) return;
+        if (sh) {
+          let nextIdx = Math.floor(Math.random() * q.length);
+          if (q.length > 1) {
+            while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
+          }
+          setCurrentIndex(nextIdx);
+          setTimeout(() => {
+            audioRef.current?.play().catch(() => {});
+          }, 50);
+        } else if (ci < q.length - 1) {
+          setCurrentIndex(ci + 1);
+          setTimeout(() => {
+            audioRef.current?.play().catch(() => {});
+          }, 50);
+        } else if (rp === "all") {
+          setCurrentIndex(0);
+          setTimeout(() => {
+            audioRef.current?.play().catch(() => {});
+          }, 50);
+        } else {
+          setIsPlaying(false);
+        }
+      });
     }
-  }, []);
+  }, [showToast]);
 
   // Hydrate player settings and queue from localStorage on mount
   useEffect(() => {
@@ -359,7 +438,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const savedShuffle = localStorage.getItem("sakura-player-shuffle");
       const savedRepeat = localStorage.getItem("sakura-player-repeat");
 
+      const savedUpNext = localStorage.getItem("sakura-player-upnext");
       if (savedQueue) setQueueState(JSON.parse(savedQueue));
+      if (savedUpNext) setUpNextQueue(JSON.parse(savedUpNext));
       if (savedIndex) setCurrentIndex(Number(savedIndex));
       if (savedProgress) setProgress(Number(savedProgress));
       if (savedVolume) {
@@ -380,6 +461,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [queue]);
 
   useEffect(() => {
+    localStorage.setItem("sakura-player-upnext", JSON.stringify(upNextQueue));
+  }, [upNextQueue]);
+
+  useEffect(() => {
     localStorage.setItem("sakura-player-index", String(currentIndex));
   }, [currentIndex]);
 
@@ -395,16 +480,58 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("sakura-player-repeat", repeat);
   }, [repeat]);
 
-  // Periodic progress saving (e.g., every 3s to minimize disk writes, plus updates on unload)
+  // Remember which track the saved progress belongs to, so a reload only ever
+  // resumes a position against the track it was actually saved for.
+  useEffect(() => {
+    if (currentTrack) {
+      localStorage.setItem("sakura-player-track-id", currentTrack.id);
+    }
+  }, [currentTrack?.id]);
+
+  // Progress saving, throttled to roughly every 3s — `progress` updates on every
+  // `timeupdate` tick (several times a second), so writing on every change here
+  // would hit localStorage far more often than the "resume where you left off"
+  // feature actually needs.
+  const PROGRESS_SAVE_INTERVAL_MS = 3000;
   useEffect(() => {
     if (seekingRef.current) return;
+    const now = Date.now();
+    if (now - lastProgressSaveRef.current < PROGRESS_SAVE_INTERVAL_MS) return;
+    lastProgressSaveRef.current = now;
     localStorage.setItem("sakura-player-progress", String(progress));
   }, [progress]);
+
+  // Always flush the latest position on tab-hide and page unload — those are
+  // exactly the moments a person is likely to actually leave, so the throttle
+  // above shouldn't be allowed to lose up to ~3s of position there. Also flush
+  // on pause via the audio element's own "pause" event (reuses the existing
+  // isPlaying listener already wired up above) so stopping playback saves
+  // immediately rather than waiting for the next throttled tick.
+  useEffect(() => {
+    function flushProgress() {
+      if (audioRef.current) {
+        lastProgressSaveRef.current = Date.now();
+        localStorage.setItem("sakura-player-progress", String(audioRef.current.currentTime));
+      }
+    }
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") flushProgress();
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", flushProgress);
+    window.addEventListener("beforeunload", flushProgress);
+    audioRef.current?.addEventListener("pause", flushProgress);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", flushProgress);
+      window.removeEventListener("beforeunload", flushProgress);
+      audioRef.current?.removeEventListener("pause", flushProgress);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
-    let isInitialLoad = true;
 
     async function loadAudio() {
       if (!audioRef.current || !currentTrack) return;
@@ -430,26 +557,57 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Guard: if this exact source is already loaded (e.g. an effect re-run that
+      // Guard: if this exact track is already loaded (e.g. an effect re-run that
       // didn't actually change tracks), skip the reload entirely — calling
       // `.load()` on an already-current src is what snaps playback back to 0.
       const resolvedSrc = new URL(src, window.location.href).href;
-      if (audioRef.current.src === resolvedSrc) {
+      if (loadedTrackIdRef.current === currentTrack.id && audioRef.current.src === resolvedSrc) {
         return;
       }
+      loadedTrackIdRef.current = currentTrack.id;
+
+      // Resolve this ONCE, before mutating audioRef.current.src — it must reflect
+      // "has the whole session already restored its saved position", not
+      // "is this the first time *this specific track* is loading". That
+      // distinction is what previously broke normal next/prev: since the flag
+      // used to be a local variable re-created on every effect run, skipping
+      // tracks mid-session kept re-triggering the "restore saved position"
+      // branch instead of resuming playback on the new track.
+      const isFirstLoadThisSession = !hasRestoredProgressRef.current;
+      hasRestoredProgressRef.current = true;
 
       audioRef.current.src = src;
       audioRef.current.load();
 
-      // If initial load of the session, restore the saved timestamp progress
-      if (isInitialLoad) {
-        isInitialLoad = false;
+      if (isFirstLoadThisSession) {
+        // Only resume a saved position if it was actually saved against this
+        // same track — otherwise a stale/mismatched value could seek a
+        // freshly-picked track to a meaningless timestamp.
         const savedProgress = localStorage.getItem("sakura-player-progress");
-        if (savedProgress) {
+        const savedTrackId = localStorage.getItem("sakura-player-track-id");
+        if (savedProgress && savedTrackId === currentTrack.id) {
           const time = Number(savedProgress);
-          audioRef.current.currentTime = time;
-          setProgress(time);
+          const applySavedSeek = () => {
+            if (!audioRef.current) return;
+            // Clamp to duration in case of a stale value longer than the track.
+            const dur = audioRef.current.duration;
+            const clamped = isFinite(dur) && dur > 0 ? Math.min(time, dur) : time;
+            audioRef.current.currentTime = clamped;
+            setProgress(clamped);
+          };
+          // Setting currentTime immediately after .load() is unreliable across
+          // browsers (metadata isn't guaranteed to be ready yet) — wait for
+          // loadedmetadata so the seek reliably lands instead of silently
+          // getting dropped.
+          if (audioRef.current.readyState >= 1 /* HAVE_METADATA */) {
+            applySavedSeek();
+          } else {
+            audioRef.current.addEventListener("loadedmetadata", applySavedSeek, { once: true });
+          }
         }
+        // Deliberately no autoplay here even if a saved "was playing" flag existed —
+        // browsers block unprompted autoplay, so we just leave playback cued up
+        // at the right spot for the person to hit play.
       } else if (wasPlaying) {
         audioRef.current.play().catch(() => {});
       }
@@ -466,6 +624,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [currentTrack?.id]);
 
   const play = useCallback((track: Track, newQueue?: Track[]) => {
+    setProgress(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlaying(true);
+
     if (newQueue) {
       setQueueState(newQueue);
       const idx = newQueue.findIndex((t) => t.id === track.id);
@@ -484,9 +648,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return newQ;
       });
     }
-    setTimeout(() => {
-      audioRef.current?.play().catch(() => {});
-    }, 50);
   }, []);
 
   const playNext = useCallback((track: Track) => {
@@ -653,29 +814,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
 
 
-  // Persist queue to localStorage
-  useEffect(() => {
-    if (queue.length > 0 && currentTrack) {
-      const data = { queue, upNextQueue, currentIndex, volume };
-      localStorage.setItem("sakura-player", JSON.stringify(data));
-    }
-  }, [queue, upNextQueue, currentIndex, volume]);
-
-  // Restore queue from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("sakura-player");
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        if (data.queue?.length > 0) {
-          setQueueState(data.queue);
-          if (data.upNextQueue) setUpNextQueue(data.upNextQueue);
-          setCurrentIndex(data.currentIndex || 0);
-          setVolumeState(data.volume || 1);
-        }
-      } catch {}
-    }
-  }, []);
+  // NOTE: queue/upNextQueue/currentIndex/volume/progress are already persisted
+  // and restored individually above (the "sakura-player-*" keys, hydrated in
+  // the mount effect near the top of this file). A second, separate
+  // "sakura-player" combined-blob save/restore used to live here, writing the
+  // same data under a different key on a different schedule — the two could
+  // drift out of sync (e.g. `queue` saved on every queue change, but this
+  // blob only on queue+upNextQueue+currentIndex+volume all together), and
+  // since this restore effect ran *after* the individual-key one, it could
+  // silently overwrite a correctly-restored currentIndex/queue with stale
+  // data. Removed in favor of the single individual-key system.
 
   return (
     <PlayerContext.Provider
@@ -722,9 +870,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         removeFromUpNext,
         reorderUpNext,
         reorderQueueTail,
+        toast,
+        showToast,
+        hideToast,
       }}
     >
       {children}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          visible={toast.visible}
+          onClose={hideToast}
+        />
+      )}
       <div aria-live="polite" aria-atomic="true" className="srOnly">
         {announcement}
       </div>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
+import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import styles from "./MiniPlayer.module.css";
 
 const PETAL_COUNT = 6;
@@ -32,6 +33,9 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     accentColor,
     setMiniArtRect,
     activeLyricLine,
+    addToQueue,
+    lyrics,
+    activeLyricIndex,
   } = usePlayer();
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
@@ -66,9 +70,12 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     vx: 0,
     vy: 0,
     axis: null as "x" | "y" | null,
+    longPressTimer: null as any,
+    longPressed: false,
   });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [gestureActive, setGestureActive] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   function isInteractive(el: HTMLElement) {
     return !!el.closest(`.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}`);
@@ -91,14 +98,45 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     g.lastT = performance.now();
     g.vx = g.vy = 0;
     g.axis = null;
+    g.longPressed = false;
+
+    // Clear any previous timer
+    if (g.longPressTimer) clearTimeout(g.longPressTimer);
+    
+    // Set 450ms long press threshold to distinct from tap-to-expand/swipes
+    g.longPressTimer = setTimeout(() => {
+      if (g.active && !g.axis && Math.abs(g.lastX - g.startX) < 10 && Math.abs(g.lastY - g.startY) < 10) {
+        g.longPressed = true;
+        import("@/lib/haptics").then((h) => h.vibrate(15));
+        setMenuPos({ x: g.lastX, y: g.lastY });
+        // Suppress gesture from firing swipe or expand
+        setGestureActive(false);
+        setDragOffset({ x: 0, y: 0 });
+      }
+    }, 450);
+
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   }, []);
 
   const handleGesturePointerMove = useCallback((e: React.PointerEvent) => {
     const g = gesture.current;
     if (!g.active || g.pointerId !== e.pointerId) return;
+    
+    g.lastX = e.clientX;
+    g.lastY = e.clientY;
+
+    if (g.longPressed) return;
+
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
+
+    // Cancel long press if user drags away
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      if (g.longPressTimer) {
+        clearTimeout(g.longPressTimer);
+        g.longPressTimer = null;
+      }
+    }
 
     if (!g.axis) {
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
@@ -110,8 +148,6 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     const dt = Math.max(1, now - g.lastT);
     g.vx = (e.clientX - g.lastX) / dt;
     g.vy = (e.clientY - g.lastY) / dt;
-    g.lastX = e.clientX;
-    g.lastY = e.clientY;
     g.lastT = now;
 
     if (g.axis === "x") {
@@ -126,9 +162,20 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const endGesture = useCallback(
     (e: React.PointerEvent) => {
       const g = gesture.current;
+      if (g.longPressTimer) {
+        clearTimeout(g.longPressTimer);
+        g.longPressTimer = null;
+      }
+
       if (!g.active || g.pointerId !== e.pointerId) return;
       g.active = false;
       setGestureActive(false);
+
+      if (g.longPressed) {
+        g.longPressed = false;
+        setDragOffset({ x: 0, y: 0 });
+        return;
+      }
 
       const dx = e.clientX - g.startX;
       const dy = e.clientY - g.startY;
@@ -138,11 +185,13 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
       if (axis === "x") {
         const committed = Math.abs(dx) > SWIPE_COMMIT_PX || Math.abs(g.vx) > SWIPE_COMMIT_VELOCITY;
         if (committed) {
+          import("@/lib/haptics").then((h) => h.vibrate(10));
           if (dx < 0) next();
           else prev();
         }
       } else if (axis === "y") {
         if (dy < EXPAND_COMMIT_PX || g.vy < -0.5) {
+          import("@/lib/haptics").then((h) => h.vibrate(8));
           handleExpand();
         }
       } else {
@@ -158,7 +207,10 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   if (!currentTrack) return null;
 
   function handleLike() {
-    if (!isLiked) setBurstKey((k) => k + 1);
+    if (!isLiked) {
+      setBurstKey((k) => k + 1);
+      import("@/lib/haptics").then((h) => h.vibrate(12));
+    }
     toggleLiked();
   }
 
@@ -172,7 +224,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
 
   return (
     <div
-      className={styles.root}
+      className={`${styles.root} ${activeLyricLine ? styles.hasLyrics : ""}`}
       style={
         {
           "--track-accent": accentColor || undefined,
@@ -198,7 +250,29 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
       </div>
 
       {activeLyricLine && (
-        <div className={styles.lyricTicker} aria-hidden="true">
+        <div
+          className={styles.lyricTicker}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (lyrics?.lines && activeLyricIndex >= 0) {
+              const line = lyrics.lines[activeLyricIndex];
+              if (line) seekTo(line.time);
+            }
+          }}
+          style={{ cursor: "pointer" }}
+          tabIndex={0}
+          role="button"
+          aria-label={`Current lyric line: ${activeLyricLine}. Press to jump playback here.`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              if (lyrics?.lines && activeLyricIndex >= 0) {
+                const line = lyrics.lines[activeLyricIndex];
+                if (line) seekTo(line.time);
+              }
+            }
+          }}
+        >
           {activeLyricLine}
         </div>
       )}
@@ -257,6 +331,55 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
           </svg>
         </button>
       </div>
+
+      {menuPos && (
+        <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)}>
+          <ContextMenuItem
+            onClick={() => {
+              setMenuPos(null);
+              addToQueue(currentTrack);
+            }}
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+          >
+            Add to Queue
+          </ContextMenuItem>
+          {currentTrack.artistId && (
+            <ContextMenuItem
+              onClick={() => {
+                setMenuPos(null);
+                window.location.href = `/artist/${currentTrack.artistId}`;
+              }}
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
+            >
+              Go to Artist
+            </ContextMenuItem>
+          )}
+          {currentTrack.albumId && (
+            <ContextMenuItem
+              onClick={() => {
+                setMenuPos(null);
+                window.location.href = `/album/${currentTrack.albumId}`;
+              }}
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>}
+            >
+              Go to Album
+            </ContextMenuItem>
+          )}
+          <ContextMenuItem
+            onClick={() => {
+              setMenuPos(null);
+              if (navigator.share) {
+                navigator.share({ title: currentTrack.title, url: `${window.location.origin}/track/${currentTrack.id}` }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(`${window.location.origin}/track/${currentTrack.id}`);
+              }
+            }}
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
+          >
+            Share
+          </ContextMenuItem>
+        </ContextMenu>
+      )}
     </div>
   );
 }

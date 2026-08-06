@@ -85,7 +85,10 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
   function handleLike(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!liked) setBurstKey((k) => k + 1);
+    if (!liked) {
+      setBurstKey((k) => k + 1);
+      import("@/lib/haptics").then((h) => h.vibrate(12));
+    }
     toggleLikeTrack(track.id);
   }
 
