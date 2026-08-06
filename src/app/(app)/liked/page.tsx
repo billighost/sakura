@@ -44,7 +44,7 @@ export default function LikedPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [allDownloaded, setAllDownloaded] = useState(false);
-  const { play } = usePlayer();
+  const { play, addToDownloadQueue, downloadStates } = usePlayer();
   const hasLoadedFromCache = useRef(false);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function LikedPage() {
     }
     checkDownloads();
     return () => { active = false; };
-  }, [tracks]);
+  }, [tracks, downloadStates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,27 +168,17 @@ export default function LikedPage() {
   }
 
   async function handleDownloadAll() {
-    for (const track of tracks) {
-      try {
-        const existing = await isTrackDownloaded(track.id);
-        if (existing) continue;
-        const res = await fetch(track.audioUrl);
-        const blob = await res.blob();
-        const cover = track.coverUrl || track.album?.coverUrl;
-        await saveTrackOffline({
-          id: track.id,
-          title: track.title,
-          artist: track.artist.name,
-          album: track.album?.title,
-          audioUrl: track.audioUrl,
-          coverUrl: cover,
-          duration: track.duration,
-        });
-        await saveAudioBlob(track.id, blob);
-      } catch {
-        continue;
-      }
-    }
+    const tracksToDownload = tracks.map(track => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist.name,
+      album: track.album?.title,
+      coverUrl: track.coverUrl || track.album?.coverUrl,
+      audioUrl: track.audioUrl,
+      duration: track.duration,
+    }));
+
+    addToDownloadQueue(tracksToDownload);
   }
 
   const sortLabels: Record<SortKey, string> = {

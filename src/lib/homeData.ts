@@ -49,7 +49,7 @@ export async function getHomeData(userId: string): Promise<HomeData> {
         [userId]
       ),
 
-      // 2. Quick Picks
+      // 2. Quick Picks (with fallback to random tracks if empty)
       query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
         `SELECT t.id, t.title, a.name AS artist, COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
          FROM "Track" t
@@ -63,7 +63,17 @@ export async function getHomeData(userId: string): Promise<HomeData> {
          ORDER BY RANDOM()
          LIMIT 6`,
         [userId]
-      ).catch(() => []),
+      ).then(async (tracks) => {
+        if (tracks.length > 0) return tracks;
+        return query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
+          `SELECT t.id, t.title, a.name AS artist, COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
+           FROM "Track" t
+           LEFT JOIN "Artist" a ON a.id = t."artistId"
+           LEFT JOIN "Album"  al ON al.id = t."albumId"
+           ORDER BY RANDOM()
+           LIMIT 6`
+        );
+      }).catch(() => []),
 
       // 3. Recently played
       query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
@@ -80,10 +90,10 @@ export async function getHomeData(userId: string): Promise<HomeData> {
         [userId]
       ).catch(() => []),
 
-      // 4. Top artists
+      // 4. Top artists (with fallback to popular/random artists if empty)
       query<{ id: string; name: string; trackCount: number; avatarUrl: string | null }>(
         `SELECT a.id, a.name, a."imageUrl" AS "avatarUrl",
-                COUNT(DISTINCT h."trackId")::int AS "trackCount"
+                 COUNT(DISTINCT h."trackId")::int AS "trackCount"
          FROM "ListeningHistory" h
          JOIN  "Track"  t ON t.id = h."trackId"
          JOIN  "Artist" a ON a.id = t."artistId"
@@ -92,7 +102,15 @@ export async function getHomeData(userId: string): Promise<HomeData> {
          ORDER BY "trackCount" DESC
          LIMIT 8`,
         [userId]
-      ).catch(() => []),
+      ).then(async (artists) => {
+        if (artists.length > 0) return artists;
+        return query<{ id: string; name: string; trackCount: number; avatarUrl: string | null }>(
+          `SELECT id, name, 0 AS "trackCount", "imageUrl" AS "avatarUrl"
+           FROM "Artist"
+           ORDER BY RANDOM()
+           LIMIT 8`
+        );
+      }).catch(() => []),
 
       // 5. User playlists
       query<{ id: string; name: string; trackCount: number; coverUrl: string | null }>(

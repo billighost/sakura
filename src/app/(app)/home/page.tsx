@@ -139,6 +139,34 @@ async function HomeFeed({ userId }: { userId: string }) {
         ))}
       </div>
 
+      {/* Quick Picks */}
+      {data.quickPicks && data.quickPicks.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Quick Picks</h2>
+          </div>
+          <div className={styles.quickPicksGrid}>
+            {data.quickPicks.map((track) => (
+              <Link key={track.id} href={`/track/${track.id}`} className={styles.quickPickCard}>
+                {track.coverUrl ? (
+                  <img src={track.coverUrl} alt="" className={styles.quickPickArt} />
+                ) : (
+                  <div className={styles.quickPickFallback}>
+                    <MusicNoteIcon size={24} />
+                  </div>
+                )}
+                <div className={styles.quickPickOverlay}>
+                  <div className={styles.quickPickPlayBtn}>
+                    <PlayIcon size={18} />
+                  </div>
+                </div>
+                <div className={styles.quickPickTitle}>{track.title}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Made For You (Custom Mixes) */}
       {data.madeForYou && data.madeForYou.length > 0 && (
         <section className={styles.section}>

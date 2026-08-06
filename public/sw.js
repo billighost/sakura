@@ -58,8 +58,16 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
-  // Bypass service worker for SSO, manifest, or vercel build links
-  if (url.pathname === "/manifest.json" || url.pathname.includes("vercel") || url.pathname.includes("sso")) return;
+  // Bypass service worker for development HMR, SSO, manifest, or vercel build links
+  if (
+    url.pathname === "/manifest.json" ||
+    url.pathname.includes("vercel") ||
+    url.pathname.includes("sso") ||
+    url.pathname.startsWith("/_next/webpack-hmr") ||
+    url.pathname.includes("hot-update")
+  ) {
+    return;
+  }
 
   // Handle Audio Requests
   if (isAudioRequest(url)) {
@@ -85,9 +93,74 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Default Shell Assets/Pages
+  // Handle Next.js page document navigation or RSC requests
+  const isNav = request.mode === "navigate";
+  const isRsc = isNextRscRequest(url, request);
+
+  if (isNav || isRsc) {
+    event.respondWith(networkFirstWithFallback(request, isNav));
+    return;
+  }
+
+  // Default Shell Assets (JS chunks, static bundles, etc.)
   event.respondWith(staleWhileRevalidate(SHELL_CACHE, request));
 });
+
+function isNextRscRequest(url, request) {
+  return (
+    request.headers.get("rsc") === "1" ||
+    request.headers.has("next-router-state-tree") ||
+    request.headers.has("next-router-prefetch") ||
+    url.pathname.startsWith("/_next/data/")
+  );
+}
+
+function getCacheRequest(request) {
+  const url = new URL(request.url);
+  const isRsc =
+    request.headers.get("rsc") === "1" ||
+    request.headers.has("next-router-state-tree") ||
+    request.headers.has("next-router-prefetch");
+
+  if (isRsc) {
+    // Differentiate cache key to prevent overwriting raw HTML or vice versa
+    url.searchParams.set("__rsc", "1");
+    return new Request(url.toString(), {
+      method: request.method,
+      headers: request.headers,
+      credentials: request.credentials,
+      mode: request.mode,
+    });
+  }
+  return request;
+}
+
+async function networkFirstWithFallback(request, isNav) {
+  const cacheKey = getCacheRequest(request);
+  const shellCache = await caches.open(SHELL_CACHE);
+
+  try {
+    const response = await fetch(request);
+    if (response.redirected) {
+      return response;
+    }
+    if (response.ok) {
+      shellCache.put(cacheKey, response.clone());
+    }
+    return response;
+  } catch (err) {
+    const cached = await shellCache.match(cacheKey);
+    if (cached) return cached;
+
+    // Fall back to the cached /home or / shell for page navigations when offline
+    if (isNav) {
+      const fallbackShell =
+        (await shellCache.match("/home")) || (await shellCache.match("/"));
+      if (fallbackShell) return fallbackShell;
+    }
+    throw err;
+  }
+}
 
 function isApiRequest(url) {
   return (

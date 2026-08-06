@@ -125,10 +125,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let dbTrack = await queryOne<{ id: string; audioUrl: string }>(
-      `SELECT id, "audioUrl" FROM "Track" WHERE "telegramMessageId" = $1`,
-      [track.messageId.toString()]
-    );
+    let dbTrack = null;
+
+    if (metadata.track?.deezerId) {
+      dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+        `SELECT id, "audioUrl" FROM "Track" WHERE "deezerId" = $1`,
+        [metadata.track.deezerId.toString()]
+      );
+    }
+
+    if (!dbTrack) {
+      dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+        `SELECT id, "audioUrl" FROM "Track" WHERE "telegramMessageId" = $1`,
+        [track.messageId.toString()]
+      );
+    }
 
     if (!dbTrack) {
       dbTrack = await queryOne<{ id: string; audioUrl: string }>(
@@ -142,7 +153,7 @@ export async function POST(req: NextRequest) {
           track.duration || 0,
           `/api/stream/telegram/${track.messageId}`,
           track.messageId.toString(),
-          metadata.track?.deezerId || null,
+          metadata.track?.deezerId?.toString() || null,
           metadata.track?.isrc || null,
           metadata.track?.previewUrl || null,
           metadata.album?.coverUrl || null,

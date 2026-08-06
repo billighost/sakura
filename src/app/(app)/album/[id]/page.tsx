@@ -67,7 +67,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 export default function AlbumPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const { play } = usePlayer();
+  const { play, addToDownloadQueue, downloadStates } = usePlayer();
 
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,11 @@ export default function AlbumPage() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [allDownloaded, setAllDownloaded] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+
+  const downloading = useMemo(() => {
+    if (!album) return false;
+    return album.tracks.some(t => downloadStates[t.id] === "queued" || downloadStates[t.id] === "downloading");
+  }, [album, downloadStates]);
 
   const loadAlbum = useCallback(async () => {
     let cancelled = false;
@@ -135,7 +139,7 @@ export default function AlbumPage() {
     }
     checkDownloads();
     return () => { active = false; };
-  }, [album]);
+  }, [album, downloadStates]);
 
   const playerQueue = useMemo(() => {
     if (!album) return [];
@@ -199,59 +203,18 @@ export default function AlbumPage() {
       }
     }
 
-    setDownloading(true);
-    try {
-      for (const track of album.tracks) {
-        try {
-          if (track.audioUrl) {
-            const existing = await isTrackDownloaded(track.id);
-            if (existing) continue;
-            const res = await fetch(track.audioUrl);
-            const blob = await res.blob();
-            await saveTrackOffline({
-              id: track.id,
-              title: track.title,
-              artist: track.artist.name,
-              album: album.title,
-              audioUrl: track.audioUrl,
-              coverUrl: track.coverUrl || album.coverUrl,
-              duration: track.duration,
-            });
-            await saveAudioBlob(track.id, blob);
-          } else {
-            const res = await fetch("/api/music/download", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: track.title,
-                artist: track.artist.name,
-                duration: track.duration,
-                albumId: album.id,
-              }),
-            });
-            const data = await res.json();
-            if (data.error || !data.audioUrl) continue;
-            
-            const streamRes = await fetch(data.audioUrl);
-            const blob = await streamRes.blob();
-            await saveTrackOffline({
-              id: data.id,
-              title: data.title,
-              artist: data.artist,
-              album: album.title,
-              audioUrl: data.audioUrl,
-              coverUrl: data.coverUrl || track.coverUrl || album.coverUrl,
-              duration: data.duration,
-            });
-            await saveAudioBlob(data.id, blob);
-          }
-        } catch {
-          continue;
-        }
-      }
-    } finally {
-      setDownloading(false);
-    }
+    const tracksToDownload = album.tracks.map(track => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist.name,
+      album: album.title,
+      coverUrl: track.coverUrl || album.coverUrl,
+      audioUrl: track.audioUrl,
+      duration: track.duration,
+      albumId: album.id
+    }));
+
+    addToDownloadQueue(tracksToDownload);
   }
 
   async function handleRemoveFromLibrary() {

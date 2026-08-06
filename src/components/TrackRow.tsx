@@ -46,16 +46,30 @@ function CircularProgress({ progress }: { progress: number }) {
 }
 
 export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
-  const { currentTrack, isPlaying, play, togglePlay, addToQueue, favoriteTrackIds, toggleLikeTrack, showToast } = usePlayer();
+  const { 
+    currentTrack, 
+    isPlaying, 
+    play, 
+    togglePlay, 
+    addToQueue, 
+    favoriteTrackIds, 
+    toggleLikeTrack, 
+    showToast,
+    downloadStates,
+    addToDownloadQueue
+  } = usePlayer();
   const liked = favoriteTrackIds?.has(track.id) || false;
   const isActive = currentTrack?.id === track.id;
   
   const [offline, setOffline] = useState(false);
-  const [downloadState, setDownloadState] = useState<"idle" | "telegram" | "device">("idle");
+  const [localDownloadState, setLocalDownloadState] = useState<"idle" | "telegram" | "device">("idle");
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [addPlaylistModalOpen, setAddPlaylistModalOpen] = useState(false);
 
   const cover = track.coverUrl || track.album?.coverUrl;
+
+  const stateInQueue = downloadStates[track.id];
+  const effectiveDownloadState = stateInQueue === "queued" ? "telegram" : stateInQueue === "downloading" ? "device" : localDownloadState;
 
   useEffect(() => {
     async function checkOffline() {
@@ -67,7 +81,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       } catch {}
     }
     checkOffline();
-  }, [track.id]);
+  }, [track.id, stateInQueue]);
 
   async function handlePlay(e: React.MouseEvent) {
     e.stopPropagation();
@@ -77,7 +91,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       return;
     }
 
-    if (downloadState !== "idle") return; // Prevent double clicks during download
+    if (effectiveDownloadState !== "idle") return; // Prevent double clicks during download
 
     // If it's already downloaded or has a valid audioUrl from library, just play
     if (offline || track.source === "library" || track.audioUrl) {
@@ -85,10 +99,10 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       return;
     }
 
-    // Otherwise, we need to download it first
-    setDownloadState("telegram");
+    // Otherwise, we need to download/stream it
+    setLocalDownloadState("telegram");
     try {
-      // 1. Trigger Telegram Download
+      // 1. Resolve Stream/Track URL
       const res = await fetch("/api/music/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -107,33 +121,26 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       const newAudioUrl = data.audioUrl;
       const finalCoverUrl = data.coverUrl || cover;
 
-      // 2. Fetch to User's Device
-      setDownloadState("device");
-      const blobRes = await fetch(newAudioUrl);
-      const blob = await blobRes.blob();
+      setLocalDownloadState("idle");
 
-      const uId = getCachedUserId();
-      const dId = getDeviceId();
-      await saveTrackOffline({
+      // 2. Play the stream URL immediately
+      playTrack(newId, newAudioUrl, finalCoverUrl);
+
+      // 3. Queue download for offline storage in background
+      addToDownloadQueue([{
         id: newId,
         title: track.title,
         artist: track.artist.name,
         album: track.album?.title,
-        audioUrl: newAudioUrl,
         coverUrl: finalCoverUrl,
+        audioUrl: newAudioUrl,
         duration: track.duration,
-      }, uId, dId);
-      await saveAudioBlob(newId, blob, uId, dId);
-      
-      setOffline(true);
-      setDownloadState("idle");
-
-      // 3. Play the newly downloaded track
-      playTrack(newId, newAudioUrl, finalCoverUrl);
+        albumId: track.album?.id,
+      }], true); // Boost priority because they are playing it
     } catch (err) {
       console.error("Auto-download failed:", err);
       showToast("Download failed. Please try again.", "error");
-      setDownloadState("idle");
+      setLocalDownloadState("idle");
     }
   }
 
@@ -264,9 +271,9 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           title="Play"
           aria-label="Play"
         >
-          {downloadState === "telegram" ? (
+          {effectiveDownloadState === "telegram" ? (
             <CircularProgress progress={50} />
-          ) : downloadState === "device" ? (
+          ) : effectiveDownloadState === "device" ? (
             <CircularProgress progress={90} />
           ) : isActive && isPlaying ? (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

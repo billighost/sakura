@@ -9,13 +9,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = session.user.id!;
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const downloadedOnly = searchParams.get("downloaded") === "true";
   const offset = (page - 1) * limit;
 
-  const cacheKey = `albums:list:${page}:${limit}:${downloadedOnly}`;
+  const cacheKey = `albums:list:${userId}:${page}:${limit}:${downloadedOnly}`;
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -28,13 +29,21 @@ export async function GET(req: NextRequest) {
   try {
     let whereClause = "";
     if (downloadedOnly) {
-      whereClause = `WHERE EXISTS (
+      whereClause = `AND EXISTS (
         SELECT 1 FROM "Track" t WHERE t."albumId" = al.id
       )`;
     }
 
     const countResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM "Album" al ${whereClause}`,
+      `SELECT COUNT(*)::text AS count FROM "Album" al
+       WHERE EXISTS (
+         SELECT 1 FROM "Favorite" f WHERE f."trackId" IN (SELECT id FROM "Track" WHERE "albumId" = al.id) AND f."userId" = $1
+       ) OR EXISTS (
+         SELECT 1 FROM "PlaylistTrack" pt
+         JOIN "Playlist" p ON pt."playlistId" = p.id
+         WHERE pt."trackId" IN (SELECT id FROM "Track" WHERE "albumId" = al.id) AND p."userId" = $1
+       ) ${whereClause}`,
+      [userId]
     );
     const total = parseInt(countResult?.count || "0", 10);
 
@@ -46,11 +55,19 @@ export async function GET(req: NextRequest) {
       FROM "Album" al
       LEFT JOIN "Artist" a ON al."artistId" = a.id
       LEFT JOIN "Track" t ON t."albumId" = al.id
-      ${whereClause}
+      WHERE (
+        EXISTS (
+          SELECT 1 FROM "Favorite" f WHERE f."trackId" = t.id AND f."userId" = $3
+        ) OR EXISTS (
+          SELECT 1 FROM "PlaylistTrack" pt
+          JOIN "Playlist" p ON pt."playlistId" = p.id
+          WHERE pt."trackId" = t.id AND p."userId" = $3
+        )
+      ) ${whereClause}
       GROUP BY al.id, a.name, a.id
       ORDER BY al.title ASC
       LIMIT $1 OFFSET $2`,
-      [limit, offset],
+      [limit, offset, userId],
     );
 
     const result = { albums, total, page, limit, pages: Math.ceil(total / limit) };

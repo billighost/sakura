@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { getAudioBlob, getCachedUserId, getDeviceId } from "@/lib/offline-db";
+import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { Toast } from "./Toast";
@@ -16,6 +16,18 @@ interface Track {
   coverUrl?: string;
   audioUrl: string;
   duration: number;
+}
+
+export interface DownloadItem {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  coverUrl?: string;
+  audioUrl?: string;
+  duration: number;
+  priority: number;
+  albumId?: string;
 }
 
 interface PlayerContextType {
@@ -67,6 +79,12 @@ interface PlayerContextType {
   hideToast: () => void;
   sleepTimerMinutes: number | null;
   setSleepTimer: (minutes: number | null) => void;
+  
+  // Download Manager fields
+  downloadQueue: DownloadItem[];
+  downloadStates: Record<string, "idle" | "queued" | "downloading" | "completed" | "failed">;
+  addToDownloadQueue: (tracks: Omit<DownloadItem, "priority">[], priorityBoost?: boolean) => void;
+  removeFromDownloadQueue: (trackId: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -114,6 +132,164 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [miniArtRect, setMiniArtRect] = useState<DOMRect | null>(null);
   const [lyrics, setLyrics] = useState<LyricData | null>(null);
   const [loadingLyrics, setLoadingLyrics] = useState(false);
+
+  // Centralized Download Queue States
+  const [downloadQueue, setDownloadQueue] = useState<DownloadItem[]>([]);
+  const [downloadStates, setDownloadStates] = useState<Record<string, "idle" | "queued" | "downloading" | "completed" | "failed">>({});
+  const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
+
+  // Helper to add tracks to queue
+  const addToDownloadQueue = useCallback((tracks: Omit<DownloadItem, "priority">[], priorityBoost = false) => {
+    setDownloadQueue((prev) => {
+      const newItems: DownloadItem[] = [];
+      const updatedStates = { ...downloadStates };
+
+      for (const track of tracks) {
+        if (updatedStates[track.id] === "completed" || updatedStates[track.id] === "downloading") {
+          continue;
+        }
+
+        const existingIdx = prev.findIndex((item) => item.id === track.id);
+        if (existingIdx >= 0) {
+          if (priorityBoost) {
+            prev[existingIdx].priority = Math.max(prev[existingIdx].priority, 10);
+          }
+          continue;
+        }
+
+        newItems.push({
+          ...track,
+          priority: priorityBoost ? 10 : 1,
+        });
+        updatedStates[track.id] = "queued";
+      }
+
+      setDownloadStates(updatedStates);
+      return [...prev, ...newItems].sort((a, b) => b.priority - a.priority);
+    });
+  }, [downloadStates]);
+
+  const removeFromDownloadQueue = useCallback((trackId: string) => {
+    setDownloadQueue((prev) => prev.filter((item) => item.id !== trackId));
+    setDownloadStates((prev) => {
+      const next = { ...prev };
+      delete next[trackId];
+      return next;
+    });
+  }, []);
+
+  // Background sequential download loop
+  useEffect(() => {
+    if (activeDownloadId || downloadQueue.length === 0) return;
+
+    const item = downloadQueue[0];
+    setActiveDownloadId(item.id);
+
+    async function startDownload() {
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
+      
+      const alreadyDownloaded = await isTrackDownloaded(item.id, uId, dId);
+      if (alreadyDownloaded) {
+        setDownloadStates((prev) => ({ ...prev, [item.id]: "completed" }));
+        setDownloadQueue((prev) => prev.filter((q) => q.id !== item.id));
+        setActiveDownloadId(null);
+        return;
+      }
+
+      setDownloadStates((prev) => ({ ...prev, [item.id]: "downloading" }));
+
+      try {
+        let finalAudioUrl = item.audioUrl;
+        let finalId = item.id;
+        let finalCoverUrl = item.coverUrl;
+
+        // If it's a Deezer track that needs Telegram downloading first
+        if (!finalAudioUrl || finalId.startsWith("deezer-")) {
+          const res = await fetch("/api/music/download", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: item.title,
+              artist: item.artist,
+              duration: item.duration,
+              albumId: item.albumId,
+            }),
+          });
+          const data = await res.json();
+          if (data.error || !data.audioUrl) throw new Error(data.error || "Auto-download failed");
+
+          finalAudioUrl = data.audioUrl;
+          finalId = data.id;
+          finalCoverUrl = data.coverUrl || finalCoverUrl;
+        }
+
+        const blobRes = await fetch(finalAudioUrl!);
+        if (!blobRes.ok) throw new Error("Failed to fetch audio stream");
+        const blob = await blobRes.blob();
+
+        await saveTrackOffline({
+          id: finalId,
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          audioUrl: finalAudioUrl!,
+          coverUrl: finalCoverUrl,
+          duration: item.duration,
+        }, uId, dId);
+        await saveAudioBlob(finalId, blob, uId, dId);
+
+        setDownloadStates((prev) => ({ ...prev, [item.id]: "completed", [finalId]: "completed" }));
+      } catch (err) {
+        console.error("Centralized download failed for track:", item.id, err);
+        setDownloadStates((prev) => ({ ...prev, [item.id]: "failed" }));
+      } finally {
+        setDownloadQueue((prev) => prev.filter((q) => q.id !== item.id));
+        setActiveDownloadId(null);
+      }
+    }
+
+    startDownload();
+  }, [downloadQueue, activeDownloadId]);
+
+  // Priority boost for upcoming tracks in the play queue
+  useEffect(() => {
+    if (downloadQueue.length === 0) return;
+
+    const upcomingIds = new Set<string>();
+    
+    // Boost current track
+    if (queue[currentIndex]) {
+      upcomingIds.add(queue[currentIndex].id);
+    }
+    
+    // Boost next 4 tracks in queue
+    for (let i = 1; i <= 4; i++) {
+      const idx = currentIndex + i;
+      if (idx < queue.length) {
+        upcomingIds.add(queue[idx].id);
+      }
+    }
+
+    // Boost next 4 tracks in upNextQueue
+    for (let i = 0; i < Math.min(upNextQueue.length, 4); i++) {
+      upcomingIds.add(upNextQueue[i].id);
+    }
+
+    setDownloadQueue((prev) => {
+      let changed = false;
+      const nextQ = prev.map((item) => {
+        if (upcomingIds.has(item.id) && item.priority < 10) {
+          changed = true;
+          return { ...item, priority: 10 };
+        }
+        return item;
+      });
+
+      if (!changed) return prev;
+      return nextQ.sort((a, b) => b.priority - a.priority);
+    });
+  }, [currentIndex, queue, upNextQueue, downloadQueue.length]);
 
   const currentTrack = queue[currentIndex] || null;
   const isLiked = currentTrack ? favoriteTrackIds.has(currentTrack.id) : false;
@@ -910,6 +1086,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         hideToast,
         sleepTimerMinutes,
         setSleepTimer,
+        downloadQueue,
+        downloadStates,
+        addToDownloadQueue,
+        removeFromDownloadQueue,
       }}
     >
       {children}
