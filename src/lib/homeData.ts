@@ -1,5 +1,7 @@
 import { query, queryOne } from "@/lib/sql";
 import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
+import { updateSystemPlaylist } from "@/lib/charts";
+import { generateUserMixes } from "@/app/api/home/mixes/route";
 
 export type HomeData = {
   user: { name: string; avatarUrl: string | null };
@@ -11,10 +13,33 @@ export type HomeData = {
   systemPlaylists: { id: string; systemId: string; name: string; coverUrl: string | null }[];
 };
 
+function triggerDailyUpdate() {
+  setTimeout(async () => {
+    try {
+      await updateSystemPlaylist("top-50-global", "Top 50 Global", "global");
+      await updateSystemPlaylist("top-50-country", "Top 50 in your Country", "country");
+      await updateSystemPlaylist("top-50-nigeria", "Top 50 Nigeria", "nigeria");
+      await updateSystemPlaylist("top-50-africa", "Top 50 Africa", "africa");
+      await updateSystemPlaylist("top-50-community", "Sakura Global Top 50", "community");
+    } catch (e) {
+      console.error("[HomeData] Failed to update system playlists:", e);
+    }
+  }, 100);
+}
+
 export async function getHomeData(userId: string): Promise<HomeData> {
   const key = cacheKey("home", userId);
   const cached = await cacheGet<HomeData>(key);
   if (cached) return cached;
+
+  // Check if system playlists need updating
+  queryOne<{ updatedAt: Date }>(`SELECT "updatedAt" FROM "SystemPlaylist" WHERE "systemId" = 'top-50-global'`)
+    .then(globalPl => {
+      if (!globalPl || Date.now() - new Date(globalPl.updatedAt).getTime() > 24 * 60 * 60 * 1000) {
+        triggerDailyUpdate();
+      }
+    })
+    .catch(() => triggerDailyUpdate());
 
   const [user, quickPicks, recentlyPlayed, topArtists, playlists, mixes, systemPlaylists] =
     await Promise.all([
@@ -109,6 +134,17 @@ export async function getHomeData(userId: string): Promise<HomeData> {
     madeForYou: mixes,
     systemPlaylists,
   };
+
+  // If no mixes exist, it means this user's mixes are expired or haven't been generated
+  if (mixes.length === 0) {
+    setTimeout(async () => {
+      try {
+        await generateUserMixes(userId);
+      } catch (e) {
+        console.error("[HomeData] Failed to generate user mixes:", e);
+      }
+    }, 100);
+  }
 
   await cacheSet(key, result, TTL.HOME);
   return result;

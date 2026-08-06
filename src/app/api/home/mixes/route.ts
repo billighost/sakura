@@ -10,7 +10,11 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.user.id!;
+  await generateUserMixes(userId);
+  return NextResponse.json({ ok: true });
+}
 
+export async function generateUserMixes(userId: string) {
   // Clear old mixes
   await execute(`DELETE FROM "UserMix" WHERE "userId" = $1`, [userId]);
 
@@ -169,6 +173,4 @@ export async function POST(req: NextRequest) {
 
   // Invalidate home cache
   await cacheDel(cacheKey("home", userId));
-
-  return NextResponse.json({ ok: true });
 }

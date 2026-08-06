@@ -113,7 +113,7 @@ async function HomeFeed({ userId }: { userId: string }) {
     <>
       {/* Top Row Collections */}
       <div className={styles.topRowGrid}>
-        <Link href="/library/liked" className={styles.topRowCard}>
+        <Link href="/liked" className={styles.topRowCard}>
           <div className={styles.topRowIconWrap} style={{ background: 'linear-gradient(135deg, #4f46e5, #ec4899)' }}>
             <HeartIcon />
           </div>
@@ -144,7 +144,6 @@ async function HomeFeed({ userId }: { userId: string }) {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Made for you</h2>
-            <Link href="/library/made-for-you" className={styles.seeAllLink}>See all</Link>
           </div>
           <div className={styles.madeForYouGrid}>
             {data.madeForYou.map((mix) => (
