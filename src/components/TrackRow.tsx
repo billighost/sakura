@@ -58,17 +58,16 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
   const cover = track.coverUrl || track.album?.coverUrl;
 
   useEffect(() => {
+    async function checkOffline() {
+      try {
+        const uId = getCachedUserId();
+        const dId = getDeviceId();
+        const cached = await isTrackDownloaded(track.id, uId, dId);
+        setOffline(cached);
+      } catch {}
+    }
     checkOffline();
   }, [track.id]);
-
-  async function checkOffline() {
-    try {
-      const uId = getCachedUserId();
-      const dId = getDeviceId();
-      const cached = await isTrackDownloaded(track.id, uId, dId);
-      setOffline(cached);
-    } catch {}
-  }
 
   async function handlePlay(e: React.MouseEvent) {
     e.stopPropagation();
@@ -147,7 +146,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       album: t.album?.title,
       albumId: t.album?.id,
       coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
-      audioUrl: t.audioUrl || actualAudioUrl,
+      audioUrl: t.audioUrl || "",
       duration: t.duration,
     }));
     play(

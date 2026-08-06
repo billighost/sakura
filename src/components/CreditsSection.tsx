@@ -5,10 +5,9 @@ interface CreditsSectionProps {
   trackId: string;
   artistName: string;
   artistId?: string;
-  onClose: () => void;
 }
 
-export function CreditsSection({ trackId, artistName, artistId, onClose }: CreditsSectionProps) {
+export function CreditsSection({ trackId, artistName, artistId }: CreditsSectionProps) {
   const [creditsData, setCreditsData] = useState<any>(null);
   const [artistData, setArtistData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,11 +53,6 @@ export function CreditsSection({ trackId, artistName, artistId, onClose }: Credi
     <div className={styles.container} data-block-drag>
       <div className={styles.header}>
         <span>Credits</span>
-        <button className={styles.closeBtn} onClick={onClose} aria-label="Close credits">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
       </div>
 
       {loading ? (

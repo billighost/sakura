@@ -19,7 +19,6 @@ const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
-  const [showCredits, setShowCredits] = useState(false);
   const [showArtLyrics, setShowArtLyrics] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
@@ -95,7 +94,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     setArtLoaded(false);
     setLyricsExpanded(false);
     setShowArtLyrics(false);
-    setShowCredits(false);
   }, [currentTrack?.id]);
 
   // Sync scroll for the lyrics container. Lyrics data itself now lives in
@@ -888,31 +886,18 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <line x1="3" y1="18" x2="3.01" y2="18" />
               </svg>
             </button>
-            <button
-              className={`${styles.iconBtn} ${showCredits ? styles.activeBtn : ""}`}
-              onClick={() => setShowCredits(!showCredits)}
-              aria-label="Credits"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
             </button>
           </div>
 
-          {/* Credits button added to extras, no inline ArtistCreditsPanel needed */}
+          {!lyricsExpanded && currentTrack && (
+            <CreditsSection 
+              trackId={currentTrack.id} 
+              artistName={currentTrack.artist} 
+              artistId={currentTrack.artistId}
+            />
+          )}
         </div>
       </div>
-
-      {showCredits && currentTrack && (
-        <CreditsSection 
-          trackId={currentTrack.id} 
-          artistName={currentTrack.artist} 
-          artistId={currentTrack.artistId}
-          onClose={() => setShowCredits(false)} 
-        />
-      )}
 
       {selectedLyricShare && (
         <LyricShareCard
