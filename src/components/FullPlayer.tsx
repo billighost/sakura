@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
 import { LyricShareCard } from "./LyricShareCard";
+import { CreditsSection } from "./CreditsSection";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -18,6 +19,7 @@ const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [showArtLyrics, setShowArtLyrics] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
@@ -93,6 +95,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     setArtLoaded(false);
     setLyricsExpanded(false);
     setShowArtLyrics(false);
+    setShowCredits(false);
   }, [currentTrack?.id]);
 
   // Sync scroll for the lyrics container. Lyrics data itself now lives in
@@ -885,13 +888,31 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <line x1="3" y1="18" x2="3.01" y2="18" />
               </svg>
             </button>
+            <button
+              className={`${styles.iconBtn} ${showCredits ? styles.activeBtn : ""}`}
+              onClick={() => setShowCredits(!showCredits)}
+              aria-label="Credits"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+            </button>
           </div>
 
-          {/* Artist Card & Song Credits — hidden while the lyrics view is open so it
-              doesn't compete for space with the thing the user just asked to see. */}
-          {!lyricsExpanded && <ArtistCreditsPanel currentTrack={currentTrack} />}
+          {/* Credits button added to extras, no inline ArtistCreditsPanel needed */}
         </div>
       </div>
+
+      {showCredits && currentTrack && (
+        <CreditsSection 
+          trackId={currentTrack.id} 
+          artistName={currentTrack.artist} 
+          artistId={currentTrack.artistId}
+          onClose={() => setShowCredits(false)} 
+        />
+      )}
 
       {selectedLyricShare && (
         <LyricShareCard
@@ -900,148 +921,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
           accentColor={accentColor}
           onClose={() => setSelectedLyricShare(null)}
         />
-      )}
-    </div>
-  );
-}
-
-interface ArtistDetail {
-  id: string;
-  name: string;
-  imageUrl?: string | null;
-  bio?: string | null;
-}
-
-interface CreditDetail {
-  id: string;
-  name: string;
-  role: string;
-}
-
-function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
-  const [artist, setArtist] = useState<ArtistDetail | null>(null);
-  const [credits, setCredits] = useState<CreditDetail[]>([]);
-  const [samples, setSamples] = useState<any[]>([]);
-  const [bioExpanded, setBioExpanded] = useState(false);
-
-  useEffect(() => {
-    if (!currentTrack) return;
-
-    // Load track credits
-    fetch(`/api/tracks/${currentTrack.id}/credits`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.credits) setCredits(data.credits);
-        if (data.samples) setSamples(data.samples);
-      })
-      .catch(() => {});
-
-    // Load artist info
-    if (currentTrack.artistId) {
-      fetch(`/api/artists/${currentTrack.artistId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && !data.error && data.name) {
-            setArtist({
-              id: data.id,
-              name: data.name,
-              imageUrl: data.imageUrl,
-              bio: data.bio
-            });
-          }
-        })
-        .catch(() => {});
-    }
-  }, [currentTrack]);
-
-  if (!currentTrack) return null;
-
-  if (!artist && credits.length === 0 && samples.length === 0) return null;
-
-  return (
-    <div className={styles.artistCreditsWrap} data-block-drag>
-      <div className={styles.creditsDivider} />
-
-      {/* Artist hero card — the artist's photo fills the card with the name and a
-          "view artist" affordance overlaid, like a small poster rather than a form row. */}
-      {artist && (
-        <Link href={`/artist/${artist.id}`} className={styles.artistHeroCard}>
-          {artist.imageUrl ? (
-            <img src={artist.imageUrl} alt="" className={styles.artistHeroImg} />
-          ) : (
-            <div className={styles.artistHeroImgFallback}>{artist.name?.[0]?.toUpperCase() || "?"}</div>
-          )}
-          <div className={styles.artistHeroOverlay} />
-          <div className={styles.artistHeroContent}>
-            <div className={styles.artistProfileLabel}>About the artist</div>
-            <div className={styles.artistHeroName}>{artist.name}</div>
-          </div>
-          <span className={styles.artistHeroChevron} aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </span>
-        </Link>
-      )}
-
-      {artist?.bio && (
-        <div className={styles.artistProfileBioWrap}>
-          <p className={`${styles.artistProfileBio} ${bioExpanded ? styles.bioExpanded : ""}`}>{artist.bio}</p>
-          {artist.bio.length > 120 && (
-            <button className={styles.bioReadMoreBtn} onClick={() => setBioExpanded(!bioExpanded)}>
-              {bioExpanded ? "Show less" : "Read more"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Song Credits Section */}
-      {credits.length > 0 && (
-        <div className={styles.songCreditsCard}>
-          <h3 className={styles.creditsSectionTitle}>
-            <span className={styles.creditsSectionIcon} aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" />
-              </svg>
-            </span>
-            Song Credits
-          </h3>
-          <div className={styles.creditsList}>
-            {credits.map((credit) => (
-              <div key={credit.id} className={styles.creditRow}>
-                <span className={styles.creditAvatar} aria-hidden="true">{credit.name?.[0]?.toUpperCase() || "?"}</span>
-                <span className={styles.creditName}>{credit.name}</span>
-                <span className={styles.creditRole}>{credit.role}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Samples Section */}
-      {samples.length > 0 && (
-        <div className={styles.songCreditsCard}>
-          <h3 className={styles.creditsSectionTitle}>
-            <span className={styles.creditsSectionIcon} aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-                <path d="M3 12h3l3-9 4 18 3-9h5" />
-              </svg>
-            </span>
-            Samples &amp; Interpolations
-          </h3>
-          <div className={styles.creditsList}>
-            {samples.map((sample, idx) => (
-              <div key={idx} className={styles.creditRow}>
-                <span className={styles.creditAvatar} aria-hidden="true">♪</span>
-                <span className={styles.creditName}>{sample.trackTitle}</span>
-                <span className={styles.creditRole}>
-                  {sample.sampleType === "samples" ? "Samples" : "Interpolated"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );
