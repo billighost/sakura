@@ -11,6 +11,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@stef-0012/synclyrics": "^2.5.10",
     "@upstash/redis": "^1.38.2",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",

@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback, useLayoutEffect, useEffect } from "react";
+import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
+import { getLyrics, LyricData, LyricLine } from "@/lib/lyrics";
+import { Scrubber } from "./Scrubber";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -15,6 +18,10 @@ const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [showFullLyrics, setShowFullLyrics] = useState(false);
+  const [showArtLyrics, setShowArtLyrics] = useState(false);
+  const [lyrics, setLyrics] = useState<LyricData | null>(null);
+  const [loadingLyrics, setLoadingLyrics] = useState(false);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
@@ -22,6 +29,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({ dragging: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
 
   const {
@@ -68,7 +76,45 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
   useEffect(() => {
     setArtLoaded(false);
-  }, [currentTrack?.coverUrl]);
+    setLyrics(null);
+    if (!currentTrack) return;
+
+    setLoadingLyrics(true);
+    getLyrics(currentTrack)
+      .then((data) => {
+        setLyrics(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLyrics(false));
+  }, [currentTrack?.id]);
+
+  // Sync scroll for the lyrics container
+  const activeLineIndex = useMemo(() => {
+    if (!lyrics || !lyrics.lines) return -1;
+    const currentProgress = seekDrag !== null ? seekDrag : progress;
+    // Find largest time less than or equal to current progress
+    let index = -1;
+    for (let i = 0; i < lyrics.lines.length; i++) {
+      if (lyrics.lines[i].time <= currentProgress) {
+        index = i;
+      } else {
+        break;
+      }
+    }
+    return index;
+  }, [lyrics, progress, seekDrag]);
+
+  useEffect(() => {
+    if (activeLineIndex !== -1 && lyricsContainerRef.current) {
+      const activeEl = lyricsContainerRef.current.children[activeLineIndex] as HTMLElement;
+      if (activeEl) {
+        lyricsContainerRef.current.scrollTo({
+          top: activeEl.offsetTop - lyricsContainerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
+          behavior: "smooth"
+        });
+      }
+    }
+  }, [activeLineIndex]);
 
   // --- Shared-element "grow from the mini player" transition ---------------
   useLayoutEffect(() => {
@@ -163,46 +209,136 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   );
 
   // --- Queue drag-to-reorder -------------------------------------------------
+  const LONG_PRESS_MS = 260;
+  const MOVE_CANCEL_THRESHOLD = 10;
+
   const [dragQueueItem, setDragQueueItem] = useState<{
     list: "upnext" | "tail";
     index: number;
     deltaY: number;
+    rowHeight: number;
   } | null>(null);
-  const queueDragRef = useRef({ startY: 0 });
 
-  function handleQueueDragStart(list: "upnext" | "tail", index: number, e: React.PointerEvent) {
-    e.stopPropagation();
-    queueDragRef.current.startY = e.clientY;
-    setDragQueueItem({ list, index, deltaY: 0 });
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+  const pressState = useRef<{
+    pointerId: number;
+    list: "upnext" | "tail";
+    index: number;
+    startY: number;
+    startX: number;
+    rowEl: HTMLElement;
+    longPressTimer: ReturnType<typeof setTimeout> | null;
+    active: boolean;
+  } | null>(null);
+
+  const finishQueueDrag = useCallback(
+    (finalDeltaY: number | null) => {
+      const ps = pressState.current;
+      if (ps?.longPressTimer) clearTimeout(ps.longPressTimer);
+      pressState.current = null;
+
+      setDragQueueItem((current) => {
+        if (!current) return null;
+        if (finalDeltaY !== null) {
+          const rowsMoved = Math.round(finalDeltaY / current.rowHeight);
+          if (rowsMoved !== 0) {
+            const listLength = current.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
+            const to = Math.min(Math.max(current.index + rowsMoved, 0), Math.max(0, listLength - 1));
+            if (to !== current.index) {
+              if (current.list === "upnext") reorderUpNext(current.index, to);
+              else reorderQueueTail(current.index, to);
+            }
+          }
+        }
+        return null;
+      });
+    },
+    [upNextQueue.length, queue.length, currentIndex, reorderUpNext, reorderQueueTail]
+  );
+
+  useEffect(() => {
+    if (!dragQueueItem) return;
+    function forceEnd() {
+      finishQueueDrag(null);
+    }
+    window.addEventListener("pointerup", forceEnd);
+    window.addEventListener("pointercancel", forceEnd);
+    window.addEventListener("blur", forceEnd);
+    return () => {
+      window.removeEventListener("pointerup", forceEnd);
+      window.removeEventListener("pointercancel", forceEnd);
+      window.removeEventListener("blur", forceEnd);
+    };
+  }, [dragQueueItem, finishQueueDrag]);
+
+  useEffect(() => {
+    if (!dragQueueItem) return;
+    const listLength = dragQueueItem.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
+    if (dragQueueItem.index >= listLength) finishQueueDrag(null);
+  }, [upNextQueue.length, queue.length, currentIndex, dragQueueItem, finishQueueDrag]);
+
+  function handleRowPointerDown(list: "upnext" | "tail", index: number, e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
+    if (e.button !== undefined && e.button !== 0) return;
+
+    const rowEl = e.currentTarget as HTMLElement;
+    const timer = setTimeout(() => {
+      const ps = pressState.current;
+      if (!ps) return;
+      ps.active = true;
+      rowEl.setPointerCapture?.(ps.pointerId);
+      setDragQueueItem({ list, index, deltaY: 0, rowHeight: rowEl.getBoundingClientRect().height || ROW_HEIGHT });
+    }, LONG_PRESS_MS);
+
+    pressState.current = {
+      pointerId: e.pointerId,
+      list,
+      index,
+      startY: e.clientY,
+      startX: e.clientX,
+      rowEl,
+      longPressTimer: timer,
+      active: false,
+    };
   }
 
-  function handleQueueDragMove(e: React.PointerEvent) {
-    if (!dragQueueItem) return;
-    e.stopPropagation();
-    const deltaY = e.clientY - queueDragRef.current.startY;
+  function handleRowPointerMove(e: React.PointerEvent) {
+    const ps = pressState.current;
+    if (!ps) return;
+
+    if (!ps.active) {
+      const dx = Math.abs(e.clientX - ps.startX);
+      const dy = Math.abs(e.clientY - ps.startY);
+      if (dx > MOVE_CANCEL_THRESHOLD || dy > MOVE_CANCEL_THRESHOLD) {
+        if (ps.longPressTimer) clearTimeout(ps.longPressTimer);
+        pressState.current = null;
+      }
+      return;
+    }
+
+    e.preventDefault();
+    const deltaY = e.clientY - ps.startY;
     setDragQueueItem((prev) => (prev ? { ...prev, deltaY } : prev));
   }
 
-  function handleQueueDragEnd(e: React.PointerEvent) {
-    if (!dragQueueItem) return;
-    e.stopPropagation();
-    const rowsMoved = Math.round(dragQueueItem.deltaY / ROW_HEIGHT);
-    if (rowsMoved !== 0) {
-      const listLength = dragQueueItem.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
-      const to = Math.min(Math.max(dragQueueItem.index + rowsMoved, 0), listLength - 1);
-      if (to !== dragQueueItem.index) {
-        if (dragQueueItem.list === "upnext") reorderUpNext(dragQueueItem.index, to);
-        else reorderQueueTail(dragQueueItem.index, to);
-      }
+  function handleRowPointerUp(e: React.PointerEvent) {
+    const ps = pressState.current;
+    if (!ps) return;
+    if (!ps.active) {
+      if (ps.longPressTimer) clearTimeout(ps.longPressTimer);
+      pressState.current = null;
+      return;
     }
-    setDragQueueItem(null);
+    const finalDeltaY = e.clientY - ps.startY;
+    finishQueueDrag(finalDeltaY);
+  }
+
+  function handleRowPointerCancel() {
+    finishQueueDrag(null);
   }
 
   if (!currentTrack) return null;
 
   const displayProgress = seekDrag !== null ? seekDrag : progress;
-  const progressPercent = duration > 0 ? (displayProgress / duration) * 100 : 0;
   const tailQueue = queue.slice(currentIndex + 1);
 
   return (
@@ -275,28 +411,26 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div
                       key={t.id}
                       className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
-                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)` } : undefined}
+                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)`, transition: "none" } : undefined}
+                      onPointerDown={(e) => handleRowPointerDown("upnext", i, e)}
+                      onPointerMove={handleRowPointerMove}
+                      onPointerUp={handleRowPointerUp}
+                      onPointerCancel={handleRowPointerCancel}
                     >
-                      <button
-                        className={styles.dragHandleBtn}
-                        onPointerDown={(e) => handleQueueDragStart("upnext", i, e)}
-                        onPointerMove={handleQueueDragMove}
-                        onPointerUp={handleQueueDragEnd}
-                        onPointerCancel={handleQueueDragEnd}
-                        aria-label={`Reorder ${t.title}`}
-                      >
+                      <span className={styles.dragGrip} aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                           <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
                           <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
                           <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
                         </svg>
-                      </button>
+                      </span>
                       <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
                       <div className={styles.queueInfo}>
                         <div className={styles.queueTitle}>{t.title}</div>
                         <div className={styles.queueArtist}>{t.artist}</div>
                       </div>
                       <button
+                        data-no-drag
                         className={styles.removeBtn}
                         onClick={() => removeFromUpNext(t.id)}
                         aria-label={`Remove ${t.title} from queue`}
@@ -320,28 +454,26 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                     <div
                       key={t.id}
                       className={`${styles.queueRow} ${isDragging ? styles.queueRowDragging : ""}`}
-                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)` } : undefined}
+                      style={isDragging ? { transform: `translateY(${dragQueueItem.deltaY}px)`, transition: "none" } : undefined}
+                      onPointerDown={(e) => handleRowPointerDown("tail", i, e)}
+                      onPointerMove={handleRowPointerMove}
+                      onPointerUp={handleRowPointerUp}
+                      onPointerCancel={handleRowPointerCancel}
                     >
-                      <button
-                        className={styles.dragHandleBtn}
-                        onPointerDown={(e) => handleQueueDragStart("tail", i, e)}
-                        onPointerMove={handleQueueDragMove}
-                        onPointerUp={handleQueueDragEnd}
-                        onPointerCancel={handleQueueDragEnd}
-                        aria-label={`Reorder ${t.title}`}
-                      >
+                      <span className={styles.dragGrip} aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                           <circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" />
                           <circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" />
                           <circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" />
                         </svg>
-                      </button>
+                      </span>
                       <img src={t.coverUrl || ""} alt="" className={styles.queueArt} />
                       <div className={styles.queueInfo}>
                         <div className={styles.queueTitle}>{t.title}</div>
                         <div className={styles.queueArtist}>{t.artist}</div>
                       </div>
                       <button
+                        data-no-drag
                         className={styles.removeBtn}
                         onClick={() => removeTrack(t.id)}
                         aria-label={`Remove ${t.title} from queue`}
@@ -356,10 +488,73 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               </>
             )}
           </div>
+        ) : showFullLyrics ? (
+          // Dedicated Full Synced Lyrics Panel
+          <div className={styles.fullLyricsContainer}>
+            <div className={styles.fullLyricsHeader}>
+              <span>Lyrics</span>
+              <button className={styles.closeLyricsBtn} onClick={() => setShowFullLyrics(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            {loadingLyrics ? (
+              <div className={styles.lyricsStatus}>Loading lyrics...</div>
+            ) : lyrics?.lines ? (
+              <div ref={lyricsContainerRef} className={styles.lyricsList}>
+                {lyrics.lines.map((line, idx) => (
+                  <p
+                    key={idx}
+                    className={`${styles.lyricLine} ${idx === activeLineIndex ? styles.lyricLineActive : ""}`}
+                    onClick={() => seek(line.time)}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+            ) : lyrics?.lyrics ? (
+              <div className={styles.plainLyricsText}>
+                {lyrics.lyrics.split("\n").map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.lyricsStatus}>Lyrics unavailable</div>
+            )}
+          </div>
         ) : (
           <div className={styles.artContainer}>
-            <div ref={artShellRef} className={styles.artShell} style={artFlipStyle}>
-              {currentTrack.coverUrl ? (
+            <div
+              ref={artShellRef}
+              className={styles.artShell}
+              style={artFlipStyle}
+              onClick={() => {
+                if (lyrics?.lines || lyrics?.lyrics) {
+                  setShowArtLyrics(!showArtLyrics);
+                }
+              }}
+            >
+              {showArtLyrics && (lyrics?.lines || lyrics?.lyrics) ? (
+                // Line-by-line album art overlay
+                <div className={styles.artLyricsOverlay}>
+                  {lyrics?.lines ? (
+                    <div className={styles.rollingLyricWrap}>
+                      <p className={styles.rollingLyricLineActive}>
+                        {lyrics.lines[activeLineIndex]?.text || "♪"}
+                      </p>
+                      <p className={styles.rollingLyricLineNext}>
+                        {lyrics.lines[activeLineIndex + 1]?.text || ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={styles.rollingLyricWrap}>
+                      <p className={styles.rollingLyricLineActive}>Plain text lyrics loaded</p>
+                      <p className={styles.rollingLyricLineNext}>Tap player icon to view full text</p>
+                    </div>
+                  )}
+                </div>
+              ) : currentTrack.coverUrl ? (
                 <>
                   {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}
                   <img
@@ -382,60 +577,27 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
       </div>
 
       <div className={styles.controls}>
-        {!showQueue && (
+        {!showQueue && !showFullLyrics && (
           <div className={styles.trackInfo}>
             <div className={styles.trackTitle}>{currentTrack.title}</div>
             <div className={styles.trackArtist}>{currentTrack.artist}</div>
           </div>
         )}
 
-        <div className={styles.seekContainer}>
-          <div className={styles.seekTrack}>
-            <div
-              className={styles.seekProgress}
-              style={{ width: `${progressPercent}%` }}
-            />
-            <div
-              className={styles.seekThumb}
-              style={{ left: `${progressPercent}%` }}
-            />
-          </div>
-          <input
-            type="range"
-            className={styles.seekInput}
-            min={0}
-            max={duration || 0}
-            step={0.1}
-            value={displayProgress}
-            onInput={(e) => {
-              const val = Number((e.target as HTMLInputElement).value);
-              setSeekDrag(val);
-            }}
-            onMouseDown={(e) => {
-              beginSeek();
-              const val = Number((e.target as HTMLInputElement).value);
-              setSeekDrag(val);
-            }}
-            onMouseUp={(e) => {
-              const val = Number((e.target as HTMLInputElement).value);
-              seek(val);
-              endSeek(val);
-              setSeekDrag(null);
-            }}
-            onTouchStart={(e) => {
-              beginSeek();
-              const val = Number((e.target as HTMLInputElement).value);
-              setSeekDrag(val);
-            }}
-            onTouchEnd={(e) => {
-              const val = Number((e.target as HTMLInputElement).value);
-              seek(val);
-              endSeek(val);
-              setSeekDrag(null);
-            }}
-            aria-label="Seek"
-          />
-        </div>
+        <Scrubber
+          progress={progress}
+          duration={duration}
+          accentColor={accentColor}
+          variant="full"
+          formatTime={formatTime}
+          onScrubStart={beginSeek}
+          onScrubMove={(t) => setSeekDrag(t)}
+          onSeek={(t) => {
+            seek(t);
+            endSeek(t);
+            setSeekDrag(null);
+          }}
+        />
         <div className={styles.timeRow}>
           <span>{formatTime(displayProgress)}</span>
           <span>{formatTime(duration)}</span>
@@ -541,6 +703,19 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </div>
           </div>
 
+          {/* Toggle Full Synced Lyrics Panel */}
+          <button
+            className={`${styles.iconBtn} ${(lyrics?.lines || lyrics?.lyrics) ? styles.lyricsAvailableBtn : ""} ${showFullLyrics ? styles.activeBtn : ""}`}
+            onClick={() => setShowFullLyrics(!showFullLyrics)}
+            aria-label="Toggle Lyrics View"
+            title="Lyrics"
+            disabled={!lyrics?.lines && !lyrics?.lyrics}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+              <path d="M12 20h9M3 20h6M3 12h18M3 4h18" />
+            </svg>
+          </button>
+
           <button className={styles.iconBtn} onClick={() => {
             if (navigator.share) {
               navigator.share({ title: currentTrack?.title, text: `${currentTrack?.title} by ${currentTrack?.artist}`, url: window.location.href });
@@ -564,9 +739,9 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </svg>
           </button>
 
-          <button 
-            className={`${styles.iconBtn} ${showQueue ? styles.activeBtn : ""}`} 
-            onClick={() => setShowQueue(!showQueue)} 
+          <button
+            className={`${styles.iconBtn} ${showQueue ? styles.activeBtn : ""}`}
+            onClick={() => setShowQueue(!showQueue)}
             aria-label="Queue"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -579,7 +754,136 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             </svg>
           </button>
         </div>
+
+        {/* Artist Card & Song Credits */}
+        <ArtistCreditsPanel currentTrack={currentTrack} />
       </div>
+    </div>
+  );
+}
+
+interface ArtistDetail {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  bio?: string | null;
+}
+
+interface CreditDetail {
+  id: string;
+  name: string;
+  role: string;
+}
+
+function ArtistCreditsPanel({ currentTrack }: { currentTrack: any }) {
+  const [artist, setArtist] = useState<ArtistDetail | null>(null);
+  const [credits, setCredits] = useState<CreditDetail[]>([]);
+  const [samples, setSamples] = useState<any[]>([]);
+  const [bioExpanded, setBioExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    // Load track credits
+    fetch(`/api/tracks/${currentTrack.id}/credits`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.credits) setCredits(data.credits);
+        if (data.samples) setSamples(data.samples);
+      })
+      .catch(() => {});
+
+    // Load artist info
+    if (currentTrack.artistId) {
+      fetch(`/api/artists/${currentTrack.artistId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            setArtist({
+              id: data.id,
+              name: data.name,
+              imageUrl: data.imageUrl,
+              bio: data.bio
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentTrack]);
+
+  if (!currentTrack) return null;
+
+  return (
+    <div className={styles.artistCreditsWrap}>
+      {/* Artist Profile Section */}
+      {artist && (
+        <div className={styles.artistProfileCard}>
+          <div className={styles.artistProfileHeader}>
+            {artist.imageUrl ? (
+              <img src={artist.imageUrl} alt="" className={styles.artistProfileAvatar} />
+            ) : (
+              <div className={styles.artistProfileAvatarFallback}>
+                {artist.name[0]?.toUpperCase()}
+              </div>
+            )}
+            <div className={styles.artistProfileInfo}>
+              <div className={styles.artistProfileLabel}>About the Artist</div>
+              <Link href={`/artist/${artist.id}`} className={styles.artistProfileName}>
+                {artist.name}
+              </Link>
+            </div>
+          </div>
+          {artist.bio && (
+            <div className={styles.artistProfileBioWrap}>
+              <p className={`${styles.artistProfileBio} ${bioExpanded ? styles.bioExpanded : ""}`}>
+                {artist.bio}
+              </p>
+              {artist.bio.length > 120 && (
+                <button
+                  className={styles.bioReadMoreBtn}
+                  onClick={() => setBioExpanded(!bioExpanded)}
+                >
+                  {bioExpanded ? "Show Less" : "Read More"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Song Credits Section */}
+      {credits.length > 0 && (
+        <div className={styles.songCreditsCard}>
+          <h3 className={styles.creditsSectionTitle}>Song Credits</h3>
+          <div className={styles.creditsList}>
+            {credits.map((credit) => (
+              <div key={credit.id} className={styles.creditRow}>
+                <span className={styles.creditName}>{credit.name}</span>
+                <span className={styles.creditRole}>{credit.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Samples Section */}
+      {samples.length > 0 && (
+        <div className={styles.songCreditsCard}>
+          <h3 className={styles.creditsSectionTitle}>Samples / Inclusions</h3>
+          <div className={styles.creditsList}>
+            {samples.map((sample, idx) => (
+              <div key={idx} className={styles.creditRow}>
+                <span className={styles.creditName}>
+                  {sample.trackTitle}
+                </span>
+                <span className={styles.creditRole}>
+                  {sample.sampleType === "samples" ? "Samples" : "Interpolated"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

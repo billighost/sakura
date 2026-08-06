@@ -17,8 +17,8 @@ export async function GET(
     const track = await queryOne(
       `SELECT
         t.id, t.title, t.duration, t."trackNumber", t.genre, t."audioUrl", t."coverUrl",
-        json_build_object('name', a.name) AS artist,
-        json_build_object('title', al.title, 'coverUrl', al."coverUrl") AS album
+        json_build_object('name', a.name, 'id', a.id) AS artist,
+        json_build_object('title', al.title, 'coverUrl', al."coverUrl", 'id', al.id) AS album
       FROM "Track" t
       LEFT JOIN "Artist" a ON t."artistId" = a.id
       LEFT JOIN "Album" al ON t."albumId" = al.id

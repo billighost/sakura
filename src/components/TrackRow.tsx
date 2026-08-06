@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
-import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack } from "@/lib/offline-db";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import styles from "./TrackRow.module.css";
 
@@ -41,16 +41,20 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
   async function checkOffline() {
     try {
-      const cached = await isTrackDownloaded(track.id);
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
+      const cached = await isTrackDownloaded(track.id, uId, dId);
       setOffline(cached);
     } catch {}
   }
 
   async function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
+    const uId = getCachedUserId();
+    const dId = getDeviceId();
     if (offline) {
       try {
-        await removeOfflineTrack(track.id);
+        await removeOfflineTrack(track.id, uId, dId);
         setOffline(false);
       } catch {}
       return;
@@ -69,8 +73,8 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
         audioUrl: track.audioUrl,
         coverUrl: cover,
         duration: track.duration,
-      });
-      await saveAudioBlob(track.id, blob);
+      }, uId, dId);
+      await saveAudioBlob(track.id, blob, uId, dId);
       setOffline(true);
     } catch (err) {
       console.error("Download failed:", err);
@@ -94,7 +98,9 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
         id: t.id,
         title: t.title,
         artist: t.artist.name,
+        artistId: t.artist.id,
         album: t.album?.title,
+        albumId: t.album?.id,
         coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
         audioUrl: t.audioUrl,
         duration: t.duration,
@@ -104,7 +110,9 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           id: track.id,
           title: track.title,
           artist: track.artist.name,
+          artistId: track.artist.id,
           album: track.album?.title,
+          albumId: track.album?.id,
           coverUrl: cover,
           audioUrl: track.audioUrl,
           duration: track.duration,
@@ -257,7 +265,9 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
                 id: track.id,
                 title: track.title,
                 artist: track.artist.name,
+                artistId: track.artist.id,
                 album: track.album?.title,
+                albumId: track.album?.id,
                 coverUrl: cover,
                 audioUrl: track.audioUrl,
                 duration: track.duration,

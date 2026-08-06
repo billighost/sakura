@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { usePlayer } from "./PlayerContext";
+import { Scrubber } from "./Scrubber";
 import styles from "./MiniPlayer.module.css";
 
 const PETAL_COUNT = 6;
@@ -23,7 +24,6 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     accentColor,
     setMiniArtRect,
   } = usePlayer();
-  const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
   const artWrapRef = useRef<HTMLDivElement>(null);
@@ -47,9 +47,6 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   }, [currentTrack?.id, setMiniArtRect]);
 
   if (!currentTrack) return null;
-
-  const displayProgress = seekDrag !== null ? seekDrag : progress;
-  const progressPercent = duration > 0 ? (displayProgress / duration) * 100 : 0;
 
   function handleLike() {
     if (!isLiked) setBurstKey((k) => k + 1);
@@ -77,48 +74,17 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         handleExpand();
       }}
     >
-      <div className={styles.seekContainer}>
-        <div className={styles.progressTrack}>
-          <div
-            className={styles.progressBar}
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-        <input
-          type="range"
-          className={styles.seekInput}
-          min={0}
-          max={duration || 0}
-          step={0.1}
-          value={displayProgress}
-          onInput={(e) => {
-            const val = Number((e.target as HTMLInputElement).value);
-            setSeekDrag(val);
+      <div className={styles.scrubRow}>
+        <Scrubber
+          progress={progress}
+          duration={duration}
+          accentColor={accentColor}
+          variant="mini"
+          onScrubStart={beginSeek}
+          onSeek={(t) => {
+            seek(t);
+            endSeek(t);
           }}
-          onMouseDown={(e) => {
-            beginSeek();
-            const val = Number((e.target as HTMLInputElement).value);
-            setSeekDrag(val);
-          }}
-          onMouseUp={(e) => {
-            const val = Number((e.target as HTMLInputElement).value);
-            seek(val);
-            endSeek(val);
-            setSeekDrag(null);
-          }}
-          onTouchStart={(e) => {
-            beginSeek();
-            const val = Number((e.target as HTMLInputElement).value);
-            setSeekDrag(val);
-          }}
-          onTouchEnd={(e) => {
-            const val = Number((e.target as HTMLInputElement).value);
-            seek(val);
-            endSeek(val);
-            setSeekDrag(null);
-          }}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Seek"
         />
       </div>
 

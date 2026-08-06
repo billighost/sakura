@@ -194,7 +194,9 @@ export default function SearchPage() {
   function handleChange(value: string) {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(value), 300);
+    debounceRef.current = setTimeout(() => {
+      search(value);
+    }, 400);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

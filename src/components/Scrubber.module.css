@@ -1,0 +1,132 @@
+/* ---------- shared ---------- */
+
+.track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trackBg {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  height: var(--scrub-track-height, 4px);
+  border-radius: 999px;
+  background: var(--scrub-track-bg, rgba(255, 255, 255, 0.16));
+  transition: height 0.15s ease;
+}
+
+.fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: var(--scrub-track-height, 4px);
+  border-radius: 999px;
+  background: var(--track-accent, var(--sakura-accent-gradient));
+  transition: height 0.15s ease;
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: var(--scrub-thumb-size, 14px);
+  height: var(--scrub-thumb-size, 14px);
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 3px var(--track-accent, rgba(242, 120, 159, 0.3));
+  pointer-events: none;
+}
+
+/* ---------- full variant (inline, in FullPlayer's control stack) ---------- */
+
+.hitAreaFull {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 2rem;
+  margin: -0.375rem 0;
+}
+
+.hitAreaFull .thumb {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hitAreaFull:hover .trackBg,
+.hitAreaFull:hover .fill,
+.hitAreaFull.pressed .trackBg,
+.hitAreaFull.pressed .fill {
+  --scrub-track-height: 6px;
+}
+
+.hitAreaFull.pressed .thumb {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+/* ---------- mini variant (its own dedicated row, not pinned to the player's border) ---------- */
+
+.hitAreaMini {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.hitAreaMini .track {
+  margin: 0 10px;
+  width: calc(100% - 20px);
+}
+
+.hitAreaMini .thumb {
+  --scrub-thumb-size: 9px;
+}
+
+.hitAreaMini:hover .trackBg,
+.hitAreaMini:hover .fill,
+.hitAreaMini.pressed .trackBg,
+.hitAreaMini.pressed .fill {
+  height: 6px;
+}
+
+.hitAreaMini:hover .thumb,
+.hitAreaMini.pressed .thumb {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hitAreaMini.pressed .thumb {
+  transform: translate(-50%, -50%) scale(1.25);
+}
+
+.tooltip {
+  position: absolute;
+  top: -2.25rem;
+  transform: translateX(-50%) translateY(4px);
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: var(--sakura-glass-strong, rgba(20, 16, 23, 0.9));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--sakura-glass-border);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.hitAreaMini.pressed .tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

@@ -1,14 +1,16 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
-import { getAudioBlob } from "@/lib/offline-db";
+import { getAudioBlob, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 
 interface Track {
   id: string;
   title: string;
   artist: string;
+  artistId?: string;
   album?: string;
+  albumId?: string;
   coverUrl?: string;
   audioUrl: string;
   duration: number;
@@ -257,6 +259,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               return newQ;
             });
             setCurrentIndex((i) => i + 1);
+            // Autoplay next item after state update settles
+            setTimeout(() => {
+              audioRef.current?.play().catch(() => {});
+            }, 50);
             return;
           }
 
@@ -273,10 +279,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
             }
             setCurrentIndex(nextIdx);
+            setTimeout(() => {
+              audioRef.current?.play().catch(() => {});
+            }, 50);
           } else if (ci < q.length - 1) {
             setCurrentIndex(ci + 1);
+            setTimeout(() => {
+              audioRef.current?.play().catch(() => {});
+            }, 50);
           } else if (rp === "all") {
             setCurrentIndex(0);
+            setTimeout(() => {
+              audioRef.current?.play().catch(() => {});
+            }, 50);
           } else {
             setIsPlaying(false);
           }
@@ -298,7 +313,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       let src = currentTrack.audioUrl;
 
       try {
-        const blob = await getAudioBlob(currentTrack.id);
+        const uId = getCachedUserId();
+        const dId = getDeviceId();
+        const blob = await getAudioBlob(currentTrack.id, uId, dId);
         if (blob && active) {
           objectUrl = URL.createObjectURL(blob);
           src = objectUrl;

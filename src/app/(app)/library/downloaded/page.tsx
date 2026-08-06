@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { getAllDownloadedTracks } from "@/lib/offline-db";
+import { getAllDownloadedTracks, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
 interface OfflineTrack {
@@ -43,7 +43,9 @@ export default function DownloadedPage() {
 
   const loadTracks = useCallback(async () => {
     try {
-      const allTracks = await getAllDownloadedTracks();
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
+      const allTracks = await getAllDownloadedTracks(uId, dId);
       setTracks(allTracks.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
     } catch {}
     setLoading(false);

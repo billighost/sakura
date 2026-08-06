@@ -167,7 +167,12 @@
   position: relative;
   z-index: 2;
   flex-shrink: 0;
-  background: var(--sakura-glass-strong);
+  /* Intentionally NOT var(--sakura-glass-strong): this sheet sits over the
+     blurred, darkened album art in both themes (like Spotify/Apple Music's
+     now-playing screen), so it needs its own fixed dark glass regardless of
+     site theme — otherwise it goes near-white in light mode and swallows
+     the white text/icons below. */
+  background: rgba(20, 16, 23, 0.82);
   backdrop-filter: blur(28px) saturate(1.3);
   -webkit-backdrop-filter: blur(28px) saturate(1.3);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -197,54 +202,6 @@
   font-size: clamp(0.8125rem, 2.5vw, 0.9375rem);
   color: rgba(255, 255, 255, 0.62);
   margin-top: 0.3rem;
-}
-
-.seekContainer {
-  position: relative;
-  height: 1.25rem;
-  display: flex;
-  align-items: center;
-}
-
-.seekTrack {
-  position: absolute;
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.16);
-  overflow: visible;
-}
-
-.seekProgress {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--track-accent, var(--sakura-accent-gradient));
-  transition: width 0.05s linear, background 0.4s ease;
-}
-
-.seekThumb {
-  position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translate(-50%, -50%) scale(0);
-  transition: transform 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-.seekContainer:hover .seekThumb {
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.seekInput {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 1;
 }
 
 .timeRow {
@@ -487,6 +444,13 @@
   padding: 8px;
   border-radius: 12px;
   position: relative;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s;
+}
+
+.queueRow {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .queueRow:hover {
@@ -502,14 +466,15 @@
 .queueRowDragging {
   position: relative;
   z-index: 5;
-  background: var(--sakura-glass-strong);
+  /* Fixed dark glass for the same reason as .controls above — the queue
+     list sits on the same dark overlay in both themes. */
+  background: rgba(20, 16, 23, 0.9);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
   border-radius: 12px;
   cursor: grabbing;
 }
 
-.dragHandleBtn {
-  all: unset;
+.dragGrip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -517,12 +482,12 @@
   height: 2.5rem;
   flex-shrink: 0;
   color: rgba(255, 255, 255, 0.35);
-  cursor: grab;
-  touch-action: none;
+  /* Purely decorative now — the whole row handles the drag gesture, this
+     just signals "draggable" visually, so it shouldn't intercept events. */
+  pointer-events: none;
 }
 
-.dragHandleBtn:active {
-  cursor: grabbing;
+.queueRowDragging .dragGrip {
   color: rgba(255, 255, 255, 0.7);
 }
 
@@ -612,4 +577,281 @@
 @keyframes eq {
   0%, 100% { transform: scaleY(0.4); }
   50% { transform: scaleY(1); }
+}
+
+/* --- Lyrics System --- */
+.lyricsAvailableBtn {
+  color: var(--track-accent, var(--sakura-accent)) !important;
+}
+
+.fullLyricsContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 clamp(1rem, 4vw, 2rem) 1rem;
+  min-height: 0;
+  color: #fff;
+  animation: fadeIn 0.3s ease;
+}
+
+.fullLyricsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--sakura-font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.closeLyricsBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.closeLyricsBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lyricsList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 0;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.lyricsList::-webkit-scrollbar {
+  display: none;
+}
+
+.lyricLine {
+  font-size: clamp(1.2rem, 3.8vw, 1.7rem);
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.3s ease;
+  transform-origin: left center;
+}
+
+.lyricLine:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.lyricLineActive {
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.plainLyricsText {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 0;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-line;
+}
+
+.lyricsStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+}
+
+/* Rolling Album Art Overlay */
+.artLyricsOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: inherit;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  animation: fadeIn 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rollingLyricWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rollingLyricLineActive {
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  line-height: 1.4;
+}
+
+.rollingLyricLineNext {
+  font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* --- Artist Credits & Profile Card --- */
+.artistCreditsWrap {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 2rem;
+}
+
+.artistProfileCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.artistProfileHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.artistProfileAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.artistProfileAvatarFallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sakura-accent), var(--sakura-accent-2));
+  color: #1A1620;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.artistProfileInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.artistProfileLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+}
+
+.artistProfileName {
+  font-family: var(--sakura-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: color 0.2s;
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.artistProfileName:hover {
+  color: var(--track-accent, var(--sakura-accent));
+}
+
+.artistProfileBioWrap {
+  margin-top: 0.75rem;
+}
+
+.artistProfileBio {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.artistProfileBio.bioExpanded {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
+.bioReadMoreBtn {
+  all: unset;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--track-accent, var(--sakura-accent));
+  cursor: pointer;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.bioReadMoreBtn:hover {
+  text-decoration: underline;
+}
+
+.songCreditsCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.creditsSectionTitle {
+  font-family: var(--sakura-font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.75rem;
+}
+
+.creditsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.creditRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+}
+
+.creditName {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.creditRole {
+  color: rgba(255, 255, 255, 0.45);
 }

@@ -52,7 +52,12 @@ export default function ProfilePage() {
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((data) => setProfile(data))
+      .then((data) => {
+        setProfile(data);
+        if (data && data.id) {
+          localStorage.setItem("sakura-user-id", data.id);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
 

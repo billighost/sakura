@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
 interface Track {
@@ -55,7 +55,18 @@ export default function LikedPage() {
   const { play } = usePlayer();
   const hasLoadedFromCache = useRef(false);
 
-  const fetchFromServer = useCallback(async (isRefresh = false) => {
+  // Restore sorting preference
+  useEffect(() => {
+    const savedSort = localStorage.getItem("sakura-liked-sort") as SortKey;
+    if (savedSort) setSortBy(savedSort);
+  }, []);
+
+  const handleSortChange = useCallback((newSort: SortKey) => {
+    setSortBy(newSort);
+    localStorage.setItem("sakura-liked-sort", newSort);
+  }, []);
+
+  const fetchFromServer = useCallback(async (isRefresh = false, userId = getCachedUserId()) => {
     if (isRefresh) setRefreshing(true);
     try {
       const res = await fetch("/api/favorites");
@@ -63,8 +74,8 @@ export default function LikedPage() {
       const newTracks = data.tracks || data || [];
       setTracks(newTracks);
 
-      // Update cache
-      setCachedLibraryData("liked-main", { tracks: newTracks });
+      // Update cache isolated by user ID
+      setCachedLibraryData("liked-main", { tracks: newTracks }, userId);
     } catch {
     } finally {
       setLoading(false);
@@ -77,17 +88,18 @@ export default function LikedPage() {
     let cancelled = false;
 
     async function init() {
-      const cached = await getCachedLibraryData<{ tracks: Track[] }>("liked-main");
+      const activeUserId = getCachedUserId();
+      const cached = await getCachedLibraryData<{ tracks: Track[] }>("liked-main", activeUserId);
       if (cancelled) return;
 
       if (cached?.tracks) {
         setTracks(cached.tracks);
         setLoading(false);
         hasLoadedFromCache.current = true;
-        // Refresh from server in background
-        fetchFromServer(false);
+        // Refresh from server silently in the background
+        fetchFromServer(false, activeUserId);
       } else {
-        await fetchFromServer(false);
+        await fetchFromServer(false, activeUserId);
       }
     }
 
@@ -245,12 +257,6 @@ export default function LikedPage() {
         </div>
       )}
 
-      {refreshing && (
-        <div className={styles.refreshIndicator}>
-          <div className={styles.refreshSpinner} />
-        </div>
-      )}
-
       {tracks.length > 0 && (
         <div className={styles.controlsRow}>
           <div className={styles.playButtons}>
@@ -296,7 +302,7 @@ export default function LikedPage() {
                       <button
                         key={key}
                         className={`${styles.sortOption} ${sortBy === key ? styles.sortOptionActive : ""}`}
-                        onClick={() => { setSortBy(key); setSortOpen(false); }}
+                        onClick={() => { handleSortChange(key); setSortOpen(false); }}
                       >
                         {sortLabels[key]}
                         {sortBy === key && (
