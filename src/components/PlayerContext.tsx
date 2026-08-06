@@ -500,18 +500,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       goToTrack(0);
     } else {
       setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     }
   }, [goToTrack]);
 
   const prev = useCallback(() => {
     const ci = currentIndexRef.current;
     if (progress > 3) {
-      if (audioRef.current) audioRef.current.currentTime = 0;
+      if (audioRef.current) {
+        try {
+          audioRef.current.currentTime = 0;
+        } catch {}
+      }
       setProgress(0);
     } else if (ci > 0) {
       goToTrack(ci - 1);
     } else {
-      goToTrack(queueRef.current.length - 1);
+      const q = queueRef.current;
+      if (q.length > 0) {
+        goToTrack(q.length - 1);
+      } else {
+        setIsPlaying(false);
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+      }
     }
   }, [progress, goToTrack]);
 
@@ -836,9 +851,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const play = useCallback((track: Track, newQueue?: Track[]) => {
     setProgress(0);
     if (audioRef.current) {
-      audioRef.current.currentTime = 0;
+      try {
+        audioRef.current.currentTime = 0;
+      } catch {}
     }
     setIsPlaying(true);
+
+    if (currentTrack && currentTrack.id === track.id) {
+      if (audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
+      }
+    }
 
     if (newQueue) {
       setQueueState(newQueue);
