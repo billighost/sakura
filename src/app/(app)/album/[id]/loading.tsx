@@ -13,7 +13,7 @@ export default function Loading() {
       </div>
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
         <div style={{ width: "6rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
-        <div style={{ width: "6rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
+        <div style={{ width: "2.75rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem" }}>
         {[...Array(5)].map((_, i) => (

@@ -1,15 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { useSwipeBack } from "@/lib/useSwipeBack";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { DiscIcon } from "@/components/Icons";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
-interface Track {
+/**
+ * NOTE ON ASSUMPTIONS
+ * Only this page's CSS module + loading skeleton were in your upload, not
+ * the component itself, so the data shape and endpoints below are
+ * reconstructed to match the conventions in your other pages (TrackRow,
+ * usePlayer, lib/offline-db, fetch-from-api pattern). Point `/api/albums/${id}`
+ * and the like-toggle endpoint at whatever your backend actually exposes.
+ */
+
+interface AlbumTrack {
   id: string;
   title: string;
   artist: { name: string };
@@ -17,29 +24,34 @@ interface Track {
   coverUrl?: string;
   audioUrl: string;
   duration: number;
-  trackNumber?: number | null;
 }
 
-interface Album {
+interface RelatedAlbum {
   id: string;
   title: string;
   coverUrl?: string;
-  releaseYear?: number | null;
-  releaseDate?: string;
+  year?: number;
+}
+
+interface AlbumDetail {
+  id: string;
+  title: string;
+  artist: { id: string; name: string };
+  coverUrl?: string;
+  year?: number;
   genres?: string[];
-  artist: { name: string; id: string };
-  tracks: Track[];
-  otherAlbums?: { id: string; title: string; coverUrl?: string; releaseYear?: number | null }[];
+  accentColor?: string;
+  liked?: boolean;
+  tracks: AlbumTrack[];
+  relatedAlbums?: RelatedAlbum[];
   copyright?: string;
 }
 
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours} hr ${minutes} min`;
-  }
-  return `${minutes} min`;
+function formatDuration(totalSec: number): string {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h > 0) return `${h} hr ${m} min`;
+  return `${m} min`;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -51,233 +63,154 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function extractColor(img: HTMLImageElement): string {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "#2a1a3a";
-  const size = 32;
-  canvas.width = size;
-  canvas.height = size;
-  ctx.drawImage(img, 0, 0, size, size);
-  const data = ctx.getImageData(0, 0, size, size).data;
-  let r = 0, g = 0, b = 0, count = 0;
-  for (let i = 0; i < data.length; i += 16) {
-    r += data[i];
-    g += data[i + 1];
-    b += data[i + 2];
-    count++;
-  }
-  r = Math.round(r / count);
-  g = Math.round(g / count);
-  b = Math.round(b / count);
-  const max = Math.max(r, g, b);
-  const factor = max > 150 ? 0.55 : 0.7;
-  r = Math.min(255, Math.round(r * factor + 10));
-  g = Math.min(255, Math.round(g * factor + 8));
-  b = Math.min(255, Math.round(b * factor + 15));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 export default function AlbumPage() {
-  const params = useParams();
   const router = useRouter();
-  useSwipeBack();
-  const { play, favoriteTrackIds, toggleLikeTrack } = usePlayer();
-  const [album, setAlbum] = useState<Album | null>(null);
+  const params = useParams<{ id: string }>();
+  const { play } = usePlayer();
+
+  const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [playlistsLoading, setPlaylistsLoading] = useState(false);
-  const [bgColor, setBgColor] = useState<string>("#2a1a3a");
-  const heroRef = useRef<HTMLDivElement>(null);
+  const [liked, setLiked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    if (showPlaylistPicker) {
-      setPlaylistsLoading(true);
-      fetch("/api/playlists")
-        .then((r) => r.json())
-        .then((data) => setPlaylists(data))
-        .catch(() => {})
-        .finally(() => setPlaylistsLoading(false));
+  const loadAlbum = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/albums/${params.id}`);
+      const data: AlbumDetail = await res.json();
+      setAlbum(data);
+      setLiked(!!data.liked);
+    } catch {
+      setAlbum(null);
+    } finally {
+      setLoading(false);
     }
-  }, [showPlaylistPicker]);
-
-  useEffect(() => {
-    fetch(`/api/albums/${params.id}`)
-      .then((r) => r.json())
-      .then((data) => setAlbum(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
   }, [params.id]);
 
-  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const color = extractColor(e.currentTarget);
-    setBgColor(color);
-  }, []);
+  useEffect(() => {
+    loadAlbum();
+  }, [loadAlbum]);
 
-  function handlePlay() {
-    if (!album || album.tracks.length === 0) return;
-    const q = album.tracks.map((t) => ({
+  const queue = useMemo(() => {
+    if (!album) return [];
+    return album.tracks.map((t) => ({
       id: t.id,
       title: t.title,
-      artist: t.artist.name,
-      album: t.album?.title,
-      coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
+      artist: { name: t.artist.name },
+      album: { title: album.title, coverUrl: album.coverUrl },
+      coverUrl: t.coverUrl || album.coverUrl,
       audioUrl: t.audioUrl,
       duration: t.duration,
     }));
-    play(q[0], q);
+  }, [album]);
+
+  function handlePlay() {
+    if (queue.length === 0) return;
+    play(queue[0], queue);
   }
 
   function handleShuffle() {
-    if (!album || album.tracks.length === 0) return;
-    const shuffled = shuffleArray(album.tracks);
-    const q = shuffled.map((t) => ({
-      id: t.id,
-      title: t.title,
-      artist: t.artist.name,
-      album: t.album?.title,
-      coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
-      audioUrl: t.audioUrl,
-      duration: t.duration,
-    }));
-    play(q[0], q);
+    if (queue.length === 0) return;
+    const shuffled = shuffleArray(queue);
+    play(shuffled[0], shuffled);
   }
 
-  async function handleLikeAll() {
+  async function handleToggleLike() {
     if (!album) return;
-    for (const track of album.tracks) {
-      if (favoriteTrackIds && !favoriteTrackIds.has(track.id)) {
-        await toggleLikeTrack(track.id);
-      }
-    }
-  }
-
-  async function handleAddToPlaylist(playlistId: string) {
-    if (!album) return;
-    setShowPlaylistPicker(false);
-    for (const track of album.tracks) {
-      try {
-        await fetch(`/api/playlists/${playlistId}/tracks`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackId: track.id }),
-        });
-      } catch (err) {
-        console.error("Failed to add track to playlist", err);
-      }
-    }
-    alert("Tracks added to playlist!");
-  }
-
-  function handleShare() {
-    if (navigator.share) {
-      navigator.share({ title: album?.title, url: window.location.href });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-    }
-  }
-
-  function formatDate(d?: string): string {
-    if (!d) return "";
+    const next = !liked;
+    setLiked(next);
     try {
-      return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      await fetch(`/api/albums/${album.id}/like`, {
+        method: next ? "POST" : "DELETE",
+      });
     } catch {
-      return d;
+      setLiked(!next);
     }
   }
 
-  const totalDuration = album
-    ? album.tracks.reduce((sum, t) => sum + t.duration, 0)
-    : 0;
+  async function handleDownloadAll() {
+    if (!album || downloading) return;
+    setDownloading(true);
+    try {
+      for (const track of album.tracks) {
+        try {
+          const existing = await isTrackDownloaded(track.id);
+          if (existing) continue;
+          const res = await fetch(track.audioUrl);
+          const blob = await res.blob();
+          await saveTrackOffline({
+            id: track.id,
+            title: track.title,
+            artist: track.artist.name,
+            album: album.title,
+            audioUrl: track.audioUrl,
+            coverUrl: track.coverUrl || album.coverUrl,
+            duration: track.duration,
+          });
+          await saveAudioBlob(track.id, blob);
+        } catch {
+          continue;
+        }
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleRemoveFromLibrary() {
+    if (!album) return;
+    try {
+      await fetch(`/api/albums/${album.id}/library`, { method: "DELETE" });
+    } catch {
+      /* ignore */
+    } finally {
+      setConfirmRemoveOpen(false);
+      router.back();
+    }
+  }
 
   if (loading) {
+    return <AlbumLoadingState />;
+  }
+
+  if (!album) {
     return (
-      <div className={styles.page}>
-        <div className={styles.heroGradient} style={{ "--bg": "#2a1a3a" } as React.CSSProperties}>
-          <div className={styles.hero}>
-            <div className="skeleton" style={{ width: "clamp(8rem, 32vw, 14rem)", height: "clamp(8rem, 32vw, 14rem)", borderRadius: "12px", flexShrink: 0 }} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "8px", padding: "0.5rem 0" }}>
-              <div className="skeleton" style={{ width: "30%", height: "0.6875rem" }} />
-              <div className="skeleton" style={{ width: "90%", height: "clamp(1.25rem, 4vw, 1.75rem)" }} />
-              <div className="skeleton" style={{ width: "40%", height: "0.8125rem" }} />
-              <div className="skeleton" style={{ width: "55%", height: "0.75rem" }} />
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
-                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
-                <div className="skeleton" style={{ width: "3rem", height: "1.375rem", borderRadius: "9999px" }} />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className={styles.actions}>
-          <div className="skeleton" style={{ width: "5.5rem", height: "2.5rem", borderRadius: "9999px" }} />
-          <div className="skeleton" style={{ width: "2.5rem", height: "2.5rem", borderRadius: "9999px" }} />
-          <div className="skeleton" style={{ width: "2.25rem", height: "2.25rem", borderRadius: "9999px" }} />
-        </div>
-        <div style={{ padding: "0 clamp(0.75rem, 3vw, 1.25rem)" }}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.625rem 0" }}>
-              <div className="skeleton" style={{ width: "1.25rem", height: "0.8125rem" }} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
-                <div className="skeleton" style={{ width: `${60 + ((i * 17) % 30)}%`, height: "0.8125rem" }} />
-                <div className="skeleton" style={{ width: `${30 + ((i * 13) % 20)}%`, height: "0.6875rem" }} />
-              </div>
-              <div className="skeleton" style={{ width: "2rem", height: "0.75rem" }} />
-            </div>
-          ))}
-        </div>
+      <div style={{ padding: "clamp(2rem, 8vh, 4rem) 1.5rem", textAlign: "center", color: "var(--sakura-text-secondary)" }}>
+        Couldn&apos;t load this album.
       </div>
     );
   }
 
-  if (!album) return null;
+  const heroStyle = { "--bg": album.accentColor || "var(--sakura-accent-2)" } as React.CSSProperties;
 
   return (
     <div className={styles.page}>
-      <button
-        onClick={() => router.back()}
-        style={{
-          position: "fixed",
-          top: "1rem",
-          left: "1rem",
-          zIndex: 100,
-          width: "36px",
-          height: "36px",
-          borderRadius: "50%",
-          background: "rgba(0, 0, 0, 0.5)",
-          border: "none",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          backdropFilter: "blur(4px)",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
-          transition: "background 0.2s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0, 0, 0, 0.7)")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0, 0, 0, 0.5)")}
-        aria-label="Go back"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
-      <div className={styles.heroGradient} style={{ "--bg": bgColor } as React.CSSProperties}>
-        <div className={styles.hero} ref={heroRef}>
+      <div className={styles.heroGradient} style={heroStyle}>
+        <button className={styles.backBtn} onClick={() => router.back()} aria-label="Go back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <div className={styles.hero}>
           {album.coverUrl ? (
-            <img className={styles.coverArt} src={album.coverUrl} alt="" onLoad={onImageLoad} crossOrigin="anonymous" />
+            <img src={album.coverUrl} alt="" className={styles.coverArt} />
           ) : (
-            <div className={styles.coverArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}><DiscIcon size={48} /></div>
+            <div className={styles.coverArt} />
           )}
           <div className={styles.heroInfo}>
             <div className={styles.heroLabel}>Album</div>
-            <div className={styles.heroTitle}>{album.title}</div>
-            <Link href={`/artist/${album.artist.id}`} className={styles.artistLink}>{album.artist.name}</Link>
+            <h1 className={styles.heroTitle}>{album.title}</h1>
+            <button className={styles.artistLink} onClick={() => router.push(`/artist/${album.artist.id}`)}>
+              {album.artist.name}
+            </button>
             <div className={styles.heroMeta}>
-              {album.releaseDate ? formatDate(album.releaseDate) : album.releaseYear ? album.releaseYear : ""}{" "}
-              · {album.tracks.length} songs{totalDuration > 0 ? ` · ${formatDuration(totalDuration)}` : ""}
+              {album.year && <span>{album.year}</span>}
+              {album.year && <span>·</span>}
+              <span>{album.tracks.length} song{album.tracks.length !== 1 ? "s" : ""}</span>
+              <span>·</span>
+              <span>{formatDuration(album.tracks.reduce((s, t) => s + (t.duration || 0), 0))}</span>
             </div>
             {album.genres && album.genres.length > 0 && (
               <div className={styles.genreTags}>
@@ -292,111 +225,143 @@ export default function AlbumPage() {
 
       <div className={styles.actions}>
         <button className={styles.playBtn} onClick={handlePlay}>
-          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M8 5v14l11-7z" /></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <path d="M8 5v14l11-7z" />
+          </svg>
           Play
         </button>
-        <button className={styles.shuffleBtn} onClick={handleShuffle} title="Shuffle">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+        <button className={styles.shuffleBtn} onClick={handleShuffle} aria-label="Shuffle play">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
         </button>
-        <button className={styles.iconBtn} onClick={() => setShowPlaylistPicker(true)} title="Add to playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M12 5v14M5 12h14" /></svg>
+        <button
+          className={`${styles.iconBtn} ${liked ? styles.iconBtnActive : ""}`}
+          onClick={handleToggleLike}
+          aria-label={liked ? "Unlike album" : "Like album"}
+          aria-pressed={liked}
+        >
+          <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+          </svg>
         </button>
-        <button className={styles.iconBtn} onClick={handleLikeAll} title="Like all">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+        <button className={styles.iconBtn} onClick={handleDownloadAll} aria-label="Download album for offline" title={downloading ? "Downloading…" : "Download for offline"}>
+          {downloading ? (
+            <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          )}
         </button>
-        <button className={styles.iconBtn} onClick={handleShare} title="Share">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
-        </button>
-      </div>
-
-      {showPlaylistPicker && (
-        <div className={styles.modalOverlay} onClick={() => setShowPlaylistPicker(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Add to Playlist</div>
-            <div className={styles.modalText}>Select a playlist to add all tracks from this album.</div>
-            {playlistsLoading ? (
-              <div style={{ textAlign: "center", padding: "1rem" }}>Loading playlists...</div>
-            ) : playlists.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "1rem", color: "var(--sakura-text-secondary)" }}>
-                No playlists found. Create a playlist in your library first.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "250px", overflowY: "auto", margin: "1rem 0" }}>
-                {playlists.map((pl) => (
-                  <button
-                    key={pl.id}
-                    onClick={() => handleAddToPlaylist(pl.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                      padding: "0.625rem",
-                      width: "100%",
-                      textAlign: "left",
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--sakura-text)",
-                      cursor: "pointer",
-                      borderRadius: "8px",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sakura-hover)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <div style={{ width: "40px", height: "40px", background: "var(--sakura-surface-2)", borderRadius: "4px", flexShrink: 0, overflow: "hidden" }}>
-                      {pl.coverUrl ? (
-                        <img src={pl.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-                          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ color: "var(--sakura-text-secondary)" }}>
-                            <path d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.875rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pl.name}</div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--sakura-text-secondary)" }}>{pl.trackCount || 0} songs</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setShowPlaylistPicker(false)}>Close</button>
-            </div>
-          </div>
+        <div className={styles.spacer} />
+        <div style={{ position: "relative" }}>
+          <button className={styles.iconBtn} onClick={() => setMoreOpen((v) => !v)} aria-label="More options" aria-haspopup="menu" aria-expanded={moreOpen}>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <circle cx="12" cy="5" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <circle cx="12" cy="19" r="1.75" />
+            </svg>
+          </button>
         </div>
-      )}
+      </div>
 
       <div className={styles.trackList}>
         {album.tracks.map((track, i) => (
-          <TrackRow key={track.id} track={track} queue={album.tracks} index={i} showNumber />
+          <TrackRow
+            key={track.id}
+            track={{
+              id: track.id,
+              title: track.title,
+              artist: track.artist,
+              album: { title: album.title, coverUrl: album.coverUrl },
+              coverUrl: track.coverUrl || album.coverUrl,
+              audioUrl: track.audioUrl,
+              duration: track.duration,
+            }}
+            queue={queue}
+            index={i}
+            showNumber
+          />
         ))}
       </div>
 
-      {album.copyright && (
-        <div className={styles.copyright}>{album.copyright}</div>
-      )}
+      {album.copyright && <p className={styles.copyright}>{album.copyright}</p>}
 
-      {album.otherAlbums && album.otherAlbums.length > 0 && (
+      {album.relatedAlbums && album.relatedAlbums.length > 0 && (
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>Other Albums by {album.artist.name}</div>
+          <h2 className={styles.sectionTitle}>More by {album.artist.name}</h2>
           <div className={styles.albumGrid}>
-            {album.otherAlbums.map((oa) => (
-              <Link key={oa.id} href={`/album/${oa.id}`} className={styles.albumCard}>
-                {oa.coverUrl ? (
-                  <img className={styles.albumArt} src={oa.coverUrl} alt="" />
+            {album.relatedAlbums.map((rel) => (
+              <button key={rel.id} className={styles.albumCard} onClick={() => router.push(`/album/${rel.id}`)}>
+                {rel.coverUrl ? (
+                  <img src={rel.coverUrl} alt="" className={styles.albumArt} />
                 ) : (
-                  <div className={styles.albumArt} style={{ background: "var(--sakura-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}><DiscIcon size={24} /></div>
+                  <div className={styles.albumArt} />
                 )}
-                <div className={styles.albumTitle}>{oa.title}</div>
-                {oa.releaseYear && <div className={styles.albumYear}>{oa.releaseYear}</div>}
-              </Link>
+                <div className={styles.albumTitle}>{rel.title}</div>
+                {rel.year && <div className={styles.albumYear}>{rel.year}</div>}
+              </button>
             ))}
           </div>
         </div>
       )}
+
+      {confirmRemoveOpen && (
+        <div className={styles.modalOverlay} onClick={() => setConfirmRemoveOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitle}>Remove from Your Library?</div>
+            <p className={styles.modalText}>
+              &ldquo;{album.title}&rdquo; will be removed from your saved albums. You can add it back anytime.
+            </p>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setConfirmRemoveOpen(false)}>Cancel</button>
+              <button className={styles.modalConfirm} onClick={handleRemoveFromLibrary}>Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlbumLoadingState() {
+  return (
+    <div style={{ padding: "clamp(0.75rem, 3vw, 1.25rem)" }}>
+      <div style={{ margin: "clamp(-0.75rem, -3vw, -1.25rem) clamp(-0.75rem, -3vw, -1.25rem) clamp(0.75rem, 3vw, 1.25rem)", background: "var(--sakura-skeleton)", padding: "clamp(1rem, 4vw, 1.5rem)", borderRadius: "0 0 16px 16px", opacity: 0.5 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "clamp(0.75rem, 3vw, 1rem)" }}>
+          <div style={{ width: "clamp(6rem, 25vw, 10rem)", height: "clamp(6rem, 25vw, 10rem)", borderRadius: "14px", background: "var(--sakura-skeleton)", flexShrink: 0 }} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem", paddingBottom: "0.5rem" }}>
+            <div style={{ width: "3rem", height: "0.6875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+            <div style={{ width: "10rem", height: "1.5rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+            <div style={{ width: "6rem", height: "0.75rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+        <div style={{ width: "6rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
+        <div style={{ width: "2.75rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem" }}>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0" }}>
+            <div style={{ width: "0.8125rem", height: "0.875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+            <div style={{ width: "3rem", height: "3rem", borderRadius: "8px", background: "var(--sakura-skeleton)", flexShrink: 0 }} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ width: "60%", height: "0.875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+              <div style={{ width: "40%", height: "0.75rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
