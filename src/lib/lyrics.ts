@@ -46,7 +46,8 @@ export async function getLyrics(track: {
   if (cached) return cached;
 
   try {
-    const apiQueryUrl = `/api/lyrics?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&duration=${track.duration || ""}`;
+    let apiQueryUrl = `/api/lyrics?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&duration=${track.duration || ""}`;
+    if (track.album) apiQueryUrl += `&album=${encodeURIComponent(track.album)}`;
     const apiRes = await fetch(apiQueryUrl);
     if (apiRes.ok) {
       const result = await apiRes.json();

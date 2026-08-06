@@ -130,11 +130,11 @@ export default async function TrackDetailPage({ params }: { params: Promise<{ id
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="max-w-4xl mx-auto px-4 pb-32">
         <div className="flex items-center gap-3 pt-4 pb-6">
-          <button onClick={() => window.history.back()} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+          <a href="javascript:history.back()" className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors" aria-label="Go back">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 18l-6-6 6-6"/>
             </svg>
-          </button>
+          </a>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Track Details</h1>
         </div>
 

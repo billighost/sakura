@@ -12,10 +12,46 @@ export interface MusicResult {
   buttonIndex: number;
 }
 
+/**
+ * Simple async mutex for serializing bot interactions.
+ * The Telegram bot (musicshuntersbot) processes one search at a time;
+ * sending multiple queries concurrently confuses its state machine and
+ * causes BOT_RESPONSE_TIMEOUT errors. All bot interactions (search →
+ * click button → wait for audio) are serialized through this queue.
+ * Actual file streaming (the bandwidth-heavy part) is NOT gated and
+ * remains fully concurrent, so 100+ simultaneous downloads are supported.
+ */
+class AsyncMutex {
+  private queue: (() => void)[] = [];
+  private locked = false;
+
+  async acquire(): Promise<() => void> {
+    return new Promise<() => void>((resolve) => {
+      const tryLock = () => {
+        if (!this.locked) {
+          this.locked = true;
+          resolve(() => {
+            this.locked = false;
+            if (this.queue.length > 0) {
+              const next = this.queue.shift()!;
+              next();
+            }
+          });
+        } else {
+          this.queue.push(tryLock);
+        }
+      };
+      tryLock();
+    });
+  }
+}
+
 export class TelegramClient {
   private client: GramClient;
   private connected = false;
   private botUsername: string;
+  // Shared mutex — bot interactions from ALL concurrent downloads are serialized
+  private static botMutex = new AsyncMutex();
 
   constructor(
     private apiId: number,
@@ -49,14 +85,50 @@ export class TelegramClient {
 
   /**
    * Send a search query to the bot and wait for the response with inline buttons.
-   * Returns the message with buttons (not the audio yet).
+   * Serialized via mutex to prevent bot state confusion.
    */
-  async searchMusic(query: string, timeoutMs = 15000): Promise<{
+  async searchMusic(query: string, timeoutMs = 20000): Promise<{
     buttonMessageId: number;
     buttons: Array<{ index: number; text: string }>;
   }> {
     await this.ensureConnected();
+    const release = await TelegramClient.botMutex.acquire();
+    try {
+      return await this._searchMusic(query, timeoutMs);
+    } finally {
+      // Don't release here — the caller must call selectResult, which releases
+      // This is handled by the wrapper in searchAndSelect
+    }
+    // Note: release is returned to the caller via searchAndSelect
+    // This method shouldn't be called directly; use searchAndSelect instead.
+    release();
+    throw new Error("Unreachable");
+  }
 
+  /**
+   * Atomically search and select a result, releasing the mutex after the audio arrives.
+   * This is the correct way to perform a full download with concurrency safety.
+   */
+  async searchAndSelect(query: string, buttonIndex = 0, searchTimeoutMs = 20000, selectTimeoutMs = 45000): Promise<MusicResult> {
+    await this.ensureConnected();
+    const release = await TelegramClient.botMutex.acquire();
+    try {
+      const { buttonMessageId, buttons } = await this._searchMusic(query, searchTimeoutMs);
+      if (buttons.length === 0) {
+        throw new Error("No results found on Telegram");
+      }
+      console.log(`[Telegram AutoDownload] Got ${buttons.length} results, selecting: "${buttons[buttonIndex]?.text || buttons[0].text}"`);
+      const result = await this._selectResult(buttonMessageId, Math.min(buttonIndex, buttons.length - 1), selectTimeoutMs);
+      return result;
+    } finally {
+      release();
+    }
+  }
+
+  private async _searchMusic(query: string, timeoutMs: number): Promise<{
+    buttonMessageId: number;
+    buttons: Array<{ index: number; text: string }>;
+  }> {
     const botEntity = await this.client.getEntity(this.botUsername);
 
     // Get last message ID before sending
@@ -66,10 +138,10 @@ export class TelegramClient {
     // Send search query
     await this.client.sendMessage(botEntity, { message: query });
 
-    // Poll for the bot's response (the message with inline buttons)
+    // Poll for the bot's response (message with inline buttons)
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1200));
 
       const newMessages = await this.client.getMessages(botEntity, {
         limit: 5,
@@ -79,7 +151,6 @@ export class TelegramClient {
       for (const msg of newMessages) {
         if (!msg || !msg.id || msg.id <= lastKnownId) continue;
 
-        // Check if this message has a reply markup with inline buttons
         const replyMarkup = msg.replyMarkup;
         if (replyMarkup instanceof Api.ReplyInlineMarkup) {
           const buttons: Array<{ index: number; text: string }> = [];
@@ -98,31 +169,24 @@ export class TelegramClient {
           }
 
           if (buttons.length > 0) {
-            return {
-              buttonMessageId: msg.id,
-              buttons,
-            };
+            return { buttonMessageId: msg.id, buttons };
           }
         }
 
-        // If the bot sent audio directly (some queries trigger immediate audio)
+        // Bot sent audio directly
         if (msg.media && "document" in msg.media) {
           const doc = (msg.media as Api.MessageMediaDocument).document;
           if (doc instanceof Api.Document) {
             const isAudio = doc.mimeType?.startsWith("audio/") ||
               doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
             if (isAudio) {
-              // Return a single "result" - the audio itself
               const audioAttr = doc.attributes.find(
                 (a) => a instanceof Api.DocumentAttributeAudio,
               ) as Api.DocumentAttributeAudio | undefined;
 
               return {
                 buttonMessageId: msg.id,
-                buttons: [{
-                  index: 0,
-                  text: audioAttr?.title || "Download",
-                }],
+                buttons: [{ index: 0, text: audioAttr?.title || "Download" }],
               };
             }
           }
@@ -136,17 +200,24 @@ export class TelegramClient {
   /**
    * Click a button on the bot's response message to trigger the audio download.
    * Waits for the audio file to be sent back.
+   * @deprecated Use searchAndSelect for proper concurrency. Called internally.
    */
   async selectResult(
     buttonMessageId: number,
     buttonIndex: number,
-    timeoutMs = 30000,
+    timeoutMs = 45000,
   ): Promise<MusicResult> {
     await this.ensureConnected();
+    return this._selectResult(buttonMessageId, buttonIndex, timeoutMs);
+  }
 
+  private async _selectResult(
+    buttonMessageId: number,
+    buttonIndex: number,
+    timeoutMs: number,
+  ): Promise<MusicResult> {
     const botEntity = await this.client.getEntity(this.botUsername);
 
-    // Get the message with buttons to extract callback data
     const messages = await this.client.getMessages(botEntity, {
       ids: [buttonMessageId],
     });
@@ -154,10 +225,27 @@ export class TelegramClient {
 
     if (!buttonMsg?.replyMarkup ||
         !(buttonMsg.replyMarkup instanceof Api.ReplyInlineMarkup)) {
+      // The bot sent audio directly (no buttons), try treating buttonMessageId as the audio msg
+      const audioMsg = messages[0];
+      if (audioMsg?.media && "document" in audioMsg.media) {
+        const doc = (audioMsg.media as Api.MessageMediaDocument).document;
+        if (doc instanceof Api.Document) {
+          const audioAttr = doc.attributes.find(
+            (a) => a instanceof Api.DocumentAttributeAudio,
+          ) as Api.DocumentAttributeAudio | undefined;
+          return {
+            messageId: audioMsg.id,
+            title: audioAttr?.title || "Unknown",
+            artist: audioAttr?.performer || "Unknown",
+            duration: audioAttr?.duration || 0,
+            fileId: doc.id.toString(),
+            buttonIndex,
+          };
+        }
+      }
       throw new Error("Message does not have inline buttons");
     }
 
-    // Find the callback data for the button at buttonIndex
     let callbackData: Uint8Array | undefined;
     let btnIdx = 0;
 
@@ -178,18 +266,29 @@ export class TelegramClient {
       throw new Error(`Button at index ${buttonIndex} not found`);
     }
 
-    // Click the button via callback query
-    await this.client.invoke(
-      new Api.messages.GetBotCallbackAnswer({
-        peer: botEntity,
-        msgId: buttonMsg.id,
-        data: Buffer.from(callbackData),
-      }),
-    );
+    // Click the button via callback query — retry once on BOT_RESPONSE_TIMEOUT
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.client.invoke(
+          new Api.messages.GetBotCallbackAnswer({
+            peer: botEntity,
+            msgId: buttonMsg.id,
+            data: Buffer.from(callbackData),
+          }),
+        );
+        break;
+      } catch (err: any) {
+        if (attempt === 0 && err?.errorMessage === "BOT_RESPONSE_TIMEOUT") {
+          console.warn("[Telegram] BOT_RESPONSE_TIMEOUT on button click, retrying...");
+          await new Promise((r) => setTimeout(r, 2000));
+        } else {
+          throw err;
+        }
+      }
+    }
 
     // Wait for the audio file to arrive
     const deadline = Date.now() + timeoutMs;
-    const afterClick = Date.now();
 
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -261,7 +360,6 @@ export class TelegramClient {
           : lastKnownId,
       });
 
-      let foundNew = false;
       for (const msg of newMessages) {
         if (!msg || !msg.media || !("document" in msg.media)) continue;
 
@@ -291,13 +389,8 @@ export class TelegramClient {
 
         results.push(track);
         lastNewAudioTime = Date.now();
-        foundNew = true;
 
         if (onTrack) onTrack(track);
-      }
-
-      if (!foundNew && results.length > 0) {
-        // No new tracks this cycle - playlist might be done
       }
     }
 

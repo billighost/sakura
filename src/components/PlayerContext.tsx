@@ -48,6 +48,7 @@ interface PlayerContextType {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   setQueue: (tracks: Track[], startIndex?: number) => void;
+  goToQueueItem: (absoluteIndex: number) => void;
   removeTrack: (trackId: string) => void;
   removeTracks: (trackIds: string[]) => void;
   reshuffleQueue: () => void;
@@ -64,6 +65,8 @@ interface PlayerContextType {
   toast: { message: string; type: "accent" | "error" | "success"; visible: boolean } | null;
   showToast: (message: string, type?: "accent" | "error" | "success") => void;
   hideToast: () => void;
+  sleepTimerMinutes: number | null;
+  setSleepTimer: (minutes: number | null) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -96,6 +99,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type: "accent" | "error" | "success"; visible: boolean } | null>(null);
+  const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
+  const sleepTimerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = useCallback((message: string, type: "accent" | "error" | "success" = "accent") => {
     setToast({ message, type, visible: true });
@@ -256,6 +261,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const goToTrack = useCallback((index: number) => {
     setCurrentIndex(index);
+  }, []);
+
+  const setSleepTimer = useCallback((minutes: number | null) => {
+    setSleepTimerMinutes(minutes);
+    if (sleepTimerTimeoutRef.current) {
+      clearTimeout(sleepTimerTimeoutRef.current);
+      sleepTimerTimeoutRef.current = null;
+    }
+    if (minutes !== null) {
+      showToast(`Sleep timer set for ${minutes} minutes`, "success");
+      sleepTimerTimeoutRef.current = setTimeout(() => {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+        setSleepTimerMinutes(null);
+        showToast("Sleep timer ended. Playback paused.", "accent");
+      }, minutes * 60 * 1000);
+    } else {
+      showToast("Sleep timer cancelled", "success");
+    }
+  }, []);
+
+  // Jump to a specific absolute index in the queue and start playing
+  const goToQueueItem = useCallback((absoluteIndex: number) => {
+    setCurrentIndex(absoluteIndex);
+    setIsPlaying(true);
+    // Trigger play after state settles
+    setTimeout(() => {
+      audioRef.current?.play().catch(() => {});
+    }, 50);
   }, []);
 
   const next = useCallback(() => {
@@ -857,6 +891,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleShuffle,
         toggleRepeat,
         setQueue,
+        goToQueueItem,
         removeTrack,
         removeTracks,
         reshuffleQueue,
@@ -873,6 +908,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toast,
         showToast,
         hideToast,
+        sleepTimerMinutes,
+        setSleepTimer,
       }}
     >
       {children}

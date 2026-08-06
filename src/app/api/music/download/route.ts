@@ -27,17 +27,9 @@ export async function POST(req: NextRequest) {
     const query = `${artist} - ${title}`;
     console.log(`[Telegram AutoDownload] Searching: "${query}"`);
 
-    const { buttonMessageId, buttons } = await client.searchMusic(query, 15000);
-
-    if (buttons.length === 0) {
-      return NextResponse.json(
-        { error: "No results found on Telegram" },
-        { status: 404 }
-      );
-    }
-
-    console.log(`[Telegram AutoDownload] Got ${buttons.length} results, selecting first: "${buttons[0].text}"`);
-    const track = await client.selectResult(buttonMessageId, 0, 30000);
+    // searchAndSelect acquires the bot mutex, searches, clicks the first result,
+    // waits for audio, then releases — all serialized for reliability
+    const track = await client.searchAndSelect(query, 0, 20000, 45000);
 
     const userId = session.user.id as string;
 

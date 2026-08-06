@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 // @ts-ignore
-import { findLyrics } from "@stef-0012/synclyrics";
+import { SyncLyrics } from "@stef-0012/synclyrics";
+
+// Shared LyricsManager instance — re-used across requests to allow token caching for Musixmatch
+let lyricsManager: any = null;
+
+function getLyricsManager() {
+  if (!lyricsManager) {
+    lyricsManager = new SyncLyrics({
+      logLevel: "none",
+      sources: ["musixmatch", "lrclib", "netease"],
+    });
+  }
+  return lyricsManager;
+}
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -12,6 +25,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const title = searchParams.get("title");
   const artist = searchParams.get("artist");
+  const album = searchParams.get("album") || undefined;
   const duration = searchParams.get("duration");
 
   if (!title || !artist) {
@@ -20,6 +34,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const durSec = duration ? Math.round(parseFloat(duration)) : undefined;
+    const durMs = durSec ? durSec * 1000 : undefined;
     let syncedLyrics = "";
     let plainLyrics = "";
     let source = "";
@@ -27,40 +42,58 @@ export async function GET(req: NextRequest) {
     const titleEncoded = encodeURIComponent(title);
     const artistEncoded = encodeURIComponent(artist);
 
-    // 1. Try LRCLib specific get on server
+    // 1. Try LRCLib direct get — most reliable for exact matches with duration
     try {
       let lrcUrl = `https://lrclib.net/api/get?artist_name=${artistEncoded}&track_name=${titleEncoded}`;
-      if (durSec) {
-        lrcUrl += `&duration=${durSec}`;
-      }
-      const response = await fetch(lrcUrl, { headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" } });
+      if (album) lrcUrl += `&album_name=${encodeURIComponent(album)}`;
+      if (durSec) lrcUrl += `&duration=${durSec}`;
+      const response = await fetch(lrcUrl, {
+        headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" },
+        signal: AbortSignal.timeout(5000),
+      });
       if (response.ok) {
         const data = await response.json();
-        syncedLyrics = data.syncedLyrics || "";
-        plainLyrics = data.plainLyrics || data.lyrics || "";
-        source = "lrclib-direct";
+        if (data && !data.error) {
+          syncedLyrics = data.syncedLyrics || "";
+          plainLyrics = data.plainLyrics || data.lyrics || "";
+          source = "lrclib-direct";
+        }
       }
     } catch (e) {
       console.warn("[Lyrics API Server] LRCLib specific get failed:", e);
     }
 
-    // 2. Try LRCLib search on server if no synced lyrics found
+    // 2. Try LRCLib search if no synced lyrics — search is fuzzier and finds more results
     if (!syncedLyrics) {
       try {
         const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${artist} ${title}`)}`;
-        const searchRes = await fetch(searchUrl, { headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" } });
+        const searchRes = await fetch(searchUrl, {
+          headers: { "User-Agent": "Sakura Music Player (https://github.com/billighost/sakura)" },
+          signal: AbortSignal.timeout(5000),
+        });
         if (searchRes.ok) {
           const results = await searchRes.json();
           if (results && results.length > 0) {
-            // Find a match with closest duration first if duration is provided
-            let match = results[0];
-            if (durSec) {
-              const exactOrClose = results.find((r: any) => Math.abs(r.duration - durSec) <= 4);
-              if (exactOrClose) match = exactOrClose;
+            // Score results by title, artist, album, duration accuracy
+            const scored = results.map((r: any) => {
+              let score = 0;
+              if (r.trackName?.toLowerCase() === title.toLowerCase()) score += 4;
+              else if (r.trackName?.toLowerCase().includes(title.toLowerCase())) score += 2;
+              if (r.artistName?.toLowerCase() === artist.toLowerCase()) score += 3;
+              else if (r.artistName?.toLowerCase().includes(artist.toLowerCase())) score += 1;
+              if (album && r.albumName?.toLowerCase() === album.toLowerCase()) score += 2;
+              if (durSec && r.duration && Math.abs(r.duration - durSec) <= 2) score += 3;
+              else if (durSec && r.duration && Math.abs(r.duration - durSec) <= 5) score += 1;
+              if (r.syncedLyrics) score += 1; // prefer synced
+              return { r, score };
+            });
+            scored.sort((a: any, b: any) => b.score - a.score);
+            const match = scored[0].r;
+            if (match.syncedLyrics || match.plainLyrics) {
+              syncedLyrics = match.syncedLyrics || "";
+              plainLyrics = match.plainLyrics || match.lyrics || plainLyrics;
+              source = "lrclib-search";
             }
-            syncedLyrics = match.syncedLyrics || "";
-            plainLyrics = match.plainLyrics || match.lyrics || plainLyrics;
-            source = "lrclib-search";
           }
         }
       } catch (e) {
@@ -68,19 +101,29 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. Try `@stef-0012/synclyrics` aggregation (Musixmatch / NetEase) if still no synced lyrics
+    // 3. Try @stef-0012/synclyrics (Musixmatch / NetEase) if still missing synced lyrics
     if (!syncedLyrics) {
       try {
-        const options: any = {};
-        if (durSec) options.duration = durSec;
-        const result = await findLyrics(artist, title, options);
-        if (result) {
-          syncedLyrics = result.synced || "";
-          plainLyrics = result.plain || plainLyrics;
-          source = result.source || "synclyrics-package";
+        const manager = getLyricsManager();
+        const result = await manager.getLyrics({
+          track: title,
+          artist,
+          album,
+          length: durMs,
+        });
+        if (result?.lyrics) {
+          const lineSynced = result.lyrics.lineSynced?.lyrics || "";
+          const plain = result.lyrics.plain?.lyrics || "";
+          if (lineSynced) {
+            syncedLyrics = lineSynced;
+            source = result.lyrics.lineSynced?.source || "synclyrics";
+          }
+          if (plain && !plainLyrics) {
+            plainLyrics = plain;
+          }
         }
       } catch (e) {
-        console.warn("[Lyrics API Server] @stef-0012/synclyrics package lookup failed:", e);
+        console.warn("[Lyrics API Server] @stef-0012/synclyrics lookup failed:", e);
       }
     }
 

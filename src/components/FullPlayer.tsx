@@ -73,6 +73,9 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     reorderUpNext,
     removeTrack,
     reorderQueueTail,
+    goToQueueItem,
+    sleepTimerMinutes,
+    setSleepTimer,
   } = usePlayer();
 
   const formatTime = (s: number) => {
@@ -388,7 +391,8 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     if (!ps.active) {
       if (ps.longPressTimer) clearTimeout(ps.longPressTimer);
       pressState.current = null;
-      return;
+      // Short tap = jump to that track
+      return; // click handler will fire naturally
     }
     const finalDeltaY = e.clientY - ps.startY;
     finishQueueDrag(finalDeltaY);
@@ -477,6 +481,16 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                         onPointerMove={handleRowPointerMove}
                         onPointerUp={handleRowPointerUp}
                         onPointerCancel={handleRowPointerCancel}
+                        onClick={() => {
+                          if (!dragQueueItem) {
+                            // Insert the upNext item right after current and jump to it
+                            const insertIdx = currentIndex + 1;
+                            goToQueueItem(insertIdx);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Play ${t.title} by ${t.artist}`}
                       >
                         <span className={styles.dragGrip} aria-hidden="true">
                           <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
@@ -511,6 +525,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                   <div className={styles.queueHeader}>Next from: {currentTrack.album || "Playlist"}</div>
                   {tailQueue.map((t, i) => {
                     const isDragging = dragQueueItem?.list === "tail" && dragQueueItem.index === i;
+                    const absoluteIndex = currentIndex + 1 + i;
                     return (
                       <div
                         key={t.id}
@@ -520,6 +535,14 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                         onPointerMove={handleRowPointerMove}
                         onPointerUp={handleRowPointerUp}
                         onPointerCancel={handleRowPointerCancel}
+                        onClick={() => {
+                          if (!dragQueueItem) {
+                            goToQueueItem(absoluteIndex);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Play ${t.title} by ${t.artist}`}
                       >
                         <span className={styles.dragGrip} aria-hidden="true">
                           <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
@@ -821,11 +844,24 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               </svg>
             </button>
 
-            <button className={styles.iconBtn} aria-label="Add to playlist">
+            <button 
+              className={`${styles.iconBtn} ${sleepTimerMinutes ? styles.activeBtn : ""}`} 
+              onClick={() => {
+                const options = [null, 15, 30, 45, 60];
+                const currentIndex = options.indexOf(sleepTimerMinutes);
+                const nextOption = options[(currentIndex + 1) % options.length];
+                setSleepTimer(nextOption);
+              }}
+              aria-label={sleepTimerMinutes ? `Sleep timer: ${sleepTimerMinutes}m` : "Set sleep timer"}
+              title={sleepTimerMinutes ? `Sleep timer: ${sleepTimerMinutes}m` : "Set sleep timer"}
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
+              {sleepTimerMinutes && (
+                <span className={styles.sleepTimerBadge}>{sleepTimerMinutes}</span>
+              )}
             </button>
 
             <button
