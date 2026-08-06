@@ -232,9 +232,11 @@ export async function enrichTrackMetadata(
   try {
     // Step 1: Search for the recording to get its MBID
     const searchQuery = encodeURIComponent(`recording:"${title}" AND artist:"${artistName}"`);
+    console.log(`[MusicBrainz] Searching: /recording?query=${searchQuery}&limit=5&fmt=json`);
     const mbSearch = await fetchMusicBrainz<{ recordings: MusicBrainzRecording[] }>(
       `/recording?query=${searchQuery}&limit=5&fmt=json`
     );
+    console.log(`[MusicBrainz] Search found ${mbSearch?.recordings?.length || 0} recordings`);
 
     if (mbSearch?.recordings?.length) {
       // Find the best match (prefer exact title + artist match)
@@ -263,9 +265,11 @@ export async function enrichTrackMetadata(
       }
 
       // Step 2: Fetch the full recording with relations
+      console.log(`[MusicBrainz] Fetching details for MBID: ${recording.id}`);
       const mbDetail = await fetchMusicBrainz<MusicBrainzRecording>(
         `/recording/${recording.id}?inc=artist-rels+work-rels+artist-credits&fmt=json`
       );
+      console.log(`[MusicBrainz] Detail relations count: ${mbDetail?.relations?.length || 0}`);
 
       if (mbDetail) {
         const credits: { name: string; role: string }[] = [];
@@ -302,6 +306,7 @@ export async function enrichTrackMetadata(
         // Also fetch work relations to get songwriters/composers
         // MusicBrainz stores writer credits on the Work entity, not the Recording
         const workRels = mbDetail.relations?.filter((r: any) => r['target-type'] === 'work' || r.work);
+        console.log(`[MusicBrainz] Work relations count: ${workRels?.length || 0}`);
         if (workRels?.length) {
           for (const wrel of workRels) {
             const workId = (wrel as any).work?.id;
@@ -331,9 +336,11 @@ export async function enrichTrackMetadata(
 
         if (credits.length > 0) result.credits = credits;
         if (samples.length > 0) result.samples = samples;
+        console.log(`[MusicBrainz] Added ${credits.length} credits and ${samples.length} samples`);
       }
     }
-  } catch {
+  } catch (e) {
+    console.error(`[MusicBrainz] Error:`, e);
     // MusicBrainz is optional, ignore errors
   }
 

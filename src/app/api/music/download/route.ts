@@ -181,9 +181,8 @@ export async function POST(req: NextRequest) {
     if (metadata.credits?.length) {
       for (const credit of metadata.credits) {
         await queryOne(
-          `INSERT INTO "TrackCredit" ("trackId", name, role, "createdAt")
-           VALUES ($1, $2, $3, NOW())
-           ON CONFLICT DO NOTHING`,
+          `INSERT INTO "TrackCredit" (id, "trackId", name, role, "createdAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())`,
           [dbTrack!.id, credit.name, credit.role]
         );
       }
@@ -200,8 +199,8 @@ export async function POST(req: NextRequest) {
         const sampleType = sample.type === "samples" ? "samples" : "sampled";
 
         await queryOne(
-          `INSERT INTO "SampledTrack" ("trackId", "sampledTrackId", "sampleType", "createdAt")
-           VALUES ($1, $2, $3, NOW())
+          `INSERT INTO "SampledTrack" (id, "trackId", "sampledTrackId", "sampleType", "createdAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
            ON CONFLICT DO NOTHING`,
           [dbTrack!.id, sampleTrackId, sampleType]
         );
