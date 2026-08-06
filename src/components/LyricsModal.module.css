@@ -1,0 +1,148 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: var(--sakura-bg);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.overlay.open {
+  transform: translateY(0);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+}
+
+.headerBtn {
+  background: transparent;
+  border: none;
+  color: var(--sakura-text);
+  cursor: pointer;
+  padding: 8px;
+}
+
+.headerCenter {
+  flex: 1;
+  text-align: center;
+}
+
+.headerLabel {
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+  text-transform: uppercase;
+}
+
+.headerTitle {
+  font-weight: bold;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.row {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowActive {
+  opacity: 1;
+}
+
+.lineGroup {
+  cursor: pointer;
+}
+
+.line {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.lineActive {
+  color: var(--track-accent, var(--sakura-accent));
+}
+
+.lineTranslit {
+  font-size: 1rem;
+  color: var(--sakura-text-secondary);
+  margin: 0;
+}
+
+.lineTranslitActive {
+  color: var(--sakura-text);
+}
+
+.shareLineBtn {
+  background: transparent;
+  border: none;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  margin-left: 1rem;
+  opacity: 0;
+}
+
+.row:hover .shareLineBtn {
+  opacity: 1;
+}
+
+.plainText {
+  font-size: 1.25rem;
+  line-height: 1.6;
+}
+
+.footer {
+  padding: 1rem;
+  background: var(--sakura-glass-strong);
+}
+
+.timeRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+}
+
+.transport {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.transportBtn, .playPauseBtn {
+  background: transparent;
+  border: none;
+  color: var(--sakura-text);
+  cursor: pointer;
+}
+
+.playPauseBtn {
+  background: var(--sakura-accent);
+  color: #fff;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
