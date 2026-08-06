@@ -47,7 +47,7 @@ export async function GET(
       );
       if (localArtist) deezerId = localArtist.deezerId;
     } else {
-      deezerId = id;
+      deezerId = id.startsWith("deezer-") ? id.replace("deezer-", "") : id;
     }
 
     let finalArtist: any = null;

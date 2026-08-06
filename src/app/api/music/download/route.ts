@@ -29,7 +29,25 @@ export async function POST(req: NextRequest) {
 
     // searchAndSelect acquires the bot mutex, searches, clicks the first result,
     // waits for audio, then releases — all serialized for reliability
-    const track = await client.searchAndSelect(query, 0, 20000, 45000);
+    let track: any = null;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        track = await client.searchAndSelect(query, 0, 35000, 60000);
+        break;
+      } catch (err) {
+        console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${query}":`, err instanceof Error ? err.message : err);
+        lastError = err;
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    }
+
+    if (!track) {
+      throw lastError || new Error("Failed to download track after 3 attempts");
+    }
 
     const userId = session.user.id as string;
 

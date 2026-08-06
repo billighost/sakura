@@ -886,7 +886,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 <line x1="3" y1="18" x2="3.01" y2="18" />
               </svg>
             </button>
-            </button>
           </div>
 
           {!lyricsExpanded && currentTrack && (
