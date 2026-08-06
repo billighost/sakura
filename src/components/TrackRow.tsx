@@ -7,8 +7,6 @@ import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack,
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import styles from "./TrackRow.module.css";
 
-const PETAL_COUNT = 5;
-
 interface TrackRowProps {
   track: {
     id: string;
@@ -16,22 +14,44 @@ interface TrackRowProps {
     artist: { name: string; id?: string };
     album?: { title: string; coverUrl?: string; id?: string } | null;
     coverUrl?: string;
-    audioUrl: string;
+    audioUrl?: string; // It could be undefined if it's an online track that needs downloading
     duration: number;
+    source?: "library" | "deezer";
   };
   queue?: TrackRowProps["track"][];
   index?: number;
   showNumber?: boolean;
 }
 
+function CircularProgress({ progress }: { progress: number }) {
+  const radius = 8;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (progress / 100) * circumference;
+
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" className={styles.circularLoader}>
+      <circle cx="12" cy="12" r={radius} stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
+      <circle 
+        cx="12" cy="12" r={radius} 
+        stroke="currentColor" strokeWidth="2" fill="none"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform="rotate(-90 12 12)"
+        style={{ transition: "stroke-dashoffset 0.3s ease" }}
+      />
+    </svg>
+  );
+}
+
 export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
   const { currentTrack, isPlaying, play, togglePlay, addToQueue, favoriteTrackIds, toggleLikeTrack, showToast } = usePlayer();
   const liked = favoriteTrackIds?.has(track.id) || false;
   const isActive = currentTrack?.id === track.id;
+  
   const [offline, setOffline] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadState, setDownloadState] = useState<"idle" | "telegram" | "device">("idle");
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [burstKey, setBurstKey] = useState(0);
 
   const cover = track.coverUrl || track.album?.coverUrl;
 
@@ -48,81 +68,110 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     } catch {}
   }
 
-  async function handleDownload(e: React.MouseEvent) {
+  async function handlePlay(e: React.MouseEvent) {
     e.stopPropagation();
-    const uId = getCachedUserId();
-    const dId = getDeviceId();
-    if (offline) {
-      try {
-        await removeOfflineTrack(track.id, uId, dId);
-        setOffline(false);
-      } catch {}
+    
+    if (isActive) {
+      togglePlay();
       return;
     }
 
-    setDownloading(true);
-    try {
-      const res = await fetch(track.audioUrl);
-      const blob = await res.blob();
+    if (downloadState !== "idle") return; // Prevent double clicks during download
 
+    // If it's already downloaded or has a valid audioUrl from library, just play
+    if (offline || track.source === "library" || track.audioUrl) {
+      playTrack(track.id, track.audioUrl!);
+      return;
+    }
+
+    // Otherwise, we need to download it first
+    setDownloadState("telegram");
+    try {
+      // 1. Trigger Telegram Download
+      const res = await fetch("/api/music/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: track.title,
+          artist: track.artist.name,
+          duration: track.duration,
+          albumId: track.album?.id
+        }),
+      });
+      const data = await res.json();
+      
+      if (!data.id) throw new Error("No track ID returned");
+
+      const newId = data.id;
+      const newAudioUrl = data.audioUrl;
+      const finalCoverUrl = data.coverUrl || cover;
+
+      // 2. Fetch to User's Device
+      setDownloadState("device");
+      const blobRes = await fetch(newAudioUrl);
+      const blob = await blobRes.blob();
+
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
       await saveTrackOffline({
-        id: track.id,
+        id: newId,
         title: track.title,
         artist: track.artist.name,
         album: track.album?.title,
-        audioUrl: track.audioUrl,
-        coverUrl: cover,
+        audioUrl: newAudioUrl,
+        coverUrl: finalCoverUrl,
         duration: track.duration,
       }, uId, dId);
-      await saveAudioBlob(track.id, blob, uId, dId);
+      await saveAudioBlob(newId, blob, uId, dId);
+      
       setOffline(true);
+      setDownloadState("idle");
+
+      // 3. Play the newly downloaded track
+      playTrack(newId, newAudioUrl, finalCoverUrl);
     } catch (err) {
-      console.error("Download failed:", err);
-    } finally {
-      setDownloading(false);
+      console.error("Auto-download failed:", err);
+      showToast("Download failed. Please try again.", "error");
+      setDownloadState("idle");
     }
   }
 
-  function handleLike(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!liked) {
-      setBurstKey((k) => k + 1);
-      import("@/lib/haptics").then((h) => h.vibrate(12));
-    }
-    toggleLikeTrack(track.id);
+  function playTrack(actualId: string, actualAudioUrl: string, actualCover?: string) {
+    const q = queue?.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist.name,
+      artistId: t.artist.id,
+      album: t.album?.title,
+      albumId: t.album?.id,
+      coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
+      audioUrl: t.audioUrl || actualAudioUrl,
+      duration: t.duration,
+    }));
+    play(
+      {
+        id: actualId,
+        title: track.title,
+        artist: track.artist.name,
+        artistId: track.artist.id,
+        album: track.album?.title,
+        albumId: track.album?.id,
+        coverUrl: actualCover || cover,
+        audioUrl: actualAudioUrl,
+        duration: track.duration,
+      },
+      q
+    );
   }
 
-  function handlePlay(e: React.MouseEvent) {
-    if ((e.target as HTMLElement).closest("[data-download-btn]")) return;
-    if (isActive) {
-      togglePlay();
-    } else {
-      const q = queue?.map((t) => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist.name,
-        artistId: t.artist.id,
-        album: t.album?.title,
-        albumId: t.album?.id,
-        coverUrl: t.coverUrl || t.album?.coverUrl || undefined,
-        audioUrl: t.audioUrl,
-        duration: t.duration,
-      }));
-      play(
-        {
-          id: track.id,
-          title: track.title,
-          artist: track.artist.name,
-          artistId: track.artist.id,
-          album: track.album?.title,
-          albumId: track.album?.id,
-          coverUrl: cover,
-          audioUrl: track.audioUrl,
-          duration: track.duration,
-        },
-        q
-      );
-    }
+  async function handleRemoveOffline() {
+    try {
+      const uId = getCachedUserId();
+      const dId = getDeviceId();
+      await removeOfflineTrack(track.id, uId, dId);
+      setOffline(false);
+      showToast("Removed from device", "success");
+    } catch {}
   }
 
   function openMenuFromButton(e: React.MouseEvent) {
@@ -154,33 +203,33 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           {isActive && isPlaying ? (
             <span className={styles.eq} aria-hidden="true"><span /><span /><span /></span>
           ) : isActive ? (
-            "♫"
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
           ) : (
             index + 1
           )}
         </span>
       ) : cover ? (
-        <div className={`${styles.artWrap} ${isActive && isPlaying ? styles.playing : ""}`}>
-          <div className={styles.artGlow} />
+        <div className={styles.artWrap}>
           <img src={cover} alt="" className={styles.art} />
-          <div className={styles.artOverlay}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
         </div>
       ) : null}
 
       <div className={styles.info}>
-        <div className={`${styles.title} ${isActive ? styles.titleActive : ""}`}>
+        <div className={styles.titleRow}>
           <Link
             href={`/track/${track.id}`}
             onClick={(e) => e.stopPropagation()}
-            className={styles.title}
-            style={{ color: "inherit" }}
+            className={`${styles.title} ${isActive ? styles.titleActive : ""}`}
           >
             {track.title}
           </Link>
+          {liked && (
+            <svg className={styles.likedIcon} width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          )}
         </div>
         <div className={styles.meta}>
           {track.artist.id ? (
@@ -209,47 +258,31 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
       <div className={styles.actions}>
         <button
-          className={`${styles.iconBtn} ${liked ? styles.liked : ""}`}
-          onClick={handleLike}
-          title={liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
+          className={styles.playBtn}
+          onClick={handlePlay}
+          title="Play"
+          aria-label="Play"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-          {burstKey > 0 && Array.from({ length: PETAL_COUNT }).map((_, i) => (
-            <span
-              key={`${burstKey}-${i}`}
-              className={styles.petal}
-              style={{ "--rot": `${(360 / PETAL_COUNT) * i}deg` } as React.CSSProperties}
-            />
-          ))}
-        </button>
-
-        <button
-          data-download-btn
-          className={`${styles.iconBtn} ${offline ? styles.downloaded : ""}`}
-          onClick={handleDownload}
-          disabled={downloading}
-          title={offline ? "Downloaded — tap to remove from device" : "Download for offline listening"}
-          aria-label={offline ? "Remove from offline" : "Download for offline"}
-        >
-          {downloading ? (
-            <span className={styles.spinner} />
-          ) : offline ? (
-            /* Downloaded: show device/offline icon */
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+          {downloadState === "telegram" ? (
+            <CircularProgress progress={50} />
+          ) : downloadState === "device" ? (
+            <CircularProgress progress={90} />
+          ) : isActive && isPlaying ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
             </svg>
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
           )}
         </button>
 
         <button className={styles.iconBtn} onClick={openMenuFromButton} title="More options" aria-label="More options">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="1.7" />
-            <circle cx="12" cy="12" r="1.7" />
-            <circle cx="12" cy="19" r="1.7" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="12" cy="19" r="2" />
           </svg>
         </button>
       </div>
@@ -259,12 +292,27 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
-              handlePlay({ target: document.body } as any);
+              toggleLikeTrack(track.id);
             }}
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>}
+            icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            }
           >
-            Play
+            {liked ? "Remove from Liked Songs" : "Add to Liked Songs"}
           </ContextMenuItem>
+          {offline && (
+            <ContextMenuItem
+              onClick={() => {
+                setMenuPos(null);
+                handleRemoveOffline();
+              }}
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>}
+            >
+              Remove from Device
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
@@ -276,7 +324,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
                 album: track.album?.title,
                 albumId: track.album?.id,
                 coverUrl: cover,
-                audioUrl: track.audioUrl,
+                audioUrl: track.audioUrl || "",
                 duration: track.duration,
               });
               showToast("Added to queue", "success");
@@ -292,6 +340,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
                 navigator.share({ title: track.title, url: `${window.location.origin}/track/${track.id}` }).catch(() => {});
               } else {
                 navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
+                showToast("Link copied to clipboard", "success");
               }
             }}
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}

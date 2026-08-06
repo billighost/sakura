@@ -4,7 +4,7 @@
   align-items: center;
   gap: clamp(0.625rem, 2vw, 0.875rem);
   padding: clamp(0.5rem, 2vw, 0.625rem) clamp(0.5rem, 2vw, 0.75rem);
-  border-radius: 14px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   color: var(--sakura-text);
@@ -24,6 +24,10 @@
 
 .active {
   background: var(--sakura-active);
+}
+
+.active .title {
+  color: var(--sakura-accent);
 }
 
 .numberCell {
@@ -70,53 +74,32 @@
   flex-shrink: 0;
 }
 
-.artGlow {
-  position: absolute;
-  inset: -3px;
-  border-radius: 11px;
-  background: var(--sakura-accent-gradient);
-  opacity: 0;
-  filter: blur(6px);
-  transition: opacity 0.3s ease;
-}
-
-.artWrap.playing .artGlow {
-  opacity: 0.5;
-}
-
 .art {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: cover;
   background: var(--sakura-skeleton);
-}
-
-.artOverlay {
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.artWrap.playing .artOverlay {
-  opacity: 1;
 }
 
 .info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .title {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,8 +111,9 @@
   text-decoration: underline;
 }
 
-.titleActive {
+.likedIcon {
   color: var(--sakura-accent);
+  flex-shrink: 0;
 }
 
 .meta {
@@ -138,7 +122,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .metaLink {
@@ -156,22 +140,45 @@
   flex-shrink: 0;
   margin-left: 0.25rem;
   font-variant-numeric: tabular-nums;
+  opacity: 0.7;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-.iconBtn {
-  position: relative;
+.playBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(1.875rem, 5.5vw, 2.125rem);
-  height: clamp(1.875rem, 5.5vw, 2.125rem);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--sakura-text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.playBtn:hover {
+  transform: scale(1.05);
+}
+
+.playBtn:active {
+  transform: scale(0.95);
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -182,69 +189,9 @@
 }
 
 .iconBtn:hover {
-  background: var(--sakura-hover);
   color: var(--sakura-text);
 }
 
-.iconBtn:active {
-  transform: scale(0.85);
-}
-
-.liked {
-  color: var(--sakura-accent);
-}
-
-.liked:hover {
-  color: var(--sakura-accent);
-}
-
-.downloaded {
-  background: var(--sakura-accent-gradient);
-  color: #1A1620;
-}
-
-.downloaded:hover {
-  background: var(--sakura-accent-gradient);
-  color: #1A1620;
-}
-
-.spinner {
-  width: 0.75rem;
-  height: 0.75rem;
-  border: 2px solid var(--sakura-text-secondary);
-  border-top-color: var(--sakura-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.petal {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 9px;
-  border-radius: 60% 60% 60% 0;
-  background: var(--sakura-accent);
-  opacity: 0;
-  pointer-events: none;
-  animation: petalBurst 0.6s ease-out forwards;
-}
-
-.petal:nth-child(2n) {
-  background: var(--sakura-accent-2);
-}
-
-@keyframes petalBurst {
-  0% {
-    opacity: 0.95;
-    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0) scale(0.6);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-20px) scale(1);
-  }
+.circularLoader {
+  color: var(--sakura-text);
 }

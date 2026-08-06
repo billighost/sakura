@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
 /* ────────────────────────────────────────────────────────────
@@ -130,11 +131,7 @@ const THEMES: { id: "dark" | "light" | "system"; name: string; preview: string }
 const AUDIO_QUALITIES = ["Low (96 kbps)", "Normal (160 kbps)", "High (320 kbps)", "Lossless"];
 
 export default function SettingsPage() {
-  const router = import("next/navigation").then(m => m.useRouter).catch(() => (() => ({ push: () => {} })));
-  const [routerPush, setRouterPush] = useState<any>(null);
-  useEffect(() => {
-    import("next/navigation").then(m => setRouterPush(() => m.useRouter().push));
-  }, []);
+  const router = useRouter();
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
@@ -191,7 +188,7 @@ export default function SettingsPage() {
   async function handleLogout() {
     setLoggingOut(true);
     await fetch("/api/auth/signout", { method: "POST" });
-    if (routerPush) routerPush("/login");
+    router.push("/login");
   }
 
   const storageUsedGb = 3.4;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
 /* ────────────────────────────────────────────────────────────
@@ -119,11 +120,7 @@ function initials(name: string) {
 const STAT_ICONS = [ClockIcon, DiscIcon, HeadphonesIcon, ListIcon, StreakIcon];
 
 export default function ProfilePage() {
-  const router = import("next/navigation").then(m => m.useRouter).catch(() => (() => ({ push: () => {} })));
-  const [routerPush, setRouterPush] = useState<any>(null);
-  useEffect(() => {
-    import("next/navigation").then(m => setRouterPush(() => m.useRouter().push));
-  }, []);
+  const router = useRouter();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [editingBio, setEditingBio] = useState(false);
@@ -223,7 +220,7 @@ export default function ProfilePage() {
   async function handleLogout() {
     setLoggingOut(true);
     await fetch("/api/auth/signout", { method: "POST" });
-    if (routerPush) routerPush("/login");
+    router.push("/login");
   }
 
   if (!profile) {
