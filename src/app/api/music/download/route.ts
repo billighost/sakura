@@ -5,10 +5,65 @@ import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 
+const globalForPendingDownloads = globalThis as unknown as {
+  pendingDownloads?: Map<string, Promise<any>>;
+};
+
+if (!globalForPendingDownloads.pendingDownloads) {
+  globalForPendingDownloads.pendingDownloads = new Map();
+}
+const pendingDownloads = globalForPendingDownloads.pendingDownloads;
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { title, artist, duration, albumId: providedAlbumId } = body;
+
+  if (!title || !artist) {
+    return NextResponse.json(
+      { error: "title and artist are required" },
+      { status: 400 }
+    );
+  }
+
+  // 1. Try to find the track in our database first to avoid hitting Telegram
+  try {
+    const existingTrack = await queryOne<{
+      id: string;
+      title: string;
+      artistName: string;
+      duration: number;
+      audioUrl: string;
+      albumId: string | null;
+      coverUrl: string | null;
+      telegramMessageId: string | null;
+    }>(
+      `SELECT t.id, t.title, a.name as "artistName", t.duration, t."audioUrl", t."albumId", t."coverUrl", t."telegramMessageId"
+       FROM "Track" t
+       JOIN "Artist" a ON t."artistId" = a.id
+       WHERE lower(t.title) = lower($1) AND lower(a.name) = lower($2)`,
+      [title, artist]
+    );
+
+    if (existingTrack) {
+      console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}". Returning DB track.`);
+      return NextResponse.json({
+        id: existingTrack.id,
+        title: existingTrack.title,
+        artist: existingTrack.artistName,
+        duration: existingTrack.duration,
+        audioUrl: existingTrack.audioUrl,
+        messageId: existingTrack.telegramMessageId ? parseInt(existingTrack.telegramMessageId, 10) : null,
+        albumId: existingTrack.albumId,
+        coverUrl: existingTrack.coverUrl,
+      });
+    }
+  } catch (err) {
+    console.error("[Telegram AutoDownload] Pre-lookup database error:", err);
   }
 
   // This endpoint drives a Telegram bot with a 3-attempt retry and 60s
@@ -21,24 +76,64 @@ export async function POST(req: NextRequest) {
   );
   if (!limited.allowed) return rateLimitResponse(limited);
 
-  const body = await req.json();
-  const { title, artist, duration, albumId: providedAlbumId } = body;
+  const cacheKey = `${artist.toLowerCase().trim()} - ${title.toLowerCase().trim()}`;
+  const searchQuery = `${artist} - ${title}`;
 
-  if (!title || !artist) {
-    return NextResponse.json(
-      { error: "title and artist are required" },
-      { status: 400 }
-    );
+  if (pendingDownloads.has(cacheKey)) {
+    console.log(`[Telegram AutoDownload] Coalescing request for "${searchQuery}". Waiting for active download...`);
+    try {
+      await pendingDownloads.get(cacheKey);
+      // Retrieve the newly created track
+      const newTrack = await queryOne<{
+        id: string;
+        title: string;
+        artistName: string;
+        duration: number;
+        audioUrl: string;
+        albumId: string | null;
+        coverUrl: string | null;
+        telegramMessageId: string | null;
+      }>(
+        `SELECT t.id, t.title, a.name as "artistName", t.duration, t."audioUrl", t."albumId", t."coverUrl", t."telegramMessageId"
+         FROM "Track" t
+         JOIN "Artist" a ON t."artistId" = a.id
+         WHERE lower(t.title) = lower($1) AND lower(a.name) = lower($2)`,
+        [title, artist]
+      );
+      if (newTrack) {
+        return NextResponse.json({
+          id: newTrack.id,
+          title: newTrack.title,
+          artist: newTrack.artistName,
+          duration: newTrack.duration,
+          audioUrl: newTrack.audioUrl,
+          messageId: newTrack.telegramMessageId ? parseInt(newTrack.telegramMessageId, 10) : null,
+          albumId: newTrack.albumId,
+          coverUrl: newTrack.coverUrl,
+        });
+      }
+    } catch (err) {
+      console.error(`[Telegram AutoDownload] Coalesced request failed for "${searchQuery}":`, err);
+      return NextResponse.json(
+        { error: "Failed to download track from Telegram" },
+        { status: 500 }
+      );
+    }
   }
+
+  // If we get here, we are the first downloader. Register the promise wrapper:
+  let resolveDownload: (value?: any) => void = () => {};
+  let rejectDownload: (reason?: any) => void = () => {};
+  const downloadPromise = new Promise((resolve, reject) => {
+    resolveDownload = resolve;
+    rejectDownload = reject;
+  });
+  pendingDownloads.set(cacheKey, downloadPromise);
 
   try {
     const client = getTelegramClient();
     await client.init();
 
-    // Named `searchQuery`, not `query` — the imported `query()` helper from
-    // lib/sql is used further down, and a local const of the same name shadows
-    // it for the whole function body.
-    const searchQuery = `${artist} - ${title}`;
     console.log(`[Telegram AutoDownload] Searching: "${searchQuery}"`);
 
     // searchAndSelect acquires the bot mutex, searches, clicks the first result,
@@ -290,6 +385,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    resolveDownload();
+    pendingDownloads.delete(cacheKey);
+
     return NextResponse.json({
       id: dbTrack!.id,
       title: track.title,
@@ -301,6 +399,8 @@ export async function POST(req: NextRequest) {
       coverUrl: metadata.album?.coverUrl || null,
     });
   } catch (error) {
+    rejectDownload(error);
+    pendingDownloads.delete(cacheKey);
     console.error("[Telegram AutoDownload]", error);
     return NextResponse.json(
       { error: "Failed to download track from Telegram" },
