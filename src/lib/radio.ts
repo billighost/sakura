@@ -1,6 +1,8 @@
 import { query, softFail } from "@/lib/sql";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 import { getTasteProfile, normaliseGenre, type TasteProfile } from "@/lib/taste";
+import { buildCandidatePool, resolveArtistDeezerIds, type VirtualTrack } from "@/lib/catalog";
+import { setVirtualTrackMeta } from "@/lib/virtualTracks";
 
 /**
  * The radio engine — what plays when the queue runs out.
@@ -133,7 +135,7 @@ export async function buildRadio(
 
   // 1. Gather. Each source runs independently and failures are isolated —
   //    a broken source degrades the mix, it doesn't empty it.
-  const candidates = await gatherCandidates(userId, {
+  const dbCandidates = await gatherCandidates(userId, {
     artistIds: positiveArtistIds,
     genres: topGenres,
     bannedArtistIds,
@@ -141,6 +143,25 @@ export async function buildRadio(
     // lot, and a thin candidate pool produces a repetitive radio.
     poolSize: Math.max(220, limit * 10),
   });
+
+  // 1b. Top up from the provider catalogue.
+  //
+  // The DB only holds tracks someone has actually fetched, so on a small or
+  // genre-narrow library the local pool collapses to the same few dozen songs
+  // and the radio loops. Virtual candidates make the reachable catalogue as
+  // wide as the provider's without storing anything. They're only fetched when
+  // the local pool is genuinely thin, so a well-stocked library pays nothing.
+  const wantVirtual = dbCandidates.length < Math.max(60, limit * 4);
+  const virtualCandidates = wantVirtual
+    ? await gatherVirtualCandidates(userId, {
+        genres: topGenres,
+        positiveArtistIds,
+        discovery: clamp(profile?.discovery ?? 0.35, 0, 1),
+        limit: Math.max(120, limit * 6),
+      })
+    : [];
+
+  const candidates = [...dbCandidates, ...virtualCandidates];
 
   // 2. Score.
   const discovery = clamp(profile?.discovery ?? 0.35, 0, 1);
@@ -153,7 +174,9 @@ export async function buildRadio(
 
   for (const c of candidates) {
     if (excludeSet.has(c.id) || seen.has(c.id)) continue;
-    if (!c.audioUrl || c.audioUrl === "pending") continue; // unplayable
+    // Virtual candidates legitimately have no audioUrl yet — they resolve on
+    // play. Only a *local* row with a missing or stuck url is unplayable.
+    if (c.source !== "virtual" && (!c.audioUrl || c.audioUrl === "pending")) continue;
     seen.add(c.id);
 
     let score = 0;
@@ -270,6 +293,97 @@ export async function buildRadio(
 }
 
 // ── Candidate gathering ─────────────────────────────────────────────────────
+
+/**
+ * Provider-backed candidates, shaped to look exactly like DB rows so the
+ * scorer needs no special cases.
+ *
+ * Two things are deliberately different from a real row:
+ *   - `audioUrl` is empty. That's the player's existing "resolve before play"
+ *     state, already handled by the load effect, so a virtual track flows
+ *     through the queue untouched.
+ *   - `artistId` is null, so artist-affinity scoring can't apply. Instead the
+ *     provider's own popularity rank feeds `globalPlays`, which is a
+ *     reasonable stand-in for "this is a well-known track" and keeps virtual
+ *     candidates competitive with local ones without letting them dominate.
+ */
+async function gatherVirtualCandidates(
+  userId: string,
+  opts: { genres: string[]; positiveArtistIds: string[]; discovery: number; limit: number }
+): Promise<Candidate[]> {
+  if (opts.genres.length === 0 && opts.positiveArtistIds.length === 0) return [];
+
+  try {
+    const likedArtists = opts.positiveArtistIds.length
+      ? await query<{ id: string; name: string; deezerId: string | null }>(
+          `SELECT id, name, "deezerId" FROM "Artist" WHERE id = ANY($1::text[]) LIMIT 10`,
+          [opts.positiveArtistIds.slice(0, 10)]
+        ).catch(softFail("radio:virtual:artists", []))
+      : [];
+
+    const seedArtistIds = await resolveArtistDeezerIds(likedArtists);
+
+    const pool = await buildCandidatePool({
+      genres: opts.genres,
+      seedArtistIds,
+      discovery: opts.discovery,
+      limit: opts.limit,
+    });
+
+    if (pool.length === 0) return [];
+
+    // Cache display metadata so the client can render these before they're
+    // resolved, and so a later mix or queue restore can find them.
+    await setVirtualTrackMeta(
+      userId,
+      pool.map((t) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artistName,
+        artistDeezerId: t.artistDeezerId,
+        album: t.albumTitle,
+        coverUrl: t.coverUrl,
+        duration: t.duration,
+      }))
+    );
+
+    return pool.map((t) => toCandidate(t, opts.genres));
+  } catch (err) {
+    console.error(
+      "[radio:virtual] pool build failed:",
+      err instanceof Error ? err.message : err
+    );
+    return [];
+  }
+}
+
+function toCandidate(t: VirtualTrack, genres: string[]): Candidate {
+  return {
+    id: t.id,
+    title: t.title,
+    artistId: null,
+    artistName: t.artistName,
+    albumId: null,
+    albumTitle: t.albumTitle,
+    coverUrl: t.coverUrl,
+    audioUrl: "", // resolve-on-play
+    duration: t.duration,
+    // The pool was built *from* these genres, so attributing them back is
+    // accurate enough for scoring and is what makes "More afrobeats" show up
+    // as a reason on a virtual pick.
+    genres: genres.slice(0, 3),
+    trackGenre: null,
+    releaseYear: null,
+    // Deezer's rank is roughly 0–1,000,000. Scaling it into the same order of
+    // magnitude as a local play count keeps the popularity term meaningful
+    // without letting a chart-topper outrank someone's actual favourites.
+    globalPlays: t.rank ? Math.round(t.rank / 20000) : 0,
+    userPlays: 0,
+    lastPlayedAt: null,
+    liked: false,
+    source: "virtual",
+  };
+}
 
 async function gatherCandidates(
   userId: string,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
+import { callProvider, HttpError } from "@/lib/resilience";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -78,10 +79,17 @@ export async function GET(
     }
 
     if (deezerId) {
-      const res = await fetch(`https://api.deezer.com/album/${deezerId}`);
-      if (res.ok) {
-        const data: DeezerAlbumResponse = await res.json();
-        
+      const data = await callProvider<DeezerAlbumResponse>(
+        async (signal) => {
+          const url = `https://api.deezer.com/album/${deezerId}`;
+          const res = await fetch(url, { signal });
+          if (!res.ok) throw new HttpError(res.status, url);
+          return res.json();
+        },
+        { provider: "deezer", op: "album", timeoutMs: 5000, attempts: 2 },
+      );
+
+      if (data) {
         if (!data.error) {
           finalAlbum = {
             id: localAlbum?.id || `deezer-${data.id}`,

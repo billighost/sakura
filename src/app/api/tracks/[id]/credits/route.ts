@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/sql";
+import { cacheKey, cacheGetStale, cacheSetStale, TTL } from "@/lib/cache";
+import { callProvider, HttpError } from "@/lib/resilience";
+
+type Credit = { id: string; name: string; role: string };
 
 export async function GET(
   _req: NextRequest,
@@ -50,18 +54,36 @@ export async function GET(
       }
 
       if (dzId) {
-        try {
-          const res = await fetch(`https://api.deezer.com/track/${dzId}`, { next: { revalidate: 3600 } });
-          const data = await res.json();
-          if (data && data.contributors) {
+        // Credits are a nice-to-have, so this whole block is best-effort:
+        // callProvider returns null rather than throwing, and an empty credit
+        // list renders fine.
+        const cKey = cacheKey("credits", dzId);
+        const cached = await cacheGetStale<Credit[]>(cKey);
+        if (cached && cached.fresh) {
+          finalCredits = cached.value;
+        } else {
+          const data = await callProvider<any>(
+            async (signal) => {
+              const url = `https://api.deezer.com/track/${dzId}`;
+              const res = await fetch(url, { signal });
+              if (!res.ok) throw new HttpError(res.status, url);
+              return res.json();
+            },
+            { provider: "deezer", op: "track.credits", timeoutMs: 5000, attempts: 2 },
+          );
+
+          if (data?.contributors) {
             finalCredits = data.contributors.map((c: any) => ({
               id: `dz-contrib-${c.id}`,
               name: c.name,
               role: c.role || "Unknown",
             }));
+            await cacheSetStale(cKey, finalCredits, TTL.credits);
+          } else if (cached) {
+            // Provider is down or breaker is open — serve the stale copy
+            // rather than pretending the track has no credits.
+            finalCredits = cached.value;
           }
-        } catch (err) {
-          console.error("Failed to fetch Deezer fallback credits:", err);
         }
       }
     }

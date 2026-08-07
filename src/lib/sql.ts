@@ -30,6 +30,21 @@ const globalForPool = globalThis as unknown as { pgPool?: Pool };
  */
 const POOL_MAX = Number(process.env.PG_POOL_MAX) || 10;
 
+/**
+ * Keep a couple of connections permanently open.
+ *
+ * The database is remote: a bare `SELECT 1` on a cold pool measured ~3.1 s
+ * (TCP + TLS + auth), against ~190 ms once a connection exists. With `min: 0`
+ * every idle period threw away all connections, so the first request after any
+ * quiet stretch paid that full handshake — which is precisely the request a
+ * person is waiting on. Holding 2 warm connections converts that into a normal
+ * round trip.
+ *
+ * `allowExitOnIdle` has to go with it: it lets the process exit while idle
+ * connections exist, which would defeat the point of holding them.
+ */
+const POOL_MIN = Number(process.env.PG_POOL_MIN) || 2;
+
 function createPool(): Pool {
   const pool = new Pool({
     connectionString:
@@ -37,16 +52,17 @@ function createPool(): Pool {
       process.env.POSTGRES_URL ||
       process.env.POSTGRES_PRISMA_URL,
     max: POOL_MAX,
-    min: 0,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    min: POOL_MIN,
+    // Long enough that normal gaps between requests don't cycle connections.
+    idleTimeoutMillis: 300_000,
+    connectionTimeoutMillis: 10_000,
     // Queries that hang hold a pool slot hostage. Under load that's how a
     // slow query turns into a total outage: every slot ends up parked on the
     // same statement and healthy requests can't get a connection. These caps
     // make a hung query fail its own request instead of the whole instance.
     statement_timeout: 15000,
     query_timeout: 15000,
-    allowExitOnIdle: true,
+    allowExitOnIdle: false,
   });
 
   // An idle client erroring (server restart, network blip) emits on the pool.
@@ -55,6 +71,12 @@ function createPool(): Pool {
   pool.on("error", (err) => {
     console.error("[SQL] Idle client error:", err.message);
   });
+
+  // Open the first connection immediately rather than lazily on the first
+  // request, so startup absorbs the handshake instead of a user doing so.
+  pool
+    .query("SELECT 1")
+    .catch((err) => console.error("[SQL] Warmup failed:", err.message));
 
   return pool;
 }

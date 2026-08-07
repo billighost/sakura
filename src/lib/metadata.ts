@@ -1,3 +1,6 @@
+import { fetchJsonResilient } from './resilience';
+import { cachedWithStale, cacheKey, TTL } from './cache';
+
 interface DeezerTrack {
   id: number;
   title: string;
@@ -81,6 +84,7 @@ interface EnrichedMetadata {
 
 const DEEZER_BASE = 'https://api.deezer.com';
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
+const ITUNES_BASE = 'https://itunes.apple.com';
 const USER_AGENT = 'SakuraMusic/1.0 (https://github.com/sakura-music)';
 
 /**
@@ -94,27 +98,72 @@ const USER_AGENT = 'SakuraMusic/1.0 (https://github.com/sakura-music)';
  */
 const PROVIDER_TIMEOUT_MS = 6000;
 
-async function fetchJson<T>(url: string, revalidate = 3600): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-      next: { revalidate },
-      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    // Timeout, network failure, or malformed JSON — all equally "no data".
-    return null;
-  }
+/**
+ * MusicBrainz asks for ~1 request/second per client and enforces it. It is
+ * also the slowest provider here by a wide margin, so it gets a longer
+ * timeout, fewer retries, and a twitchier breaker than Deezer: when MB is
+ * struggling the right move is to stop asking, not to try harder.
+ */
+const MB_TIMEOUT_MS = 8000;
+
+async function fetchDeezer<T>(endpoint: string, op: string): Promise<T | null> {
+  return fetchJsonResilient<T>(`${DEEZER_BASE}${endpoint}`, {
+    provider: 'deezer',
+    op,
+    headers: { 'User-Agent': USER_AGENT },
+    revalidate: 3600,
+    timeoutMs: PROVIDER_TIMEOUT_MS,
+    attempts: 3,
+  });
 }
 
-async function fetchDeezer<T>(endpoint: string): Promise<T | null> {
-  return fetchJson<T>(`${DEEZER_BASE}${endpoint}`);
+async function fetchMusicBrainz<T>(endpoint: string, op: string): Promise<T | null> {
+  return fetchJsonResilient<T>(`${MUSICBRAINZ_BASE}${endpoint}`, {
+    provider: 'musicbrainz',
+    op,
+    headers: { 'User-Agent': USER_AGENT },
+    revalidate: 86400,
+    timeoutMs: MB_TIMEOUT_MS,
+    attempts: 2,
+  });
 }
 
-async function fetchMusicBrainz<T>(endpoint: string): Promise<T | null> {
-  return fetchJson<T>(`${MUSICBRAINZ_BASE}${endpoint}`);
+/**
+ * iTunes Search — the fallback when Deezer can't identify a track.
+ *
+ * Chosen over the alternatives for one reason: it needs no key and no
+ * account, so it can't silently stop working when a credential expires. Its
+ * artwork is also higher resolution than Deezer's (the 100x100 URL rewrites
+ * to any size), which is why it's worth consulting for covers even on the
+ * path where Deezer succeeded but returned nothing usable.
+ */
+async function fetchItunes<T>(endpoint: string, op: string): Promise<T | null> {
+  return fetchJsonResilient<T>(`${ITUNES_BASE}${endpoint}`, {
+    provider: 'itunes',
+    op,
+    revalidate: 86400,
+    timeoutMs: PROVIDER_TIMEOUT_MS,
+    attempts: 2,
+  });
+}
+
+interface ItunesTrack {
+  trackId: number;
+  trackName: string;
+  artistName: string;
+  artistId: number;
+  collectionId: number;
+  collectionName: string;
+  artworkUrl100?: string;
+  releaseDate?: string;
+  primaryGenreName?: string;
+  trackTimeMillis?: number;
+  copyright?: string;
+}
+
+/** iTunes serves 100×100 by default; the size is just a path segment. */
+function itunesArtwork(url: string | undefined, size = 1000): string | undefined {
+  return url?.replace(/\/\d+x\d+bb\./, `/${size}x${size}bb.`);
 }
 
 export async function searchDeezerTrack(
@@ -122,45 +171,139 @@ export async function searchDeezerTrack(
   artist: string,
 ): Promise<DeezerTrack | null> {
   const query = `${artist} ${title}`.replace(/['"]/g, '').replace(/[^\w\s]/g, ' ');
-  const data = await fetchDeezer<{ data: DeezerTrack[] }>(
-    `/search?q=${encodeURIComponent(query)}&limit=5`
+  const key = cacheKey('ext', 'dz', 'track', query.toLowerCase().trim());
+
+  return cachedWithStale(
+    key,
+    TTL.EXT_TRACK_SEARCH,
+    async () => {
+      const data = await fetchDeezer<{ data: DeezerTrack[] }>(
+        `/search?q=${encodeURIComponent(query)}&limit=5`,
+        'search.track',
+      );
+      if (!data?.data?.length) return null;
+
+      const normalisedTitle = title.toLowerCase().replace(/[^\w]/g, '');
+      const normalisedArtist = artist.toLowerCase().replace(/[^\w]/g, '');
+
+      const best = data.data.find((t) => {
+        const tTitle = t.title.toLowerCase().replace(/[^\w]/g, '');
+        const tArtist = t.artist.name.toLowerCase().replace(/[^\w]/g, '');
+        return tTitle.includes(normalisedTitle) || normalisedTitle.includes(tTitle)
+          || tArtist.includes(normalisedArtist) || normalisedArtist.includes(tArtist);
+      });
+
+      return best || data.data[0];
+    },
+    { label: 'deezer.track' },
   );
-  if (!data?.data?.length) return null;
+}
 
-  const normalisedTitle = title.toLowerCase().replace(/[^\w]/g, '');
-  const normalisedArtist = artist.toLowerCase().replace(/[^\w]/g, '');
+/** Fallback identification when Deezer is down or has no match. */
+export async function searchItunesTrack(
+  title: string,
+  artist: string,
+): Promise<ItunesTrack | null> {
+  const term = `${artist} ${title}`.replace(/['"]/g, '').trim();
+  const key = cacheKey('ext', 'it', 'track', term.toLowerCase());
 
-  const best = data.data.find((t) => {
-    const tTitle = t.title.toLowerCase().replace(/[^\w]/g, '');
-    const tArtist = t.artist.name.toLowerCase().replace(/[^\w]/g, '');
-    return tTitle.includes(normalisedTitle) || normalisedTitle.includes(tTitle)
-      || tArtist.includes(normalisedArtist) || normalisedArtist.includes(tArtist);
-  });
+  return cachedWithStale(
+    key,
+    TTL.EXT_TRACK_SEARCH,
+    async () => {
+      const data = await fetchItunes<{ results: ItunesTrack[] }>(
+        `/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=5`,
+        'search.track',
+      );
+      if (!data?.results?.length) return null;
 
-  return best || data.data[0];
+      const normTitle = title.toLowerCase().replace(/[^\w]/g, '');
+      return (
+        data.results.find((t) =>
+          t.trackName?.toLowerCase().replace(/[^\w]/g, '').includes(normTitle),
+        ) ?? data.results[0]
+      );
+    },
+    { label: 'itunes.track' },
+  );
+}
+
+/**
+ * Multi-result iTunes search, shaped to look like a Deezer search response.
+ *
+ * This exists so the search route can fall back without branching on which
+ * provider answered. The shape is a faithful subset: `preview` and
+ * `contributors` are genuinely unavailable from iTunes, and the album/artist
+ * ids are iTunes ids rather than Deezer ones — so results are marked with
+ * id 0 where a Deezer id would otherwise be assumed downstream, which keeps
+ * them out of any code path that would try to treat them as Deezer keys.
+ */
+export async function searchTracksITunes(
+  term: string,
+  limit: number,
+): Promise<DeezerTrack[]> {
+  const data = await fetchItunes<{ results: ItunesTrack[] }>(
+    `/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=${limit}`,
+    'search.tracks',
+  );
+  if (!data?.results?.length) return [];
+
+  return data.results.map((it) => ({
+    id: 0,
+    title: it.trackName,
+    duration: it.trackTimeMillis ? Math.round(it.trackTimeMillis / 1000) : 0,
+    preview: '',
+    artist: { id: 0, name: it.artistName },
+    album: {
+      id: 0,
+      title: it.collectionName,
+      cover_medium: itunesArtwork(it.artworkUrl100, 250) ?? '',
+      cover_big: itunesArtwork(it.artworkUrl100, 1000),
+      release_date: it.releaseDate,
+    },
+    contributors: [],
+  })) as unknown as DeezerTrack[];
 }
 
 export async function getDeezerAlbum(albumId: number): Promise<DeezerAlbum | null> {
-  return fetchDeezer<DeezerAlbum>(`/album/${albumId}`);
+  return cachedWithStale(
+    cacheKey('ext', 'dz', 'album', albumId),
+    TTL.EXT_ALBUM,
+    () => fetchDeezer<DeezerAlbum>(`/album/${albumId}`, 'album'),
+    { label: 'deezer.album' },
+  );
 }
 
 export async function getDeezerArtist(artistId: number): Promise<DeezerArtist | null> {
-  return fetchDeezer<DeezerArtist>(`/artist/${artistId}`);
+  return cachedWithStale(
+    cacheKey('ext', 'dz', 'artist', artistId),
+    TTL.EXT_ARTIST,
+    () => fetchDeezer<DeezerArtist>(`/artist/${artistId}`, 'artist'),
+    { label: 'deezer.artist' },
+  );
 }
 
 export async function searchDeezerArtist(name: string): Promise<DeezerArtist | null> {
-  const data = await fetchDeezer<{ data: DeezerArtist[] }>(
-    `/search/artist?q=${encodeURIComponent(name)}&limit=3`
+  return cachedWithStale(
+    cacheKey('ext', 'dz', 'artistsearch', name.toLowerCase().trim()),
+    TTL.EXT_ARTIST,
+    async () => {
+      const data = await fetchDeezer<{ data: DeezerArtist[] }>(
+        `/search/artist?q=${encodeURIComponent(name)}&limit=3`,
+        'search.artist',
+      );
+      if (!data?.data?.length) return null;
+
+      const normalised = name.toLowerCase().replace(/[^\w]/g, '');
+      const best = data.data.find((a) => {
+        const aName = a.name.toLowerCase().replace(/[^\w]/g, '');
+        return aName === normalised || aName.includes(normalised) || normalised.includes(aName);
+      });
+
+      return best || data.data[0];
+    },
+    { label: 'deezer.artistSearch' },
   );
-  if (!data?.data?.length) return null;
-
-  const normalised = name.toLowerCase().replace(/[^\w]/g, '');
-  const best = data.data.find((a) => {
-    const aName = a.name.toLowerCase().replace(/[^\w]/g, '');
-    return aName === normalised || aName.includes(normalised) || normalised.includes(aName);
-  });
-
-  return best || data.data[0];
 }
 
 export async function enrichTrackMetadata(
@@ -171,6 +314,27 @@ export async function enrichTrackMetadata(
   const normalisedTitle = title.toLowerCase().replace(/[^\w]/g, '');
 
   const deezerTrack = await searchDeezerTrack(title, artistName);
+
+  // Fallback identification. Only consulted when Deezer produced nothing —
+  // either it has no match or its breaker is open — so the common path still
+  // costs exactly one provider call.
+  if (!deezerTrack) {
+    const it = await searchItunesTrack(title, artistName);
+    if (it) {
+      const releaseYear = it.releaseDate ? parseInt(it.releaseDate.substring(0, 4)) : undefined;
+      result.track = { deezerId: 0, previewUrl: undefined };
+      result.artist = { deezerId: 0, name: it.artistName };
+      result.album = {
+        deezerId: 0,
+        title: it.collectionName,
+        coverUrl: itunesArtwork(it.artworkUrl100),
+        releaseDate: it.releaseDate,
+        releaseYear: Number.isNaN(releaseYear as number) ? undefined : releaseYear,
+        genre: it.primaryGenreName,
+        copyright: it.copyright,
+      };
+    }
+  }
 
   if (deezerTrack) {
     result.track = {
@@ -242,7 +406,8 @@ export async function enrichTrackMetadata(
   try {
     const searchQuery = encodeURIComponent(`recording:"${title}" AND artist:"${artistName}"`);
     const mbSearch = await fetchMusicBrainz<{ recordings: MusicBrainzRecording[] }>(
-      `/recording?query=${searchQuery}&limit=5&fmt=json`
+      `/recording?query=${searchQuery}&limit=5&fmt=json`,
+      'search.recording',
     );
 
     if (mbSearch?.recordings?.length) {
@@ -273,8 +438,15 @@ export async function enrichTrackMetadata(
       }
 
       // Full recording details with relations
-      const mbDetail = await fetchMusicBrainz<MusicBrainzRecording>(
-        `/recording/${recording.id}?inc=artist-rels+work-rels+artist-credits&fmt=json`
+      const mbDetail = await cachedWithStale(
+        cacheKey('ext', 'mb', 'recording', recording.id),
+        TTL.EXT_CREDITS,
+        () =>
+          fetchMusicBrainz<MusicBrainzRecording>(
+            `/recording/${recording.id}?inc=artist-rels+work-rels+artist-credits&fmt=json`,
+            'recording.detail',
+          ),
+        { label: 'mb.recording' },
       );
 
       if (mbDetail) {
@@ -314,8 +486,15 @@ export async function enrichTrackMetadata(
             workRels.map((wrel: any) => {
               const workId = wrel.work?.id;
               if (!workId) return Promise.resolve(null);
-              return fetchMusicBrainz<{ relations?: any[] }>(
-                `/work/${workId}?inc=artist-rels&fmt=json`
+              return cachedWithStale(
+                cacheKey('ext', 'mb', 'work', workId),
+                TTL.EXT_CREDITS,
+                () =>
+                  fetchMusicBrainz<{ relations?: any[] }>(
+                    `/work/${workId}?inc=artist-rels&fmt=json`,
+                    'work.detail',
+                  ),
+                { label: 'mb.work' },
               );
             })
           );

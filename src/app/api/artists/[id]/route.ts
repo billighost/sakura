@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
+import { callProvider, HttpError } from "@/lib/resilience";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -93,15 +94,43 @@ export async function GET(
     }
 
     if (deezerId) {
-      // Fetch artist data, albums, and top tracks in parallel
-      const [artistRes, topRes, albumsRes] = await Promise.all([
-        fetch(`https://api.deezer.com/artist/${deezerId}`),
-        fetch(`https://api.deezer.com/artist/${deezerId}/top?limit=50`),
-        fetch(`https://api.deezer.com/artist/${deezerId}/albums`),
+      // Artist, albums and top tracks in parallel, each independently
+      // resilient. Previously these were three bare fetches inside a
+      // Promise.all, so a single network blip rejected the whole thing and the
+      // artist page 500'd even when the local DB had everything needed to
+      // render it. Now a failed leg is simply absent and the page degrades to
+      // whatever is in the library.
+      const [dArtist, dTop, dAlbums] = await Promise.all([
+        callProvider<any>(
+          async (signal) => {
+            const url = `https://api.deezer.com/artist/${deezerId}`;
+            const res = await fetch(url, { signal });
+            if (!res.ok) throw new HttpError(res.status, url);
+            return res.json();
+          },
+          { provider: "deezer", op: "artist", timeoutMs: 5000, attempts: 2 },
+        ),
+        callProvider<any>(
+          async (signal) => {
+            const url = `https://api.deezer.com/artist/${deezerId}/top?limit=50`;
+            const res = await fetch(url, { signal });
+            if (!res.ok) throw new HttpError(res.status, url);
+            return res.json();
+          },
+          { provider: "deezer", op: "artist.top", timeoutMs: 5000, attempts: 2 },
+        ),
+        callProvider<any>(
+          async (signal) => {
+            const url = `https://api.deezer.com/artist/${deezerId}/albums`;
+            const res = await fetch(url, { signal });
+            if (!res.ok) throw new HttpError(res.status, url);
+            return res.json();
+          },
+          { provider: "deezer", op: "artist.albums", timeoutMs: 5000, attempts: 2 },
+        ),
       ]);
 
-      if (artistRes.ok) {
-        const dArtist = await artistRes.json();
+      if (dArtist) {
         if (!dArtist.error) {
           if (!finalArtist) {
             finalArtist = {
@@ -119,8 +148,7 @@ export async function GET(
         }
       }
 
-      if (albumsRes.ok) {
-        const dAlbums = await albumsRes.json();
+      if (dAlbums) {
         if (dAlbums.data) {
           const mergedAlbums = [...finalAlbums];
           for (const da of dAlbums.data) {
@@ -139,8 +167,7 @@ export async function GET(
         }
       }
 
-      if (topRes.ok) {
-        const dTop = await topRes.json();
+      if (dTop) {
         if (dTop.data) {
           const mergedTracks = [...finalTracks];
           for (const dt of dTop.data) {

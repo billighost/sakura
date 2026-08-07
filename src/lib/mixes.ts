@@ -1,6 +1,16 @@
 import { query, execute, softFail } from "@/lib/sql";
 import { getTasteProfile, normaliseGenre, ensureTasteProfile } from "@/lib/taste";
 import { invalidateTasteCaches } from "@/lib/taste";
+import {
+  buildCandidatePool,
+  getArtistTopTracks,
+  getGenreArtists,
+  getChartTracks,
+  resolveArtistDeezerIds,
+  diversify,
+  type VirtualTrack,
+} from "@/lib/catalog";
+import { setVirtualTrackMeta } from "@/lib/virtualTracks";
 
 /**
  * Mix generation.
@@ -48,10 +58,15 @@ export async function generateUserMixes(userId: string): Promise<number> {
 
   const drafts: (MixDraft | null)[] = [];
 
+  // Virtual tracks surfaced by the catalogue-backed builders. Their display
+  // metadata is written to Redis at the end so the mix can render without a
+  // Track row — this array is how the builders hand it back.
+  const collected: VirtualTrack[] = [];
+
   const [dailyMixes, onRepeat, discover, timeCapsule, deepCuts, timeOfDay] = await Promise.all([
-    buildDailyMixes(userId),
+    buildDailyMixes(userId, collected),
     buildOnRepeat(userId),
-    buildDiscover(userId, profile?.discovery ?? 0.35),
+    buildDiscover(userId, profile?.discovery ?? 0.35, collected),
     buildTimeCapsule(userId),
     buildDeepCuts(userId),
     buildTimeOfDay(userId),
@@ -62,31 +77,56 @@ export async function generateUserMixes(userId: string): Promise<number> {
   const valid = drafts.filter((d): d is MixDraft => d !== null && d.trackIds.length >= MIN_MIX_SIZE);
 
   // A brand-new account with no signal at all still needs something on the
-  // shelf, or the home page reads as broken rather than as empty.
+  // shelf, or the home page reads as broken rather than as empty. Charts are
+  // the right source here — they need no local history whatsoever.
   if (valid.length === 0) {
-    const starter = await buildStarter(userId);
+    const starter = (await buildVirtualStarter(collected)) ?? (await buildStarter(userId));
     if (starter) valid.push(starter);
   }
 
   if (valid.length === 0) {
-    // Nothing playable in the catalogue at all — clear stale mixes and stop.
+    // Nothing playable anywhere — clear stale mixes and stop.
     await execute(`DELETE FROM "UserMix" WHERE "userId" = $1`, [userId]).catch(() => {});
     return 0;
   }
 
-  // Cover art: a mosaic of the first few distinct covers in the mix.
+  // Persist display metadata for every virtual track before the mixes go in,
+  // so a mix row is never visible without the data needed to render it.
+  if (collected.length > 0) {
+    await setVirtualTrackMeta(
+      userId,
+      collected.map((t) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artistName,
+        artistDeezerId: t.artistDeezerId,
+        album: t.albumTitle,
+        coverUrl: t.coverUrl,
+        duration: t.duration,
+      }))
+    );
+  }
+
+  // Cover art: a mosaic of the first few distinct covers in the mix. Virtual
+  // tracks carry their own cover, so only real ids need the DB lookup.
   const allTrackIds = [...new Set(valid.flatMap((m) => m.trackIds.slice(0, 12)))];
-  const covers = allTrackIds.length
+  const realIds = allTrackIds.filter((id) => !id.startsWith("deezer-"));
+  const covers = realIds.length
     ? await query<TrackRow>(
         `SELECT t.id, COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl", a.name AS "artistName"
          FROM "Track" t
          LEFT JOIN "Album" al ON al.id = t."albumId"
          LEFT JOIN "Artist" a ON a.id = t."artistId"
          WHERE t.id = ANY($1::text[])`,
-        [allTrackIds]
+        [realIds]
       ).catch(softFail("mixes:covers", []))
     : [];
   const coverById = new Map(covers.map((c) => [c.id, c]));
+  for (const vt of collected) {
+    if (vt.coverUrl) {
+      coverById.set(vt.id, { id: vt.id, coverUrl: vt.coverUrl, artistName: vt.artistName });
+    }
+  }
 
   // Replace in one transaction-ish sequence. Delete-then-insert keeps mix ids
   // fresh, which matters: a stale id in a bookmarked /mix/<id> URL should 404
@@ -143,7 +183,10 @@ export async function generateUserMixes(userId: string): Promise<number> {
  * one mix per cluster. This is what makes a Daily Mix feel coherent — each is
  * a single mood, not a shuffle of everything they've ever played.
  */
-async function buildDailyMixes(userId: string): Promise<(MixDraft | null)[]> {
+async function buildDailyMixes(
+  userId: string,
+  collected: VirtualTrack[],
+): Promise<(MixDraft | null)[]> {
   const topGenres = await query<{ genre: string; score: number }>(
     `SELECT genre, score FROM "GenreAffinity"
      WHERE "userId" = $1 AND score > 0
@@ -153,32 +196,39 @@ async function buildDailyMixes(userId: string): Promise<(MixDraft | null)[]> {
 
   if (topGenres.length === 0) return [];
 
+  // Artists this user actually likes, so a Daily Mix leans on them rather than
+  // being a generic genre sampler. Only the ids are needed — the tracks come
+  // from the provider.
+  const likedArtists = await query<{ id: string; name: string; deezerId: string | null }>(
+    `SELECT a.id, a.name, a."deezerId"
+     FROM "ArtistAffinity" aff
+     JOIN "Artist" a ON a.id = aff."artistId"
+     WHERE aff."userId" = $1 AND aff.score > 0
+     ORDER BY aff.score DESC LIMIT 12`,
+    [userId]
+  ).catch(softFail("mixes:dailyMixes:artists", []));
+
+  const seedArtistIds = await resolveArtistDeezerIds(likedArtists);
+  const snoozed = await fetchSnoozedDeezerIds(userId);
+
   const mixes = await Promise.all(
     topGenres.slice(0, 3).map(async (g, i) => {
-      const tracks = await query<{ id: string; artistName: string }>(
-        `SELECT DISTINCT ON (t.id) t.id, ar.name AS "artistName"
-         FROM "Track" t
-         JOIN "Artist" ar ON ar.id = t."artistId"
-         LEFT JOIN "ArtistAffinity" aff ON aff."artistId" = ar.id AND aff."userId" = $1
-         WHERE (
-           EXISTS (SELECT 1 FROM unnest(COALESCE(ar.genres, ARRAY[]::text[])) x WHERE lower(x) = $2)
-           OR lower(t.genre) = $2
-         )
-         AND t."audioUrl" IS NOT NULL AND t."audioUrl" <> '' AND t."audioUrl" <> 'pending'
-         AND COALESCE(aff.score, 0) > -3
-         AND t.id NOT IN (
-           SELECT "trackId" FROM "SnoozedTrack" WHERE "userId" = $1 AND "expiresAt" > NOW()
-         )
-         ORDER BY t.id, COALESCE(aff.score, 0) DESC
-         LIMIT 400`,
-        [userId, g.genre]
-      ).catch(softFail("mixes:dailyMixes2", []));
+      // One genre per mix keeps each one a single coherent mood — that's what
+      // stops "Made for you" being three shuffles of the same list.
+      const pool = await buildCandidatePool({
+        genres: [g.genre],
+        seedArtistIds,
+        discovery: 0.3,
+        limit: 120,
+      });
 
-      if (tracks.length < MIN_MIX_SIZE) return null;
+      const usable = pool.filter((t) => !snoozed.has(t.deezerId));
+      if (usable.length < MIN_MIX_SIZE) return null;
 
-      // Cap per artist so a Daily Mix doesn't become one artist's discography.
-      const picked = diversifyByArtist(tracks, TARGET_MIX_SIZE, 3);
+      const picked = diversify(usable, TARGET_MIX_SIZE, 3);
       if (picked.length < MIN_MIX_SIZE) return null;
+
+      collected.push(...picked);
 
       const featured = [...new Set(picked.map((t) => t.artistName).filter(Boolean))].slice(0, 3);
 
@@ -196,6 +246,28 @@ async function buildDailyMixes(userId: string): Promise<(MixDraft | null)[]> {
   );
 
   return mixes;
+}
+
+/**
+ * Snoozed tracks, mapped to provider ids so exclusions still apply to virtual
+ * candidates. A track someone snoozed shouldn't come back just because it
+ * arrived from the catalogue this time instead of the database.
+ */
+async function fetchSnoozedDeezerIds(userId: string): Promise<Set<number>> {
+  const rows = await query<{ deezerId: string | null }>(
+    `SELECT t."deezerId"
+     FROM "SnoozedTrack" s
+     JOIN "Track" t ON t.id = s."trackId"
+     WHERE s."userId" = $1 AND s."expiresAt" > NOW() AND t."deezerId" IS NOT NULL`,
+    [userId]
+  ).catch(softFail("mixes:snoozed", []));
+
+  const out = new Set<number>();
+  for (const r of rows) {
+    const n = r.deezerId ? parseInt(r.deezerId, 10) : NaN;
+    if (Number.isFinite(n)) out.add(n);
+  }
+  return out;
 }
 
 /** On Repeat: what they've actually played most in the last month. */
@@ -234,7 +306,11 @@ async function buildOnRepeat(userId: string): Promise<MixDraft | null> {
  * Discover: artists they have *never* played, reachable from their genres.
  * The discovery dial widens or narrows how far it reaches.
  */
-async function buildDiscover(userId: string, discovery: number): Promise<MixDraft | null> {
+async function buildDiscover(
+  userId: string,
+  discovery: number,
+  collected: VirtualTrack[],
+): Promise<MixDraft | null> {
   const genres = await query<{ genre: string }>(
     `SELECT genre FROM "GenreAffinity"
      WHERE "userId" = $1 AND score > 0
@@ -244,30 +320,61 @@ async function buildDiscover(userId: string, discovery: number): Promise<MixDraf
 
   if (genres.length === 0) return null;
 
-  const tracks = await query<{ id: string; artistName: string }>(
-    `SELECT DISTINCT ON (t.id) t.id, ar.name AS "artistName"
-     FROM "Track" t
-     JOIN "Artist" ar ON ar.id = t."artistId"
-     WHERE (
-       EXISTS (SELECT 1 FROM unnest(COALESCE(ar.genres, ARRAY[]::text[])) x WHERE lower(x) = ANY($2::text[]))
-       OR lower(t.genre) = ANY($2::text[])
-     )
-     AND t."audioUrl" IS NOT NULL AND t."audioUrl" <> '' AND t."audioUrl" <> 'pending'
-     -- Never played by this user, and by an artist they've never played either
-     AND NOT EXISTS (SELECT 1 FROM "ListeningHistory" h WHERE h."userId" = $1 AND h."trackId" = t.id)
-     AND NOT EXISTS (
-       SELECT 1 FROM "ArtistAffinity" aff
-       WHERE aff."userId" = $1 AND aff."artistId" = ar.id AND aff.plays > 0
-     )
-     ORDER BY t.id, RANDOM()
-     LIMIT 300`,
-    [userId, genres.map((g) => g.genre)]
-  ).catch(softFail("mixes:discover2", []));
+  const likedArtists = await query<{ id: string; name: string; deezerId: string | null }>(
+    `SELECT a.id, a.name, a."deezerId"
+     FROM "ArtistAffinity" aff
+     JOIN "Artist" a ON a.id = aff."artistId"
+     WHERE aff."userId" = $1 AND aff.score > 0
+     ORDER BY aff.score DESC LIMIT 8`,
+    [userId]
+  ).catch(softFail("mixes:discover:artists", []));
 
-  if (tracks.length < MIN_MIX_SIZE) return null;
+  const seedArtistIds = await resolveArtistDeezerIds(likedArtists);
 
-  const picked = diversifyByArtist(tracks, TARGET_MIX_SIZE, 2);
+  // Discovery is the one mix where reaching past the user's known artists is
+  // the entire point, so the pool is built with the dial turned up and then
+  // filtered against everything they've already heard.
+  const pool = await buildCandidatePool({
+    genres: genres.map((g) => g.genre),
+    seedArtistIds,
+    discovery: Math.max(0.6, discovery),
+    limit: 240,
+  });
+
+  const [heardArtistNames, heardDeezerIds] = await Promise.all([
+    query<{ name: string }>(
+      `SELECT DISTINCT a.name
+       FROM "ArtistAffinity" aff
+       JOIN "Artist" a ON a.id = aff."artistId"
+       WHERE aff."userId" = $1 AND aff.plays > 0`,
+      [userId]
+    ).catch(softFail("mixes:discover:heard", [])),
+    query<{ deezerId: string | null }>(
+      `SELECT DISTINCT t."deezerId"
+       FROM "ListeningHistory" h
+       JOIN "Track" t ON t.id = h."trackId"
+       WHERE h."userId" = $1 AND t."deezerId" IS NOT NULL`,
+      [userId]
+    ).catch(softFail("mixes:discover:heardTracks", [])),
+  ]);
+
+  const knownArtists = new Set(heardArtistNames.map((r) => r.name.toLowerCase()));
+  const knownTracks = new Set(
+    heardDeezerIds
+      .map((r) => (r.deezerId ? parseInt(r.deezerId, 10) : NaN))
+      .filter((n) => Number.isFinite(n))
+  );
+
+  const fresh = pool.filter(
+    (t) => !knownTracks.has(t.deezerId) && !knownArtists.has(t.artistName.toLowerCase())
+  );
+
+  if (fresh.length < MIN_MIX_SIZE) return null;
+
+  const picked = diversify(fresh, TARGET_MIX_SIZE, 2);
   if (picked.length < MIN_MIX_SIZE) return null;
+
+  collected.push(...picked);
 
   return {
     kind: "discover",
@@ -277,6 +384,35 @@ async function buildDiscover(userId: string, discovery: number): Promise<MixDraf
     description: "New-to-you music picked from the corners of what you already love.",
     tint: "b",
     seedGenres: genres.map((g) => g.genre).slice(0, 3),
+    trackIds: picked.map((t) => t.id),
+  };
+}
+
+/**
+ * Cold-start mix from the provider charts.
+ *
+ * Replaces the old "most-played rows in our own table" starter, which had a
+ * bootstrapping problem: a fresh install has no plays, so the starter mix was
+ * built from whatever happened to have been downloaded first. Charts give a
+ * genuinely reasonable first shelf with no local data at all.
+ */
+async function buildVirtualStarter(collected: VirtualTrack[]): Promise<MixDraft | null> {
+  const pool = await getChartTracks(60);
+  if (pool.length < MIN_MIX_SIZE) return null;
+
+  const picked = diversify(pool, TARGET_MIX_SIZE, 2);
+  if (picked.length < MIN_MIX_SIZE) return null;
+
+  collected.push(...picked);
+
+  return {
+    kind: "starter",
+    slot: 0,
+    label: "Start Here",
+    subtitle: "Popular right now",
+    description: "Play a few of these and your mixes will start shaping themselves around you.",
+    tint: "a",
+    seedGenres: [],
     trackIds: picked.map((t) => t.id),
   };
 }

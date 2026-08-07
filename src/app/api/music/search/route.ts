@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/sql";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
+import { callProvider, HttpError } from "@/lib/resilience";
+import { cachedWithStale, cacheKey, TTL } from "@/lib/cache";
+import { searchTracksITunes } from "@/lib/metadata";
 
 interface DeezerTrack {
   id: number;
@@ -33,7 +36,9 @@ export async function GET(req: NextRequest) {
   try {
     const term = q.trim();
 
-    // Run local catalogue lookup and Deezer search in parallel.
+    // Run local catalogue lookup and provider search in parallel. The local
+    // half is authoritative for "do we already have this?", the provider half
+    // supplies the result set.
     const localPromise = query<{ id: string; deezerId: number; title: string; audioUrl: string }>(
       `SELECT t.id, t."deezerId", t.title, t."audioUrl"
          FROM "Track" t
@@ -48,18 +53,20 @@ export async function GET(req: NextRequest) {
       [term, limit]
     ).catch(() => [] as { id: string; deezerId: number; title: string; audioUrl: string }[]);
 
-    // Search the music catalogue in parallel.
-    const deezerPromise = fetch(
-      `https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=${limit}`,
-      { signal: AbortSignal.timeout(5000) }
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .catch(() => null);
+    // Search results are cached with a stale fallback. A repeated query costs
+    // one Redis read instead of a round-trip to Deezer, and if Deezer is down
+    // or rate-limiting, a previously-seen query still returns results.
+    const searchPromise = cachedWithStale<{ tracks: DeezerTrack[]; total: number }>(
+      cacheKey("search", term.toLowerCase(), limit),
+      TTL.search,
+      () => searchProviders(term, limit),
+      { label: "search" },
+    );
 
-    const [localTracks, data] = await Promise.all([localPromise, deezerPromise]);
+    const [localTracks, searchResult] = await Promise.all([localPromise, searchPromise]);
 
     const localByDeezerId = new Map(localTracks.map((t) => [t.deezerId, t]));
-    const deezerTracks = (data?.data || []) as DeezerTrack[];
+    const deezerTracks = searchResult?.tracks ?? [];
 
     const tracks = deezerTracks.map((t) => {
       const local = localByDeezerId.get(t.id);
@@ -87,12 +94,49 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ tracks, total: data?.total || 0 });
+    return NextResponse.json(
+      { tracks, total: searchResult?.total || 0 },
+      { headers: { "Cache-Control": "private, max-age=60" } },
+    );
   } catch (error) {
-    console.error("[Deezer Search]", error);
+    console.error("[Search]", error);
     return NextResponse.json(
       { error: "Failed to search music" },
       { status: 500 }
     );
   }
+}
+
+/**
+ * Deezer first, iTunes Search as the fallback.
+ *
+ * Both are free and keyless. Deezer is preferred because it carries the album
+ * id, contributor credits and preview url the UI already renders; iTunes has
+ * none of those, so a fallback result is deliberately thinner — but a thin
+ * result set beats an empty one when Deezer is unavailable.
+ */
+async function searchProviders(
+  term: string,
+  limit: number,
+): Promise<{ tracks: DeezerTrack[]; total: number } | null> {
+  const deezer = await callProvider<any>(
+    async (signal) => {
+      const url = `https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=${limit}`;
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new HttpError(res.status, url);
+      return res.json();
+    },
+    { provider: "deezer", op: "search", timeoutMs: 5000, attempts: 3 },
+  );
+
+  if (deezer?.data?.length) {
+    return { tracks: deezer.data as DeezerTrack[], total: deezer.total ?? deezer.data.length };
+  }
+
+  const itunes = await searchTracksITunes(term, limit);
+  if (itunes.length) {
+    return { tracks: itunes, total: itunes.length };
+  }
+
+  return null;
 }

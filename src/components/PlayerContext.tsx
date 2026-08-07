@@ -28,6 +28,23 @@ interface Track {
   autoplay?: boolean;
   /** Human-readable "why this is here", shown in the queue UI. */
   reason?: string;
+  /**
+   * The real DB id, once a virtual/pending track has been resolved.
+   *
+   * Kept separate from `id` on purpose. Overwriting `id` in place (which is
+   * what used to happen) changes the key the load effect is subscribed to, so
+   * the effect re-runs, the "already loaded" guard misses, and playback
+   * restarts — and if the resolved id already existed elsewhere in the queue
+   * you end up with two entries sharing an id, which makes every findIndex
+   * lookup ambiguous. Anything that needs the canonical id reads
+   * `resolvedId ?? id`.
+   */
+  resolvedId?: string;
+}
+
+/** The id to report to the server for a track: canonical if known. */
+function canonicalId(track: Track): string {
+  return track.resolvedId ?? track.id;
 }
 
 /** Where the current queue came from — recorded with every play signal. */
@@ -493,7 +510,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [currentIndex, queue, upNextQueue, downloadQueue.length]);
 
   const currentTrack = queue[currentIndex] || null;
-  const isLiked = currentTrack ? favoriteTrackIds.has(currentTrack.id) : false;
+  const isLiked = currentTrack
+    ? favoriteTrackIds.has(canonicalId(currentTrack)) || favoriteTrackIds.has(currentTrack.id)
+    : false;
 
   // Announce track changes for screen reader users (aria-live region rendered below)
   const [announcement, setAnnouncement] = useState("");
@@ -617,7 +636,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleLiked = useCallback(() => {
     if (currentTrack) {
-      toggleLikeTrack(currentTrack.id);
+      // Canonical id: liking a not-yet-resolved track would otherwise write a
+      // favourite against an id that has no row.
+      toggleLikeTrack(canonicalId(currentTrack));
     }
   }, [currentTrack, toggleLikeTrack]);
 
@@ -701,7 +722,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
         const data = await res.json();
         const tracks: Track[] = (data?.tracks ?? [])
-          .filter((t: any) => t?.id && t?.audioUrl)
+          // A radio pick may be a virtual candidate with no audioUrl yet — it
+          // resolves on play. Requiring audioUrl here silently discarded the
+          // entire catalogue-backed half of the batch.
+          .filter((t: any) => t?.id && (t.audioUrl || t.id.startsWith("deezer-")))
           .map((t: any) => ({
             id: t.id,
             title: t.title,
@@ -763,16 +787,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       };
 
       // 1. Explicit "play next" items always win.
+      //
+      // Computed outside the updaters for the same reason as play/removeTrack:
+      // the spliced queue and the incremented index must be derived from one
+      // and the same `prev`, or they can disagree and the player loads a
+      // different track than the one the UI is showing.
       const uq = upNextRef.current;
       if (uq.length > 0) {
         const nextTrack = uq[0];
+        const prevQueue = queueRef.current;
+        const insertAt = Math.min(currentIndexRef.current + 1, prevQueue.length);
+        const nextQueue = [...prevQueue];
+        nextQueue.splice(insertAt, 0, nextTrack);
+
         setUpNextQueue((prev) => prev.slice(1));
-        setQueueState((prev) => {
-          const newQ = [...prev];
-          newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
-          return newQ;
-        });
-        setCurrentIndex((i) => i + 1);
+        setQueueState(nextQueue);
+        setCurrentIndex(insertAt);
         resumeIfNeeded();
         return;
       }
@@ -850,7 +880,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!currentTrack) return;
-    signalTracker.beginTrack(currentTrack.id, (currentTrack.duration || 0) * 1000, {
+    // Signals must carry the canonical id — a `deezer-` virtual id has no row
+    // to attach taste data to, so reporting it would silently drop the signal.
+    signalTracker.beginTrack(canonicalId(currentTrack), (currentTrack.duration || 0) * 1000, {
       context: playContextRef.current.context,
       contextId: playContextRef.current.contextId,
       autoplay: currentTrack.autoplay ?? false,
@@ -892,7 +924,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return 0;
       const data = await res.json();
       const tracks: Track[] = (data?.tracks ?? [])
-        .filter((t: any) => t?.id && t?.audioUrl)
+        // Same as the continuation path: virtual picks carry no audioUrl until
+        // they're resolved, so they must survive this filter.
+        .filter((t: any) => t?.id && (t.audioUrl || t.id.startsWith("deezer-")))
         .map((t: any) => ({
           id: t.id,
           title: t.title,
@@ -1171,7 +1205,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // progress tick would be absurd.
   const snapshotRef = useRef<PlaybackSnapshot>(null as unknown as PlaybackSnapshot);
   snapshotRef.current = {
-    trackId: currentTrack?.id ?? null,
+    trackId: currentTrack ? canonicalId(currentTrack) : null,
     positionMs: Math.floor(progress * 1000),
     durationMs: Math.floor(duration * 1000),
     isPlaying,
@@ -1360,13 +1394,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
           if (data?.audioUrl) {
             src = data.audioUrl;
-            // Write the resolved URL (and any corrected id) back into the
-            // queue so a replay or a prev/next pass doesn't re-resolve it.
-            const resolvedId = data.id || currentTrack.id;
+            // Write the resolved URL back into the queue so a replay or a
+            // prev/next pass doesn't re-resolve it. The canonical id goes in
+            // `resolvedId`, never over `id` — see the Track type for why
+            // mutating `id` here restarted playback and could duplicate keys.
             setQueueState((prev) =>
               prev.map((t) =>
                 t.id === currentTrack.id
-                  ? { ...t, id: resolvedId, audioUrl: data.audioUrl, coverUrl: data.coverUrl || t.coverUrl }
+                  ? {
+                      ...t,
+                      resolvedId: data.id || t.resolvedId,
+                      audioUrl: data.audioUrl,
+                      coverUrl: data.coverUrl || t.coverUrl,
+                    }
                   : t
               )
             );
@@ -1472,20 +1512,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setQueueState(newQueue);
       const idx = newQueue.findIndex((t) => t.id === track.id);
       setCurrentIndex(idx >= 0 ? idx : 0);
-    } else {
-      setQueueState((prev) => {
-        const existingIdx = prev.findIndex((t) => t.id === track.id);
-        if (existingIdx >= 0) {
-          setCurrentIndex(existingIdx);
-          return prev;
-        }
-        const newQ = [...prev];
-        const insertAt = currentIndexRef.current + 1;
-        newQ.splice(insertAt, 0, track);
-        setCurrentIndex(insertAt);
-        return newQ;
-      });
+      return;
     }
+
+    // Both the queue and the index are derived here *before* either setter
+    // runs. The previous version called setCurrentIndex from inside the
+    // setQueueState updater — updaters must be pure and React may invoke them
+    // more than once (StrictMode does so deliberately), so the index could be
+    // computed against a different `prev` than the one that was committed.
+    // That is exactly the "details show one song, a different one plays"
+    // symptom: the queue array and currentIndex came from different passes.
+    const prevQueue = queueRef.current;
+    const existingIdx = prevQueue.findIndex((t) => t.id === track.id);
+
+    if (existingIdx >= 0) {
+      setCurrentIndex(existingIdx);
+      return;
+    }
+
+    const insertAt = Math.min(currentIndexRef.current + 1, prevQueue.length);
+    const nextQueue = [...prevQueue];
+    nextQueue.splice(insertAt, 0, track);
+    setQueueState(nextQueue);
+    setCurrentIndex(insertAt);
   }, []);
 
   const playNext = useCallback((track: Track) => {
@@ -1569,42 +1618,56 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setUpNextQueue([]);
   }, []);
 
+  // Both removers compute the new queue *and* the new index up front, then
+  // issue plain setState calls. Deriving the index inside a setQueueState
+  // updater (as these used to) is unsafe: updaters may run more than once, so
+  // the committed queue and the committed index could disagree — the wrong
+  // song plays for the details on screen.
   const removeTrack = useCallback((trackId: string) => {
-    setQueueState((prev) => {
-      const idx = prev.findIndex((t) => t.id === trackId);
-      if (idx === -1) return prev;
-      const newQ = [...prev];
-      newQ.splice(idx, 1);
-      if (idx < currentIndexRef.current) {
-        setCurrentIndex((i) => i - 1);
-      } else if (idx === currentIndexRef.current) {
-        if (newQ.length === 0) {
-          setCurrentIndex(0);
-          setIsPlaying(false);
-        } else if (currentIndexRef.current >= newQ.length) {
-          setCurrentIndex(newQ.length - 1);
-        }
-      }
-      return newQ;
-    });
+    const prev = queueRef.current;
+    const idx = prev.findIndex((t) => t.id === trackId);
+    if (idx === -1) return;
+
+    const nextQueue = [...prev];
+    nextQueue.splice(idx, 1);
+    const ci = currentIndexRef.current;
+
+    setQueueState(nextQueue);
+
+    if (nextQueue.length === 0) {
+      setCurrentIndex(0);
+      setIsPlaying(false);
+      audioRef.current?.pause();
+    } else if (idx < ci) {
+      setCurrentIndex(Math.max(0, ci - 1));
+    } else if (idx === ci) {
+      // The playing track was removed — clamp onto whatever now occupies the
+      // slot, which is the next track in practice.
+      setCurrentIndex(Math.min(ci, nextQueue.length - 1));
+    }
   }, []);
 
   const removeTracks = useCallback((trackIds: string[]) => {
     const idsSet = new Set(trackIds);
-    setQueueState((prev) => {
-      const currentTrack = prev[currentIndexRef.current];
-      const newQ = prev.filter((t) => !idsSet.has(t.id));
-      const newIdx = newQ.findIndex((t) => t.id === currentTrack?.id);
-      if (newIdx >= 0) {
-        setCurrentIndex(newIdx);
-      } else if (newQ.length === 0) {
-        setCurrentIndex(0);
-        setIsPlaying(false);
-      } else {
-        setCurrentIndex(Math.min(currentIndexRef.current, newQ.length - 1));
-      }
-      return newQ;
-    });
+    const prev = queueRef.current;
+    const playing = prev[currentIndexRef.current];
+    const nextQueue = prev.filter((t) => !idsSet.has(t.id));
+
+    setQueueState(nextQueue);
+
+    // Follow the playing track to its new position if it survived — that keeps
+    // playback uninterrupted through a bulk removal.
+    const survivedIdx = playing ? nextQueue.findIndex((t) => t.id === playing.id) : -1;
+
+    if (survivedIdx >= 0) {
+      setCurrentIndex(survivedIdx);
+    } else if (nextQueue.length === 0) {
+      setCurrentIndex(0);
+      setIsPlaying(false);
+      audioRef.current?.pause();
+    } else {
+      setCurrentIndex(Math.min(currentIndexRef.current, nextQueue.length - 1));
+    }
   }, []);
 
   const removeFromUpNext = useCallback((trackId: string) => {
