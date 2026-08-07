@@ -12,11 +12,7 @@ marked 🎯 get most of their value *because* per-play signals now exist.
 ## Tier 1 — highest leverage right now
 
 ### 1. Seed the catalogue 🎯 · **M**
-Everything here is gated on catalogue size. The taste engine, radio and mixes
-all work (verified end-to-end), but with an empty `Track` table there's nothing
-to recommend. A backfill job that walks Deezer charts by genre and pre-resolves
-the top few hundred tracks would turn every feature on at once. **This is the
-single highest-value item on the list.**
+don't do thsi again
 
 ### 2. "Song radio" and "Artist radio" entry points 🎯 · **S**
 `startRadio(seedTrack)` already exists in `PlayerContext` and is wired to the
@@ -42,6 +38,7 @@ requests via `after()`. That works, but it means the first visitor of the day
 pays for the chart refresh, and a user who never opens the app never gets fresh
 mixes. A cron endpoint (`/api/cron/*` + Vercel Cron or a GitHub Action) makes
 this predictable.
+don't let us use vercel cron, we will seu cronjob.orG. giv em eht eloniq k to add htere and i wills et up the cron stuff
 
 ### 6. Fix the catalogue's genre coverage 🎯 · **M**
 Genre affinity is the signal that generalises to new music, but genres only get

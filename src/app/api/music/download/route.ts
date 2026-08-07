@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        track = await client.searchAndSelect(searchQuery, 0, 35000, 60000);
+        track = await client.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 35000, 60000);
         break;
       } catch (err) {
         console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${searchQuery}":`, err instanceof Error ? err.message : err);

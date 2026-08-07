@@ -108,8 +108,14 @@ export class TelegramClient {
   /**
    * Atomically search and select a result, releasing the mutex after the audio arrives.
    * This is the correct way to perform a full download with concurrency safety.
+   * Scores and selects the best matching inline button to avoid previews and low quality.
    */
-  async searchAndSelect(query: string, buttonIndex = 0, searchTimeoutMs = 20000, selectTimeoutMs = 45000): Promise<MusicResult> {
+  async searchAndSelect(
+    query: string,
+    targetDuration?: number,
+    searchTimeoutMs = 20000,
+    selectTimeoutMs = 45000
+  ): Promise<MusicResult> {
     await this.ensureConnected();
     const release = await TelegramClient.botMutex.acquire();
     try {
@@ -117,8 +123,62 @@ export class TelegramClient {
       if (buttons.length === 0) {
         throw new Error("No results found on Telegram");
       }
-      console.log(`[Telegram AutoDownload] Got ${buttons.length} results, selecting: "${buttons[buttonIndex]?.text || buttons[0].text}"`);
-      const result = await this._selectResult(buttonMessageId, Math.min(buttonIndex, buttons.length - 1), selectTimeoutMs);
+
+      let selectedIndex = 0;
+      let bestScore = -999999;
+
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = buttons[i];
+        const text = btn.text.toLowerCase();
+        let score = 0;
+
+        // 1. Avoid previews/snippets
+        const isPreview = text.includes("preview") || text.includes("30s") || text.includes("30 sec") || text.includes("clip");
+        if (isPreview) {
+          score -= 1000;
+        }
+
+        // 2. Parse duration from button text if present, e.g. "Artist - Title [03:45]"
+        const durationRegex = /(?:\[|\()(\d{1,2}):(\d{2})(?:\]|\))/;
+        const match = btn.text.match(durationRegex);
+        if (match) {
+          const min = parseInt(match[1], 10);
+          const sec = parseInt(match[2], 10);
+          const duration = min * 60 + sec;
+
+          if (targetDuration && targetDuration > 0) {
+            const diff = Math.abs(duration - targetDuration);
+            if (diff <= 5) {
+              score += 200; // Perfect/near perfect match
+            } else if (diff <= 15) {
+              score += 100;
+            } else if (diff > 45 && targetDuration > 45 && duration < 45) {
+              // Target is full length but this is a short preview clip
+              score -= 500;
+            } else {
+              score -= diff; // Small penalty proportional to duration mismatch
+            }
+          } else {
+            // Avoid very short durations by default unless they are expected
+            if (duration < 45) {
+              score -= 300;
+            }
+          }
+        }
+
+        // 3. Prefer high quality (e.g. 320kbps, flac)
+        if (text.includes("320") || text.includes("flac") || text.includes("kbps")) {
+          score += 10;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          selectedIndex = i;
+        }
+      }
+
+      console.log(`[Telegram AutoDownload] Got ${buttons.length} results. Selecting index ${selectedIndex}: "${buttons[selectedIndex]?.text}" (score: ${bestScore}) for query "${query}"`);
+      const result = await this._selectResult(buttonMessageId, selectedIndex, selectTimeoutMs);
       return result;
     } finally {
       release();
@@ -458,10 +518,10 @@ export class TelegramClient {
   }
 }
 
-let instance: TelegramClient | null = null;
+const globalForTelegram = globalThis as unknown as { telegramClient?: TelegramClient };
 
 export function getTelegramClient(): TelegramClient {
-  if (!instance) {
+  if (!globalForTelegram.telegramClient) {
     const apiId = parseInt(process.env.TELEGRAM_API_ID || "0", 10);
     const apiHash = process.env.TELEGRAM_API_HASH || "";
     const sessionString = process.env.TELEGRAM_SESSION_STRING || "";
@@ -470,7 +530,7 @@ export function getTelegramClient(): TelegramClient {
       throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
     }
 
-    instance = new TelegramClient(apiId, apiHash, sessionString, process.env.TELEGRAM_BOT_USERNAME);
+    globalForTelegram.telegramClient = new TelegramClient(apiId, apiHash, sessionString, process.env.TELEGRAM_BOT_USERNAME);
   }
-  return instance;
+  return globalForTelegram.telegramClient;
 }
