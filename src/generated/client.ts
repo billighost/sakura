@@ -141,3 +141,13 @@ export type UserMix = Prisma.UserMixModel
  * 
  */
 export type SystemPlaylist = Prisma.SystemPlaylistModel
+/**
+ * Model PlaybackState
+ * 
+ */
+export type PlaybackState = Prisma.PlaybackStateModel
+/**
+ * Model Share
+ * 
+ */
+export type Share = Prisma.ShareModel

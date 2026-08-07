@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSwipeBack } from "@/lib/useSwipeBack";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
@@ -49,7 +48,6 @@ function shuffleArray<T>(arr: T[]): T[] {
 export default function PlaylistPage() {
   const params = useParams();
   const router = useRouter();
-  useSwipeBack();
   const { play, addToDownloadQueue, downloadStates } = usePlayer();
   const { downloadAll } = useDownloadAll();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);

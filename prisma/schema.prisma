@@ -27,6 +27,8 @@ model User {
   artistAffinities ArtistAffinity[]
   genreAffinities  GenreAffinity[]
   tasteFeedback    TasteFeedback[]
+  playbackState    PlaybackState?
+  shares           Share[]
 }
 
 model UserSettings {
@@ -376,4 +378,66 @@ model SystemPlaylist {
   createdAt   DateTime @default(now())
 
   @@index([systemId])
+}
+
+// ── Cross-device continuity ─────────────────────────────────────────────────
+// Playback state lived only in localStorage, so a queue built on the phone was
+// invisible on the laptop and "resume where I left off" reset on every device
+// change. One row per user, last-writer-wins on `updatedAt`.
+//
+// The queue is stored denormalised (title/artist/cover inline, not just track
+// ids) on purpose: the receiving device must be able to render the queue before
+// it has resolved any of those ids against its own cache, and a track that has
+// since been removed from the catalogue should still display rather than
+// vanish.
+model PlaybackState {
+  userId      String   @id
+  trackId     String?
+  positionMs  Int      @default(0)
+  durationMs  Int      @default(0)
+  isPlaying   Boolean  @default(false)
+
+  queue       Json?    // Track[] — denormalised, see above
+  upNext      Json?    // Track[]
+  queueIndex  Int      @default(0)
+
+  shuffle     Boolean  @default(false)
+  repeat      String   @default("off") // "off" | "one" | "all"
+
+  context     String?  // "playlist" | "album" | "mix" | "radio" | ...
+  contextId   String?
+
+  // Which device wrote this. Lets a device ignore the echo of its own write
+  // instead of clobbering a newer local position with its own stale one.
+  deviceId    String?
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Sharing ─────────────────────────────────────────────────────────────────
+// A share is a durable, addressable object rather than a one-off image blob, so
+// a link keeps working after the image is out of the recipient's cache, and so
+// open-graph previews can be rendered server-side.
+model Share {
+  id        String   @id @default(uuid())
+  slug      String   @unique          // short, URL-safe public identifier
+  userId    String
+  kind      String                    // "lyric" | "track" | "playlist" | "album" | "artist" | "mix"
+
+  targetId  String?                   // track/playlist/album id this points at
+  // Lyric shares: the selected lines plus their timing, so the card can be
+  // re-rendered at any size and the recipient can jump to that moment.
+  payload   Json
+
+  theme     String   @default("auto") // card variant chosen by the sharer
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([kind])
+  @@index([createdAt])
 }

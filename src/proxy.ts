@@ -12,7 +12,16 @@ export const proxy = auth((req) => {
     nextUrl.pathname === "/" ||
     nextUrl.pathname.startsWith("/about") ||
     nextUrl.pathname.startsWith("/privacy") ||
-    nextUrl.pathname.startsWith("/terms");
+    nextUrl.pathname.startsWith("/terms") ||
+    // The service worker pre-caches /offline at install time, which can happen
+    // while signed out. If this redirected to /login, the cached "offline"
+    // fallback would be a login redirect — so every offline cold start would
+    // bounce to a page that itself needs the network.
+    nextUrl.pathname.startsWith("/offline") ||
+    // Shared links — a share is public by design (the person making it wants
+    // someone else to see it), so redirecting these to /login would break the
+    // one feature that's supposed to bring people *into* the app.
+    nextUrl.pathname.startsWith("/s/");
 
   // Redirect to login if trying to access a protected page while unauthenticated.
   // Preserve where they were headed so login can send them back rather than

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { TrackRow } from "@/components/TrackRow";
-import { MicrophoneIcon, GuitarIcon, MusicNoteIcon, SliderIcon, SaxophoneIcon, HeadphonesIcon } from "@/components/Icons";
+import { MicrophoneIcon, RockIcon, HipHopIcon, ElectronicIcon, RnBIcon, JazzIcon, ClassicalIcon, PodcastIcon } from "@/components/Icons";
 import { getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -37,13 +37,13 @@ const MAX_HISTORY = 10;
 
 const CATEGORIES = [
   { label: "Pop", icon: <MicrophoneIcon size={24} />, query: "pop hits", colors: ["#FF6B9D", "#C44DFF"] },
-  { label: "Rock", icon: <GuitarIcon size={24} />, query: "rock classics", colors: ["#FF4D4D", "#FF8C42"] },
-  { label: "Hip-Hop", icon: <MicrophoneIcon size={24} />, query: "hip hop", colors: ["#6C5CE7", "#A29BFE"] },
-  { label: "Electronic", icon: <SliderIcon size={24} />, query: "electronic music", colors: ["#00B4D8", "#0077B6"] },
-  { label: "R&B", icon: <MusicNoteIcon size={24} />, query: "R&B soul", colors: ["#E17055", "#FDCB6E"] },
-  { label: "Jazz", icon: <SaxophoneIcon size={24} />, query: "jazz classics", colors: ["#00B894", "#55EFC4"] },
-  { label: "Classical", icon: <MusicNoteIcon size={24} />, query: "classical music", colors: ["#636E72", "#B2BEC3"] },
-  { label: "Podcast", icon: <HeadphonesIcon size={24} />, query: "podcast", colors: ["#2D3436", "#636E72"] },
+  { label: "Rock", icon: <RockIcon size={24} />, query: "rock classics", colors: ["#FF4D4D", "#FF8C42"] },
+  { label: "Hip-Hop", icon: <HipHopIcon size={24} />, query: "hip hop", colors: ["#6C5CE7", "#A29BFE"] },
+  { label: "Electronic", icon: <ElectronicIcon size={24} />, query: "electronic music", colors: ["#00B4D8", "#0077B6"] },
+  { label: "R&B", icon: <RnBIcon size={24} />, query: "R&B soul", colors: ["#E17055", "#FDCB6E"] },
+  { label: "Jazz", icon: <JazzIcon size={24} />, query: "jazz classics", colors: ["#00B894", "#55EFC4"] },
+  { label: "Classical", icon: <ClassicalIcon size={24} />, query: "classical music", colors: ["#636E72", "#B2BEC3"] },
+  { label: "Podcast", icon: <PodcastIcon size={24} />, query: "podcast", colors: ["#2D3436", "#636E72"] },
 ];
 
 const QUICK_PICKS = ["Chill vibes", "Workout mix", "Throwback hits", "Feel good", "Focus flow", "Late night", "Acoustic", "Party starters"];

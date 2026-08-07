@@ -1,27 +1,27 @@
 import { PrismaClient } from "../generated/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { sql } from "./sql";
 
+/**
+ * Prisma shares the `pg` pool from `./sql` rather than opening its own.
+ *
+ * Two pools to the same database doubled the connection footprint for no
+ * benefit — and the pool built here had no `max` (so it silently took pg's
+ * default of 10 *on top of* the other pool's 20) and, more seriously, no
+ * `error` listener. An idle client erroring on a pool with no listener is an
+ * unhandled 'error' event, which takes the process down. That was fixed for
+ * the raw-SQL pool and missed here, because the duplication hid it.
+ *
+ * Sharing also means the timeouts and `PG_POOL_MAX` sizing in `./sql` apply to
+ * Prisma queries too, so there's one number to tune for concurrency.
+ */
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  pool: import("pg").Pool | undefined;
 };
 
-import { Pool } from "pg";
+const prisma =
+  globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaPg(sql) });
 
-const pool = globalForPrisma.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL,
-});
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.pool = pool;
-}
-
-const adapter = new PrismaPg(pool);
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
 
 export default prisma;

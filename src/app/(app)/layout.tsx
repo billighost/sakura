@@ -1,61 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { TabBar } from "@/components/TabBar";
 import { MiniPlayer } from "@/components/MiniPlayer";
 import { FullPlayer } from "@/components/FullPlayer";
 import { PlayerProvider, usePlayer } from "@/components/PlayerContext";
 import { MediaSessionProvider } from "@/components/MediaSessionProvider";
+import { useSwipeBack } from "@/lib/useSwipeBack";
+import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import styles from "./layout.module.css";
-
-function ThemeInit() {
-  useEffect(() => {
-    const saved = localStorage.getItem("sakura-theme");
-    if (saved) {
-      document.documentElement.setAttribute("data-theme", saved);
-    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      document.documentElement.setAttribute("data-theme", "light");
-    }
-  }, []);
-  return null;
-}
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const { currentTrack } = usePlayer();
-  const pathname = usePathname();
-  const router = useRouter();
 
+  // Single registration. This used to be an inline copy of the same listener
+  // that `useSwipeBack` installs, so on pages calling the hook a swipe fired
+  // router.back() twice.
+  useSwipeBack();
+
+  useKeyboardShortcuts({
+    onToggleFullPlayer: useCallback(() => {
+      setFullPlayerOpen((open) => !open);
+    }, []),
+    fullPlayerOpen,
+  });
+
+  // Close the player on Back rather than leaving the page, so the hardware/
+  // browser back button matches the visual stack the user sees.
   useEffect(() => {
-    let touchStartX = 0;
-    let touchStartY = 0;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      const deltaX = e.changedTouches[0].clientX - touchStartX;
-      const deltaY = e.changedTouches[0].clientY - touchStartY;
-
-      // Allow swipe back if not on main tabs
-      const mainTabs = ["/home", "/search", "/library", "/profile"];
-      if (mainTabs.includes(pathname)) return;
-
-      if (deltaX > 80 && Math.abs(deltaY) < 40 && touchStartX < 50) {
-        router.back();
-      }
-    };
-
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    if (!fullPlayerOpen) return;
+    window.history.pushState({ sakuraPlayer: true }, "");
+    const onPop = () => setFullPlayerOpen(false);
+    window.addEventListener("popstate", onPop);
     return () => {
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("popstate", onPop);
+      // If the player was closed by any other means, retire the history entry
+      // we pushed so Back doesn't need pressing twice.
+      if (window.history.state?.sakuraPlayer) window.history.back();
     };
-  }, [pathname, router]);
+  }, [fullPlayerOpen]);
 
   return (
     <div className={styles.root}>
@@ -72,7 +56,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PlayerProvider>
-      <ThemeInit />
       <MediaSessionProvider />
       <AppShell>{children}</AppShell>
     </PlayerProvider>

@@ -1,4 +1,15 @@
+/*
+ * Like the full player, this is an always-dark media surface in both themes —
+ * the base below is opaque enough that the theme underneath never shows
+ * through, so white text is correct here regardless of light/dark mode.
+ * Tokens are declared once rather than repeating rgba(255,255,255,.x) inline.
+ */
 .overlay {
+  --on-media: rgba(255, 255, 255, 0.95);
+  --on-media-secondary: rgba(255, 255, 255, 0.72);
+  --on-media-tertiary: rgba(255, 255, 255, 0.45);
+  --on-media-fill: rgba(255, 255, 255, 0.1);
+
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -10,6 +21,7 @@
   transform: translateY(100%);
   transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
   pointer-events: none;
+  padding-top: env(safe-area-inset-top);
 }
 
 .overlay.open {
@@ -30,16 +42,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--tap-min);
+  height: var(--tap-min);
   cursor: pointer;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--on-media);
   transition: background 0.15s;
+  flex-shrink: 0;
 }
 
 .headerBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--on-media-fill);
 }
 
 .headerBtn:active {
@@ -54,7 +67,7 @@
 
 .headerLabel {
   font-size: 0.625rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--on-media-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 600;
@@ -64,7 +77,7 @@
   font-family: var(--sakura-font-display);
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--on-media);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -84,7 +97,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-media-tertiary);
   font-size: 0.95rem;
   text-align: center;
 }
@@ -169,24 +182,36 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
+/*
+ * Revealed on hover on pointer devices, but permanently visible on touch —
+ * it used to be `opacity: 0` with a hover-only reveal, which on a phone made
+ * "share this line" completely unreachable. The 32px box was also below the
+ * 44px minimum tap target.
+ */
 .shareLineBtn {
   all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border-radius: 50%;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--on-media-tertiary);
   opacity: 0;
   flex-shrink: 0;
   transition: opacity 0.2s ease, color 0.15s, background 0.15s;
 }
 
+@media (hover: none) {
+  .shareLineBtn {
+    opacity: 0.55;
+  }
+}
+
 .shareLineBtn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.15);
+  color: var(--on-media);
+  background: var(--on-media-fill);
 }
 
 .shareLineBtn:active {
@@ -199,7 +224,7 @@
   padding: 1.5rem 0;
   font-size: 1.05rem;
   line-height: 1.65;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--on-media-secondary);
   white-space: pre-line;
   scrollbar-width: none;
 }
@@ -219,7 +244,7 @@
   justify-content: space-between;
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-media-tertiary);
   margin-top: 0.35rem;
 }
 
@@ -236,16 +261,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: max(var(--tap-min), 2.75rem);
+  height: max(var(--tap-min), 2.75rem);
   cursor: pointer;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--on-media-secondary);
   transition: all 0.15s;
+  flex-shrink: 0;
 }
 
 .transportBtn:hover {
-  color: #fff;
+  color: var(--on-media);
 }
 
 .transportBtn:active {
@@ -273,4 +299,52 @@
 
 .playPauseBtn:active {
   transform: scale(0.92);
+}
+
+/*
+ * Short viewports: 1.1rem line margins plus the footer transport consumed the
+ * entire screen in landscape, leaving roughly one lyric visible. Tighten the
+ * spacing instead of letting the list collapse to nothing.
+ */
+@media (max-height: 640px) {
+  .list {
+    padding: 0.75rem 0 1rem;
+  }
+
+  .row {
+    margin: 0.6rem 0;
+  }
+
+  .line {
+    font-size: clamp(1rem, 3.2vw, 1.3rem);
+  }
+
+  .footer {
+    padding: 0.375rem clamp(0.75rem, 4vw, 2rem)
+      calc(0.625rem + env(safe-area-inset-bottom));
+  }
+
+  .transport {
+    gap: 1.25rem;
+    margin-top: 0.5rem;
+  }
+
+  .playPauseBtn {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    transition: none;
+  }
+
+  .list {
+    scroll-behavior: auto;
+  }
+
+  .lineGroupActive {
+    transform: none;
+  }
 }

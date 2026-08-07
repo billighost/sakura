@@ -70,7 +70,9 @@ export const ModelName = {
   GenreAffinity: 'GenreAffinity',
   TasteFeedback: 'TasteFeedback',
   UserMix: 'UserMix',
-  SystemPlaylist: 'SystemPlaylist'
+  SystemPlaylist: 'SystemPlaylist',
+  PlaybackState: 'PlaybackState',
+  Share: 'Share'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -374,6 +376,42 @@ export const SystemPlaylistScalarFieldEnum = {
 export type SystemPlaylistScalarFieldEnum = (typeof SystemPlaylistScalarFieldEnum)[keyof typeof SystemPlaylistScalarFieldEnum]
 
 
+export const PlaybackStateScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  positionMs: 'positionMs',
+  durationMs: 'durationMs',
+  isPlaying: 'isPlaying',
+  queue: 'queue',
+  upNext: 'upNext',
+  queueIndex: 'queueIndex',
+  shuffle: 'shuffle',
+  repeat: 'repeat',
+  context: 'context',
+  contextId: 'contextId',
+  deviceId: 'deviceId',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PlaybackStateScalarFieldEnum = (typeof PlaybackStateScalarFieldEnum)[keyof typeof PlaybackStateScalarFieldEnum]
+
+
+export const ShareScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  userId: 'userId',
+  kind: 'kind',
+  targetId: 'targetId',
+  payload: 'payload',
+  theme: 'theme',
+  views: 'views',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type ShareScalarFieldEnum = (typeof ShareScalarFieldEnum)[keyof typeof ShareScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -388,6 +426,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

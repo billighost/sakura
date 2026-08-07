@@ -416,7 +416,9 @@ export const ModelName = {
   GenreAffinity: 'GenreAffinity',
   TasteFeedback: 'TasteFeedback',
   UserMix: 'UserMix',
-  SystemPlaylist: 'SystemPlaylist'
+  SystemPlaylist: 'SystemPlaylist',
+  PlaybackState: 'PlaybackState',
+  Share: 'Share'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -432,7 +434,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist"
+    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist" | "playbackState" | "share"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1916,6 +1918,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PlaybackState: {
+      payload: Prisma.$PlaybackStatePayload<ExtArgs>
+      fields: Prisma.PlaybackStateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlaybackStateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlaybackStateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        findFirst: {
+          args: Prisma.PlaybackStateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlaybackStateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        findMany: {
+          args: Prisma.PlaybackStateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>[]
+        }
+        create: {
+          args: Prisma.PlaybackStateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        createMany: {
+          args: Prisma.PlaybackStateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlaybackStateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>[]
+        }
+        delete: {
+          args: Prisma.PlaybackStateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        update: {
+          args: Prisma.PlaybackStateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        deleteMany: {
+          args: Prisma.PlaybackStateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlaybackStateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlaybackStateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>[]
+        }
+        upsert: {
+          args: Prisma.PlaybackStateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlaybackStatePayload>
+        }
+        aggregate: {
+          args: Prisma.PlaybackStateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlaybackState>
+        }
+        groupBy: {
+          args: Prisma.PlaybackStateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlaybackStateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlaybackStateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlaybackStateCountAggregateOutputType> | number
+        }
+      }
+    }
+    Share: {
+      payload: Prisma.$SharePayload<ExtArgs>
+      fields: Prisma.ShareFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ShareFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ShareFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        findFirst: {
+          args: Prisma.ShareFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ShareFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        findMany: {
+          args: Prisma.ShareFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>[]
+        }
+        create: {
+          args: Prisma.ShareCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        createMany: {
+          args: Prisma.ShareCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ShareCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>[]
+        }
+        delete: {
+          args: Prisma.ShareDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        update: {
+          args: Prisma.ShareUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        deleteMany: {
+          args: Prisma.ShareDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ShareUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ShareUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>[]
+        }
+        upsert: {
+          args: Prisma.ShareUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharePayload>
+        }
+        aggregate: {
+          args: Prisma.ShareAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateShare>
+        }
+        groupBy: {
+          args: Prisma.ShareGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ShareGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ShareCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ShareCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2240,6 +2390,42 @@ export const SystemPlaylistScalarFieldEnum = {
 export type SystemPlaylistScalarFieldEnum = (typeof SystemPlaylistScalarFieldEnum)[keyof typeof SystemPlaylistScalarFieldEnum]
 
 
+export const PlaybackStateScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  positionMs: 'positionMs',
+  durationMs: 'durationMs',
+  isPlaying: 'isPlaying',
+  queue: 'queue',
+  upNext: 'upNext',
+  queueIndex: 'queueIndex',
+  shuffle: 'shuffle',
+  repeat: 'repeat',
+  context: 'context',
+  contextId: 'contextId',
+  deviceId: 'deviceId',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PlaybackStateScalarFieldEnum = (typeof PlaybackStateScalarFieldEnum)[keyof typeof PlaybackStateScalarFieldEnum]
+
+
+export const ShareScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  userId: 'userId',
+  kind: 'kind',
+  targetId: 'targetId',
+  payload: 'payload',
+  theme: 'theme',
+  views: 'views',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type ShareScalarFieldEnum = (typeof ShareScalarFieldEnum)[keyof typeof ShareScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2254,6 +2440,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -2534,6 +2727,8 @@ export type GlobalOmitConfig = {
   tasteFeedback?: Prisma.TasteFeedbackOmit
   userMix?: Prisma.UserMixOmit
   systemPlaylist?: Prisma.SystemPlaylistOmit
+  playbackState?: Prisma.PlaybackStateOmit
+  share?: Prisma.ShareOmit
 }
 
 /* Types for Logging */

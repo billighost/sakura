@@ -5,6 +5,13 @@ import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrac
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { signalTracker } from "@/lib/signals";
+import {
+  pushPlaybackState,
+  fetchPlaybackState,
+  shouldAdoptRemote,
+  HEARTBEAT_MS,
+  type PlaybackSnapshot,
+} from "@/lib/playbackSync";
 import { Toast } from "./Toast";
 
 interface Track {
@@ -1149,6 +1156,162 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("pagehide", flushProgress);
       window.removeEventListener("beforeunload", flushProgress);
       audioRef.current?.removeEventListener("pause", flushProgress);
+    };
+  }, []);
+
+  // ── Cross-device continuity ───────────────────────────────────────────────
+  //
+  // localStorage makes playback survive a reload; this makes it survive a
+  // *device*. The server holds one row per user and the rule is last-writer-
+  // wins, which is the right model for something a person can only really do
+  // in one place at a time.
+
+  // A ref, not a dependency array: the snapshot has to reflect the live values
+  // at the moment of a push, but re-registering unload listeners on every
+  // progress tick would be absurd.
+  const snapshotRef = useRef<PlaybackSnapshot>(null as unknown as PlaybackSnapshot);
+  snapshotRef.current = {
+    trackId: currentTrack?.id ?? null,
+    positionMs: Math.floor(progress * 1000),
+    durationMs: Math.floor(duration * 1000),
+    isPlaying,
+    queue: queue.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      album: t.album,
+      coverUrl: t.coverUrl,
+      duration: t.duration,
+    })),
+    upNext: upNextQueue.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      album: t.album,
+      coverUrl: t.coverUrl,
+      duration: t.duration,
+    })),
+    queueIndex: currentIndex,
+    shuffle,
+    repeat,
+    context: playContextRef.current.context,
+    contextId: playContextRef.current.contextId,
+  };
+
+  // Restore from another device, once, on first load.
+  //
+  // Runs after the localStorage hydration effect above (declaration order is
+  // effect order), so `shouldAdoptRemote` compares against real local state
+  // rather than an empty player.
+  const remoteRestoreAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (remoteRestoreAttemptedRef.current) return;
+    remoteRestoreAttemptedRef.current = true;
+
+    let cancelled = false;
+
+    (async () => {
+      const remote = await fetchPlaybackState();
+      if (cancelled || !remote) return;
+
+      const local = snapshotRef.current;
+      if (
+        !shouldAdoptRemote(remote, {
+          trackId: local.trackId,
+          positionMs: local.positionMs,
+          isPlaying: local.isPlaying,
+        })
+      ) {
+        return;
+      }
+
+      const remoteQueue = Array.isArray(remote.queue) ? remote.queue : [];
+      if (remoteQueue.length === 0) return;
+
+      // `audioUrl` is deliberately absent from synced queues (it can be a
+      // signed, expiring URL). The load effect already resolves an unresolved
+      // track on demand, so an empty string here is the documented "resolve
+      // this for me" state rather than a stall.
+      const restored: Track[] = remoteQueue.map((t) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        coverUrl: t.coverUrl,
+        audioUrl: "",
+        duration: t.duration ?? 0,
+      }));
+
+      setQueueState(restored);
+      setUpNextQueue(
+        (Array.isArray(remote.upNext) ? remote.upNext : []).map((t) => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          album: t.album,
+          coverUrl: t.coverUrl,
+          audioUrl: "",
+          duration: t.duration ?? 0,
+        }))
+      );
+      setCurrentIndex(
+        Math.min(Math.max(0, remote.queueIndex ?? 0), Math.max(0, restored.length - 1))
+      );
+      setShuffle(!!remote.shuffle);
+      setRepeat((remote.repeat as "off" | "one" | "all") ?? "off");
+
+      // Hand the position to the same mechanism a reload uses, so there's one
+      // code path that applies a resume seek and it's already been proven to
+      // wait for loadedmetadata.
+      const seconds = Math.floor((remote.positionMs ?? 0) / 1000);
+      localStorage.setItem("sakura-player-progress", String(seconds));
+      localStorage.setItem("sakura-player-track-id", remote.trackId!);
+      setProgress(seconds);
+      hasRestoredProgressRef.current = false;
+
+      showToast("Picked up where you left off", "accent");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast]);
+
+  // Push: heartbeat while playing, plus the moments that must not be lost.
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    const interval = setInterval(() => {
+      if (snapshotRef.current.isPlaying) {
+        void pushPlaybackState(snapshotRef.current);
+      }
+    }, HEARTBEAT_MS);
+
+    return () => clearInterval(interval);
+  }, [currentTrack?.id]);
+
+  // Track change and play/pause are the transitions worth syncing immediately —
+  // they're exactly when someone is likely to pick up a different device.
+  useEffect(() => {
+    if (!currentTrack) return;
+    void pushPlaybackState(snapshotRef.current, { force: true });
+  }, [currentTrack?.id, isPlaying]);
+
+  useEffect(() => {
+    // sendBeacon is the only transport guaranteed to survive unload — a normal
+    // fetch is cancelled with the document.
+    const flushRemote = () => {
+      void pushPlaybackState(snapshotRef.current, { force: true, beacon: true });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushRemote();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flushRemote);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flushRemote);
     };
   }, []);
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
-import { queryOne, query } from "@/lib/sql";
+import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 
@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
     const client = getTelegramClient();
     await client.init();
 
-    const query = `${artist} - ${title}`;
-    console.log(`[Telegram AutoDownload] Searching: "${query}"`);
+    // Named `searchQuery`, not `query` — the imported `query()` helper from
+    // lib/sql is used further down, and a local const of the same name shadows
+    // it for the whole function body.
+    const searchQuery = `${artist} - ${title}`;
+    console.log(`[Telegram AutoDownload] Searching: "${searchQuery}"`);
 
     // searchAndSelect acquires the bot mutex, searches, clicks the first result,
     // waits for audio, then releases — all serialized for reliability
@@ -45,10 +48,10 @@ export async function POST(req: NextRequest) {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        track = await client.searchAndSelect(query, 0, 35000, 60000);
+        track = await client.searchAndSelect(searchQuery, 0, 35000, 60000);
         break;
       } catch (err) {
-        console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${query}":`, err instanceof Error ? err.message : err);
+        console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${searchQuery}":`, err instanceof Error ? err.message : err);
         lastError = err;
         if (attempt < 3) {
           await new Promise((r) => setTimeout(r, 2000));
@@ -172,45 +175,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (metadata.track?.contributors?.length) {
-      for (let i = 0; i < metadata.track.contributors.length; i++) {
-        const c = metadata.track.contributors[i];
-        if (!c.name) continue;
+    // ── Contributors ────────────────────────────────────────────────────────
+    // Previously this looped one artist at a time with a SELECT then maybe an
+    // INSERT per contributor — up to 2N round trips for a track with N credited
+    // artists. Now: one upsert for all of them, one read back, one join insert.
+    const contributors = metadata.track?.contributors?.filter((c) => c.name) ?? [];
 
-        let contribArtistId: string;
-        const existing = await queryOne<{ id: string }>(
-          `SELECT id FROM "Artist" WHERE name = $1`,
-          [c.name]
+    if (contributors.length > 0) {
+      const names = contributors.map((c) => c.name);
+      const images = contributors.map((c) => c.imageUrl || null);
+
+      // `ON CONFLICT DO UPDATE` rather than DO NOTHING: DO NOTHING wouldn't
+      // return the existing rows, and we need every id back in one trip.
+      const artistRows = await query<{ id: string; name: string }>(
+        `INSERT INTO "Artist" (id, name, "imageUrl", "createdAt")
+         SELECT gen_random_uuid()::text, n, i, NOW()
+           FROM UNNEST($1::text[], $2::text[]) AS t(n, i)
+         ON CONFLICT (name) DO UPDATE
+           SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
+         RETURNING id, name`,
+        [names, images]
+      );
+
+      const idByName = new Map(artistRows.map((r) => [r.name, r.id]));
+
+      const joinArtistIds: string[] = [];
+      const joinRoles: string[] = [];
+      const joinPositions: number[] = [];
+
+      contributors.forEach((c, i) => {
+        const artistIdForContributor = idByName.get(c.name);
+        if (!artistIdForContributor) return;
+        joinArtistIds.push(artistIdForContributor);
+        joinRoles.push(
+          c.role === "Main" ? "main" : c.role === "Featured" ? "featured" : "contributor"
         );
+        joinPositions.push(i);
+      });
 
-        if (existing) {
-          contribArtistId = existing.id;
-          if (c.imageUrl) {
-            await queryOne(
-              `UPDATE "Artist" SET "imageUrl" = COALESCE("imageUrl", $1) WHERE id = $2 AND "imageUrl" IS NULL`,
-              [c.imageUrl, contribArtistId]
-            );
-          }
-        } else {
-          const newContrib = await queryOne<{ id: string }>(
-            `INSERT INTO "Artist" (id, name, "imageUrl", "createdAt")
-             VALUES (gen_random_uuid()::text, $1, $2, NOW())
-             RETURNING id`,
-            [c.name, c.imageUrl || null]
-          );
-          contribArtistId = newContrib!.id;
-        }
-
-        const role = c.role === 'Main' ? 'main' : c.role === 'Featured' ? 'featured' : 'contributor';
-        await queryOne(
+      if (joinArtistIds.length > 0) {
+        await execute(
           `INSERT INTO "TrackArtist" ("trackId", "artistId", role, position, "addedAt")
-           VALUES ($1, $2, $3, $4, NOW())
+           SELECT $1, a, r, p, NOW()
+             FROM UNNEST($2::text[], $3::text[], $4::int[]) AS t(a, r, p)
            ON CONFLICT ("trackId", "artistId") DO NOTHING`,
-          [dbTrack!.id, contribArtistId, role, i]
+          [dbTrack!.id, joinArtistIds, joinRoles, joinPositions]
         );
       }
     } else {
-      await queryOne(
+      await execute(
         `INSERT INTO "TrackArtist" ("trackId", "artistId", role, position, "addedAt")
          VALUES ($1, $2, 'main', 0, NOW())
          ON CONFLICT ("trackId", "artistId") DO NOTHING`,
@@ -218,31 +231,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Credits ─────────────────────────────────────────────────────────────
+    // One multi-row insert instead of one per credit. Also de-duplicated: the
+    // previous version inserted unconditionally, so re-downloading a track
+    // appended a second copy of every producer/writer credit.
     if (metadata.credits?.length) {
-      for (const credit of metadata.credits) {
-        await queryOne(
-          `INSERT INTO "TrackCredit" (id, "trackId", name, role, "createdAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())`,
-          [dbTrack!.id, credit.name, credit.role]
-        );
-      }
+      await execute(
+        `INSERT INTO "TrackCredit" (id, "trackId", name, role, "createdAt")
+         SELECT gen_random_uuid()::text, $1, n, r, NOW()
+           FROM UNNEST($2::text[], $3::text[]) AS t(n, r)
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "TrackCredit" c
+             WHERE c."trackId" = $1 AND c.name = t.n AND c.role = t.r
+          )`,
+        [
+          dbTrack!.id,
+          metadata.credits.map((c) => c.name),
+          metadata.credits.map((c) => c.role),
+        ]
+      );
     }
 
+    // ── Samples ─────────────────────────────────────────────────────────────
+    // The per-sample `SELECT ... WHERE title ILIKE '%x%'` lookup is gone: it
+    // ran a full scan per sample, and when it missed it fell back to pointing
+    // the sample at the track itself — writing a row claiming the song sampled
+    // itself. Resolution now happens in one pass, and unresolvable samples are
+    // skipped rather than recorded wrongly.
     if (metadata.samples?.length) {
-      for (const sample of metadata.samples) {
-        const existingTrack = await queryOne<{ id: string }>(
-          `SELECT id FROM "Track" WHERE title ILIKE $1 LIMIT 1`,
-          [`%${sample.trackTitle}%`]
+      const sampleTitles = metadata.samples.map((s) => s.trackTitle);
+
+      const matches = await query<{ id: string; title: string }>(
+        `SELECT DISTINCT ON (lower(title)) id, title
+           FROM "Track"
+          WHERE lower(title) = ANY(SELECT lower(x) FROM UNNEST($1::text[]) AS x)`,
+        [sampleTitles]
+      ).catch(() => [] as { id: string; title: string }[]);
+
+      const idByTitle = new Map(matches.map((m) => [m.title.toLowerCase(), m.id]));
+
+      const resolved = metadata.samples
+        .map((s) => ({
+          sampledId: idByTitle.get(s.trackTitle.toLowerCase()),
+          type: s.type === "samples" ? "samples" : "sampled",
+        }))
+        .filter((s): s is { sampledId: string; type: string } =>
+          !!s.sampledId && s.sampledId !== dbTrack!.id
         );
 
-        const sampleTrackId = existingTrack?.id || dbTrack!.id;
-        const sampleType = sample.type === "samples" ? "samples" : "sampled";
-
-        await queryOne(
+      if (resolved.length > 0) {
+        await execute(
           `INSERT INTO "SampledTrack" (id, "trackId", "sampledTrackId", "sampleType", "createdAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
+           SELECT gen_random_uuid()::text, $1, s, ty, NOW()
+             FROM UNNEST($2::text[], $3::text[]) AS t(s, ty)
            ON CONFLICT DO NOTHING`,
-          [dbTrack!.id, sampleTrackId, sampleType]
+          [dbTrack!.id, resolved.map((r) => r.sampledId), resolved.map((r) => r.type)]
         );
       }
     }

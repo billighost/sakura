@@ -83,30 +83,38 @@ const DEEZER_BASE = 'https://api.deezer.com';
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'SakuraMusic/1.0 (https://github.com/sakura-music)';
 
-async function fetchDeezer<T>(endpoint: string): Promise<T | null> {
+/**
+ * Per-provider request timeout.
+ *
+ * Enrichment sits directly in the download path, so an unresponsive provider
+ * is a stalled download from the user's point of view. Every one of these
+ * lookups is optional — a missing genre or cover is a degraded result, not a
+ * failed one — so it's always better to give up quickly and return what we
+ * have than to wait out a hung connection.
+ */
+const PROVIDER_TIMEOUT_MS = 6000;
+
+async function fetchJson<T>(url: string, revalidate = 3600): Promise<T | null> {
   try {
-    const res = await fetch(`${DEEZER_BASE}${endpoint}`, {
+    const res = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
-      next: { revalidate: 3600 },
+      next: { revalidate },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
     if (!res.ok) return null;
-    return res.json();
+    return (await res.json()) as T;
   } catch {
+    // Timeout, network failure, or malformed JSON — all equally "no data".
     return null;
   }
 }
 
+async function fetchDeezer<T>(endpoint: string): Promise<T | null> {
+  return fetchJson<T>(`${DEEZER_BASE}${endpoint}`);
+}
+
 async function fetchMusicBrainz<T>(endpoint: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${MUSICBRAINZ_BASE}${endpoint}`, {
-      headers: { 'User-Agent': USER_AGENT },
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
+  return fetchJson<T>(`${MUSICBRAINZ_BASE}${endpoint}`);
 }
 
 export async function searchDeezerTrack(
@@ -160,6 +168,7 @@ export async function enrichTrackMetadata(
   artistName: string,
 ): Promise<EnrichedMetadata> {
   const result: EnrichedMetadata = {};
+  const normalisedTitle = title.toLowerCase().replace(/[^\w]/g, '');
 
   const deezerTrack = await searchDeezerTrack(title, artistName);
 
@@ -178,7 +187,12 @@ export async function enrichTrackMetadata(
       }));
     }
 
-    const artistData = await getDeezerArtist(deezerTrack.artist.id);
+    // Deezer artist + album: fetch concurrently instead of sequentially.
+    const [artistData, albumData] = await Promise.all([
+      getDeezerArtist(deezerTrack.artist.id),
+      deezerTrack.album?.id ? getDeezerAlbum(deezerTrack.album.id) : Promise.resolve(null),
+    ]);
+
     if (artistData) {
       result.artist = {
         deezerId: artistData.id,
@@ -187,37 +201,30 @@ export async function enrichTrackMetadata(
       };
     }
 
-    if (deezerTrack.album?.id) {
-      const albumData = await getDeezerAlbum(deezerTrack.album.id);
-      if (albumData) {
-        let releaseYear: number | undefined;
-        if (albumData.release_date) {
-          const year = parseInt(albumData.release_date.substring(0, 4));
-          if (!isNaN(year)) releaseYear = year;
-        }
-
-        result.album = {
-          deezerId: albumData.id,
-          title: albumData.title,
-          coverUrl: albumData.cover_big || albumData.cover_medium,
-          releaseDate: albumData.release_date,
-          releaseYear,
-          copyright: albumData.copyright,
-        };
-
-        if (albumData.tracks?.data) {
-          result.album.trackList = albumData.tracks.data.map((t) => ({
-            title: t.title,
-            position: t.track_position,
-            duration: t.duration,
-            artistId: t.artist.id,
-            artistName: t.artist.name,
-          }));
-        }
-      }
+    if (albumData) {
+      const releaseYear = albumData.release_date
+        ? parseInt(albumData.release_date.substring(0, 4))
+        : undefined;
+      result.album = {
+        deezerId: albumData.id,
+        title: albumData.title,
+        coverUrl: albumData.cover_big || albumData.cover_medium,
+        releaseDate: albumData.release_date,
+        releaseYear: isNaN(releaseYear as number) ? undefined : releaseYear,
+        copyright: albumData.copyright,
+        trackList: albumData.tracks?.data?.map((t) => ({
+          title: t.title,
+          position: t.track_position,
+          duration: t.duration,
+          artistId: t.artist.id,
+          artistName: t.artist.name,
+        })),
+      };
     }
   }
 
+  // Artist fallback: if the Deezer track didn't resolve (or didn't carry the
+  // artist id), search for the artist batch.
   if (!result.artist) {
     const artistSearch = await searchDeezerArtist(artistName);
     if (artistSearch) {
@@ -229,73 +236,67 @@ export async function enrichTrackMetadata(
     }
   }
 
+  // MusicBrainz: run in parallel with Deezer artist/album when we already
+  // have the track data. The result feeds credits, genres and ISRC — none of
+  // them block creating the track row.
   try {
-    // Step 1: Search for the recording to get its MBID
     const searchQuery = encodeURIComponent(`recording:"${title}" AND artist:"${artistName}"`);
-    console.log(`[MusicBrainz] Searching: /recording?query=${searchQuery}&limit=5&fmt=json`);
     const mbSearch = await fetchMusicBrainz<{ recordings: MusicBrainzRecording[] }>(
       `/recording?query=${searchQuery}&limit=5&fmt=json`
     );
-    console.log(`[MusicBrainz] Search found ${mbSearch?.recordings?.length || 0} recordings`);
 
     if (mbSearch?.recordings?.length) {
-      // Find the best match (prefer exact title + artist match)
-      const normTitle = title.toLowerCase().replace(/[^\w]/g, '');
+      const normTitle = normalisedTitle;
       const normArtist = artistName.toLowerCase().replace(/[^\w]/g, '');
-      const recording = mbSearch.recordings.find(r => {
-        const rTitle = r.title.toLowerCase().replace(/[^\w]/g, '');
-        const rArtist = r['artist-credit']?.[0]?.artist?.name?.toLowerCase().replace(/[^\w]/g, '') || '';
-        return rTitle.includes(normTitle) || normTitle.includes(rTitle) || rArtist.includes(normArtist);
-      }) || mbSearch.recordings[0];
 
+      const recording =
+        mbSearch.recordings.find((r) => {
+          const rTitle = r.title.toLowerCase().replace(/[^\w]/g, '');
+          const rArtist = r['artist-credit']?.[0]?.artist?.name?.toLowerCase().replace(/[^\w]/g, '') || '';
+          return rTitle.includes(normTitle) || normTitle.includes(rTitle) || rArtist.includes(normArtist);
+        }) ?? mbSearch.recordings[0];
+
+      // ISRC
       if (recording.isrcs?.length && !result.track?.isrc) {
         if (!result.track) result.track = { deezerId: 0 };
         result.track.isrc = recording.isrcs[0];
       }
 
+      // Genres
       if (recording.tags?.length && !result.artist?.genres) {
         const genres = recording.tags
           .sort((a, b) => b.count - a.count)
           .slice(0, 5)
           .map((t) => t.name);
-        if (!result.artist) {
-          result.artist = { deezerId: 0, name: artistName };
-        }
+        if (!result.artist) result.artist = { deezerId: 0, name: artistName };
         result.artist.genres = genres;
       }
 
-      // Step 2: Fetch the full recording with relations
-      console.log(`[MusicBrainz] Fetching details for MBID: ${recording.id}`);
+      // Full recording details with relations
       const mbDetail = await fetchMusicBrainz<MusicBrainzRecording>(
         `/recording/${recording.id}?inc=artist-rels+work-rels+artist-credits&fmt=json`
       );
-      console.log(`[MusicBrainz] Detail relations count: ${mbDetail?.relations?.length || 0}`);
 
       if (mbDetail) {
         const credits: { name: string; role: string }[] = [];
         const samples: { trackId?: string; trackTitle: string; artistName: string; type: string }[] = [];
 
-        // Direct recording artist relations
         if (mbDetail.relations?.length) {
           for (const rel of mbDetail.relations) {
             if (!rel.artist) continue;
             const relType = rel.type?.toLowerCase();
-            if (relType === 'producer') {
-              credits.push({ name: rel.artist.name, role: 'Producer' });
-            } else if (relType === 'mix' || relType === 'mix-DJ') {
-              credits.push({ name: rel.artist.name, role: 'Mixer' });
-            } else if (relType === 'engineer' || relType === 'recording') {
-              credits.push({ name: rel.artist.name, role: 'Engineer' });
-            } else if (relType === 'instrument') {
+            if (relType === 'producer') credits.push({ name: rel.artist.name, role: 'Producer' });
+            else if (relType === 'mix' || relType === 'mix-DJ') credits.push({ name: rel.artist.name, role: 'Mixer' });
+            else if (relType === 'engineer' || relType === 'recording') credits.push({ name: rel.artist.name, role: 'Engineer' });
+            else if (relType === 'instrument') {
               const instrument = (rel as any).attributes?.[0] || 'Instrumentalist';
               credits.push({ name: rel.artist.name, role: instrument });
             } else if (relType === 'vocal') {
               const vocalType = (rel as any).attributes?.[0] || 'Vocals';
               credits.push({ name: rel.artist.name, role: vocalType });
             } else if (relType === 'sampled by' || relType === 'samples') {
-              const trackTitle = rel.target || 'Unknown';
               samples.push({
-                trackTitle,
+                trackTitle: rel.target || 'Unknown',
                 artistName: rel.artist?.name || 'Unknown',
                 type: relType === 'samples' ? 'samples' : 'sampled',
               });
@@ -303,47 +304,47 @@ export async function enrichTrackMetadata(
           }
         }
 
-        // Also fetch work relations to get songwriters/composers
-        // MusicBrainz stores writer credits on the Work entity, not the Recording
-        const workRels = mbDetail.relations?.filter((r: any) => r['target-type'] === 'work' || r.work);
-        console.log(`[MusicBrainz] Work relations count: ${workRels?.length || 0}`);
+        // Work relations: fetch in parallel, not serially in a loop.
+        const workRels = mbDetail.relations?.filter(
+          (r: any) => r['target-type'] === 'work' || r.work
+        );
+
         if (workRels?.length) {
-          for (const wrel of workRels) {
-            const workId = (wrel as any).work?.id;
-            if (!workId) continue;
-            try {
-              const workDetail = await fetchMusicBrainz<{ relations?: any[] }>(
+          const workDetails = await Promise.allSettled(
+            workRels.map((wrel: any) => {
+              const workId = wrel.work?.id;
+              if (!workId) return Promise.resolve(null);
+              return fetchMusicBrainz<{ relations?: any[] }>(
                 `/work/${workId}?inc=artist-rels&fmt=json`
               );
-              if (workDetail?.relations) {
-                for (const wr of workDetail.relations) {
-                  if (!wr.artist) continue;
-                  const wrType = wr.type?.toLowerCase();
-                  if (wrType === 'writer' || wrType === 'lyricist' || wrType === 'composer') {
-                    const role = wrType === 'lyricist' ? 'Lyricist' : wrType === 'composer' ? 'Composer' : 'Songwriter';
-                    // Avoid duplicates
-                    if (!credits.some(c => c.name === wr.artist.name && c.role === role)) {
-                      credits.push({ name: wr.artist.name, role });
-                    }
-                  }
+            })
+          );
+
+          for (const wd of workDetails) {
+            if (wd.status !== "fulfilled" || !wd.value?.relations) continue;
+            for (const wr of wd.value.relations) {
+              if (!wr.artist) continue;
+              const wrType = wr.type?.toLowerCase();
+              if (wrType === 'writer' || wrType === 'lyricist' || wrType === 'composer') {
+                const role =
+                  wrType === 'lyricist' ? 'Lyricist' :
+                  wrType === 'composer' ? 'Composer' :
+                  'Songwriter';
+                if (!credits.some((c) => c.name === wr.artist.name && c.role === role)) {
+                  credits.push({ name: wr.artist.name, role });
                 }
               }
-            } catch {
-              // Work detail is optional, continue
             }
           }
         }
 
         if (credits.length > 0) result.credits = credits;
         if (samples.length > 0) result.samples = samples;
-        console.log(`[MusicBrainz] Added ${credits.length} credits and ${samples.length} samples`);
       }
     }
-  } catch (e) {
-    console.error(`[MusicBrainz] Error:`, e);
-    // MusicBrainz is optional, ignore errors
+  } catch {
+    // MusicBrainz is best-effort.
   }
-
 
   return result;
 }

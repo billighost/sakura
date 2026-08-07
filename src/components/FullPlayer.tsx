@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
-import { LyricShareCard } from "./LyricShareCard";
+import { ShareModal } from "./ShareModal";
+import { ShareIcon } from "./Icons";
 import { CreditsSection } from "./CreditsSection";
 import { LyricsPreviewCard } from "./LyricsPreviewCard";
 import { QueueModal } from "./QueueModal";
@@ -27,6 +28,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [artLoaded, setArtLoaded] = useState(false);
   const [artFlipStyle, setArtFlipStyle] = useState<React.CSSProperties>({});
   const [selectedLyricShare, setSelectedLyricShare] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
@@ -586,20 +588,18 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               </div>
             </div>
 
-            <button className={styles.iconBtn} onClick={() => {
-              if (navigator.share) {
-                navigator.share({ title: currentTrack?.title, text: `${currentTrack?.title} by ${currentTrack?.artist}`, url: window.location.href });
-              } else {
-                navigator.clipboard.writeText(window.location.href);
-              }
-            }} aria-label="Share">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <circle cx="18" cy="5" r="3" />
-                <circle cx="6" cy="12" r="3" />
-                <circle cx="18" cy="19" r="3" />
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-              </svg>
+            {/*
+              Opens the card generator rather than calling navigator.share with
+              the raw URL. Sharing "sakura.app/home" told the recipient nothing
+              about what was playing — the generated card carries the artwork,
+              the title and the artist.
+            */}
+            <button
+              className={styles.iconBtn}
+              onClick={() => setShareOpen(true)}
+              aria-label="Share this track"
+            >
+              <ShareIcon size={20} />
             </button>
 
             <button 
@@ -698,14 +698,17 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         formatTime={formatTime}
       />
 
-      {selectedLyricShare && (
-        <LyricShareCard
-          track={currentTrack}
-          lyric={selectedLyricShare}
-          accentColor={accentColor}
-          onClose={() => setSelectedLyricShare(null)}
-        />
-      )}
+      <ShareModal
+        open={shareOpen || selectedLyricShare !== null}
+        onClose={() => {
+          setShareOpen(false);
+          setSelectedLyricShare(null);
+        }}
+        track={currentTrack}
+        lyricText={selectedLyricShare ?? undefined}
+        lyricTime={selectedLyricShare ? displayProgress : undefined}
+        accentColor={accentColor}
+      />
     </div>
   );
 }

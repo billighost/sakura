@@ -1,6 +1,8 @@
 .page {
   padding: clamp(0.75rem, 3vw, 1.25rem);
-  padding-bottom: 2rem;
+  /* Clears the mini-player + tab bar. At the old 2rem the last shelf sat
+   * underneath the chrome and couldn't be scrolled into view. */
+  padding-bottom: calc(var(--bottom-chrome) + 1rem);
 }
 
 /* ── Header ── */

@@ -2,6 +2,13 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 
+/**
+ * Proxy a Telegram message's audio as a streamable response.
+ *
+ * CORS and cache headers are set so the browser can serve this through the
+ * audio element, the service worker can cache it, and re-winding the same
+ * track doesn't re-fetch from Telegram.
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ messageId: string }> }
@@ -26,7 +33,10 @@ export async function GET(
     return new Response(stream as unknown as ReadableStream, {
       headers: {
         "Content-Type": "audio/mpeg",
-        "Cache-Control": "public, max-age=86400",
+        // Long cache: a Telegram file is immutable. Let the browser and the
+        // service worker keep it aggressively.
+        "Cache-Control": "public, max-age=604800, immutable",
+        "Accept-Ranges": "none",
       },
     });
   } catch (error) {

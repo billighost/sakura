@@ -27,8 +27,8 @@
   --sakura-scrollbar-thumb: #2A242E;
 
   /* --- shared player design tokens --- */
-  --sakura-font-display: "Fraunces", ui-serif, Georgia, serif;
-  --sakura-font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sakura-font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --sakura-font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
   --sakura-glass: rgba(26, 22, 32, 0.62);
   --sakura-glass-strong: rgba(20, 16, 23, 0.82);
@@ -66,8 +66,8 @@
   --sakura-scrollbar-track: #F0ECF2;
   --sakura-scrollbar-thumb: #C4BCC8;
 
-  --sakura-font-display: "Fraunces", ui-serif, Georgia, serif;
-  --sakura-font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sakura-font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --sakura-font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
   --sakura-glass: rgba(255, 255, 255, 0.66);
   --sakura-glass-strong: rgba(255, 255, 255, 0.86);
@@ -117,13 +117,42 @@
   padding: 0;
 }
 
-* {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease,
-    box-shadow 0.2s ease, opacity 0.2s ease;
+/*
+ * Interactive elements get a default colour transition. This used to be a
+ * universal `*` rule paired with
+ * `*:not([style*="transform"]):not([class*="anim"]):not([class*="transition"])`.
+ * Two problems with that: substring attribute matching against every element
+ * is re-evaluated on every style recalculation, which is measurable on a long
+ * track list; and transitioning `opacity` on *everything* made skeleton →
+ * content swaps cross-fade through a visible flicker.
+ *
+ * Scoping to the elements that actually have hover/active states keeps the
+ * feel and drops the cost. Components that need more define it themselves.
+ */
+a,
+button,
+input,
+select,
+textarea,
+summary,
+[role="button"],
+[role="tab"],
+[role="option"] {
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-*:not([style*="transform"]):not([class*="anim"]):not([class*="transition"]) {
-  transition-duration: 0.2s;
+/*
+ * Theme switching is the one moment a whole-page colour transition is worth
+ * paying for. `ThemeInit` adds this class for the duration of the swap and
+ * removes it, so the cost is bounded to ~300ms instead of permanent.
+ */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 0.25s ease, color 0.25s ease,
+    border-color 0.25s ease, fill 0.25s ease, stroke 0.25s ease !important;
 }
 
 html,
@@ -140,6 +169,11 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* iOS rubber-band on the body scrolls the whole app shell out of view. */
+  overscroll-behavior: none;
+  /* Stops the double-tap-to-zoom delay without disabling pinch zoom. */
+  touch-action: manipulation;
+  text-rendering: optimizeLegibility;
 }
 
 ::-webkit-scrollbar {
@@ -179,6 +213,120 @@ body {
 
 .safe-area-right {
   padding-right: env(safe-area-inset-right);
+}
+
+/* ── Responsive scale ──────────────────────────────────────────────────────
+ *
+ * Two axes, not one. Width alone is the usual approach and it's wrong for a
+ * player: an iPhone SE / mini in landscape, or any phone with the keyboard
+ * open, has plenty of width and almost no height. Sizing album art off `vw`
+ * there pushes the transport controls off-screen entirely.
+ *
+ * `--ui-density` is the single knob every component reads. It shrinks on
+ * short viewports, so vertical space is reclaimed from padding and art before
+ * anything gets clipped. Components use `--space-*` / `--art-max` rather than
+ * hardcoded rems so they all respond together.
+ */
+:root {
+  --ui-density: 1;
+
+  --space-1: calc(0.25rem * var(--ui-density));
+  --space-2: calc(0.5rem * var(--ui-density));
+  --space-3: calc(0.75rem * var(--ui-density));
+  --space-4: calc(1rem * var(--ui-density));
+  --space-5: calc(1.5rem * var(--ui-density));
+  --space-6: calc(2rem * var(--ui-density));
+
+  /* Bottom chrome, exported so pages can pad their scroll area correctly
+   * instead of each guessing a magic number. */
+  --tabbar-h: 3.5rem;
+  --miniplayer-h: 3.75rem;
+  --bottom-chrome: calc(
+    var(--tabbar-h) + var(--miniplayer-h) + env(safe-area-inset-bottom, 0px)
+  );
+
+  /* Largest the full-player artwork may be. Bounded by height as well as
+   * width so it can never crowd out the controls. */
+  --art-max: min(62vw, 42vh, 19rem);
+
+  /* Apple's HIG minimum; anything smaller is a mis-tap generator. */
+  --tap-min: 44px;
+}
+
+/* Short viewports: phones in landscape, small phones with a keyboard up,
+ * split-screen. Reclaim vertical space progressively. */
+@media (max-height: 740px) {
+  :root {
+    --ui-density: 0.85;
+    --art-max: min(56vw, 38vh, 15rem);
+  }
+}
+
+@media (max-height: 640px) {
+  :root {
+    --ui-density: 0.72;
+    --tabbar-h: 3.125rem;
+    --miniplayer-h: 3.25rem;
+    --art-max: min(48vw, 34vh, 12rem);
+  }
+}
+
+@media (max-height: 540px) {
+  :root {
+    --ui-density: 0.62;
+    --tabbar-h: 2.875rem;
+    --miniplayer-h: 3rem;
+    --art-max: min(40vw, 30vh, 9.5rem);
+  }
+}
+
+/* Narrow phones (iPhone SE/mini are 320–375 CSS px). */
+@media (max-width: 380px) {
+  :root {
+    --ui-density: 0.88;
+  }
+}
+
+@media (max-width: 340px) {
+  :root {
+    --ui-density: 0.8;
+  }
+}
+
+/* Landscape phone: both axes are tight and the safe areas move to the sides. */
+@media (max-height: 480px) and (orientation: landscape) {
+  :root {
+    --ui-density: 0.6;
+    --art-max: min(26vw, 46vh, 8.5rem);
+  }
+}
+
+/* Every interactive control clears the minimum tap target, regardless of how
+ * small its icon renders at the current density. */
+button,
+a[role="button"],
+[role="tab"],
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+}
+
+/* Opt-out for controls that are legitimately inline (a chip inside a row, an
+ * icon inside a text link) where a 44px box would break the layout. Those
+ * still need the hit area, so they get it via a padded ::before instead. */
+.tapTarget {
+  position: relative;
+}
+
+.tapTarget::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--tap-min));
+  height: max(100%, var(--tap-min));
+  transform: translate(-50%, -50%);
 }
 
 .text-xs {

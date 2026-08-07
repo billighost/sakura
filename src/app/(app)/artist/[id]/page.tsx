@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSwipeBack } from "@/lib/useSwipeBack";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
@@ -55,7 +54,6 @@ function shuffleArray<T>(arr: T[]): T[] {
 export default function ArtistPage() {
   const params = useParams();
   const router = useRouter();
-  useSwipeBack();
   const { play } = usePlayer();
   const { downloadAll, checking: downloading } = useDownloadAll();
   const [artist, setArtist] = useState<Artist | null>(null);

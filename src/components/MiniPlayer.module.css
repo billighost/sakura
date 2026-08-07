@@ -124,6 +124,12 @@
   margin-top: 1px;
 }
 
+/*
+ * The visible circle stays small so the bar doesn't get bulky, but the *hit
+ * area* is padded out to the 44px minimum with a pseudo-element. At 30px, and
+ * sitting directly beside the play button, this was a reliable mis-tap: people
+ * aiming for "like" got "pause".
+ */
 .likeBtn {
   all: unset;
   position: relative;
@@ -137,6 +143,17 @@
   color: var(--sakura-text-secondary);
   transition: color 0.15s, transform 0.15s;
   border-radius: 50%;
+}
+
+.likeBtn::before,
+.playBtn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--tap-min));
+  height: max(100%, var(--tap-min));
+  transform: translate(-50%, -50%);
 }
 
 .likeBtn:active {
