@@ -54,6 +54,6 @@ export async function POST(req: NextRequest) {
     [userId, trackId]
   );
 
-  await cacheDel(cacheKey("favorites", userId));
+  await cacheDel(cacheKey("favorites", userId), cacheKey("home", userId));
   return NextResponse.json({ liked: true });
 }

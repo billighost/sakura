@@ -23,6 +23,10 @@ model User {
   snoozedTracks    SnoozedTrack[]
   listeningHistory ListeningHistory[]
   mixes            UserMix[]
+  tasteProfile     TasteProfile?
+  artistAffinities ArtistAffinity[]
+  genreAffinities  GenreAffinity[]
+  tasteFeedback    TasteFeedback[]
 }
 
 model UserSettings {
@@ -57,6 +61,7 @@ model Artist {
   albums        Album[]
   tracks        Track[]
   trackArtists  TrackArtist[]
+  affinities    ArtistAffinity[]
 }
 
 model Album {
@@ -224,12 +229,110 @@ model ListeningHistory {
   playedAt DateTime @default(now())
   skipped  Boolean  @default(false)
 
+  // ── Signal columns ────────────────────────────────────────────────────────
+  // A bare "this track was played" row can't distinguish a song someone loved
+  // from one they killed after two seconds. These make every play a graded
+  // signal the taste engine can weight.
+  msPlayed   Int      @default(0)  // actual audible playback time, not wall clock
+  completed  Boolean  @default(false)
+  skipAtMs   Int?                  // where in the track the skip happened
+  context    String?               // "mix" | "radio" | "playlist" | "album" | "artist" | "search" | "liked" | "library" | "chart" | "direct"
+  contextId  String?               // id of the mix/playlist/album that sourced it
+  autoplay   Boolean  @default(false) // true when radio queued it, not the person
+  hourOfDay  Int?                  // 0-23, local to the listener — powers time-of-day mixes
+  dayOfWeek  Int?                  // 0-6
+
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([trackId])
   @@index([playedAt])
+  @@index([userId, playedAt])
+  @@index([userId, trackId])
+}
+
+// ── Taste system ────────────────────────────────────────────────────────────
+// Three layers:
+//   1. TasteProfile   — the cached, denormalised summary (fast to read on every
+//                       home render / radio call).
+//   2. ArtistAffinity — per-artist running score, the strongest single signal.
+//   3. GenreAffinity  — per-genre running score, what generalises to new music.
+// Affinities are recomputed from ListeningHistory + Favorite + explicit
+// feedback rather than incremented blindly, so a rebuild is always idempotent.
+
+model TasteProfile {
+  userId          String   @id
+  onboarded       Boolean  @default(false)
+  seedArtistIds   String[]                  // artists picked during onboarding
+  seedGenres      String[]                  // genres picked during onboarding
+  seedArtistNames String[]                  // names kept for artists not yet in the catalogue
+  topGenres       String[]                  // ordered, derived
+  topArtistIds    String[]                  // ordered, derived
+  // 0 = "only play me what I know", 1 = "surprise me". Seeded from onboarding,
+  // then nudged by behaviour (how often unfamiliar tracks survive vs get skipped).
+  discovery       Float    @default(0.35)
+  // Rolling behavioural stats used for scoring + shown back to the user.
+  eraCenter       Int?                      // mean release year the person leans toward
+  eraSpread       Int?
+  avgTrackMs      Int?
+  skipRate        Float    @default(0)
+  totalPlays      Int      @default(0)
+  vector          Json?                     // { genres: {}, eras: {}, hours: {} } — full weights
+  computedAt      DateTime @default(now())
+  version         Int      @default(1)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ArtistAffinity {
+  userId      String
+  artistId    String
+  score       Float    @default(0)   // decayed, signed. negative = actively disliked
+  plays       Int      @default(0)
+  completions Int      @default(0)
+  skips       Int      @default(0)
+  likes       Int      @default(0)
+  lastPlayedAt DateTime?
+  updatedAt   DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([userId, artistId])
+  @@index([userId, score])
+  @@index([artistId])
+}
+
+model GenreAffinity {
+  userId    String
+  genre     String
+  score     Float    @default(0)
+  plays     Int      @default(0)
+  skips     Int      @default(0)
+  updatedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, genre])
+  @@index([userId, score])
+}
+
+// Explicit, deliberate feedback — worth far more than an implicit play signal.
+// kind: "love" | "ban" | "more" | "less"
+// target: "track" | "artist" | "genre"
+model TasteFeedback {
+  id        String   @id @default(uuid())
+  userId    String
+  target    String
+  targetId  String              // trackId / artistId / genre string
+  kind      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, target, targetId])
+  @@index([userId])
 }
 
 // ── User Mixes ("Made for you" / Discover Weekly etc.) ──────────────────────
@@ -239,10 +342,15 @@ model ListeningHistory {
 model UserMix {
   id          String   @id @default(uuid())
   userId      String
+  kind        String   @default("generic") // "daily" | "discover" | "repeat" | "timeofday" | "deepcuts" | "throwback" | "artist" | "genre"
+  slot        Int      @default(0)         // stable ordering within a kind (Daily Mix 1/2/3)
   label       String                // e.g. "Discover Weekly", "Daily Mix 1"
+  subtitle    String?               // "Burna Boy, Wizkid, Asake and more"
   description String?
   coverUrl    String?
+  coverUrls   String[]              // up to 4 covers for a mosaic tile
   tint        String   @default("a") // "a" | "b" — gradient variant
+  seedGenres  String[]
   trackIds    String[]               // ordered list of track IDs
   generatedAt DateTime @default(now())
   expiresAt   DateTime
@@ -251,6 +359,7 @@ model UserMix {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([userId, kind, slot])
 }
 
 // ── System Playlists (Top 50 Global, Nigeria, Africa, etc.) ──────────────────

@@ -51,17 +51,32 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
-      data: {
-        username,
-        email,
-        passwordHash,
-        settings: {
-          create: {},
+    // The findFirst check above is a fast path for a friendly error message,
+    // not the actual guarantee — two simultaneous signups with the same
+    // username both pass it. The unique constraint is what really enforces
+    // this, so translate its violation into the same 409 rather than a 500.
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          username,
+          email,
+          passwordHash,
+          settings: {
+            create: {},
+          },
         },
-      },
-      select: { id: true, username: true, email: true },
-    });
+        select: { id: true, username: true, email: true },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        const field = Array.isArray(err.meta?.target) && err.meta.target.includes("email")
+          ? "Email"
+          : "Username";
+        return NextResponse.json({ error: `${field} is already taken` }, { status: 409 });
+      }
+      throw err;
+    }
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {

@@ -56,6 +56,12 @@ export const TTL = {
   TRACKS: 60,          // 60 s
   ARTISTS: 60,         // 60 s
   ALBUMS: 60,          // 60 s
-  HOME: 30,            // 30 s  — aggregated home feed
+  HOME: 5 * 60,        // 5 min — home aggregates eight queries plus precomputed
+                       //         mixes that regenerate every few days. At 30s
+                       //         nearly every visit paid full cost for
+                       //         unchanged data. Everything that should bust
+                       //         it does so explicitly: liking a track,
+                       //         editing a playlist, and regenerating mixes
+                       //         all call cacheDel / invalidateTasteCaches.
   LIBRARY: 30,         // 30 s  — aggregated library
 } as const;

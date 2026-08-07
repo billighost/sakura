@@ -24,6 +24,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Not liked" }, { status: 404 });
   }
 
-  await cacheDel(cacheKey("favorites", userId));
+  await cacheDel(cacheKey("favorites", userId), cacheKey("home", userId));
   return NextResponse.json({ liked: false });
 }

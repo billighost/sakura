@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { useDownloadAll } from "@/lib/useDownloadAll";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -45,6 +46,7 @@ export default function LikedPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [allDownloaded, setAllDownloaded] = useState(false);
   const { play, addToDownloadQueue, downloadStates } = usePlayer();
+  const { downloadAll, checking: downloading } = useDownloadAll();
   const hasLoadedFromCache = useRef(false);
 
   useEffect(() => {
@@ -168,17 +170,18 @@ export default function LikedPage() {
   }
 
   async function handleDownloadAll() {
-    const tracksToDownload = tracks.map(track => ({
-      id: track.id,
-      title: track.title,
-      artist: track.artist.name,
-      album: track.album?.title,
-      coverUrl: track.coverUrl || track.album?.coverUrl,
-      audioUrl: track.audioUrl,
-      duration: track.duration,
-    }));
-
-    addToDownloadQueue(tracksToDownload);
+    await downloadAll(
+      tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist.name,
+        album: track.album?.title,
+        coverUrl: track.coverUrl || track.album?.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+      })),
+      "liked songs"
+    );
   }
 
   const sortLabels: Record<SortKey, string> = {

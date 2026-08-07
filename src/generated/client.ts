@@ -112,6 +112,26 @@ export type SnoozedTrack = Prisma.SnoozedTrackModel
  */
 export type ListeningHistory = Prisma.ListeningHistoryModel
 /**
+ * Model TasteProfile
+ * 
+ */
+export type TasteProfile = Prisma.TasteProfileModel
+/**
+ * Model ArtistAffinity
+ * 
+ */
+export type ArtistAffinity = Prisma.ArtistAffinityModel
+/**
+ * Model GenreAffinity
+ * 
+ */
+export type GenreAffinity = Prisma.GenreAffinityModel
+/**
+ * Model TasteFeedback
+ * 
+ */
+export type TasteFeedback = Prisma.TasteFeedbackModel
+/**
  * Model UserMix
  * 
  */

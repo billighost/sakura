@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, execute } from "@/lib/sql";
+import { queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 
+/**
+ * Resolve a track to its playable URL.
+ *
+ * This deliberately does *not* write listening history. It used to insert a
+ * ListeningHistory row per request, which made every stream open look like a
+ * completed play — the audio element hits this endpoint on load, on seek, and
+ * on range requests, so a single song could log a dozen "plays" while a song
+ * someone skipped instantly logged exactly as strong a signal as one they
+ * loved. Real play data now comes from the client via /api/signals, which
+ * knows how long the audio was actually audible.
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ trackId: string }> }
@@ -22,10 +33,9 @@ export async function GET(
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  execute(
-    `INSERT INTO "ListeningHistory" ("userId", "trackId") VALUES ($1, $2)`,
-    [session.user.id!, trackId]
-  ).catch(() => {});
+  if (!track.audioUrl || track.audioUrl === "pending") {
+    return NextResponse.json({ error: "Track has no audio yet" }, { status: 409 });
+  }
 
   return NextResponse.redirect(track.audioUrl);
 }

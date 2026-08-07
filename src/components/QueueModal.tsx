@@ -33,6 +33,8 @@ interface QueueModalProps {
   onGoToQueueItem: (absoluteIndex: number) => void;
   onRemoveFromUpNext: (trackId: string) => void;
   onRemoveTrack: (trackId: string) => void;
+  /** Whether the taste radio is refilling this queue. */
+  radioActive?: boolean;
 }
 
 /**
@@ -58,6 +60,7 @@ export function QueueModal({
   onGoToQueueItem,
   onRemoveFromUpNext,
   onRemoveTrack,
+  radioActive = false,
 }: QueueModalProps) {
   return (
     <div className={`${styles.overlay} ${open ? styles.open : ""}`} aria-hidden={!open}>
@@ -202,7 +205,20 @@ export function QueueModal({
           )}
 
           {upNextQueue.length === 0 && tailQueue.length === 0 && (
-            <div className={styles.emptyState}>Nothing queued next. Add songs to keep the music going.</div>
+            <div className={styles.emptyState}>
+              {radioActive
+                ? "Nothing queued — we'll keep playing music that fits your taste."
+                : "Nothing queued next. Add songs to keep the music going."}
+            </div>
+          )}
+
+          {/* When the radio is filling the queue, say so. Otherwise tracks
+              appear out of nowhere and it reads as a bug rather than a feature. */}
+          {radioActive && (upNextQueue.length > 0 || tailQueue.length > 0) && (
+            <div className={styles.radioNote}>
+              <span className={styles.radioDot} aria-hidden="true" />
+              Autoplay is on — more like this will keep coming.
+            </div>
           )}
         </div>
       </div>

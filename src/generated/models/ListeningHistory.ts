@@ -20,8 +20,24 @@ export type ListeningHistoryModel = runtime.Types.Result.DefaultSelection<Prisma
 
 export type AggregateListeningHistory = {
   _count: ListeningHistoryCountAggregateOutputType | null
+  _avg: ListeningHistoryAvgAggregateOutputType | null
+  _sum: ListeningHistorySumAggregateOutputType | null
   _min: ListeningHistoryMinAggregateOutputType | null
   _max: ListeningHistoryMaxAggregateOutputType | null
+}
+
+export type ListeningHistoryAvgAggregateOutputType = {
+  msPlayed: number | null
+  skipAtMs: number | null
+  hourOfDay: number | null
+  dayOfWeek: number | null
+}
+
+export type ListeningHistorySumAggregateOutputType = {
+  msPlayed: number | null
+  skipAtMs: number | null
+  hourOfDay: number | null
+  dayOfWeek: number | null
 }
 
 export type ListeningHistoryMinAggregateOutputType = {
@@ -30,6 +46,14 @@ export type ListeningHistoryMinAggregateOutputType = {
   trackId: string | null
   playedAt: Date | null
   skipped: boolean | null
+  msPlayed: number | null
+  completed: boolean | null
+  skipAtMs: number | null
+  context: string | null
+  contextId: string | null
+  autoplay: boolean | null
+  hourOfDay: number | null
+  dayOfWeek: number | null
 }
 
 export type ListeningHistoryMaxAggregateOutputType = {
@@ -38,6 +62,14 @@ export type ListeningHistoryMaxAggregateOutputType = {
   trackId: string | null
   playedAt: Date | null
   skipped: boolean | null
+  msPlayed: number | null
+  completed: boolean | null
+  skipAtMs: number | null
+  context: string | null
+  contextId: string | null
+  autoplay: boolean | null
+  hourOfDay: number | null
+  dayOfWeek: number | null
 }
 
 export type ListeningHistoryCountAggregateOutputType = {
@@ -46,9 +78,31 @@ export type ListeningHistoryCountAggregateOutputType = {
   trackId: number
   playedAt: number
   skipped: number
+  msPlayed: number
+  completed: number
+  skipAtMs: number
+  context: number
+  contextId: number
+  autoplay: number
+  hourOfDay: number
+  dayOfWeek: number
   _all: number
 }
 
+
+export type ListeningHistoryAvgAggregateInputType = {
+  msPlayed?: true
+  skipAtMs?: true
+  hourOfDay?: true
+  dayOfWeek?: true
+}
+
+export type ListeningHistorySumAggregateInputType = {
+  msPlayed?: true
+  skipAtMs?: true
+  hourOfDay?: true
+  dayOfWeek?: true
+}
 
 export type ListeningHistoryMinAggregateInputType = {
   id?: true
@@ -56,6 +110,14 @@ export type ListeningHistoryMinAggregateInputType = {
   trackId?: true
   playedAt?: true
   skipped?: true
+  msPlayed?: true
+  completed?: true
+  skipAtMs?: true
+  context?: true
+  contextId?: true
+  autoplay?: true
+  hourOfDay?: true
+  dayOfWeek?: true
 }
 
 export type ListeningHistoryMaxAggregateInputType = {
@@ -64,6 +126,14 @@ export type ListeningHistoryMaxAggregateInputType = {
   trackId?: true
   playedAt?: true
   skipped?: true
+  msPlayed?: true
+  completed?: true
+  skipAtMs?: true
+  context?: true
+  contextId?: true
+  autoplay?: true
+  hourOfDay?: true
+  dayOfWeek?: true
 }
 
 export type ListeningHistoryCountAggregateInputType = {
@@ -72,6 +142,14 @@ export type ListeningHistoryCountAggregateInputType = {
   trackId?: true
   playedAt?: true
   skipped?: true
+  msPlayed?: true
+  completed?: true
+  skipAtMs?: true
+  context?: true
+  contextId?: true
+  autoplay?: true
+  hourOfDay?: true
+  dayOfWeek?: true
   _all?: true
 }
 
@@ -113,6 +191,18 @@ export type ListeningHistoryAggregateArgs<ExtArgs extends runtime.Types.Extensio
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: ListeningHistoryAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: ListeningHistorySumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: ListeningHistoryMinAggregateInputType
@@ -143,6 +233,8 @@ export type ListeningHistoryGroupByArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   _count?: ListeningHistoryCountAggregateInputType | true
+  _avg?: ListeningHistoryAvgAggregateInputType
+  _sum?: ListeningHistorySumAggregateInputType
   _min?: ListeningHistoryMinAggregateInputType
   _max?: ListeningHistoryMaxAggregateInputType
 }
@@ -153,7 +245,17 @@ export type ListeningHistoryGroupByOutputType = {
   trackId: string
   playedAt: Date
   skipped: boolean
+  msPlayed: number
+  completed: boolean
+  skipAtMs: number | null
+  context: string | null
+  contextId: string | null
+  autoplay: boolean
+  hourOfDay: number | null
+  dayOfWeek: number | null
   _count: ListeningHistoryCountAggregateOutputType | null
+  _avg: ListeningHistoryAvgAggregateOutputType | null
+  _sum: ListeningHistorySumAggregateOutputType | null
   _min: ListeningHistoryMinAggregateOutputType | null
   _max: ListeningHistoryMaxAggregateOutputType | null
 }
@@ -182,6 +284,14 @@ export type ListeningHistoryWhereInput = {
   trackId?: Prisma.StringFilter<"ListeningHistory"> | string
   playedAt?: Prisma.DateTimeFilter<"ListeningHistory"> | Date | string
   skipped?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  msPlayed?: Prisma.IntFilter<"ListeningHistory"> | number
+  completed?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  skipAtMs?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  context?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  contextId?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  autoplay?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  hourOfDay?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  dayOfWeek?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   track?: Prisma.XOR<Prisma.TrackScalarRelationFilter, Prisma.TrackWhereInput>
 }
@@ -192,6 +302,14 @@ export type ListeningHistoryOrderByWithRelationInput = {
   trackId?: Prisma.SortOrder
   playedAt?: Prisma.SortOrder
   skipped?: Prisma.SortOrder
+  msPlayed?: Prisma.SortOrder
+  completed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrderInput | Prisma.SortOrder
+  context?: Prisma.SortOrderInput | Prisma.SortOrder
+  contextId?: Prisma.SortOrderInput | Prisma.SortOrder
+  autoplay?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrderInput | Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrderInput | Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
   track?: Prisma.TrackOrderByWithRelationInput
 }
@@ -205,6 +323,14 @@ export type ListeningHistoryWhereUniqueInput = Prisma.AtLeast<{
   trackId?: Prisma.StringFilter<"ListeningHistory"> | string
   playedAt?: Prisma.DateTimeFilter<"ListeningHistory"> | Date | string
   skipped?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  msPlayed?: Prisma.IntFilter<"ListeningHistory"> | number
+  completed?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  skipAtMs?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  context?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  contextId?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  autoplay?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  hourOfDay?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  dayOfWeek?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   track?: Prisma.XOR<Prisma.TrackScalarRelationFilter, Prisma.TrackWhereInput>
 }, "id">
@@ -215,9 +341,19 @@ export type ListeningHistoryOrderByWithAggregationInput = {
   trackId?: Prisma.SortOrder
   playedAt?: Prisma.SortOrder
   skipped?: Prisma.SortOrder
+  msPlayed?: Prisma.SortOrder
+  completed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrderInput | Prisma.SortOrder
+  context?: Prisma.SortOrderInput | Prisma.SortOrder
+  contextId?: Prisma.SortOrderInput | Prisma.SortOrder
+  autoplay?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrderInput | Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ListeningHistoryCountOrderByAggregateInput
+  _avg?: Prisma.ListeningHistoryAvgOrderByAggregateInput
   _max?: Prisma.ListeningHistoryMaxOrderByAggregateInput
   _min?: Prisma.ListeningHistoryMinOrderByAggregateInput
+  _sum?: Prisma.ListeningHistorySumOrderByAggregateInput
 }
 
 export type ListeningHistoryScalarWhereWithAggregatesInput = {
@@ -229,12 +365,28 @@ export type ListeningHistoryScalarWhereWithAggregatesInput = {
   trackId?: Prisma.StringWithAggregatesFilter<"ListeningHistory"> | string
   playedAt?: Prisma.DateTimeWithAggregatesFilter<"ListeningHistory"> | Date | string
   skipped?: Prisma.BoolWithAggregatesFilter<"ListeningHistory"> | boolean
+  msPlayed?: Prisma.IntWithAggregatesFilter<"ListeningHistory"> | number
+  completed?: Prisma.BoolWithAggregatesFilter<"ListeningHistory"> | boolean
+  skipAtMs?: Prisma.IntNullableWithAggregatesFilter<"ListeningHistory"> | number | null
+  context?: Prisma.StringNullableWithAggregatesFilter<"ListeningHistory"> | string | null
+  contextId?: Prisma.StringNullableWithAggregatesFilter<"ListeningHistory"> | string | null
+  autoplay?: Prisma.BoolWithAggregatesFilter<"ListeningHistory"> | boolean
+  hourOfDay?: Prisma.IntNullableWithAggregatesFilter<"ListeningHistory"> | number | null
+  dayOfWeek?: Prisma.IntNullableWithAggregatesFilter<"ListeningHistory"> | number | null
 }
 
 export type ListeningHistoryCreateInput = {
   id?: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
   user: Prisma.UserCreateNestedOneWithoutListeningHistoryInput
   track: Prisma.TrackCreateNestedOneWithoutListeningHistoryInput
 }
@@ -245,12 +397,28 @@ export type ListeningHistoryUncheckedCreateInput = {
   trackId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   user?: Prisma.UserUpdateOneRequiredWithoutListeningHistoryNestedInput
   track?: Prisma.TrackUpdateOneRequiredWithoutListeningHistoryNestedInput
 }
@@ -261,6 +429,14 @@ export type ListeningHistoryUncheckedUpdateInput = {
   trackId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryCreateManyInput = {
@@ -269,12 +445,28 @@ export type ListeningHistoryCreateManyInput = {
   trackId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryUncheckedUpdateManyInput = {
@@ -283,6 +475,14 @@ export type ListeningHistoryUncheckedUpdateManyInput = {
   trackId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryListRelationFilter = {
@@ -301,6 +501,21 @@ export type ListeningHistoryCountOrderByAggregateInput = {
   trackId?: Prisma.SortOrder
   playedAt?: Prisma.SortOrder
   skipped?: Prisma.SortOrder
+  msPlayed?: Prisma.SortOrder
+  completed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrder
+  context?: Prisma.SortOrder
+  contextId?: Prisma.SortOrder
+  autoplay?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrder
+}
+
+export type ListeningHistoryAvgOrderByAggregateInput = {
+  msPlayed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrder
 }
 
 export type ListeningHistoryMaxOrderByAggregateInput = {
@@ -309,6 +524,14 @@ export type ListeningHistoryMaxOrderByAggregateInput = {
   trackId?: Prisma.SortOrder
   playedAt?: Prisma.SortOrder
   skipped?: Prisma.SortOrder
+  msPlayed?: Prisma.SortOrder
+  completed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrder
+  context?: Prisma.SortOrder
+  contextId?: Prisma.SortOrder
+  autoplay?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrder
 }
 
 export type ListeningHistoryMinOrderByAggregateInput = {
@@ -317,6 +540,21 @@ export type ListeningHistoryMinOrderByAggregateInput = {
   trackId?: Prisma.SortOrder
   playedAt?: Prisma.SortOrder
   skipped?: Prisma.SortOrder
+  msPlayed?: Prisma.SortOrder
+  completed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrder
+  context?: Prisma.SortOrder
+  contextId?: Prisma.SortOrder
+  autoplay?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrder
+}
+
+export type ListeningHistorySumOrderByAggregateInput = {
+  msPlayed?: Prisma.SortOrder
+  skipAtMs?: Prisma.SortOrder
+  hourOfDay?: Prisma.SortOrder
+  dayOfWeek?: Prisma.SortOrder
 }
 
 export type ListeningHistoryCreateNestedManyWithoutUserInput = {
@@ -407,6 +645,14 @@ export type ListeningHistoryCreateWithoutUserInput = {
   id?: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
   track: Prisma.TrackCreateNestedOneWithoutListeningHistoryInput
 }
 
@@ -415,6 +661,14 @@ export type ListeningHistoryUncheckedCreateWithoutUserInput = {
   trackId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryCreateOrConnectWithoutUserInput = {
@@ -452,12 +706,28 @@ export type ListeningHistoryScalarWhereInput = {
   trackId?: Prisma.StringFilter<"ListeningHistory"> | string
   playedAt?: Prisma.DateTimeFilter<"ListeningHistory"> | Date | string
   skipped?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  msPlayed?: Prisma.IntFilter<"ListeningHistory"> | number
+  completed?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  skipAtMs?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  context?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  contextId?: Prisma.StringNullableFilter<"ListeningHistory"> | string | null
+  autoplay?: Prisma.BoolFilter<"ListeningHistory"> | boolean
+  hourOfDay?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
+  dayOfWeek?: Prisma.IntNullableFilter<"ListeningHistory"> | number | null
 }
 
 export type ListeningHistoryCreateWithoutTrackInput = {
   id?: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
   user: Prisma.UserCreateNestedOneWithoutListeningHistoryInput
 }
 
@@ -466,6 +736,14 @@ export type ListeningHistoryUncheckedCreateWithoutTrackInput = {
   userId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryCreateOrConnectWithoutTrackInput = {
@@ -499,12 +777,28 @@ export type ListeningHistoryCreateManyUserInput = {
   trackId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   track?: Prisma.TrackUpdateOneRequiredWithoutListeningHistoryNestedInput
 }
 
@@ -513,6 +807,14 @@ export type ListeningHistoryUncheckedUpdateWithoutUserInput = {
   trackId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryUncheckedUpdateManyWithoutUserInput = {
@@ -520,6 +822,14 @@ export type ListeningHistoryUncheckedUpdateManyWithoutUserInput = {
   trackId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryCreateManyTrackInput = {
@@ -527,12 +837,28 @@ export type ListeningHistoryCreateManyTrackInput = {
   userId: string
   playedAt?: Date | string
   skipped?: boolean
+  msPlayed?: number
+  completed?: boolean
+  skipAtMs?: number | null
+  context?: string | null
+  contextId?: string | null
+  autoplay?: boolean
+  hourOfDay?: number | null
+  dayOfWeek?: number | null
 }
 
 export type ListeningHistoryUpdateWithoutTrackInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   user?: Prisma.UserUpdateOneRequiredWithoutListeningHistoryNestedInput
 }
 
@@ -541,6 +867,14 @@ export type ListeningHistoryUncheckedUpdateWithoutTrackInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ListeningHistoryUncheckedUpdateManyWithoutTrackInput = {
@@ -548,6 +882,14 @@ export type ListeningHistoryUncheckedUpdateManyWithoutTrackInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   playedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   skipped?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  msPlayed?: Prisma.IntFieldUpdateOperationsInput | number
+  completed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  skipAtMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  context?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contextId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoplay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  hourOfDay?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  dayOfWeek?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 
@@ -558,6 +900,14 @@ export type ListeningHistorySelect<ExtArgs extends runtime.Types.Extensions.Inte
   trackId?: boolean
   playedAt?: boolean
   skipped?: boolean
+  msPlayed?: boolean
+  completed?: boolean
+  skipAtMs?: boolean
+  context?: boolean
+  contextId?: boolean
+  autoplay?: boolean
+  hourOfDay?: boolean
+  dayOfWeek?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   track?: boolean | Prisma.TrackDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["listeningHistory"]>
@@ -568,6 +918,14 @@ export type ListeningHistorySelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   trackId?: boolean
   playedAt?: boolean
   skipped?: boolean
+  msPlayed?: boolean
+  completed?: boolean
+  skipAtMs?: boolean
+  context?: boolean
+  contextId?: boolean
+  autoplay?: boolean
+  hourOfDay?: boolean
+  dayOfWeek?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   track?: boolean | Prisma.TrackDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["listeningHistory"]>
@@ -578,6 +936,14 @@ export type ListeningHistorySelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   trackId?: boolean
   playedAt?: boolean
   skipped?: boolean
+  msPlayed?: boolean
+  completed?: boolean
+  skipAtMs?: boolean
+  context?: boolean
+  contextId?: boolean
+  autoplay?: boolean
+  hourOfDay?: boolean
+  dayOfWeek?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   track?: boolean | Prisma.TrackDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["listeningHistory"]>
@@ -588,9 +954,17 @@ export type ListeningHistorySelectScalar = {
   trackId?: boolean
   playedAt?: boolean
   skipped?: boolean
+  msPlayed?: boolean
+  completed?: boolean
+  skipAtMs?: boolean
+  context?: boolean
+  contextId?: boolean
+  autoplay?: boolean
+  hourOfDay?: boolean
+  dayOfWeek?: boolean
 }
 
-export type ListeningHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "trackId" | "playedAt" | "skipped", ExtArgs["result"]["listeningHistory"]>
+export type ListeningHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "trackId" | "playedAt" | "skipped" | "msPlayed" | "completed" | "skipAtMs" | "context" | "contextId" | "autoplay" | "hourOfDay" | "dayOfWeek", ExtArgs["result"]["listeningHistory"]>
 export type ListeningHistoryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   track?: boolean | Prisma.TrackDefaultArgs<ExtArgs>
@@ -616,6 +990,14 @@ export type $ListeningHistoryPayload<ExtArgs extends runtime.Types.Extensions.In
     trackId: string
     playedAt: Date
     skipped: boolean
+    msPlayed: number
+    completed: boolean
+    skipAtMs: number | null
+    context: string | null
+    contextId: string | null
+    autoplay: boolean
+    hourOfDay: number | null
+    dayOfWeek: number | null
   }, ExtArgs["result"]["listeningHistory"]>
   composites: {}
 }
@@ -1046,6 +1428,14 @@ export interface ListeningHistoryFieldRefs {
   readonly trackId: Prisma.FieldRef<"ListeningHistory", 'String'>
   readonly playedAt: Prisma.FieldRef<"ListeningHistory", 'DateTime'>
   readonly skipped: Prisma.FieldRef<"ListeningHistory", 'Boolean'>
+  readonly msPlayed: Prisma.FieldRef<"ListeningHistory", 'Int'>
+  readonly completed: Prisma.FieldRef<"ListeningHistory", 'Boolean'>
+  readonly skipAtMs: Prisma.FieldRef<"ListeningHistory", 'Int'>
+  readonly context: Prisma.FieldRef<"ListeningHistory", 'String'>
+  readonly contextId: Prisma.FieldRef<"ListeningHistory", 'String'>
+  readonly autoplay: Prisma.FieldRef<"ListeningHistory", 'Boolean'>
+  readonly hourOfDay: Prisma.FieldRef<"ListeningHistory", 'Int'>
+  readonly dayOfWeek: Prisma.FieldRef<"ListeningHistory", 'Int'>
 }
     
 

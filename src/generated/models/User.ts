@@ -205,6 +205,10 @@ export type UserWhereInput = {
   snoozedTracks?: Prisma.SnoozedTrackListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
   mixes?: Prisma.UserMixListRelationFilter
+  tasteProfile?: Prisma.XOR<Prisma.TasteProfileNullableScalarRelationFilter, Prisma.TasteProfileWhereInput> | null
+  artistAffinities?: Prisma.ArtistAffinityListRelationFilter
+  genreAffinities?: Prisma.GenreAffinityListRelationFilter
+  tasteFeedback?: Prisma.TasteFeedbackListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -222,6 +226,10 @@ export type UserOrderByWithRelationInput = {
   snoozedTracks?: Prisma.SnoozedTrackOrderByRelationAggregateInput
   listeningHistory?: Prisma.ListeningHistoryOrderByRelationAggregateInput
   mixes?: Prisma.UserMixOrderByRelationAggregateInput
+  tasteProfile?: Prisma.TasteProfileOrderByWithRelationInput
+  artistAffinities?: Prisma.ArtistAffinityOrderByRelationAggregateInput
+  genreAffinities?: Prisma.GenreAffinityOrderByRelationAggregateInput
+  tasteFeedback?: Prisma.TasteFeedbackOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -242,6 +250,10 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   snoozedTracks?: Prisma.SnoozedTrackListRelationFilter
   listeningHistory?: Prisma.ListeningHistoryListRelationFilter
   mixes?: Prisma.UserMixListRelationFilter
+  tasteProfile?: Prisma.XOR<Prisma.TasteProfileNullableScalarRelationFilter, Prisma.TasteProfileWhereInput> | null
+  artistAffinities?: Prisma.ArtistAffinityListRelationFilter
+  genreAffinities?: Prisma.GenreAffinityListRelationFilter
+  tasteFeedback?: Prisma.TasteFeedbackListRelationFilter
 }, "id" | "username" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -285,6 +297,10 @@ export type UserCreateInput = {
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -302,6 +318,10 @@ export type UserUncheckedCreateInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -319,6 +339,10 @@ export type UserUpdateInput = {
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -336,6 +360,10 @@ export type UserUncheckedUpdateInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -499,6 +527,62 @@ export type UserUpdateOneRequiredWithoutListeningHistoryNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutListeningHistoryInput, Prisma.UserUpdateWithoutListeningHistoryInput>, Prisma.UserUncheckedUpdateWithoutListeningHistoryInput>
 }
 
+export type UserCreateNestedOneWithoutTasteProfileInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasteProfileInput, Prisma.UserUncheckedCreateWithoutTasteProfileInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasteProfileInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutTasteProfileNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasteProfileInput, Prisma.UserUncheckedCreateWithoutTasteProfileInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasteProfileInput
+  upsert?: Prisma.UserUpsertWithoutTasteProfileInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTasteProfileInput, Prisma.UserUpdateWithoutTasteProfileInput>, Prisma.UserUncheckedUpdateWithoutTasteProfileInput>
+}
+
+export type UserCreateNestedOneWithoutArtistAffinitiesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutArtistAffinitiesInput, Prisma.UserUncheckedCreateWithoutArtistAffinitiesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutArtistAffinitiesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutArtistAffinitiesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutArtistAffinitiesInput, Prisma.UserUncheckedCreateWithoutArtistAffinitiesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutArtistAffinitiesInput
+  upsert?: Prisma.UserUpsertWithoutArtistAffinitiesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutArtistAffinitiesInput, Prisma.UserUpdateWithoutArtistAffinitiesInput>, Prisma.UserUncheckedUpdateWithoutArtistAffinitiesInput>
+}
+
+export type UserCreateNestedOneWithoutGenreAffinitiesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGenreAffinitiesInput, Prisma.UserUncheckedCreateWithoutGenreAffinitiesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGenreAffinitiesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutGenreAffinitiesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGenreAffinitiesInput, Prisma.UserUncheckedCreateWithoutGenreAffinitiesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGenreAffinitiesInput
+  upsert?: Prisma.UserUpsertWithoutGenreAffinitiesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutGenreAffinitiesInput, Prisma.UserUpdateWithoutGenreAffinitiesInput>, Prisma.UserUncheckedUpdateWithoutGenreAffinitiesInput>
+}
+
+export type UserCreateNestedOneWithoutTasteFeedbackInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasteFeedbackInput, Prisma.UserUncheckedCreateWithoutTasteFeedbackInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasteFeedbackInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutTasteFeedbackNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTasteFeedbackInput, Prisma.UserUncheckedCreateWithoutTasteFeedbackInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTasteFeedbackInput
+  upsert?: Prisma.UserUpsertWithoutTasteFeedbackInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTasteFeedbackInput, Prisma.UserUpdateWithoutTasteFeedbackInput>, Prisma.UserUncheckedUpdateWithoutTasteFeedbackInput>
+}
+
 export type UserCreateNestedOneWithoutMixesInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutMixesInput, Prisma.UserUncheckedCreateWithoutMixesInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutMixesInput
@@ -527,6 +611,10 @@ export type UserCreateWithoutSettingsInput = {
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSettingsInput = {
@@ -543,6 +631,10 @@ export type UserUncheckedCreateWithoutSettingsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSettingsInput = {
@@ -575,6 +667,10 @@ export type UserUpdateWithoutSettingsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSettingsInput = {
@@ -591,6 +687,10 @@ export type UserUncheckedUpdateWithoutSettingsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPlaylistsInput = {
@@ -607,6 +707,10 @@ export type UserCreateWithoutPlaylistsInput = {
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPlaylistsInput = {
@@ -623,6 +727,10 @@ export type UserUncheckedCreateWithoutPlaylistsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPlaylistsInput = {
@@ -655,6 +763,10 @@ export type UserUpdateWithoutPlaylistsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPlaylistsInput = {
@@ -671,6 +783,10 @@ export type UserUncheckedUpdateWithoutPlaylistsInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPlaylistFoldersInput = {
@@ -687,6 +803,10 @@ export type UserCreateWithoutPlaylistFoldersInput = {
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPlaylistFoldersInput = {
@@ -703,6 +823,10 @@ export type UserUncheckedCreateWithoutPlaylistFoldersInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPlaylistFoldersInput = {
@@ -735,6 +859,10 @@ export type UserUpdateWithoutPlaylistFoldersInput = {
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPlaylistFoldersInput = {
@@ -751,6 +879,10 @@ export type UserUncheckedUpdateWithoutPlaylistFoldersInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFavoritesInput = {
@@ -767,6 +899,10 @@ export type UserCreateWithoutFavoritesInput = {
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFavoritesInput = {
@@ -783,6 +919,10 @@ export type UserUncheckedCreateWithoutFavoritesInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFavoritesInput = {
@@ -815,6 +955,10 @@ export type UserUpdateWithoutFavoritesInput = {
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFavoritesInput = {
@@ -831,6 +975,10 @@ export type UserUncheckedUpdateWithoutFavoritesInput = {
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSnoozedTracksInput = {
@@ -847,6 +995,10 @@ export type UserCreateWithoutSnoozedTracksInput = {
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSnoozedTracksInput = {
@@ -863,6 +1015,10 @@ export type UserUncheckedCreateWithoutSnoozedTracksInput = {
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSnoozedTracksInput = {
@@ -895,6 +1051,10 @@ export type UserUpdateWithoutSnoozedTracksInput = {
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSnoozedTracksInput = {
@@ -911,6 +1071,10 @@ export type UserUncheckedUpdateWithoutSnoozedTracksInput = {
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutListeningHistoryInput = {
@@ -927,6 +1091,10 @@ export type UserCreateWithoutListeningHistoryInput = {
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutListeningHistoryInput = {
@@ -943,6 +1111,10 @@ export type UserUncheckedCreateWithoutListeningHistoryInput = {
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutListeningHistoryInput = {
@@ -975,6 +1147,10 @@ export type UserUpdateWithoutListeningHistoryInput = {
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutListeningHistoryInput = {
@@ -991,6 +1167,394 @@ export type UserUncheckedUpdateWithoutListeningHistoryInput = {
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutTasteProfileInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutTasteProfileInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutTasteProfileInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasteProfileInput, Prisma.UserUncheckedCreateWithoutTasteProfileInput>
+}
+
+export type UserUpsertWithoutTasteProfileInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTasteProfileInput, Prisma.UserUncheckedUpdateWithoutTasteProfileInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasteProfileInput, Prisma.UserUncheckedCreateWithoutTasteProfileInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutTasteProfileInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTasteProfileInput, Prisma.UserUncheckedUpdateWithoutTasteProfileInput>
+}
+
+export type UserUpdateWithoutTasteProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutTasteProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutArtistAffinitiesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutArtistAffinitiesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutArtistAffinitiesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutArtistAffinitiesInput, Prisma.UserUncheckedCreateWithoutArtistAffinitiesInput>
+}
+
+export type UserUpsertWithoutArtistAffinitiesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutArtistAffinitiesInput, Prisma.UserUncheckedUpdateWithoutArtistAffinitiesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutArtistAffinitiesInput, Prisma.UserUncheckedCreateWithoutArtistAffinitiesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutArtistAffinitiesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutArtistAffinitiesInput, Prisma.UserUncheckedUpdateWithoutArtistAffinitiesInput>
+}
+
+export type UserUpdateWithoutArtistAffinitiesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutArtistAffinitiesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutGenreAffinitiesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutGenreAffinitiesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutGenreAffinitiesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutGenreAffinitiesInput, Prisma.UserUncheckedCreateWithoutGenreAffinitiesInput>
+}
+
+export type UserUpsertWithoutGenreAffinitiesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutGenreAffinitiesInput, Prisma.UserUncheckedUpdateWithoutGenreAffinitiesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutGenreAffinitiesInput, Prisma.UserUncheckedCreateWithoutGenreAffinitiesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutGenreAffinitiesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutGenreAffinitiesInput, Prisma.UserUncheckedUpdateWithoutGenreAffinitiesInput>
+}
+
+export type UserUpdateWithoutGenreAffinitiesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutGenreAffinitiesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutTasteFeedbackInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutTasteFeedbackInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutTasteFeedbackInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasteFeedbackInput, Prisma.UserUncheckedCreateWithoutTasteFeedbackInput>
+}
+
+export type UserUpsertWithoutTasteFeedbackInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTasteFeedbackInput, Prisma.UserUncheckedUpdateWithoutTasteFeedbackInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTasteFeedbackInput, Prisma.UserUncheckedCreateWithoutTasteFeedbackInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutTasteFeedbackInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTasteFeedbackInput, Prisma.UserUncheckedUpdateWithoutTasteFeedbackInput>
+}
+
+export type UserUpdateWithoutTasteFeedbackInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutTasteFeedbackInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMixesInput = {
@@ -1007,6 +1571,10 @@ export type UserCreateWithoutMixesInput = {
   favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
   snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMixesInput = {
@@ -1023,6 +1591,10 @@ export type UserUncheckedCreateWithoutMixesInput = {
   favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
   snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMixesInput = {
@@ -1055,6 +1627,10 @@ export type UserUpdateWithoutMixesInput = {
   favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
   snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMixesInput = {
@@ -1071,6 +1647,10 @@ export type UserUncheckedUpdateWithoutMixesInput = {
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
   snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
   listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -1085,6 +1665,9 @@ export type UserCountOutputType = {
   snoozedTracks: number
   listeningHistory: number
   mixes: number
+  artistAffinities: number
+  genreAffinities: number
+  tasteFeedback: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1094,6 +1677,9 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   snoozedTracks?: boolean | UserCountOutputTypeCountSnoozedTracksArgs
   listeningHistory?: boolean | UserCountOutputTypeCountListeningHistoryArgs
   mixes?: boolean | UserCountOutputTypeCountMixesArgs
+  artistAffinities?: boolean | UserCountOutputTypeCountArtistAffinitiesArgs
+  genreAffinities?: boolean | UserCountOutputTypeCountGenreAffinitiesArgs
+  tasteFeedback?: boolean | UserCountOutputTypeCountTasteFeedbackArgs
 }
 
 /**
@@ -1148,6 +1734,27 @@ export type UserCountOutputTypeCountMixesArgs<ExtArgs extends runtime.Types.Exte
   where?: Prisma.UserMixWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountArtistAffinitiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ArtistAffinityWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountGenreAffinitiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.GenreAffinityWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountTasteFeedbackArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TasteFeedbackWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1164,6 +1771,10 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   snoozedTracks?: boolean | Prisma.User$snoozedTracksArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.User$listeningHistoryArgs<ExtArgs>
   mixes?: boolean | Prisma.User$mixesArgs<ExtArgs>
+  tasteProfile?: boolean | Prisma.User$tasteProfileArgs<ExtArgs>
+  artistAffinities?: boolean | Prisma.User$artistAffinitiesArgs<ExtArgs>
+  genreAffinities?: boolean | Prisma.User$genreAffinitiesArgs<ExtArgs>
+  tasteFeedback?: boolean | Prisma.User$tasteFeedbackArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1206,6 +1817,10 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   snoozedTracks?: boolean | Prisma.User$snoozedTracksArgs<ExtArgs>
   listeningHistory?: boolean | Prisma.User$listeningHistoryArgs<ExtArgs>
   mixes?: boolean | Prisma.User$mixesArgs<ExtArgs>
+  tasteProfile?: boolean | Prisma.User$tasteProfileArgs<ExtArgs>
+  artistAffinities?: boolean | Prisma.User$artistAffinitiesArgs<ExtArgs>
+  genreAffinities?: boolean | Prisma.User$genreAffinitiesArgs<ExtArgs>
+  tasteFeedback?: boolean | Prisma.User$tasteFeedbackArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1221,6 +1836,10 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     snoozedTracks: Prisma.$SnoozedTrackPayload<ExtArgs>[]
     listeningHistory: Prisma.$ListeningHistoryPayload<ExtArgs>[]
     mixes: Prisma.$UserMixPayload<ExtArgs>[]
+    tasteProfile: Prisma.$TasteProfilePayload<ExtArgs> | null
+    artistAffinities: Prisma.$ArtistAffinityPayload<ExtArgs>[]
+    genreAffinities: Prisma.$GenreAffinityPayload<ExtArgs>[]
+    tasteFeedback: Prisma.$TasteFeedbackPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1631,6 +2250,10 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   snoozedTracks<T extends Prisma.User$snoozedTracksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$snoozedTracksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SnoozedTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   listeningHistory<T extends Prisma.User$listeningHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$listeningHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListeningHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   mixes<T extends Prisma.User$mixesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$mixesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserMixPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tasteProfile<T extends Prisma.User$tasteProfileArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tasteProfileArgs<ExtArgs>>): Prisma.Prisma__TasteProfileClient<runtime.Types.Result.GetResult<Prisma.$TasteProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  artistAffinities<T extends Prisma.User$artistAffinitiesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$artistAffinitiesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArtistAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  genreAffinities<T extends Prisma.User$genreAffinitiesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$genreAffinitiesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GenreAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tasteFeedback<T extends Prisma.User$tasteFeedbackArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tasteFeedbackArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TasteFeedbackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2220,6 +2843,97 @@ export type User$mixesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
   take?: number
   skip?: number
   distinct?: Prisma.UserMixScalarFieldEnum | Prisma.UserMixScalarFieldEnum[]
+}
+
+/**
+ * User.tasteProfile
+ */
+export type User$tasteProfileArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TasteProfile
+   */
+  select?: Prisma.TasteProfileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TasteProfile
+   */
+  omit?: Prisma.TasteProfileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TasteProfileInclude<ExtArgs> | null
+  where?: Prisma.TasteProfileWhereInput
+}
+
+/**
+ * User.artistAffinities
+ */
+export type User$artistAffinitiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ArtistAffinity
+   */
+  select?: Prisma.ArtistAffinitySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ArtistAffinity
+   */
+  omit?: Prisma.ArtistAffinityOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ArtistAffinityInclude<ExtArgs> | null
+  where?: Prisma.ArtistAffinityWhereInput
+  orderBy?: Prisma.ArtistAffinityOrderByWithRelationInput | Prisma.ArtistAffinityOrderByWithRelationInput[]
+  cursor?: Prisma.ArtistAffinityWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ArtistAffinityScalarFieldEnum | Prisma.ArtistAffinityScalarFieldEnum[]
+}
+
+/**
+ * User.genreAffinities
+ */
+export type User$genreAffinitiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the GenreAffinity
+   */
+  select?: Prisma.GenreAffinitySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the GenreAffinity
+   */
+  omit?: Prisma.GenreAffinityOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.GenreAffinityInclude<ExtArgs> | null
+  where?: Prisma.GenreAffinityWhereInput
+  orderBy?: Prisma.GenreAffinityOrderByWithRelationInput | Prisma.GenreAffinityOrderByWithRelationInput[]
+  cursor?: Prisma.GenreAffinityWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.GenreAffinityScalarFieldEnum | Prisma.GenreAffinityScalarFieldEnum[]
+}
+
+/**
+ * User.tasteFeedback
+ */
+export type User$tasteFeedbackArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TasteFeedback
+   */
+  select?: Prisma.TasteFeedbackSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TasteFeedback
+   */
+  omit?: Prisma.TasteFeedbackOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TasteFeedbackInclude<ExtArgs> | null
+  where?: Prisma.TasteFeedbackWhereInput
+  orderBy?: Prisma.TasteFeedbackOrderByWithRelationInput | Prisma.TasteFeedbackOrderByWithRelationInput[]
+  cursor?: Prisma.TasteFeedbackWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TasteFeedbackScalarFieldEnum | Prisma.TasteFeedbackScalarFieldEnum[]
 }
 
 /**

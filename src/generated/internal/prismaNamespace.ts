@@ -411,6 +411,10 @@ export const ModelName = {
   Favorite: 'Favorite',
   SnoozedTrack: 'SnoozedTrack',
   ListeningHistory: 'ListeningHistory',
+  TasteProfile: 'TasteProfile',
+  ArtistAffinity: 'ArtistAffinity',
+  GenreAffinity: 'GenreAffinity',
+  TasteFeedback: 'TasteFeedback',
   UserMix: 'UserMix',
   SystemPlaylist: 'SystemPlaylist'
 } as const
@@ -428,7 +432,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "userMix" | "systemPlaylist"
+    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1468,6 +1472,302 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TasteProfile: {
+      payload: Prisma.$TasteProfilePayload<ExtArgs>
+      fields: Prisma.TasteProfileFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TasteProfileFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TasteProfileFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        findFirst: {
+          args: Prisma.TasteProfileFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TasteProfileFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        findMany: {
+          args: Prisma.TasteProfileFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>[]
+        }
+        create: {
+          args: Prisma.TasteProfileCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        createMany: {
+          args: Prisma.TasteProfileCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TasteProfileCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>[]
+        }
+        delete: {
+          args: Prisma.TasteProfileDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        update: {
+          args: Prisma.TasteProfileUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        deleteMany: {
+          args: Prisma.TasteProfileDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TasteProfileUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TasteProfileUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>[]
+        }
+        upsert: {
+          args: Prisma.TasteProfileUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteProfilePayload>
+        }
+        aggregate: {
+          args: Prisma.TasteProfileAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTasteProfile>
+        }
+        groupBy: {
+          args: Prisma.TasteProfileGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TasteProfileGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TasteProfileCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TasteProfileCountAggregateOutputType> | number
+        }
+      }
+    }
+    ArtistAffinity: {
+      payload: Prisma.$ArtistAffinityPayload<ExtArgs>
+      fields: Prisma.ArtistAffinityFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ArtistAffinityFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ArtistAffinityFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        findFirst: {
+          args: Prisma.ArtistAffinityFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ArtistAffinityFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        findMany: {
+          args: Prisma.ArtistAffinityFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>[]
+        }
+        create: {
+          args: Prisma.ArtistAffinityCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        createMany: {
+          args: Prisma.ArtistAffinityCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ArtistAffinityCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>[]
+        }
+        delete: {
+          args: Prisma.ArtistAffinityDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        update: {
+          args: Prisma.ArtistAffinityUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        deleteMany: {
+          args: Prisma.ArtistAffinityDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ArtistAffinityUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ArtistAffinityUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>[]
+        }
+        upsert: {
+          args: Prisma.ArtistAffinityUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ArtistAffinityPayload>
+        }
+        aggregate: {
+          args: Prisma.ArtistAffinityAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateArtistAffinity>
+        }
+        groupBy: {
+          args: Prisma.ArtistAffinityGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArtistAffinityGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ArtistAffinityCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ArtistAffinityCountAggregateOutputType> | number
+        }
+      }
+    }
+    GenreAffinity: {
+      payload: Prisma.$GenreAffinityPayload<ExtArgs>
+      fields: Prisma.GenreAffinityFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GenreAffinityFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GenreAffinityFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        findFirst: {
+          args: Prisma.GenreAffinityFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GenreAffinityFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        findMany: {
+          args: Prisma.GenreAffinityFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>[]
+        }
+        create: {
+          args: Prisma.GenreAffinityCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        createMany: {
+          args: Prisma.GenreAffinityCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GenreAffinityCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>[]
+        }
+        delete: {
+          args: Prisma.GenreAffinityDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        update: {
+          args: Prisma.GenreAffinityUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        deleteMany: {
+          args: Prisma.GenreAffinityDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GenreAffinityUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GenreAffinityUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>[]
+        }
+        upsert: {
+          args: Prisma.GenreAffinityUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GenreAffinityPayload>
+        }
+        aggregate: {
+          args: Prisma.GenreAffinityAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGenreAffinity>
+        }
+        groupBy: {
+          args: Prisma.GenreAffinityGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GenreAffinityGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GenreAffinityCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GenreAffinityCountAggregateOutputType> | number
+        }
+      }
+    }
+    TasteFeedback: {
+      payload: Prisma.$TasteFeedbackPayload<ExtArgs>
+      fields: Prisma.TasteFeedbackFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TasteFeedbackFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TasteFeedbackFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        findFirst: {
+          args: Prisma.TasteFeedbackFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TasteFeedbackFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        findMany: {
+          args: Prisma.TasteFeedbackFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>[]
+        }
+        create: {
+          args: Prisma.TasteFeedbackCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        createMany: {
+          args: Prisma.TasteFeedbackCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TasteFeedbackCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>[]
+        }
+        delete: {
+          args: Prisma.TasteFeedbackDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        update: {
+          args: Prisma.TasteFeedbackUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        deleteMany: {
+          args: Prisma.TasteFeedbackDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TasteFeedbackUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TasteFeedbackUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>[]
+        }
+        upsert: {
+          args: Prisma.TasteFeedbackUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TasteFeedbackPayload>
+        }
+        aggregate: {
+          args: Prisma.TasteFeedbackAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTasteFeedback>
+        }
+        groupBy: {
+          args: Prisma.TasteFeedbackGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TasteFeedbackGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TasteFeedbackCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TasteFeedbackCountAggregateOutputType> | number
+        }
+      }
+    }
     UserMix: {
       payload: Prisma.$UserMixPayload<ExtArgs>
       fields: Prisma.UserMixFieldRefs
@@ -1831,19 +2131,93 @@ export const ListeningHistoryScalarFieldEnum = {
   userId: 'userId',
   trackId: 'trackId',
   playedAt: 'playedAt',
-  skipped: 'skipped'
+  skipped: 'skipped',
+  msPlayed: 'msPlayed',
+  completed: 'completed',
+  skipAtMs: 'skipAtMs',
+  context: 'context',
+  contextId: 'contextId',
+  autoplay: 'autoplay',
+  hourOfDay: 'hourOfDay',
+  dayOfWeek: 'dayOfWeek'
 } as const
 
 export type ListeningHistoryScalarFieldEnum = (typeof ListeningHistoryScalarFieldEnum)[keyof typeof ListeningHistoryScalarFieldEnum]
 
 
+export const TasteProfileScalarFieldEnum = {
+  userId: 'userId',
+  onboarded: 'onboarded',
+  seedArtistIds: 'seedArtistIds',
+  seedGenres: 'seedGenres',
+  seedArtistNames: 'seedArtistNames',
+  topGenres: 'topGenres',
+  topArtistIds: 'topArtistIds',
+  discovery: 'discovery',
+  eraCenter: 'eraCenter',
+  eraSpread: 'eraSpread',
+  avgTrackMs: 'avgTrackMs',
+  skipRate: 'skipRate',
+  totalPlays: 'totalPlays',
+  vector: 'vector',
+  computedAt: 'computedAt',
+  version: 'version'
+} as const
+
+export type TasteProfileScalarFieldEnum = (typeof TasteProfileScalarFieldEnum)[keyof typeof TasteProfileScalarFieldEnum]
+
+
+export const ArtistAffinityScalarFieldEnum = {
+  userId: 'userId',
+  artistId: 'artistId',
+  score: 'score',
+  plays: 'plays',
+  completions: 'completions',
+  skips: 'skips',
+  likes: 'likes',
+  lastPlayedAt: 'lastPlayedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ArtistAffinityScalarFieldEnum = (typeof ArtistAffinityScalarFieldEnum)[keyof typeof ArtistAffinityScalarFieldEnum]
+
+
+export const GenreAffinityScalarFieldEnum = {
+  userId: 'userId',
+  genre: 'genre',
+  score: 'score',
+  plays: 'plays',
+  skips: 'skips',
+  updatedAt: 'updatedAt'
+} as const
+
+export type GenreAffinityScalarFieldEnum = (typeof GenreAffinityScalarFieldEnum)[keyof typeof GenreAffinityScalarFieldEnum]
+
+
+export const TasteFeedbackScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  target: 'target',
+  targetId: 'targetId',
+  kind: 'kind',
+  createdAt: 'createdAt'
+} as const
+
+export type TasteFeedbackScalarFieldEnum = (typeof TasteFeedbackScalarFieldEnum)[keyof typeof TasteFeedbackScalarFieldEnum]
+
+
 export const UserMixScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  kind: 'kind',
+  slot: 'slot',
   label: 'label',
+  subtitle: 'subtitle',
   description: 'description',
   coverUrl: 'coverUrl',
+  coverUrls: 'coverUrls',
   tint: 'tint',
+  seedGenres: 'seedGenres',
   trackIds: 'trackIds',
   generatedAt: 'generatedAt',
   expiresAt: 'expiresAt'
@@ -1874,6 +2248,14 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -1888,6 +2270,15 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -1956,6 +2347,20 @@ export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, '
  * Reference to a field of type 'Float[]'
  */
 export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 /**
@@ -2123,6 +2528,10 @@ export type GlobalOmitConfig = {
   favorite?: Prisma.FavoriteOmit
   snoozedTrack?: Prisma.SnoozedTrackOmit
   listeningHistory?: Prisma.ListeningHistoryOmit
+  tasteProfile?: Prisma.TasteProfileOmit
+  artistAffinity?: Prisma.ArtistAffinityOmit
+  genreAffinity?: Prisma.GenreAffinityOmit
+  tasteFeedback?: Prisma.TasteFeedbackOmit
   userMix?: Prisma.UserMixOmit
   systemPlaylist?: Prisma.SystemPlaylistOmit
 }

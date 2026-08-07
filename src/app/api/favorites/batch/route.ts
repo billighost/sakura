@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     params
   );
 
-  await cacheDel(cacheKey("favorites", userId));
+  await cacheDel(cacheKey("favorites", userId), cacheKey("home", userId));
   return NextResponse.json({ liked: true });
 }
 
@@ -64,6 +64,6 @@ export async function DELETE(req: NextRequest) {
     params
   );
 
-  await cacheDel(cacheKey("favorites", userId));
+  await cacheDel(cacheKey("favorites", userId), cacheKey("home", userId));
   return NextResponse.json({ unliked: true });
 }

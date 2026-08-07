@@ -14,7 +14,10 @@ export async function GET(
 
   const { id } = await params;
   const userId = session.user.id!;
-  const key = cacheKey("mix", id);
+  // Scope the cache key to the user. A mix id is already user-owned, but a
+  // shared key is the kind of thing that silently becomes a data leak the
+  // moment someone adds a lookup by another route.
+  const key = cacheKey("mix", userId, id);
 
   const cached = await cacheGet(key);
   if (cached) {
@@ -34,12 +37,18 @@ export async function GET(
   const tracks = [];
   if (mix.trackIds && mix.trackIds.length > 0) {
     const trackRows = await query(
-      `SELECT t.id, t.title, t.duration, t."audioUrl", t."coverUrl", 
-         json_build_object('name', a.name) as artist, 
-         json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album
-       FROM "Track" t 
-       LEFT JOIN "Artist" a ON t."artistId" = a.id 
-       LEFT JOIN "Album" al ON t."albumId" = al.id 
+      `SELECT t.id, t.title, t.duration, t."audioUrl",
+         COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl",
+         json_build_object('name', COALESCE(a.name, 'Unknown Artist'), 'id', a.id) as artist,
+         -- Without the NULL guard this yields {"title": null} for a track with
+         -- no album, which reads as a real album downstream and renders an
+         -- empty link.
+         CASE WHEN al.id IS NULL THEN NULL
+              ELSE json_build_object('title', al.title, 'coverUrl', al."coverUrl", 'id', al.id)
+         END as album
+       FROM "Track" t
+       LEFT JOIN "Artist" a ON t."artistId" = a.id
+       LEFT JOIN "Album" al ON t."albumId" = al.id
        WHERE t.id = ANY($1::text[])`,
       [mix.trackIds]
     );
@@ -53,12 +62,15 @@ export async function GET(
     }
   }
 
-  const result = { 
-    id: mix.id, 
-    name: mix.label, 
-    description: mix.description, 
-    coverUrl: mix.coverUrl, 
-    tracks 
+  const result = {
+    id: mix.id,
+    name: mix.label,
+    subtitle: mix.subtitle,
+    description: mix.description,
+    coverUrl: mix.coverUrl,
+    coverUrls: mix.coverUrls ?? [],
+    kind: mix.kind,
+    tracks
   };
   
   await cacheSet(key, result, TTL.PLAYLIST);

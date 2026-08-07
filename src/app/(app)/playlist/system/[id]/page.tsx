@@ -7,6 +7,7 @@ import { useSwipeBack } from "@/lib/useSwipeBack";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { useDownloadAll } from "@/lib/useDownloadAll";
 import styles from "./page.module.css";
 
 interface Track {
@@ -50,6 +51,7 @@ export default function PlaylistPage() {
   const router = useRouter();
   useSwipeBack();
   const { play } = usePlayer();
+  const { downloadAll, checking: downloading } = useDownloadAll();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -58,7 +60,6 @@ export default function PlaylistPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
   const [allDownloaded, setAllDownloaded] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -141,81 +142,19 @@ export default function PlaylistPage() {
   // System playlists cannot be edited
 
   async function handleDownloadAll() {
-    if (!playlist || downloading) return;
-    
-    const undownloaded = [];
-    for (const t of playlist.tracks) {
-      if (!(await isTrackDownloaded(t.id))) undownloaded.push(t);
-    }
-    if (undownloaded.length === 0) return;
-
-    if (undownloaded.length > 5) {
-      if (!window.confirm(`This playlist has ${undownloaded.length} undownloaded tracks. Downloading them all might take some time and storage space. Do you want to proceed?`)) {
-        return;
-      }
-    }
-
-    setDownloading(true);
-    let successCount = 0;
-    try {
-      for (const track of playlist.tracks) {
-        try {
-          if (track.audioUrl) {
-            const existing = await isTrackDownloaded(track.id);
-            if (existing) continue;
-            
-            const isApi = track.audioUrl.startsWith("/api/");
-            if (!isApi) {
-              const streamRes = await fetch(track.audioUrl);
-              const blob = await streamRes.blob();
-              await saveTrackOffline({
-                id: track.id,
-                title: track.title,
-                artist: track.artist.name,
-                album: track.album?.title,
-                audioUrl: track.audioUrl,
-                coverUrl: track.coverUrl || track.album?.coverUrl,
-                duration: track.duration,
-              });
-              await saveAudioBlob(track.id, blob);
-              successCount++;
-            } else {
-              const res = await fetch("/api/music/download", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  title: track.title,
-                  artist: track.artist.name,
-                  duration: track.duration,
-                }),
-              });
-              const data = await res.json();
-              if (data.error || !data.audioUrl) continue;
-              
-              const streamRes = await fetch(data.audioUrl);
-              const blob = await streamRes.blob();
-              await saveTrackOffline({
-                id: data.id || track.id,
-                title: data.title || track.title,
-                artist: data.artist || track.artist.name,
-                album: track.album?.title,
-                audioUrl: data.audioUrl,
-                coverUrl: data.coverUrl || track.coverUrl || track.album?.coverUrl,
-                duration: data.duration || track.duration,
-              });
-              await saveAudioBlob(data.id || track.id, blob);
-              successCount++;
-            }
-          }
-        } catch {
-          // ignore individual track fail
-        }
-      }
-    } finally {
-      setDownloading(false);
-      // Trigger a re-check of download status
-      setAllDownloaded(successCount === undownloaded.length);
-    }
+    if (!playlist) return;
+    await downloadAll(
+      playlist.tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist.name,
+        album: track.album?.title,
+        coverUrl: track.coverUrl || track.album?.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+      })),
+      "songs from this chart"
+    );
   }
 
   const totalDuration = playlist

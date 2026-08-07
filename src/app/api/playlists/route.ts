@@ -44,6 +44,6 @@ export async function POST(req: NextRequest) {
     [userId, name, description || null]
   );
 
-  await cacheDel(cacheKey("playlists", userId));
+  await cacheDel(cacheKey("playlists", userId), cacheKey("home", userId));
   return NextResponse.json(playlist, { status: 201 });
 }

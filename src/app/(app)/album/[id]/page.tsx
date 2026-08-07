@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { useDownloadAll } from "@/lib/useDownloadAll";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -68,6 +69,7 @@ export default function AlbumPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { play, addToDownloadQueue, downloadStates } = usePlayer();
+  const { downloadAll } = useDownloadAll();
 
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -195,26 +197,20 @@ export default function AlbumPage() {
   }
 
   async function handleDownloadAll() {
-    if (!album || downloading) return;
-    
-    if (album.tracks.length > 50) {
-      if (!window.confirm(`This album has ${album.tracks.length} tracks. Downloading them all might take some time and storage space. Do you want to proceed?`)) {
-        return;
-      }
-    }
-
-    const tracksToDownload = album.tracks.map(track => ({
-      id: track.id,
-      title: track.title,
-      artist: track.artist.name,
-      album: album.title,
-      coverUrl: track.coverUrl || album.coverUrl,
-      audioUrl: track.audioUrl,
-      duration: track.duration,
-      albumId: album.id
-    }));
-
-    addToDownloadQueue(tracksToDownload);
+    if (!album) return;
+    await downloadAll(
+      album.tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist.name,
+        album: album.title,
+        coverUrl: track.coverUrl || album.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+        albumId: album.id,
+      })),
+      "tracks from this album"
+    );
   }
 
   async function handleRemoveFromLibrary() {

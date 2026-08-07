@@ -20,14 +20,27 @@ export type UserMixModel = runtime.Types.Result.DefaultSelection<Prisma.$UserMix
 
 export type AggregateUserMix = {
   _count: UserMixCountAggregateOutputType | null
+  _avg: UserMixAvgAggregateOutputType | null
+  _sum: UserMixSumAggregateOutputType | null
   _min: UserMixMinAggregateOutputType | null
   _max: UserMixMaxAggregateOutputType | null
+}
+
+export type UserMixAvgAggregateOutputType = {
+  slot: number | null
+}
+
+export type UserMixSumAggregateOutputType = {
+  slot: number | null
 }
 
 export type UserMixMinAggregateOutputType = {
   id: string | null
   userId: string | null
+  kind: string | null
+  slot: number | null
   label: string | null
+  subtitle: string | null
   description: string | null
   coverUrl: string | null
   tint: string | null
@@ -38,7 +51,10 @@ export type UserMixMinAggregateOutputType = {
 export type UserMixMaxAggregateOutputType = {
   id: string | null
   userId: string | null
+  kind: string | null
+  slot: number | null
   label: string | null
+  subtitle: string | null
   description: string | null
   coverUrl: string | null
   tint: string | null
@@ -49,10 +65,15 @@ export type UserMixMaxAggregateOutputType = {
 export type UserMixCountAggregateOutputType = {
   id: number
   userId: number
+  kind: number
+  slot: number
   label: number
+  subtitle: number
   description: number
   coverUrl: number
+  coverUrls: number
   tint: number
+  seedGenres: number
   trackIds: number
   generatedAt: number
   expiresAt: number
@@ -60,10 +81,21 @@ export type UserMixCountAggregateOutputType = {
 }
 
 
+export type UserMixAvgAggregateInputType = {
+  slot?: true
+}
+
+export type UserMixSumAggregateInputType = {
+  slot?: true
+}
+
 export type UserMixMinAggregateInputType = {
   id?: true
   userId?: true
+  kind?: true
+  slot?: true
   label?: true
+  subtitle?: true
   description?: true
   coverUrl?: true
   tint?: true
@@ -74,7 +106,10 @@ export type UserMixMinAggregateInputType = {
 export type UserMixMaxAggregateInputType = {
   id?: true
   userId?: true
+  kind?: true
+  slot?: true
   label?: true
+  subtitle?: true
   description?: true
   coverUrl?: true
   tint?: true
@@ -85,10 +120,15 @@ export type UserMixMaxAggregateInputType = {
 export type UserMixCountAggregateInputType = {
   id?: true
   userId?: true
+  kind?: true
+  slot?: true
   label?: true
+  subtitle?: true
   description?: true
   coverUrl?: true
+  coverUrls?: true
   tint?: true
+  seedGenres?: true
   trackIds?: true
   generatedAt?: true
   expiresAt?: true
@@ -133,6 +173,18 @@ export type UserMixAggregateArgs<ExtArgs extends runtime.Types.Extensions.Intern
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: UserMixAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: UserMixSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: UserMixMinAggregateInputType
@@ -163,6 +215,8 @@ export type UserMixGroupByArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   _count?: UserMixCountAggregateInputType | true
+  _avg?: UserMixAvgAggregateInputType
+  _sum?: UserMixSumAggregateInputType
   _min?: UserMixMinAggregateInputType
   _max?: UserMixMaxAggregateInputType
 }
@@ -170,14 +224,21 @@ export type UserMixGroupByArgs<ExtArgs extends runtime.Types.Extensions.Internal
 export type UserMixGroupByOutputType = {
   id: string
   userId: string
+  kind: string
+  slot: number
   label: string
+  subtitle: string | null
   description: string | null
   coverUrl: string | null
+  coverUrls: string[]
   tint: string
+  seedGenres: string[]
   trackIds: string[]
   generatedAt: Date
   expiresAt: Date
   _count: UserMixCountAggregateOutputType | null
+  _avg: UserMixAvgAggregateOutputType | null
+  _sum: UserMixSumAggregateOutputType | null
   _min: UserMixMinAggregateOutputType | null
   _max: UserMixMaxAggregateOutputType | null
 }
@@ -203,10 +264,15 @@ export type UserMixWhereInput = {
   NOT?: Prisma.UserMixWhereInput | Prisma.UserMixWhereInput[]
   id?: Prisma.StringFilter<"UserMix"> | string
   userId?: Prisma.StringFilter<"UserMix"> | string
+  kind?: Prisma.StringFilter<"UserMix"> | string
+  slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string
+  subtitle?: Prisma.StringNullableFilter<"UserMix"> | string | null
   description?: Prisma.StringNullableFilter<"UserMix"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"UserMix"> | string | null
+  coverUrls?: Prisma.StringNullableListFilter<"UserMix">
   tint?: Prisma.StringFilter<"UserMix"> | string
+  seedGenres?: Prisma.StringNullableListFilter<"UserMix">
   trackIds?: Prisma.StringNullableListFilter<"UserMix">
   generatedAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
@@ -216,10 +282,15 @@ export type UserMixWhereInput = {
 export type UserMixOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  subtitle?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   coverUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  coverUrls?: Prisma.SortOrder
   tint?: Prisma.SortOrder
+  seedGenres?: Prisma.SortOrder
   trackIds?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
@@ -232,10 +303,15 @@ export type UserMixWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.UserMixWhereInput[]
   NOT?: Prisma.UserMixWhereInput | Prisma.UserMixWhereInput[]
   userId?: Prisma.StringFilter<"UserMix"> | string
+  kind?: Prisma.StringFilter<"UserMix"> | string
+  slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string
+  subtitle?: Prisma.StringNullableFilter<"UserMix"> | string | null
   description?: Prisma.StringNullableFilter<"UserMix"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"UserMix"> | string | null
+  coverUrls?: Prisma.StringNullableListFilter<"UserMix">
   tint?: Prisma.StringFilter<"UserMix"> | string
+  seedGenres?: Prisma.StringNullableListFilter<"UserMix">
   trackIds?: Prisma.StringNullableListFilter<"UserMix">
   generatedAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
@@ -245,16 +321,23 @@ export type UserMixWhereUniqueInput = Prisma.AtLeast<{
 export type UserMixOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  subtitle?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   coverUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  coverUrls?: Prisma.SortOrder
   tint?: Prisma.SortOrder
+  seedGenres?: Prisma.SortOrder
   trackIds?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   _count?: Prisma.UserMixCountOrderByAggregateInput
+  _avg?: Prisma.UserMixAvgOrderByAggregateInput
   _max?: Prisma.UserMixMaxOrderByAggregateInput
   _min?: Prisma.UserMixMinOrderByAggregateInput
+  _sum?: Prisma.UserMixSumOrderByAggregateInput
 }
 
 export type UserMixScalarWhereWithAggregatesInput = {
@@ -263,10 +346,15 @@ export type UserMixScalarWhereWithAggregatesInput = {
   NOT?: Prisma.UserMixScalarWhereWithAggregatesInput | Prisma.UserMixScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
   userId?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
+  kind?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
+  slot?: Prisma.IntWithAggregatesFilter<"UserMix"> | number
   label?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
+  subtitle?: Prisma.StringNullableWithAggregatesFilter<"UserMix"> | string | null
   description?: Prisma.StringNullableWithAggregatesFilter<"UserMix"> | string | null
   coverUrl?: Prisma.StringNullableWithAggregatesFilter<"UserMix"> | string | null
+  coverUrls?: Prisma.StringNullableListFilter<"UserMix">
   tint?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
+  seedGenres?: Prisma.StringNullableListFilter<"UserMix">
   trackIds?: Prisma.StringNullableListFilter<"UserMix">
   generatedAt?: Prisma.DateTimeWithAggregatesFilter<"UserMix"> | Date | string
   expiresAt?: Prisma.DateTimeWithAggregatesFilter<"UserMix"> | Date | string
@@ -274,10 +362,15 @@ export type UserMixScalarWhereWithAggregatesInput = {
 
 export type UserMixCreateInput = {
   id?: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -287,10 +380,15 @@ export type UserMixCreateInput = {
 export type UserMixUncheckedCreateInput = {
   id?: string
   userId: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -298,10 +396,15 @@ export type UserMixUncheckedCreateInput = {
 
 export type UserMixUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -311,10 +414,15 @@ export type UserMixUpdateInput = {
 export type UserMixUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -323,10 +431,15 @@ export type UserMixUncheckedUpdateInput = {
 export type UserMixCreateManyInput = {
   id?: string
   userId: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -334,10 +447,15 @@ export type UserMixCreateManyInput = {
 
 export type UserMixUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -346,10 +464,15 @@ export type UserMixUpdateManyMutationInput = {
 export type UserMixUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -368,19 +491,31 @@ export type UserMixOrderByRelationAggregateInput = {
 export type UserMixCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  subtitle?: Prisma.SortOrder
   description?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
+  coverUrls?: Prisma.SortOrder
   tint?: Prisma.SortOrder
+  seedGenres?: Prisma.SortOrder
   trackIds?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
 }
 
+export type UserMixAvgOrderByAggregateInput = {
+  slot?: Prisma.SortOrder
+}
+
 export type UserMixMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  subtitle?: Prisma.SortOrder
   description?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
   tint?: Prisma.SortOrder
@@ -391,12 +526,19 @@ export type UserMixMaxOrderByAggregateInput = {
 export type UserMixMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  subtitle?: Prisma.SortOrder
   description?: Prisma.SortOrder
   coverUrl?: Prisma.SortOrder
   tint?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
+}
+
+export type UserMixSumOrderByAggregateInput = {
+  slot?: Prisma.SortOrder
 }
 
 export type UserMixCreateNestedManyWithoutUserInput = {
@@ -441,8 +583,26 @@ export type UserMixUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.UserMixScalarWhereInput | Prisma.UserMixScalarWhereInput[]
 }
 
+export type UserMixCreatecoverUrlsInput = {
+  set: string[]
+}
+
+export type UserMixCreateseedGenresInput = {
+  set: string[]
+}
+
 export type UserMixCreatetrackIdsInput = {
   set: string[]
+}
+
+export type UserMixUpdatecoverUrlsInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
+export type UserMixUpdateseedGenresInput = {
+  set?: string[]
+  push?: string | string[]
 }
 
 export type UserMixUpdatetrackIdsInput = {
@@ -452,10 +612,15 @@ export type UserMixUpdatetrackIdsInput = {
 
 export type UserMixCreateWithoutUserInput = {
   id?: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -463,10 +628,15 @@ export type UserMixCreateWithoutUserInput = {
 
 export type UserMixUncheckedCreateWithoutUserInput = {
   id?: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -504,10 +674,15 @@ export type UserMixScalarWhereInput = {
   NOT?: Prisma.UserMixScalarWhereInput | Prisma.UserMixScalarWhereInput[]
   id?: Prisma.StringFilter<"UserMix"> | string
   userId?: Prisma.StringFilter<"UserMix"> | string
+  kind?: Prisma.StringFilter<"UserMix"> | string
+  slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string
+  subtitle?: Prisma.StringNullableFilter<"UserMix"> | string | null
   description?: Prisma.StringNullableFilter<"UserMix"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"UserMix"> | string | null
+  coverUrls?: Prisma.StringNullableListFilter<"UserMix">
   tint?: Prisma.StringFilter<"UserMix"> | string
+  seedGenres?: Prisma.StringNullableListFilter<"UserMix">
   trackIds?: Prisma.StringNullableListFilter<"UserMix">
   generatedAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"UserMix"> | Date | string
@@ -515,10 +690,15 @@ export type UserMixScalarWhereInput = {
 
 export type UserMixCreateManyUserInput = {
   id?: string
+  kind?: string
+  slot?: number
   label: string
+  subtitle?: string | null
   description?: string | null
   coverUrl?: string | null
+  coverUrls?: Prisma.UserMixCreatecoverUrlsInput | string[]
   tint?: string
+  seedGenres?: Prisma.UserMixCreateseedGenresInput | string[]
   trackIds?: Prisma.UserMixCreatetrackIdsInput | string[]
   generatedAt?: Date | string
   expiresAt: Date | string
@@ -526,10 +706,15 @@ export type UserMixCreateManyUserInput = {
 
 export type UserMixUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -537,10 +722,15 @@ export type UserMixUpdateWithoutUserInput = {
 
 export type UserMixUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -548,10 +738,15 @@ export type UserMixUncheckedUpdateWithoutUserInput = {
 
 export type UserMixUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  slot?: Prisma.IntFieldUpdateOperationsInput | number
   label?: Prisma.StringFieldUpdateOperationsInput | string
+  subtitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coverUrls?: Prisma.UserMixUpdatecoverUrlsInput | string[]
   tint?: Prisma.StringFieldUpdateOperationsInput | string
+  seedGenres?: Prisma.UserMixUpdateseedGenresInput | string[]
   trackIds?: Prisma.UserMixUpdatetrackIdsInput | string[]
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -562,10 +757,15 @@ export type UserMixUncheckedUpdateManyWithoutUserInput = {
 export type UserMixSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   userId?: boolean
+  kind?: boolean
+  slot?: boolean
   label?: boolean
+  subtitle?: boolean
   description?: boolean
   coverUrl?: boolean
+  coverUrls?: boolean
   tint?: boolean
+  seedGenres?: boolean
   trackIds?: boolean
   generatedAt?: boolean
   expiresAt?: boolean
@@ -575,10 +775,15 @@ export type UserMixSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
 export type UserMixSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   userId?: boolean
+  kind?: boolean
+  slot?: boolean
   label?: boolean
+  subtitle?: boolean
   description?: boolean
   coverUrl?: boolean
+  coverUrls?: boolean
   tint?: boolean
+  seedGenres?: boolean
   trackIds?: boolean
   generatedAt?: boolean
   expiresAt?: boolean
@@ -588,10 +793,15 @@ export type UserMixSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
 export type UserMixSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   userId?: boolean
+  kind?: boolean
+  slot?: boolean
   label?: boolean
+  subtitle?: boolean
   description?: boolean
   coverUrl?: boolean
+  coverUrls?: boolean
   tint?: boolean
+  seedGenres?: boolean
   trackIds?: boolean
   generatedAt?: boolean
   expiresAt?: boolean
@@ -601,16 +811,21 @@ export type UserMixSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
 export type UserMixSelectScalar = {
   id?: boolean
   userId?: boolean
+  kind?: boolean
+  slot?: boolean
   label?: boolean
+  subtitle?: boolean
   description?: boolean
   coverUrl?: boolean
+  coverUrls?: boolean
   tint?: boolean
+  seedGenres?: boolean
   trackIds?: boolean
   generatedAt?: boolean
   expiresAt?: boolean
 }
 
-export type UserMixOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "label" | "description" | "coverUrl" | "tint" | "trackIds" | "generatedAt" | "expiresAt", ExtArgs["result"]["userMix"]>
+export type UserMixOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "kind" | "slot" | "label" | "subtitle" | "description" | "coverUrl" | "coverUrls" | "tint" | "seedGenres" | "trackIds" | "generatedAt" | "expiresAt", ExtArgs["result"]["userMix"]>
 export type UserMixInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -629,10 +844,15 @@ export type $UserMixPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     userId: string
+    kind: string
+    slot: number
     label: string
+    subtitle: string | null
     description: string | null
     coverUrl: string | null
+    coverUrls: string[]
     tint: string
+    seedGenres: string[]
     trackIds: string[]
     generatedAt: Date
     expiresAt: Date
@@ -1062,10 +1282,15 @@ export interface Prisma__UserMixClient<T, Null = never, ExtArgs extends runtime.
 export interface UserMixFieldRefs {
   readonly id: Prisma.FieldRef<"UserMix", 'String'>
   readonly userId: Prisma.FieldRef<"UserMix", 'String'>
+  readonly kind: Prisma.FieldRef<"UserMix", 'String'>
+  readonly slot: Prisma.FieldRef<"UserMix", 'Int'>
   readonly label: Prisma.FieldRef<"UserMix", 'String'>
+  readonly subtitle: Prisma.FieldRef<"UserMix", 'String'>
   readonly description: Prisma.FieldRef<"UserMix", 'String'>
   readonly coverUrl: Prisma.FieldRef<"UserMix", 'String'>
+  readonly coverUrls: Prisma.FieldRef<"UserMix", 'String[]'>
   readonly tint: Prisma.FieldRef<"UserMix", 'String'>
+  readonly seedGenres: Prisma.FieldRef<"UserMix", 'String[]'>
   readonly trackIds: Prisma.FieldRef<"UserMix", 'String[]'>
   readonly generatedAt: Prisma.FieldRef<"UserMix", 'DateTime'>
   readonly expiresAt: Prisma.FieldRef<"UserMix", 'DateTime'>

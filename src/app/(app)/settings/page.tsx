@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePlayer } from "@/components/PlayerContext";
 import styles from "./page.module.css";
 
 /* ────────────────────────────────────────────────────────────
@@ -84,12 +85,14 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 function Row({
   icon,
   label,
+  sublabel,
   value,
   onClick,
   control,
 }: {
   icon?: React.ReactNode;
   label: string;
+  sublabel?: string;
   value?: string;
   onClick?: () => void;
   control?: React.ReactNode;
@@ -98,7 +101,14 @@ function Row({
     <>
       <span className={icon ? styles.rowLabelWithIcon : styles.rowLabel}>
         {icon}
-        {label}
+        {sublabel ? (
+          <span className={styles.rowLabelStack}>
+            <span>{label}</span>
+            <span className={styles.rowSublabel}>{sublabel}</span>
+          </span>
+        ) : (
+          label
+        )}
       </span>
       {control ?? (
         <span className={styles.rowAction} style={{ display: "flex", gap: "0.5rem" }}>
@@ -135,6 +145,10 @@ export default function SettingsPage() {
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
+  // Autoplay lives in the player (localStorage-backed) rather than in
+  // UserSettings — it's a device preference, and it has to be readable
+  // synchronously by the playback loop.
+  const { autoplayRadio, setAutoplayRadio } = usePlayer();
   const [quality, setQuality] = useState("High (320 kbps)");
   const [downloadQuality, setDownloadQuality] = useState("High (320 kbps)");
   const [crossfade, setCrossfade] = useState(4);
@@ -262,6 +276,11 @@ export default function SettingsPage() {
           />
           <Row label="Gapless playback" control={<Toggle on={gaplessPlayback} onChange={(v) => { setGaplessPlayback(v); updateSetting("gaplessPlayback", v); }} label="Gapless playback" />} />
           <Row label="Normalize volume" control={<Toggle on={normalizeVolume} onChange={(v) => { setNormalizeVolume(v); updateSetting("normalizeVolume", v); }} label="Normalize volume" />} />
+          <Row
+            label="Autoplay similar music"
+            sublabel="Keep playing songs that match your taste when a queue ends"
+            control={<Toggle on={autoplayRadio} onChange={setAutoplayRadio} label="Autoplay similar music" />}
+          />
         </div>
         <div className={styles.qualityInfo}>Higher quality uses more data and storage.</div>
 

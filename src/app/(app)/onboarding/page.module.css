@@ -1,0 +1,322 @@
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(2rem, -1.5rem) scale(1.1); }
+}
+
+.container {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  background: var(--sakura-bg);
+  overflow-x: hidden;
+}
+
+.bloom {
+  position: absolute;
+  top: -12%;
+  left: 50%;
+  width: min(34rem, 90vw);
+  height: min(34rem, 90vw);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--sakura-accent-gradient);
+  filter: blur(90px);
+  opacity: 0.22;
+  pointer-events: none;
+  animation: drift 22s ease-in-out infinite;
+  z-index: 0;
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 46rem;
+  background: var(--sakura-glass);
+  border: 1px solid var(--sakura-glass-border);
+  border-radius: var(--sakura-radius-xl);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: clamp(1.25rem, 4vw, 2.25rem);
+  box-shadow: 0 24px 60px var(--sakura-shadow);
+}
+
+.progressTrack {
+  height: 3px;
+  width: 100%;
+  background: var(--sakura-surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: clamp(1.25rem, 4vw, 2rem);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--sakura-accent-gradient);
+  border-radius: 999px;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.step {
+  animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.title {
+  font-family: var(--sakura-font-display);
+  font-size: clamp(1.5rem, 5vw, 2.25rem);
+  font-weight: 600;
+  color: var(--sakura-text);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: clamp(0.8125rem, 2.5vw, 0.9375rem);
+  color: var(--sakura-text-secondary);
+  margin: 0 0 clamp(1.25rem, 4vw, 1.75rem);
+  line-height: 1.5;
+  max-width: 34rem;
+}
+
+/* ── Genre chips ─────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.625rem;
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 999px;
+  border: 1px solid var(--sakura-border);
+  background: var(--sakura-surface);
+  color: var(--sakura-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  text-align: left;
+}
+
+.chip:hover { border-color: var(--sakura-accent); }
+.chip:active { transform: scale(0.97); }
+
+.chipActive {
+  background: var(--sakura-active);
+  border-color: var(--sakura-accent);
+  color: var(--sakura-accent);
+}
+
+.chipEmoji { font-size: 1rem; line-height: 1; }
+
+/* ── Artist grid ─────────────────────────────────────────────────────────── */
+
+.artistGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: clamp(0.75rem, 2.5vw, 1.125rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.artistCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--sakura-text);
+}
+
+.artistAvatarWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+  background: var(--sakura-surface-2);
+}
+
+.artistCard:active .artistAvatarWrap { transform: scale(0.95); }
+.artistActive .artistAvatarWrap { border-color: var(--sakura-accent); }
+
+.artistAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.artistFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sakura-font-display);
+  font-size: 1.5rem;
+  color: var(--sakura-text-secondary);
+  background: var(--sakura-accent-gradient);
+  opacity: 0.85;
+  color: #fff;
+}
+
+.check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.artistName {
+  font-size: 0.75rem;
+  text-align: center;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.artistActive .artistName { color: var(--sakura-accent); }
+
+.empty {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  color: var(--sakura-text-secondary);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+/* ── Discovery slider ────────────────────────────────────────────────────── */
+
+.sliderBlock {
+  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+}
+
+.slider {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sakura-surface-2);
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  border: 3px solid var(--sakura-bg);
+  box-shadow: 0 2px 8px var(--sakura-shadow);
+  cursor: grab;
+}
+
+.slider::-moz-range-thumb {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  border: 3px solid var(--sakura-bg);
+  cursor: grab;
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  color: var(--sakura-text-secondary);
+}
+
+.sliderHint {
+  margin: 1rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--sakura-text);
+  padding: 0.75rem 1rem;
+  background: var(--sakura-surface);
+  border-radius: var(--sakura-radius-lg);
+  border: 1px solid var(--sakura-border);
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.primary {
+  flex: 1;
+  max-width: 16rem;
+  margin-left: auto;
+  padding: 0.875rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--sakura-accent-gradient);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.primary:hover:not(:disabled) { transform: translateY(-1px); }
+.primary:active:not(:disabled) { transform: scale(0.98); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.skip {
+  background: none;
+  border: none;
+  color: var(--sakura-text-secondary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.16s ease;
+}
+
+.skip:hover { color: var(--sakura-text); }
+
+.error {
+  color: var(--sakura-danger);
+  font-size: 0.8125rem;
+  margin: 0 0 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloom { animation: none; }
+  .step { animation: none; }
+  .progressFill { transition: none; }
+}

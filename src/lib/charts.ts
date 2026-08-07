@@ -46,12 +46,17 @@ async function fetchAppleMusicChart(type: string, countryCode: string): Promise<
   if (type === 'nigeria') cc = 'ng';
   if (type === 'africa') cc = 'za';
   if (type === 'global') cc = 'us';
+  // 'country' keeps whatever the caller passed — that's the whole point of the
+  // playlist. It previously fell through to the 'us' default, so "Top 50 in
+  // your Country" was the US chart for every user on the platform.
 
   const url = `https://rss.applemarketingtools.com/api/v2/${cc}/music/most-played/50/songs.json`;
   const res = await fetch(url, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error('Apple RSS failed');
   const data = await res.json();
-  
+
+  if (!Array.isArray(data?.feed?.results)) return [];
+
   return data.feed.results.map((r: any) => ({
     title: r.name,
     artist: r.artistName,
@@ -64,7 +69,9 @@ async function fetchDeezerChart(type: string): Promise<ChartTrack[]> {
   const res = await fetch(url, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error('Deezer failed');
   const data = await res.json();
-  
+
+  if (!Array.isArray(data?.data)) return [];
+
   return data.data.map((t: any) => ({
     title: t.title,
     artist: t.artist.name,
@@ -116,27 +123,33 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
         } else {
           const dzTrack = await searchDeezerTrack(ct.title, ct.artist);
           if (dzTrack) {
-            let artistRow = await queryOne(`SELECT id FROM "Artist" WHERE name = $1`, [dzTrack.artist.name]);
-            if (!artistRow) {
-              artistRow = await queryOne(`
-                INSERT INTO "Artist" (name, "imageUrl") VALUES ($1, $2) RETURNING id
-              `, [dzTrack.artist.name, dzTrack.artist.picture_medium]);
-            }
-            
-            const trackRow = await queryOne(`
-              INSERT INTO "Track" (title, "artistId", duration, "audioUrl", "coverUrl", "deezerId")
-              VALUES ($1, $2, $3, $4, $5, $6)
+            // ON CONFLICT rather than a bare INSERT: `Artist.name` is unique,
+            // and two chart updates running concurrently (global + country,
+            // say) will genuinely race on the same artist. Without this the
+            // insert throws and aborts the whole chart refresh.
+            const artistRow = await queryOne<{ id: string }>(`
+              INSERT INTO "Artist" (id, name, "imageUrl")
+              VALUES (gen_random_uuid()::text, $1, $2)
+              ON CONFLICT (name) DO UPDATE SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
+              RETURNING id
+            `, [dzTrack.artist.name, dzTrack.artist.picture_medium]);
+
+            if (!artistRow) continue;
+
+            const trackRow = await queryOne<{ id: string }>(`
+              INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", "coverUrl", "deezerId")
+              VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6)
               RETURNING id
             `, [
-              dzTrack.title, 
-              artistRow.id, 
-              dzTrack.duration || 180, 
-              dzTrack.preview || "pending", 
+              dzTrack.title,
+              artistRow.id,
+              dzTrack.duration || 180,
+              dzTrack.preview || "pending",
               dzTrack.album?.cover_big || ct.coverUrl,
               dzTrack.id.toString()
             ]);
-            
-            dbTrackIds.push(trackRow.id);
+
+            if (trackRow) dbTrackIds.push(trackRow.id);
           }
         }
       }

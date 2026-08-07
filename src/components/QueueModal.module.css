@@ -279,3 +279,34 @@
   font-size: 0.875rem;
   line-height: 1.5;
 }
+
+/* Footer note telling the listener the radio is what's filling the queue. */
+.radioNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 0.5rem 1.5rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.75rem;
+}
+
+.radioDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sakura-accent);
+  box-shadow: 0 0 0 0 var(--sakura-accent);
+  animation: radioPulse 2.4s ease-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes radioPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(242, 120, 159, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(242, 120, 159, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(242, 120, 159, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radioDot { animation: none; }
+}

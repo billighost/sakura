@@ -77,6 +77,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     goToQueueItem,
     sleepTimerMinutes,
     setSleepTimer,
+    autoplayRadio,
   } = usePlayer();
 
   const formatTime = (s: number) => {
@@ -669,6 +670,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         onGoToQueueItem={goToQueueItem}
         onRemoveFromUpNext={removeFromUpNext}
         onRemoveTrack={removeTrack}
+        radioActive={autoplayRadio}
       />
 
       <LyricsModal

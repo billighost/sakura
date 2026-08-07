@@ -65,6 +65,10 @@ export const ModelName = {
   Favorite: 'Favorite',
   SnoozedTrack: 'SnoozedTrack',
   ListeningHistory: 'ListeningHistory',
+  TasteProfile: 'TasteProfile',
+  ArtistAffinity: 'ArtistAffinity',
+  GenreAffinity: 'GenreAffinity',
+  TasteFeedback: 'TasteFeedback',
   UserMix: 'UserMix',
   SystemPlaylist: 'SystemPlaylist'
 } as const
@@ -261,19 +265,93 @@ export const ListeningHistoryScalarFieldEnum = {
   userId: 'userId',
   trackId: 'trackId',
   playedAt: 'playedAt',
-  skipped: 'skipped'
+  skipped: 'skipped',
+  msPlayed: 'msPlayed',
+  completed: 'completed',
+  skipAtMs: 'skipAtMs',
+  context: 'context',
+  contextId: 'contextId',
+  autoplay: 'autoplay',
+  hourOfDay: 'hourOfDay',
+  dayOfWeek: 'dayOfWeek'
 } as const
 
 export type ListeningHistoryScalarFieldEnum = (typeof ListeningHistoryScalarFieldEnum)[keyof typeof ListeningHistoryScalarFieldEnum]
 
 
+export const TasteProfileScalarFieldEnum = {
+  userId: 'userId',
+  onboarded: 'onboarded',
+  seedArtistIds: 'seedArtistIds',
+  seedGenres: 'seedGenres',
+  seedArtistNames: 'seedArtistNames',
+  topGenres: 'topGenres',
+  topArtistIds: 'topArtistIds',
+  discovery: 'discovery',
+  eraCenter: 'eraCenter',
+  eraSpread: 'eraSpread',
+  avgTrackMs: 'avgTrackMs',
+  skipRate: 'skipRate',
+  totalPlays: 'totalPlays',
+  vector: 'vector',
+  computedAt: 'computedAt',
+  version: 'version'
+} as const
+
+export type TasteProfileScalarFieldEnum = (typeof TasteProfileScalarFieldEnum)[keyof typeof TasteProfileScalarFieldEnum]
+
+
+export const ArtistAffinityScalarFieldEnum = {
+  userId: 'userId',
+  artistId: 'artistId',
+  score: 'score',
+  plays: 'plays',
+  completions: 'completions',
+  skips: 'skips',
+  likes: 'likes',
+  lastPlayedAt: 'lastPlayedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ArtistAffinityScalarFieldEnum = (typeof ArtistAffinityScalarFieldEnum)[keyof typeof ArtistAffinityScalarFieldEnum]
+
+
+export const GenreAffinityScalarFieldEnum = {
+  userId: 'userId',
+  genre: 'genre',
+  score: 'score',
+  plays: 'plays',
+  skips: 'skips',
+  updatedAt: 'updatedAt'
+} as const
+
+export type GenreAffinityScalarFieldEnum = (typeof GenreAffinityScalarFieldEnum)[keyof typeof GenreAffinityScalarFieldEnum]
+
+
+export const TasteFeedbackScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  target: 'target',
+  targetId: 'targetId',
+  kind: 'kind',
+  createdAt: 'createdAt'
+} as const
+
+export type TasteFeedbackScalarFieldEnum = (typeof TasteFeedbackScalarFieldEnum)[keyof typeof TasteFeedbackScalarFieldEnum]
+
+
 export const UserMixScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  kind: 'kind',
+  slot: 'slot',
   label: 'label',
+  subtitle: 'subtitle',
   description: 'description',
   coverUrl: 'coverUrl',
+  coverUrls: 'coverUrls',
   tint: 'tint',
+  seedGenres: 'seedGenres',
   trackIds: 'trackIds',
   generatedAt: 'generatedAt',
   expiresAt: 'expiresAt'
@@ -304,6 +382,14 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -318,4 +404,13 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

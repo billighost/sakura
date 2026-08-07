@@ -3,12 +3,23 @@ import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 import { queryOne, query } from "@/lib/sql";
 import { enrichTrackMetadata } from "@/lib/metadata";
+import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // This endpoint drives a Telegram bot with a 3-attempt retry and 60s
+  // timeouts, so it is by far the most expensive thing a client can trigger.
+  // Without a cap, one looping client can saturate the bot for everyone.
+  const limited = await rateLimit(
+    `download:${session.user.id}`,
+    LIMITS.download.limit,
+    LIMITS.download.window
+  );
+  if (!limited.allowed) return rateLimitResponse(limited);
 
   const body = await req.json();
   const { title, artist, duration, albumId: providedAlbumId } = body;

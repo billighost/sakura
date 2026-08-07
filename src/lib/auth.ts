@@ -2,12 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma from "./db";
+import { authConfig } from "./auth.config";
 
 const nextAuthInstance = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
-  trustHost: true,
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  ...authConfig,
   providers: [
     Credentials({
       name: "credentials",
@@ -40,47 +38,13 @@ const nextAuthInstance = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.name = user.name;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token) {
-        session.user.id = token.id as string;
-        session.user.name = token.name as string;
-      }
-      return session;
-    },
-  },
 });
 
-export const { handlers, signIn, signOut } = nextAuthInstance;
-
-export const auth = async (...args: any[]) => {
-  // @ts-ignore
-  const session = await nextAuthInstance.auth(...args);
-  if (session) return session;
-
-  try {
-    const defaultUser = await prisma.user.findFirst({
-      orderBy: { createdAt: "asc" },
-    });
-    if (defaultUser) {
-      return {
-        user: {
-          id: defaultUser.id,
-          name: defaultUser.username,
-          email: defaultUser.email,
-        },
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      };
-    }
-  } catch (err) {
-    console.error("Auth bypass fallback failed:", err);
-  }
-  return null;
-};
+// Exported directly rather than through a hand-written wrapper.
+//
+// The wrapper that used to live here existed for a dev-only "sign in as the
+// first user" fallback — an auth bypass that has since been removed. What was
+// left was a pass-through typed `(...args: any[])` with a `@ts-ignore`, which
+// erased NextAuth's real overloads and left every `session.user` access
+// untyped at the call site.
+export const { handlers, signIn, signOut, auth } = nextAuthInstance;

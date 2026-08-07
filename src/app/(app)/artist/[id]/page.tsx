@@ -7,6 +7,7 @@ import { useSwipeBack } from "@/lib/useSwipeBack";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { useDownloadAll } from "@/lib/useDownloadAll";
 import { DiscIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
@@ -56,6 +57,7 @@ export default function ArtistPage() {
   const router = useRouter();
   useSwipeBack();
   const { play } = usePlayer();
+  const { downloadAll, checking: downloading } = useDownloadAll();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [loading, setLoading] = useState(true);
   const [bioExpanded, setBioExpanded] = useState(false);
@@ -168,7 +170,6 @@ export default function ArtistPage() {
     play(q[0], q);
   }
 
-  const [downloading, setDownloading] = useState(false);
   const [likedAll, setLikedAll] = useState(false);
 
   async function handleLikeAllSongs() {
@@ -188,70 +189,20 @@ export default function ArtistPage() {
   }
 
   async function handleDownloadAll() {
-    if (!artist || downloading) return;
-    
-    if (artist.tracks.length > 50) {
-      if (!window.confirm(`This artist has ${artist.tracks.length} tracks listed. Downloading them all might take significant time and storage space. Do you want to proceed?`)) {
-        return;
-      }
-    }
-
-    setDownloading(true);
-    try {
-      for (const track of artist.tracks) {
-        try {
-          // Note: we'll import isTrackDownloaded, saveTrackOffline, saveAudioBlob from offline-db
-          const { isTrackDownloaded, saveTrackOffline, saveAudioBlob } = await import("@/lib/offline-db");
-          
-          if (track.audioUrl) {
-            const existing = await isTrackDownloaded(track.id);
-            if (existing) continue;
-            const res = await fetch(track.audioUrl);
-            const blob = await res.blob();
-            await saveTrackOffline({
-              id: track.id,
-              title: track.title,
-              artist: track.artist.name,
-              album: track.album?.title,
-              audioUrl: track.audioUrl,
-              coverUrl: track.coverUrl || track.album?.coverUrl,
-              duration: track.duration,
-            });
-            await saveAudioBlob(track.id, blob);
-          } else {
-            const res = await fetch("/api/music/download", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: track.title,
-                artist: track.artist.name,
-                duration: track.duration,
-                albumId: track.album?.id,
-              }),
-            });
-            const data = await res.json();
-            if (data.error || !data.audioUrl) continue;
-            
-            const streamRes = await fetch(data.audioUrl);
-            const blob = await streamRes.blob();
-            await saveTrackOffline({
-              id: data.id,
-              title: data.title,
-              artist: data.artist,
-              album: track.album?.title,
-              audioUrl: data.audioUrl,
-              coverUrl: data.coverUrl || track.coverUrl || track.album?.coverUrl,
-              duration: data.duration,
-            });
-            await saveAudioBlob(data.id, blob);
-          }
-        } catch {
-          continue;
-        }
-      }
-    } finally {
-      setDownloading(false);
-    }
+    if (!artist) return;
+    await downloadAll(
+      artist.tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist.name,
+        album: track.album?.title,
+        coverUrl: track.coverUrl || track.album?.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+        albumId: track.album?.id,
+      })),
+      `tracks by ${artist.name}`
+    );
   }
 
   function handleShare() {

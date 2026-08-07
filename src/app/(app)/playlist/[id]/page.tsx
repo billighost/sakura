@@ -7,6 +7,7 @@ import { useSwipeBack } from "@/lib/useSwipeBack";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
+import { useDownloadAll } from "@/lib/useDownloadAll";
 import styles from "./page.module.css";
 
 interface Track {
@@ -50,6 +51,7 @@ export default function PlaylistPage() {
   const router = useRouter();
   useSwipeBack();
   const { play, addToDownloadQueue, downloadStates } = usePlayer();
+  const { downloadAll } = useDownloadAll();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -171,31 +173,19 @@ export default function PlaylistPage() {
   }
 
   async function handleDownloadAll() {
-    if (!playlist || downloading) return;
-    
-    const undownloaded = [];
-    for (const t of playlist.tracks) {
-      if (!(await isTrackDownloaded(t.id))) undownloaded.push(t);
-    }
-    if (undownloaded.length === 0) return;
-
-    if (undownloaded.length > 5) {
-      if (!window.confirm(`This playlist has ${undownloaded.length} undownloaded tracks. Downloading them all might take some time and storage space. Do you want to proceed?`)) {
-        return;
-      }
-    }
-
-    const tracksToDownload = playlist.tracks.map(track => ({
-      id: track.id,
-      title: track.title,
-      artist: track.artist.name,
-      album: track.album?.title,
-      coverUrl: track.coverUrl || track.album?.coverUrl,
-      audioUrl: track.audioUrl,
-      duration: track.duration,
-    }));
-
-    addToDownloadQueue(tracksToDownload);
+    if (!playlist) return;
+    await downloadAll(
+      playlist.tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist.name,
+        album: track.album?.title,
+        coverUrl: track.coverUrl || track.album?.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+      })),
+      "songs from this playlist"
+    );
   }
 
   const totalDuration = playlist

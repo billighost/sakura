@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useRef, useEffect, useCallback, us
 import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob, findDownloadedTrackByMetadata, cloneDownloadedTrack } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
+import { signalTracker } from "@/lib/signals";
 import { Toast } from "./Toast";
 
 interface Track {
@@ -16,7 +17,17 @@ interface Track {
   coverUrl?: string;
   audioUrl: string;
   duration: number;
+  /** Set when the radio queued this track rather than the listener. */
+  autoplay?: boolean;
+  /** Human-readable "why this is here", shown in the queue UI. */
+  reason?: string;
 }
+
+/** Where the current queue came from — recorded with every play signal. */
+export type PlayContext = {
+  context: string | null;
+  contextId: string | null;
+};
 
 export interface DownloadItem {
   id: string;
@@ -79,7 +90,18 @@ interface PlayerContextType {
   hideToast: () => void;
   sleepTimerMinutes: number | null;
   setSleepTimer: (minutes: number | null) => void;
-  
+
+  // Radio / endless playback
+  /** When on, an exhausted queue is refilled with taste-matched tracks. */
+  autoplayRadio: boolean;
+  setAutoplayRadio: (on: boolean) => void;
+  /** True while a radio batch is being fetched. */
+  radioLoading: boolean;
+  /** Start a radio seeded from a specific track. */
+  startRadio: (seedTrack?: Track) => Promise<void>;
+  /** Set the origin of the current queue so play signals carry context. */
+  setPlayContext: (ctx: PlayContext) => void;
+
   // Download Manager fields
   downloadQueue: DownloadItem[];
   downloadStates: Record<string, "idle" | "queued" | "downloading" | "completed" | "failed">;
@@ -95,6 +117,52 @@ export function usePlayer() {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error("usePlayer must be used within PlayerProvider");
   return ctx;
+}
+
+/**
+ * Write a value to localStorage, debounced, and flush it on unload.
+ *
+ * Serializing a long queue is a synchronous main-thread cost, and the queue
+ * changes far more often than anyone could benefit from persisting — a radio
+ * refill alone appends 15-20 tracks at once. The unload/visibility flush is
+ * what makes the delay safe: the moments a person actually leaves are covered
+ * synchronously, so the debounce can never lose real state.
+ */
+function useDebouncedStorage(key: string, value: unknown, delayMs = 500) {
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify(valueRef.current));
+      } catch {
+        // Quota exceeded or storage blocked — persistence is best-effort and
+        // must never interrupt playback.
+      }
+    }, delayMs);
+    return () => clearTimeout(timer);
+  }, [key, value, delayMs]);
+
+  useEffect(() => {
+    const flush = () => {
+      try {
+        localStorage.setItem(key, JSON.stringify(valueRef.current));
+      } catch {
+        /* see above */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [key]);
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -122,6 +190,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
   const sleepTimerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Radio / endless playback ──────────────────────────────────────────────
+  const [autoplayRadio, setAutoplayRadioState] = useState(true);
+  const [radioLoading, setRadioLoading] = useState(false);
+  const playContextRef = useRef<PlayContext>({ context: null, contextId: null });
+  // Guards against two radio fetches racing when `ended` and `next` both fire.
+  const radioFetchingRef = useRef(false);
+  // Tracks consecutive empty radio responses so a catalogue with nothing left
+  // to offer stops hammering the endpoint on every track end.
+  const radioMissesRef = useRef(0);
+
   const showToast = useCallback((message: string, type: "accent" | "error" | "success" = "accent") => {
     setToast({ message, type, visible: true });
   }, []);
@@ -143,10 +221,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
   const [downloadPaused, setDownloadPaused] = useState(false);
 
-  // Sync downloadQueue to localStorage
-  useEffect(() => {
-    localStorage.setItem("sakura-player-download-queue", JSON.stringify(downloadQueue));
-  }, [downloadQueue]);
+  // Sync downloadQueue to localStorage — see useDebouncedStorage below.
 
   // Battery and Visibility Checker
   useEffect(() => {
@@ -190,36 +265,52 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Helper to add tracks to queue
+  // Helper to add tracks to queue.
+  //
+  // Both state updates are issued as independent functional updates. The
+  // previous version mutated `prev[i].priority` in place and called
+  // setDownloadStates from inside the setDownloadQueue updater — updaters have
+  // to be pure, and React may invoke them more than once (StrictMode does so
+  // deliberately), which made the nested update fire twice and the in-place
+  // mutation invisible to change detection.
   const addToDownloadQueue = useCallback((tracks: Omit<DownloadItem, "priority">[], priorityBoost = false) => {
     setDownloadQueue((prev) => {
+      const existingById = new Map(prev.map((item) => [item.id, item]));
       const newItems: DownloadItem[] = [];
-      const updatedStates = { ...downloadStates };
+      let boosted = false;
 
       for (const track of tracks) {
-        if (updatedStates[track.id] === "completed" || updatedStates[track.id] === "downloading") {
-          continue;
-        }
-
-        const existingIdx = prev.findIndex((item) => item.id === track.id);
-        if (existingIdx >= 0) {
-          if (priorityBoost) {
-            prev[existingIdx].priority = Math.max(prev[existingIdx].priority, 10);
+        const existing = existingById.get(track.id);
+        if (existing) {
+          if (priorityBoost && existing.priority < 10) {
+            existingById.set(track.id, { ...existing, priority: 10 });
+            boosted = true;
           }
           continue;
         }
-
-        newItems.push({
-          ...track,
-          priority: priorityBoost ? 10 : 1,
-        });
-        updatedStates[track.id] = "queued";
+        newItems.push({ ...track, priority: priorityBoost ? 10 : 1 });
       }
 
-      setDownloadStates(updatedStates);
-      return [...prev, ...newItems].sort((a, b) => b.priority - a.priority);
+      if (newItems.length === 0 && !boosted) return prev;
+
+      return [...prev.map((item) => existingById.get(item.id) ?? item), ...newItems].sort(
+        (a, b) => b.priority - a.priority
+      );
     });
-  }, [downloadStates]);
+
+    setDownloadStates((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const track of tracks) {
+        // Don't re-queue something already finished or in flight.
+        if (next[track.id] === "completed" || next[track.id] === "downloading") continue;
+        if (next[track.id] === "queued") continue;
+        next[track.id] = "queued";
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, []);
 
   const removeFromDownloadQueue = useCallback((trackId: string) => {
     setDownloadQueue((prev) => prev.filter((item) => item.id !== trackId));
@@ -530,6 +621,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const shuffleRef = useRef(shuffle);
   const repeatRef = useRef(repeat);
   const isPlayingRef = useRef(isPlaying);
+  const autoplayRadioRef = useRef(autoplayRadio);
 
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { upNextRef.current = upNextQueue; }, [upNextQueue]);
@@ -537,6 +629,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
   useEffect(() => { repeatRef.current = repeat; }, [repeat]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { autoplayRadioRef.current = autoplayRadio; }, [autoplayRadio]);
 
   const goToTrack = useCallback((index: number) => {
     setCurrentIndex(index);
@@ -571,43 +664,287 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }, 50);
   }, []);
 
-  const next = useCallback(() => {
-    const uq = upNextRef.current;
-    if (uq.length > 0) {
-      const nextTrack = uq[0];
-      setUpNextQueue((prev) => prev.slice(1));
-      setQueueState((prev) => {
-        const newQ = [...prev];
-        newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
-        return newQ;
-      });
-      setCurrentIndex((i) => i + 1);
-      return;
-    }
+  // ── Radio ─────────────────────────────────────────────────────────────────
 
-    const q = queueRef.current;
-    const ci = currentIndexRef.current;
-    const sh = shuffleRef.current;
-    const rp = repeatRef.current;
+  /**
+   * Fetch a batch of taste-matched tracks and append them to the queue.
+   *
+   * Returns the number of tracks appended. Exclusions cover everything already
+   * queued so the radio never hands back a song the listener is about to hear
+   * anyway.
+   */
+  const fetchRadioBatch = useCallback(
+    async (seedTrackId: string | null, limit = 20): Promise<number> => {
+      if (radioFetchingRef.current) return 0;
+      radioFetchingRef.current = true;
+      setRadioLoading(true);
 
-    if (q.length === 0) return;
-    if (sh) {
-      let nextIdx = Math.floor(Math.random() * q.length);
-      if (q.length > 1) {
-        while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
+      try {
+        const exclude = [
+          ...queueRef.current.map((t) => t.id),
+          ...upNextRef.current.map((t) => t.id),
+        ];
+
+        const res = await fetch("/api/radio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seedTrackId, limit, excludeTrackIds: exclude }),
+        });
+        if (!res.ok) return 0;
+
+        const data = await res.json();
+        const tracks: Track[] = (data?.tracks ?? [])
+          .filter((t: any) => t?.id && t?.audioUrl)
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            artist: t.artist,
+            artistId: t.artistId ?? undefined,
+            album: t.album ?? undefined,
+            albumId: t.albumId ?? undefined,
+            coverUrl: t.coverUrl ?? undefined,
+            audioUrl: t.audioUrl,
+            duration: t.duration ?? 0,
+            autoplay: true,
+            reason: t.reason,
+          }));
+
+        if (tracks.length === 0) {
+          radioMissesRef.current += 1;
+          return 0;
+        }
+
+        radioMissesRef.current = 0;
+        setQueueState((prev) => {
+          // Filter against the live queue too — it may have changed while the
+          // request was in flight.
+          const existing = new Set(prev.map((t) => t.id));
+          const fresh = tracks.filter((t) => !existing.has(t.id));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
+        return tracks.length;
+      } catch (err) {
+        console.error("[Radio] Failed to fetch radio batch:", err);
+        radioMissesRef.current += 1;
+        return 0;
+      } finally {
+        radioFetchingRef.current = false;
+        setRadioLoading(false);
       }
-      goToTrack(nextIdx);
-    } else if (ci < q.length - 1) {
-      goToTrack(ci + 1);
-    } else if (rp === "all") {
-      goToTrack(0);
-    } else {
+    },
+    []
+  );
+
+  /**
+   * Advance to the next track. Single source of truth for "what plays next" —
+   * the ended handler, the error handler, and the manual next button all route
+   * through here. Keeping three copies of this logic in sync by hand is how
+   * they quietly drift apart.
+   *
+   * @param opts.autoplay true when playback should continue automatically
+   *                      (track ended / errored) rather than only moving the
+   *                      cursor (manual skip while paused).
+   */
+  const advance = useCallback(
+    (opts: { autoplay: boolean }) => {
+      const resumeIfNeeded = () => {
+        if (!opts.autoplay) return;
+        // State has to settle before the new src is loaded and playable.
+        setTimeout(() => {
+          audioRef.current?.play().catch(() => {});
+        }, 50);
+      };
+
+      // 1. Explicit "play next" items always win.
+      const uq = upNextRef.current;
+      if (uq.length > 0) {
+        const nextTrack = uq[0];
+        setUpNextQueue((prev) => prev.slice(1));
+        setQueueState((prev) => {
+          const newQ = [...prev];
+          newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
+          return newQ;
+        });
+        setCurrentIndex((i) => i + 1);
+        resumeIfNeeded();
+        return;
+      }
+
+      const q = queueRef.current;
+      const ci = currentIndexRef.current;
+      const sh = shuffleRef.current;
+      const rp = repeatRef.current;
+
+      if (q.length === 0) return;
+
+      if (sh) {
+        let nextIdx = Math.floor(Math.random() * q.length);
+        if (q.length > 1) {
+          while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
+        }
+        setCurrentIndex(nextIdx);
+        resumeIfNeeded();
+        return;
+      }
+
+      if (ci < q.length - 1) {
+        setCurrentIndex(ci + 1);
+        resumeIfNeeded();
+        return;
+      }
+
+      if (rp === "all") {
+        setCurrentIndex(0);
+        resumeIfNeeded();
+        return;
+      }
+
+      // 2. Queue exhausted. This is the whole point of the radio: rather than
+      //    going silent, keep playing music that fits their taste.
+      //    `radioMissesRef` stops us retrying forever against a catalogue that
+      //    genuinely has nothing left to offer.
+      if (autoplayRadioRef.current && radioMissesRef.current < 3) {
+        const seedId = q[ci]?.id ?? null;
+        fetchRadioBatch(seedId).then((added) => {
+          if (added > 0) {
+            setCurrentIndex(ci + 1);
+            resumeIfNeeded();
+          } else {
+            setIsPlaying(false);
+            audioRef.current?.pause();
+          }
+        });
+        return;
+      }
+
+      // 3. Nothing left and radio is off — stop cleanly.
       setIsPlaying(false);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      audioRef.current?.pause();
+    },
+    [fetchRadioBatch]
+  );
+
+  const next = useCallback(() => {
+    // A manual skip should keep playing if we were already playing.
+    advance({ autoplay: isPlayingRef.current });
+  }, [advance]);
+
+  // ── Play-signal tracking ──────────────────────────────────────────────────
+  // Every track change opens a new measurement window. The tracker itself
+  // handles closing out the previous one and batching to the server.
+  useEffect(() => {
+    signalTracker.start();
+    return () => {
+      // Flush whatever is pending if the provider ever unmounts.
+      signalTracker.endTrack({ positionMs: audioRef.current?.currentTime ? audioRef.current.currentTime * 1000 : 0 });
+      signalTracker.flush();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentTrack) return;
+    signalTracker.beginTrack(currentTrack.id, (currentTrack.duration || 0) * 1000, {
+      context: playContextRef.current.context,
+      contextId: playContextRef.current.contextId,
+      autoplay: currentTrack.autoplay ?? false,
+    });
+    // If audio is already rolling, start counting immediately — the `play`
+    // event won't fire again for a track that's mid-stream.
+    if (isPlayingRef.current) signalTracker.resume();
+  }, [currentTrack?.id]);
+
+  /**
+   * Keep the radio a few tracks ahead.
+   *
+   * Waiting for the queue to fully drain means a gap of dead air while the
+   * request goes out. Refilling once only two tracks remain makes the
+   * transition seamless.
+   */
+  useEffect(() => {
+    if (!autoplayRadio) return;
+    if (queue.length === 0) return;
+    if (repeat === "all" || repeat === "one") return;
+    if (upNextQueue.length > 0) return;
+    if (radioMissesRef.current >= 3) return;
+
+    const remaining = queue.length - 1 - currentIndex;
+    if (remaining > 2) return;
+
+    fetchRadioBatch(queue[currentIndex]?.id ?? null, 15);
+  }, [queue, currentIndex, upNextQueue.length, autoplayRadio, repeat, fetchRadioBatch]);
+
+  /** Radio with no seed — replaces the queue entirely. */
+  const fetchRadioBatchIntoNewQueue = useCallback(async (): Promise<number> => {
+    setRadioLoading(true);
+    try {
+      const res = await fetch("/api/radio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const tracks: Track[] = (data?.tracks ?? [])
+        .filter((t: any) => t?.id && t?.audioUrl)
+        .map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          artistId: t.artistId ?? undefined,
+          album: t.album ?? undefined,
+          albumId: t.albumId ?? undefined,
+          coverUrl: t.coverUrl ?? undefined,
+          audioUrl: t.audioUrl,
+          duration: t.duration ?? 0,
+          autoplay: true,
+          reason: t.reason,
+        }));
+      if (tracks.length === 0) return 0;
+
+      setQueueState(tracks);
+      setCurrentIndex(0);
+      setUpNextQueue([]);
+      setIsPlaying(true);
+      setTimeout(() => audioRef.current?.play().catch(() => {}), 50);
+      return tracks.length;
+    } catch {
+      return 0;
+    } finally {
+      setRadioLoading(false);
     }
-  }, [goToTrack]);
+  }, []);
+
+  /** Explicitly start a radio from a seed track (or from pure taste). */
+  const startRadio = useCallback(
+    async (seedTrack?: Track) => {
+      radioMissesRef.current = 0;
+      playContextRef.current = { context: "radio", contextId: seedTrack?.id ?? null };
+
+      if (seedTrack) {
+        setQueueState([{ ...seedTrack }]);
+        setCurrentIndex(0);
+        setUpNextQueue([]);
+        setIsPlaying(true);
+        setTimeout(() => audioRef.current?.play().catch(() => {}), 50);
+        await fetchRadioBatch(seedTrack.id, 20);
+        return;
+      }
+
+      const added = await fetchRadioBatchIntoNewQueue();
+      if (added === 0) showToast("Nothing to play just yet", "error");
+    },
+    [fetchRadioBatch, fetchRadioBatchIntoNewQueue, showToast]
+  );
+
+  const setAutoplayRadio = useCallback((on: boolean) => {
+    setAutoplayRadioState(on);
+    localStorage.setItem("sakura-player-autoplay-radio", String(on));
+    if (on) radioMissesRef.current = 0;
+  }, []);
+
+  const setPlayContext = useCallback((ctx: PlayContext) => {
+    playContextRef.current = ctx;
+  }, []);
 
   const prev = useCallback(() => {
     const ci = currentIndexRef.current;
@@ -633,6 +970,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [progress, goToTrack]);
 
+  // The audio element and its listeners are created exactly once. Handlers
+  // read through refs rather than closing over state, so they never go stale.
+  const advanceRef = useRef(advance);
+  useEffect(() => { advanceRef.current = advance; }, [advance]);
+
   useEffect(() => {
     if (!audioRef.current) {
       const audio = new Audio();
@@ -646,112 +988,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      audio.addEventListener("ended", () => {
-        if (repeatRef.current === "one") {
-          audioRef.current?.play().catch(() => {});
-        } else {
-          const uq = upNextRef.current;
-          if (uq.length > 0) {
-            const nextTrack = uq[0];
-            setUpNextQueue((prev) => prev.slice(1));
-            setQueueState((prev) => {
-              const newQ = [...prev];
-              newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
-              return newQ;
-            });
-            setCurrentIndex((i) => i + 1);
-            // Autoplay next item after state update settles
-            setTimeout(() => {
-              audioRef.current?.play().catch(() => {});
-            }, 50);
-            return;
-          }
-
-          // Use refs to avoid stale closure
-          const q = queueRef.current;
-          const ci = currentIndexRef.current;
-          const sh = shuffleRef.current;
-          const rp = repeatRef.current;
-
-          if (q.length === 0) return;
-          if (sh) {
-            let nextIdx = Math.floor(Math.random() * q.length);
-            if (q.length > 1) {
-              while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
-            }
-            setCurrentIndex(nextIdx);
-            setTimeout(() => {
-              audioRef.current?.play().catch(() => {});
-            }, 50);
-          } else if (ci < q.length - 1) {
-            setCurrentIndex(ci + 1);
-            setTimeout(() => {
-              audioRef.current?.play().catch(() => {});
-            }, 50);
-          } else if (rp === "all") {
-            setCurrentIndex(0);
-            setTimeout(() => {
-              audioRef.current?.play().catch(() => {});
-            }, 50);
-          } else {
-            setIsPlaying(false);
-          }
-        }
+      audio.addEventListener("loadedmetadata", () => {
+        const d = audioRef.current?.duration;
+        if (d && isFinite(d)) signalTracker.setDuration(d * 1000);
       });
 
-      audio.addEventListener("play", () => setIsPlaying(true));
-      audio.addEventListener("pause", () => setIsPlaying(false));
-      
-      // Auto-skip on stream playback failure with toast notification
-      audio.addEventListener("error", (e) => {
-        console.error("Audio playback error occurred:", e);
-        showToast("Playback failure. Skipping to next track.", "error");
-        
-        // Skip track using ended event handler sequential logic
-        const uq = upNextRef.current;
-        if (uq.length > 0) {
-          const nextTrack = uq[0];
-          setUpNextQueue((prev) => prev.slice(1));
-          setQueueState((prev) => {
-            const newQ = [...prev];
-            newQ.splice(currentIndexRef.current + 1, 0, nextTrack);
-            return newQ;
-          });
-          setCurrentIndex((i) => i + 1);
-          setTimeout(() => {
-            audioRef.current?.play().catch(() => {});
-          }, 50);
+      audio.addEventListener("ended", () => {
+        // A completed listen — the single strongest positive taste signal
+        // there is. Bank it before the queue moves on.
+        signalTracker.endTrack({ natural: true });
+
+        if (repeatRef.current === "one") {
+          audioRef.current?.play().catch(() => {});
           return;
         }
+        advanceRef.current({ autoplay: true });
+      });
 
-        const q = queueRef.current;
-        const ci = currentIndexRef.current;
-        const sh = shuffleRef.current;
-        const rp = repeatRef.current;
+      audio.addEventListener("play", () => {
+        setIsPlaying(true);
+        signalTracker.resume();
+      });
 
-        if (q.length === 0) return;
-        if (sh) {
-          let nextIdx = Math.floor(Math.random() * q.length);
-          if (q.length > 1) {
-            while (nextIdx === ci) nextIdx = Math.floor(Math.random() * q.length);
-          }
-          setCurrentIndex(nextIdx);
-          setTimeout(() => {
-            audioRef.current?.play().catch(() => {});
-          }, 50);
-        } else if (ci < q.length - 1) {
-          setCurrentIndex(ci + 1);
-          setTimeout(() => {
-            audioRef.current?.play().catch(() => {});
-          }, 50);
-        } else if (rp === "all") {
-          setCurrentIndex(0);
-          setTimeout(() => {
-            audioRef.current?.play().catch(() => {});
-          }, 50);
-        } else {
-          setIsPlaying(false);
-        }
+      audio.addEventListener("pause", () => {
+        setIsPlaying(false);
+        signalTracker.pause();
+      });
+
+      // Auto-skip on stream playback failure with toast notification.
+      audio.addEventListener("error", () => {
+        // Only treat this as a real failure if a source was actually set —
+        // clearing src or an aborted load fires error too, and skipping the
+        // track there would make playback lurch for no reason.
+        const el = audioRef.current;
+        if (!el || !el.src || el.src === window.location.href) return;
+
+        console.error("Audio playback error for", el.src);
+        showToast("Playback failure. Skipping to next track.", "error");
+        // Don't record a skip signal: the person didn't reject this track,
+        // the stream broke. Counting it would poison their taste profile.
+        signalTracker.endTrack({ natural: false, positionMs: 0 });
+        advanceRef.current({ autoplay: true });
       });
     }
   }, [showToast]);
@@ -780,6 +1057,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (savedShuffle) setShuffle(savedShuffle === "true");
       if (savedRepeat) setRepeat(savedRepeat as any);
 
+      // Radio defaults to on — an endless queue is the expected behaviour for
+      // a music app, so only an explicit opt-out turns it off.
+      const savedAutoplay = localStorage.getItem("sakura-player-autoplay-radio");
+      if (savedAutoplay !== null) setAutoplayRadioState(savedAutoplay === "true");
+
       if (savedDownloadQueue) {
         const parsed = JSON.parse(savedDownloadQueue) as DownloadItem[];
         setDownloadQueue(parsed);
@@ -794,14 +1076,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Persist state updates to localStorage
-  useEffect(() => {
-    localStorage.setItem("sakura-player-queue", JSON.stringify(queue));
-  }, [queue]);
-
-  useEffect(() => {
-    localStorage.setItem("sakura-player-upnext", JSON.stringify(upNextQueue));
-  }, [upNextQueue]);
+  // Persist state updates to localStorage.
+  //
+  // Debounced: `queue` changes on every radio refill (15-20 tracks at a time),
+  // every reorder and every skip, and `JSON.stringify` of a long queue on the
+  // main thread is not free. 500ms is far below the window in which anyone
+  // could lose data — the unload/visibility flush below covers the real
+  // "person is leaving" cases.
+  useDebouncedStorage("sakura-player-queue", queue);
+  useDebouncedStorage("sakura-player-upnext", upNextQueue);
+  useDebouncedStorage("sakura-player-download-queue", downloadQueue);
 
   useEffect(() => {
     localStorage.setItem("sakura-player-index", String(currentIndex));
@@ -874,7 +1158,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     async function loadAudio() {
       if (!audioRef.current || !currentTrack) return;
-      
+
       // Determine if we should play. Only play if we are changing tracks *after* hydration
       const wasPlaying = isPlayingRef.current;
       let src = currentTrack.audioUrl;
@@ -889,6 +1173,50 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.error("Offline audio fetch failed, playing default URL", err);
+      }
+
+      // Queue rows built from a listing carry an empty audioUrl for anything
+      // not yet fetched from Telegram (TrackRow only resolves the track the
+      // person actually tapped). Skipping onto one of those used to load an
+      // empty src and stall silently. Resolve it here — on demand, once, for
+      // whichever track is about to play.
+      if (!objectUrl && (!src || src === "pending")) {
+        try {
+          const res = await fetch("/api/music/download", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: currentTrack.title,
+              artist: currentTrack.artist,
+              duration: currentTrack.duration,
+              albumId: currentTrack.albumId,
+            }),
+          });
+          const data = await res.json();
+          if (!active) return;
+
+          if (data?.audioUrl) {
+            src = data.audioUrl;
+            // Write the resolved URL (and any corrected id) back into the
+            // queue so a replay or a prev/next pass doesn't re-resolve it.
+            const resolvedId = data.id || currentTrack.id;
+            setQueueState((prev) =>
+              prev.map((t) =>
+                t.id === currentTrack.id
+                  ? { ...t, id: resolvedId, audioUrl: data.audioUrl, coverUrl: data.coverUrl || t.coverUrl }
+                  : t
+              )
+            );
+          } else {
+            throw new Error(data?.error || "No audio available");
+          }
+        } catch (err) {
+          console.error("Failed to resolve audio for queued track:", err);
+          if (!active) return;
+          showToast("Couldn't load that track. Skipping.", "error");
+          advanceRef.current({ autoplay: wasPlaying });
+          return;
+        }
       }
 
       if (!active) {
@@ -1172,65 +1500,94 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // silently overwrite a correctly-restored currentIndex/queue with stale
   // data. Removed in favor of the single individual-key system.
 
+  // Memoised so the provider doesn't hand every consumer a brand-new object
+  // on each render. `progress` updates several times a second during
+  // playback, and without this every component reading *any* part of the
+  // context (each row in a long track list, the tab bar, the mini player)
+  // re-rendered on every tick.
+  //
+  // The dependency list is exhaustive on purpose: all the callbacks are
+  // useCallback-stable, so in practice this only rebuilds when real state
+  // changes.
+  const contextValue = useMemo<PlayerContextType>(
+    () => ({
+      queue,
+      upNextQueue,
+      currentIndex,
+      currentTrack,
+      isPlaying,
+      isSeeking,
+      progress,
+      duration,
+      volume,
+      shuffle,
+      repeat,
+      play,
+      playNext,
+      addToQueue,
+      togglePlay,
+      seek,
+      beginSeek,
+      endSeek,
+      seekTo,
+      lyrics,
+      loadingLyrics,
+      activeLyricIndex,
+      activeLyricLine,
+      setVolume,
+      next,
+      prev,
+      toggleShuffle,
+      toggleRepeat,
+      setQueue,
+      goToQueueItem,
+      removeTrack,
+      removeTracks,
+      reshuffleQueue,
+      isLiked,
+      toggleLiked,
+      favoriteTrackIds,
+      toggleLikeTrack,
+      accentColor,
+      miniArtRect,
+      setMiniArtRect,
+      removeFromUpNext,
+      reorderUpNext,
+      reorderQueueTail,
+      toast,
+      showToast,
+      hideToast,
+      sleepTimerMinutes,
+      setSleepTimer,
+      autoplayRadio,
+      setAutoplayRadio,
+      radioLoading,
+      startRadio,
+      setPlayContext,
+      downloadQueue,
+      downloadStates,
+      downloadProgress,
+      downloadSpeed,
+      addToDownloadQueue,
+      removeFromDownloadQueue,
+    }),
+    [
+      queue, upNextQueue, currentIndex, currentTrack, isPlaying, isSeeking,
+      progress, duration, volume, shuffle, repeat, play, playNext, addToQueue,
+      togglePlay, seek, beginSeek, endSeek, seekTo, lyrics, loadingLyrics,
+      activeLyricIndex, activeLyricLine, setVolume, next, prev, toggleShuffle,
+      toggleRepeat, setQueue, goToQueueItem, removeTrack, removeTracks,
+      reshuffleQueue, isLiked, toggleLiked, favoriteTrackIds, toggleLikeTrack,
+      accentColor, miniArtRect, removeFromUpNext, reorderUpNext,
+      reorderQueueTail, toast, showToast, hideToast, sleepTimerMinutes,
+      setSleepTimer, autoplayRadio, setAutoplayRadio, radioLoading, startRadio,
+      setPlayContext, downloadQueue, downloadStates, downloadProgress,
+      downloadSpeed, addToDownloadQueue, removeFromDownloadQueue,
+    ]
+  );
+
   return (
-    <PlayerContext.Provider
-      value={{
-        queue,
-        upNextQueue,
-        currentIndex,
-        currentTrack,
-        isPlaying,
-        isSeeking,
-        progress,
-        duration,
-        volume,
-        shuffle,
-        repeat,
-        play,
-        playNext,
-        addToQueue,
-        togglePlay,
-        seek,
-        beginSeek,
-        endSeek,
-        seekTo,
-        lyrics,
-        loadingLyrics,
-        activeLyricIndex,
-        activeLyricLine,
-        setVolume,
-        next,
-        prev,
-        toggleShuffle,
-        toggleRepeat,
-        setQueue,
-        goToQueueItem,
-        removeTrack,
-        removeTracks,
-        reshuffleQueue,
-        isLiked,
-        toggleLiked,
-        favoriteTrackIds,
-        toggleLikeTrack,
-        accentColor,
-        miniArtRect,
-        setMiniArtRect,
-        removeFromUpNext,
-        reorderUpNext,
-        reorderQueueTail,
-        toast,
-        showToast,
-        hideToast,
-        sleepTimerMinutes,
-        setSleepTimer,
-        downloadQueue,
-        downloadStates,
-        downloadProgress,
-        downloadSpeed,
-        addToDownloadQueue,
-        removeFromDownloadQueue,
-      }}
-    >
+    <PlayerContext.Provider value={contextValue}>
       {children}
       {toast && (
         <Toast

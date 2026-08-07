@@ -1,5 +1,18 @@
 # Sakura — Comprehensive Page-by-Page Improvement Plan
 
+> **Status: historical.** This was the original page-by-page UI plan. A good
+> share of it has since shipped (Quick Picks, Made for You, top artists,
+> pull-to-refresh, search categories and history, the redesigned player and
+> queue, offline support), and the recommendation sections it sketched are now
+> superseded by the taste system.
+>
+> For current work see:
+> - **`ROADMAP.md`** — what to build next, prioritised
+> - **`AUDIT.md`** — known defects and their status
+>
+> Kept because the per-page UI/accessibility detail below is still a useful
+> checklist; treat individual items as unverified rather than outstanding.
+
 > Guided by Spotify's UI/UX patterns, accessibility, and modern mobile-first design.
 
 ---

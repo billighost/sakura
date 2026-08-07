@@ -1,8 +1,22 @@
 // Extracts a usable "mood" accent color from an image (album art).
 // Result is cached per URL since this runs on every track change.
 
+// Bounded so a long listening session can't grow the map without limit —
+// a few hundred entries covers any realistic queue, and eviction is
+// insertion-ordered (Map preserves it), which approximates LRU well enough
+// for what is only a memory guard.
+const MAX_CACHE_ENTRIES = 300;
+
 const cache = new Map<string, string | null>();
 const inflight = new Map<string, Promise<string | null>>();
+
+function remember(url: string, value: string | null) {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(url, value);
+}
 
 export async function extractDominantColor(url: string | undefined | null): Promise<string | null> {
   if (!url) return null;
@@ -61,7 +75,7 @@ export async function extractDominantColor(url: string | undefined | null): Prom
   inflight.set(url, promise);
   const result = await promise;
   inflight.delete(url);
-  cache.set(url, result);
+  remember(url, result);
   return result;
 }
 

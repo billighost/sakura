@@ -119,6 +119,23 @@
   color: var(--sakura-text);
 }
 
+/* Two-line row label: title plus an explanatory line underneath. Used where a
+   toggle's effect isn't obvious from its name alone. */
+.rowLabelStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.rowSublabel {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--sakura-text-secondary);
+  line-height: 1.35;
+  max-width: 15rem;
+}
+
 .rowValue {
   font-size: 0.8125rem;
   color: var(--sakura-text-secondary);

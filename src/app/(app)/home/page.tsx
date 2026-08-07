@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import styles from "./page.module.css";
 import { auth } from "@/lib/auth";
 import { getHomeData } from "@/lib/homeData";
+import { isOnboarded } from "@/lib/taste";
 import { redirect } from "next/navigation";
 
 /* ────────────────────────────────────────────────────────────
@@ -179,14 +180,32 @@ async function HomeFeed({ userId }: { userId: string }) {
                 key={mix.id}
                 href={`/mix/${mix.id}`}
                 className={styles.madeForYouCard}
-                style={!mix.coverUrl ? {
-                  background: mix.tint === "a"
-                    ? "linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-accent-2))"
-                    : "linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end))"
-                } : undefined}
+                style={
+                  mix.coverUrls.length === 0
+                    ? {
+                        background:
+                          mix.tint === "a"
+                            ? "linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-accent-2))"
+                            : "linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end))",
+                      }
+                    : undefined
+                }
               >
-                {mix.coverUrl && <img src={mix.coverUrl} alt="" className={styles.madeForYouArt} />}
-                <span className={styles.madeForYouLabel}>{mix.label}</span>
+                {/* A four-up mosaic reads as "assembled for you" in a way a
+                    single album cover never does — it shows the mix has range. */}
+                {mix.coverUrls.length >= 4 ? (
+                  <div className={styles.mixMosaic} aria-hidden="true">
+                    {mix.coverUrls.slice(0, 4).map((url, i) => (
+                      <img key={i} src={url} alt="" className={styles.mixMosaicCell} />
+                    ))}
+                  </div>
+                ) : mix.coverUrl ? (
+                  <img src={mix.coverUrl} alt="" className={styles.madeForYouArt} />
+                ) : null}
+                <div className={styles.mixOverlay}>
+                  <span className={styles.madeForYouLabel}>{mix.label}</span>
+                  {mix.subtitle && <span className={styles.mixSubtitle}>{mix.subtitle}</span>}
+                </div>
               </Link>
             ))}
           </div>
@@ -270,6 +289,11 @@ async function HomeFeed({ userId }: { userId: string }) {
 export default async function HomePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+
+  // First run: send them through taste onboarding before the empty home page.
+  // A cold home screen is a bad first impression, and the two minutes spent
+  // here is what makes every mix below actually personal.
+  if (!(await isOnboarded(session.user.id!))) redirect("/onboarding");
 
   const greeting = getGreeting(new Date().getHours());
   const user = session.user;
