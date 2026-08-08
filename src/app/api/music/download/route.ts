@@ -161,6 +161,8 @@ export async function POST(req: NextRequest) {
     resolveDownload = resolve;
     rejectDownload = reject;
   });
+  // Prevent unhandledRejection if the promise rejects while no coalesced request is awaiting it.
+  downloadPromise.catch(() => {});
   pendingDownloads.set(cacheKey, downloadPromise);
 
   try {
@@ -483,8 +485,9 @@ export async function POST(req: NextRequest) {
     console.error("[Telegram AutoDownload]", error);
     
     if (redis) {
-      // Cache the failure for 5 minutes to prevent slamming the bot
-      await redis.set(negativeCacheKey, "1", { ex: 300 }).catch(console.error);
+      // Cache the failure for 30 seconds to prevent slamming the bot instantly,
+      // but allow the user to retry relatively quickly.
+      await redis.set(negativeCacheKey, "1", { ex: 30 }).catch(console.error);
     }
     
     return NextResponse.json(
