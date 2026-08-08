@@ -1401,7 +1401,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // person actually tapped). Skipping onto one of those used to load an
       // empty src and stall silently. Resolve it here — on demand, once, for
       // whichever track is about to play.
-      if (!objectUrl && (!src || src === "pending")) {
+      const audioUrlUnusable =
+        !src ||
+        src === "pending" ||
+        src.includes("dzcdn.net") ||
+        src.endsWith("/api/stream/telegram/0");
+
+      if (!objectUrl && audioUrlUnusable) {
         try {
           const res = await fetch("/api/music/download", {
             method: "POST",
