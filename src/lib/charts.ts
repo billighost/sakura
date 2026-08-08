@@ -144,7 +144,7 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
               dzTrack.title,
               artistRow.id,
               dzTrack.duration || 180,
-              dzTrack.preview || "pending",
+              "pending",
               dzTrack.album?.cover_big || ct.coverUrl,
               dzTrack.id.toString()
             ]);
