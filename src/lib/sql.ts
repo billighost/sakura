@@ -78,11 +78,34 @@ function assertPooled(connectionString: string | undefined): void {
   }
 }
 
+function getValidConnectionString(): string | undefined {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+  ].filter((url): url is string => !!url && url.trim().length > 0);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.hostname && parsed.hostname !== "base" && !parsed.hostname.endsWith(".base")) {
+        return candidate;
+      }
+    } catch {
+      // Skip invalid URL strings
+    }
+  }
+
+  return candidates[0];
+}
+
 function createPool(): Pool {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL;
+  const connectionString = getValidConnectionString();
+  if (!connectionString || connectionString.includes("@base") || connectionString === "base") {
+    console.error(
+      "[SQL] Invalid DATABASE_URL or POSTGRES_URL configured (hostname is 'base'). Please set a valid PostgreSQL connection URL in your Vercel / environment variables.",
+    );
+  }
 
   assertPooled(connectionString);
 
