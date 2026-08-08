@@ -127,6 +127,19 @@ export async function GET(req: NextRequest) {
  * id, contributor credits and preview url the UI already renders; iTunes has
  * none of those, so a fallback result is deliberately thinner — but a thin
  * result set beats an empty one when Deezer is unavailable.
+ *
+ * The return type separates two things that used to look identical to the
+ * caller, and the conflation was expensive:
+ *
+ *   `{ tracks: [] }` — the providers answered, and the answer is "nothing".
+ *                      That is a real, cacheable fact.
+ *   `null`           — nobody answered. Cache nothing; serve stale if we have
+ *                      it, and try again next time.
+ *
+ * Returning `null` for both meant an empty result was never cached, so every
+ * repeat of a typo or a half-typed prefix re-asked Deezer *and* iTunes. Under
+ * load that is exactly the traffic that tripped both circuit breakers, and the
+ * queries driving it were the ones guaranteed to keep returning nothing.
  */
 async function searchProviders(
   term: string,
@@ -141,6 +154,10 @@ async function searchProviders(
     },
     { provider: "deezer", op: "search", timeoutMs: 5000, attempts: 3 },
   );
+
+  // callProvider resolves to null only when every attempt failed or the breaker
+  // is open — an empty `data` array is a genuine answer.
+  const deezerAnswered = deezer !== null && deezer !== undefined;
 
   if (deezer?.data?.length) {
     return { tracks: deezer.data as DeezerTrack[], total: deezer.total ?? deezer.data.length };

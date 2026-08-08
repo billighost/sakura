@@ -1,6 +1,6 @@
 import { query, queryOne, execute } from './sql';
 import { searchDeezerTrack } from './metadata';
-import { cacheGet, cacheSet } from './cache';
+import { acquireLock, releaseLock } from './cache';
 
 // Providers Configuration
 const PROVIDERS = ['apple', 'deezer', 'lastfm', 'audiomack', 'shazam'];
@@ -83,14 +83,19 @@ async function fetchDeezerChart(type: string): Promise<ChartTrack[]> {
  * Updates or creates a system playlist in the DB
  */
 export async function updateSystemPlaylist(systemId: string, name: string, type: string, countryCode?: string) {
+  // Atomic acquire. The previous get-then-set let concurrent callers all read
+  // "unlocked" and all start the same refresh; at the concurrency this app is
+  // sized for that meant several full chart rebuilds racing on the same rows.
+  //
+  // TTL is 15 minutes, comfortably longer than a cold rebuild, because a lock
+  // that expires while the work is still running admits exactly the duplicate
+  // it exists to prevent. It's released in `finally` so the normal case doesn't
+  // wait for expiry.
   const lockKey = `lock:charts-update:${systemId}`;
-  const isLocked = await cacheGet(lockKey);
-  if (isLocked) {
-    console.log(`[Charts] Update for ${systemId} is locked. Skipping.`);
+  if (!(await acquireLock(lockKey, 900))) {
+    console.log(`[Charts] Update for ${systemId} already running. Skipping.`);
     return;
   }
-  // Lock for 5 minutes
-  await cacheSet(lockKey, '1', 300);
 
   try {
     let dbTrackIds: string[] = [];
@@ -109,50 +114,56 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
       const chartTracks = await fetchTopChartFromProviders(type, countryCode);
       if (chartTracks.length === 0) return null;
 
-      for (const ct of chartTracks) {
-        const existing = await queryOne(`
-          SELECT t.id 
-          FROM "Track" t
-          JOIN "Artist" a ON t."artistId" = a.id
-          WHERE t.title ILIKE $1 AND a.name ILIKE $2
-          LIMIT 1
-        `, [ct.title, ct.artist]);
+      // Resolve all 50 chart entries against the DB in ONE round trip.
+      //
+      // This was a sequential loop doing a SELECT per chart entry, then an
+      // artist INSERT and a track INSERT for each miss — up to ~150 serial
+      // round trips per chart, five charts per refresh. At a realistic
+      // cross-region RTT that is minutes of wall clock during which the
+      // guard lock has already expired. UNNEST lets Postgres match the whole
+      // batch at once, so the cost is one round trip regardless of chart size.
+      const titles = chartTracks.map((c) => c.title);
+      const artists = chartTracks.map((c) => c.artist);
 
-        if (existing) {
-          dbTrackIds.push(existing.id);
-        } else {
-          const dzTrack = await searchDeezerTrack(ct.title, ct.artist);
-          if (dzTrack) {
-            // ON CONFLICT rather than a bare INSERT: `Artist.name` is unique,
-            // and two chart updates running concurrently (global + country,
-            // say) will genuinely race on the same artist. Without this the
-            // insert throws and aborts the whole chart refresh.
-            const artistRow = await queryOne<{ id: string }>(`
-              INSERT INTO "Artist" (id, name, "imageUrl")
-              VALUES (gen_random_uuid()::text, $1, $2)
-              ON CONFLICT (name) DO UPDATE SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
-              RETURNING id
-            `, [dzTrack.artist.name, dzTrack.artist.picture_medium]);
+      const matched = await query<{ idx: number; id: string }>(
+        `
+        SELECT DISTINCT ON (p.idx) p.idx, t.id
+        FROM UNNEST($1::text[], $2::text[]) WITH ORDINALITY AS p(title, artist, idx)
+        JOIN "Artist" a ON a.name ILIKE p.artist
+        JOIN "Track" t ON t."artistId" = a.id AND t.title ILIKE p.title
+        ORDER BY p.idx, t."createdAt" ASC
+        `,
+        [titles, artists]
+      );
 
-            if (!artistRow) continue;
+      const byIdx = new Map<number, string>();
+      for (const row of matched) byIdx.set(Number(row.idx), row.id);
 
-            const trackRow = await queryOne<{ id: string }>(`
-              INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", "coverUrl", "deezerId")
-              VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6)
-              RETURNING id
-            `, [
-              dzTrack.title,
-              artistRow.id,
-              dzTrack.duration || 180,
-              "pending",
-              dzTrack.album?.cover_big || ct.coverUrl,
-              dzTrack.id.toString()
-            ]);
+      // Chart order is meaningful — it's a Top 50 — so results are collected
+      // positionally and compacted at the end rather than pushed as they land.
+      const resolved: (string | null)[] = chartTracks.map((_, i) => byIdx.get(i + 1) ?? null);
 
-            if (trackRow) dbTrackIds.push(trackRow.id);
-          }
-        }
+      const missingIdx = resolved.flatMap((id, i) => (id === null ? [i] : []));
+
+      // Deezer lookups for the misses, bounded so a cold chart doesn't open 50
+      // sockets to one provider and get rate-limited into a full failure.
+      const DZ_CONCURRENCY = 6;
+      const dzResults = new Map<number, Awaited<ReturnType<typeof searchDeezerTrack>>>();
+      for (let i = 0; i < missingIdx.length; i += DZ_CONCURRENCY) {
+        const slice = missingIdx.slice(i, i + DZ_CONCURRENCY);
+        const settled = await Promise.allSettled(
+          slice.map((idx) => searchDeezerTrack(chartTracks[idx].title, chartTracks[idx].artist))
+        );
+        settled.forEach((r, k) => {
+          if (r.status === "fulfilled" && r.value) dzResults.set(slice[k], r.value);
+        });
       }
+
+      if (dzResults.size > 0) {
+        await insertResolvedChartTracks(chartTracks, dzResults, resolved);
+      }
+
+      dbTrackIds = resolved.filter((id): id is string => id !== null);
     }
 
     if (dbTrackIds.length === 0) return null;
@@ -173,5 +184,95 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
     }
   } catch (err) {
     console.error(`[Charts] Error updating ${systemId}:`, err);
+  } finally {
+    await releaseLock(lockKey);
+  }
+}
+
+/**
+ * Insert the chart entries that weren't already in the catalogue.
+ *
+ * Two multi-row statements rather than two per track: artists upserted in one
+ * pass, then tracks in a second pass now that their artist ids are known.
+ * `resolved` is filled in positionally so chart order survives.
+ *
+ * Both batches are de-duplicated first, and that is not optional. Postgres
+ * rejects an `ON CONFLICT DO UPDATE` whose input contains the same conflict key
+ * twice — "cannot affect row a second time" — and a Top 50 routinely lists one
+ * artist three times, so the un-deduplicated version failed on virtually every
+ * real chart. It failed *quietly*, too: the error was caught and logged inside
+ * `after()`, so charts simply stopped updating while everything looked healthy.
+ */
+async function insertResolvedChartTracks(
+  chartTracks: ChartTrack[],
+  dzResults: Map<number, any>,
+  resolved: (string | null)[],
+): Promise<void> {
+  const entries = [...dzResults.entries()];
+  if (entries.length === 0) return;
+
+  // One row per artist name, first occurrence wins.
+  const artistImageByName = new Map<string, string | null>();
+  for (const [, dz] of entries) {
+    const name = dz?.artist?.name;
+    if (!name || artistImageByName.has(name)) continue;
+    artistImageByName.set(name, dz.artist.picture_medium ?? null);
+  }
+  if (artistImageByName.size === 0) return;
+
+  const artistRows = await query<{ id: string; name: string }>(
+    `INSERT INTO "Artist" (id, name, "imageUrl")
+     SELECT gen_random_uuid()::text, n, i
+       FROM UNNEST($1::text[], $2::text[]) AS t(n, i)
+     ON CONFLICT (name) DO UPDATE
+       SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
+     RETURNING id, name`,
+    [[...artistImageByName.keys()], [...artistImageByName.values()]],
+  );
+
+  const artistIdByName = new Map(artistRows.map((r) => [r.name, r.id]));
+
+  // One row per deezerId. Two chart positions can legitimately point at the
+  // same recording; both are recorded here so each position can be filled in
+  // from the single inserted row afterwards.
+  const positionsByDeezerId = new Map<string, number[]>();
+  const rowByDeezerId = new Map<string, { idx: number; dz: any }>();
+  for (const [idx, dz] of entries) {
+    const dzId = dz?.id?.toString();
+    if (!dzId || !artistIdByName.has(dz?.artist?.name)) continue;
+    if (!positionsByDeezerId.has(dzId)) {
+      positionsByDeezerId.set(dzId, []);
+      rowByDeezerId.set(dzId, { idx, dz });
+    }
+    positionsByDeezerId.get(dzId)!.push(idx);
+  }
+  if (rowByDeezerId.size === 0) return;
+
+  const unique = [...rowByDeezerId.values()];
+
+  // DO UPDATE rather than DO NOTHING: a chart entry may already exist from a
+  // previous refresh or a user download, and only DO UPDATE returns a row for
+  // every input, which is what lets each chart position be resolved below.
+  const trackRows = await query<{ id: string; deezerId: string }>(
+    `INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", "coverUrl", "deezerId")
+     SELECT gen_random_uuid()::text, ti, ar, du, 'pending', co, dz
+       FROM UNNEST($1::text[], $2::text[], $3::int[], $4::text[], $5::text[])
+            AS t(ti, ar, du, co, dz)
+     ON CONFLICT ("deezerId") DO UPDATE
+       SET "coverUrl" = COALESCE("Track"."coverUrl", EXCLUDED."coverUrl")
+     RETURNING id, "deezerId"`,
+    [
+      unique.map(({ idx, dz }) => dz.title ?? chartTracks[idx].title),
+      unique.map(({ dz }) => artistIdByName.get(dz.artist.name)!),
+      unique.map(({ dz }) => dz.duration || 180),
+      unique.map(({ idx, dz }) => dz.album?.cover_big ?? chartTracks[idx].coverUrl ?? null),
+      unique.map(({ dz }) => dz.id.toString()),
+    ],
+  );
+
+  for (const row of trackRows) {
+    for (const idx of positionsByDeezerId.get(row.deezerId) ?? []) {
+      resolved[idx] = row.id;
+    }
   }
 }

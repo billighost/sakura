@@ -21,32 +21,46 @@ export type RateLimitResult = {
 };
 
 /**
- * Per-instance memory of counters already known to be over the limit.
+ * Per-instance view of a counter, so the common case costs nothing.
  *
- * Rate limiting ran two Redis commands (INCR, then EXPIRE) on every single
- * call to a limited endpoint. On a metered plan that is the most expensive
- * thing in the request: the limiter cost more commands than the cache it was
- * protecting. Two changes fix it, and both matter for different reasons.
+ * Two observations make this safe. First, a caller nowhere near their limit
+ * does not need a network round trip to be told so — the answer cannot be "no"
+ * until far more requests have happened. Second, once a caller is over, the
+ * answer cannot become "yes" until the window rolls, so that case needs no
+ * round trip either.
  *
- * First, INCR and EXPIRE go in one pipeline — Upstash bills a pipeline as one
- * request, so the steady-state cost halves with no behavioural change at all.
+ * That leaves only the band near the threshold actually needing Redis, which is
+ * a small fraction of traffic and exactly where accuracy matters. On a metered
+ * plan this is the difference between the limiter being the single largest
+ * consumer of the quota and being a rounding error.
  *
- * Second, once a key is known to be over its limit, further requests in that
- * same window are rejected locally. The answer cannot change until the window
- * rolls over, so asking Redis again buys nothing — and a client being actively
- * rate limited is precisely the one sending the most traffic. Without this, the
- * abusive case is also the most expensive case, which is exactly backwards.
+ * `softLimit` is what makes it correct across instances: local counting only
+ * governs the first `limit × LOCAL_BUDGET_FRACTION` requests an instance sees.
+ * With several instances running, the worst case is each admitting up to its
+ * own soft budget before any of them consults Redis, so the fraction is set low
+ * enough that the sum stays under the real limit for a plausible fleet. Past
+ * the soft limit every call checks Redis and the shared counter decides.
  */
-const globalForRlCache = globalThis as unknown as {
-  rlBlocked?: Map<string, number>;
-};
-if (!globalForRlCache.rlBlocked) globalForRlCache.rlBlocked = new Map();
-const blockedUntil = globalForRlCache.rlBlocked;
+const LOCAL_BUDGET_FRACTION = 0.25;
 
-function sweepBlocked(now: number): void {
-  if (blockedUntil.size < 5000) return;
-  for (const [k, until] of blockedUntil) {
-    if (now >= until) blockedUntil.delete(k);
+type LocalCounter = {
+  bucket: number;
+  count: number;
+  blockedUntil: number;
+  /** How much of `count` has already been reported to the shared counter. */
+  syncedAt: number;
+};
+
+const globalForRlCache = globalThis as unknown as {
+  rlLocal?: Map<string, LocalCounter>;
+};
+if (!globalForRlCache.rlLocal) globalForRlCache.rlLocal = new Map();
+const local = globalForRlCache.rlLocal;
+
+function sweepLocal(nowBucket: number): void {
+  if (local.size < 5000) return;
+  for (const [k, v] of local) {
+    if (v.bucket !== nowBucket) local.delete(k);
   }
 }
 
@@ -60,33 +74,47 @@ export async function rateLimit(
   const redisKey = `rl:${key}:${bucket}`;
   const resetInSeconds = windowSeconds - (Math.floor(nowMs / 1000) % windowSeconds);
 
-  const blocked = blockedUntil.get(redisKey);
-  if (blocked !== undefined && nowMs < blocked) {
+  let entry = local.get(redisKey);
+  if (!entry || entry.bucket !== bucket) {
+    sweepLocal(bucket);
+    entry = { bucket, count: 0, blockedUntil: 0, syncedAt: 0 };
+    local.set(redisKey, entry);
+  }
+  entry.count += 1;
+
+  // Already known to be over for this window — the shared counter cannot have
+  // gone down, so there is nothing to ask.
+  if (entry.blockedUntil > nowMs) {
     return { allowed: false, remaining: 0, resetInSeconds };
   }
 
+  // Comfortably under, on this instance's share of the budget.
+  const softLimit = Math.max(1, Math.floor(limit * LOCAL_BUDGET_FRACTION));
+  if (entry.count <= softLimit) {
+    return { allowed: true, remaining: limit - entry.count, resetInSeconds };
+  }
+
   try {
-    // INCR and EXPIRE in one pipelined round trip. Setting the TTL
-    // unconditionally would slide the expiry forward under sustained load and
-    // the key would never expire, so it stays guarded by the first-hit check —
-    // just evaluated after the fact rather than costing a second round trip to
-    // decide.
+    // INCR and EXPIRE in one pipelined round trip. Upstash bills a pipeline as
+    // a single request. EXPIRE is NX so a sustained stream of requests cannot
+    // keep sliding the expiry forward and leave the key immortal.
+    //
+    // The local count is folded in with INCRBY rather than INCR, because the
+    // requests admitted locally above still happened and the shared counter has
+    // to learn about them or the limit would be silently multiplied by
+    // 1/LOCAL_BUDGET_FRACTION.
+    const delta = entry.count - entry.syncedAt;
+    entry.syncedAt = entry.count;
+
     const pipe = redis.pipeline();
-    pipe.incr(redisKey);
+    pipe.incrby(redisKey, delta);
     pipe.expire(redisKey, windowSeconds, "NX");
     const [count] = (await pipe.exec()) as [number, number];
 
     const allowed = count <= limit;
-    if (!allowed) {
-      sweepBlocked(nowMs);
-      blockedUntil.set(redisKey, nowMs + resetInSeconds * 1000);
-    }
+    if (!allowed) entry.blockedUntil = nowMs + resetInSeconds * 1000;
 
-    return {
-      allowed,
-      remaining: Math.max(0, limit - count),
-      resetInSeconds,
-    };
+    return { allowed, remaining: Math.max(0, limit - count), resetInSeconds };
   } catch {
     return { allowed: true, remaining: limit, resetInSeconds: windowSeconds };
   }

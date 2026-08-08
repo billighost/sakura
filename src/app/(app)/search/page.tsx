@@ -80,11 +80,54 @@ export default function SearchPage() {
   const [history, setHistory] = useState<string[]>([]);
   
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const providerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Guards against out-of-order responses. Each search takes the next id; a
+   * response whose id is no longer current is discarded. Without this, a slow
+   * lookup for "tay" can land after a fast one for "taylor swift" and replace
+   * correct results with stale ones — the faster you type, the likelier it is.
+   */
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<AbortController | null>(null);
+
+  /**
+   * Two thresholds, because the two halves of a search cost wildly different
+   * things.
+   *
+   * The local half is a cached query against our own catalogue — cheap enough
+   * to run while someone is still typing, and it's what makes the page feel
+   * responsive.
+   *
+   * The provider half calls Deezer, which rate-limits. Every distinct prefix is
+   * a distinct cache key, so firing it mid-word means "taylor swift" costs
+   * several upstream calls for prefixes nobody wanted results for. Under load
+   * testing that pattern was what tripped the Deezer *and* iTunes circuit
+   * breakers and dropped search success to 62%; with novel terms removed the
+   * same load ran at 98%.
+   *
+   * 650ms is chosen to sit above normal inter-keystroke time (~150-300ms for
+   * most typists) so it fires when someone has genuinely stopped, not when they
+   * paused to think mid-word.
+   */
+  const LOCAL_IDLE_MS = 180;
+  const PROVIDER_IDLE_MS = 650;
+  /** Below this, a prefix matches too much to be worth asking a provider. */
+  const MIN_PROVIDER_CHARS = 3;
 
   useEffect(() => {
     setHistory(getHistory());
     inputRef.current?.focus();
+  }, []);
+
+  // Navigating away mid-type would otherwise leave a timer to fire against an
+  // unmounted component, and an in-flight fetch nobody is waiting for.
+  useEffect(() => {
+    return () => {
+      if (localTimerRef.current) clearTimeout(localTimerRef.current);
+      if (providerTimerRef.current) clearTimeout(providerTimerRef.current);
+      inFlightRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -103,35 +146,70 @@ export default function SearchPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  const search = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      setResults([]);
-      setSearched(false);
-      return;
-    }
-    setLoading(true);
-    setSearched(true);
-    saveHistory(q);
-    setHistory(getHistory());
+  /**
+   * `commit` distinguishes a search someone *meant* from one that merely
+   * happened because they stopped typing. Only committed searches are worth
+   * remembering — the old code saved history on every debounce tick, so typing
+   * one query left "tay", "taylo" and "taylor" in the recent-searches list.
+   */
+  const search = useCallback(
+    async (q: string, opts: { provider?: boolean; commit?: boolean } = {}) => {
+      const includeProvider = opts.provider ?? true;
 
-    const cacheKey = `search-${q.trim().toLowerCase()}`;
-    const cached = await getCachedLibraryData<SearchResult[]>(cacheKey);
-    if (cached) {
-      setResults(cached);
-      setLoading(false);
-      fetchSearchResults(q, cacheKey);
-      return;
-    }
+      if (!q.trim()) {
+        generationRef.current += 1;
+        inFlightRef.current?.abort();
+        setResults([]);
+        setSearched(false);
+        setLoading(false);
+        return;
+      }
 
-    await fetchSearchResults(q, cacheKey);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      setLoading(true);
+      setSearched(true);
 
-  async function fetchSearchResults(q: string, cacheKey: string) {
+      if (opts.commit) {
+        saveHistory(q);
+        setHistory(getHistory());
+      }
+
+      const cacheKey = `search-${q.trim().toLowerCase()}`;
+      const cached = await getCachedLibraryData<SearchResult[]>(cacheKey);
+      if (cached) {
+        setResults(cached);
+        setLoading(false);
+        // Refresh behind the visible results, but only if this pass was meant
+        // to reach the provider at all.
+        if (includeProvider) fetchSearchResults(q, cacheKey, true);
+        return;
+      }
+
+      await fetchSearchResults(q, cacheKey, includeProvider);
+    },
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  async function fetchSearchResults(q: string, cacheKey: string, includeProvider: boolean) {
+    const generation = ++generationRef.current;
+    inFlightRef.current?.abort();
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+
     try {
       const [libRes, deezerRes] = await Promise.allSettled([
-        fetch(`/api/tracks?q=${encodeURIComponent(q.trim())}&limit=10`),
-        fetch(`/api/music/search?q=${encodeURIComponent(q.trim())}&limit=15`),
+        fetch(`/api/tracks?q=${encodeURIComponent(q.trim())}&limit=10`, {
+          signal: controller.signal,
+        }),
+        includeProvider
+          ? fetch(`/api/music/search?q=${encodeURIComponent(q.trim())}&limit=15`, {
+              signal: controller.signal,
+            })
+          : Promise.reject(new Error("provider skipped")),
       ]);
+
+      // A newer keystroke has already started its own search; anything this one
+      // produces is stale by definition.
+      if (generation !== generationRef.current) return;
 
       let libTracks: SearchResult[] = [];
       if (libRes.status === "fulfilled") {
@@ -156,6 +234,8 @@ export default function SearchPage() {
         dzrTracks = data.tracks || [];
       }
 
+      if (generation !== generationRef.current) return;
+
       // Deduplicate tracks by deezerId or title+artist
       const allResults = [...libTracks];
       for (const dt of dzrTracks) {
@@ -165,11 +245,14 @@ export default function SearchPage() {
       }
 
       setResults(allResults);
-      setCachedLibraryData(cacheKey, allResults);
+      // Only persist a result set that actually consulted the provider.
+      // Caching a library-only pass would make the eventual full search read it
+      // back as complete and never fill in the provider half.
+      if (includeProvider) setCachedLibraryData(cacheKey, allResults);
     } catch {
-      setResults([]);
+      if (generation === generationRef.current) setResults([]);
     } finally {
-      setLoading(false);
+      if (generation === generationRef.current) setLoading(false);
     }
   }
 
@@ -188,18 +271,47 @@ export default function SearchPage() {
     }
   }
 
+  /**
+   * Both timers restart on every keystroke, so each fires only once the typing
+   * has actually stopped for its own interval — the local one almost
+   * immediately, the provider one only after a real pause.
+   *
+   * Typing "taylor swift" straight through now costs one provider call instead
+   * of one per prefix the old 400ms timer happened to land on.
+   */
   function handleChange(value: string) {
     setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      search(value);
-    }, 400);
+
+    if (localTimerRef.current) clearTimeout(localTimerRef.current);
+    if (providerTimerRef.current) clearTimeout(providerTimerRef.current);
+
+    if (!value.trim()) {
+      // Clearing the box should empty the results now, not in 650ms.
+      search("");
+      return;
+    }
+
+    localTimerRef.current = setTimeout(() => {
+      search(value, { provider: false });
+    }, LOCAL_IDLE_MS);
+
+    if (value.trim().length >= MIN_PROVIDER_CHARS) {
+      providerTimerRef.current = setTimeout(() => {
+        search(value, { provider: true });
+      }, PROVIDER_IDLE_MS);
+    }
+  }
+
+  function cancelPending() {
+    if (localTimerRef.current) clearTimeout(localTimerRef.current);
+    if (providerTimerRef.current) clearTimeout(providerTimerRef.current);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      search(query);
+      // An explicit submit skips both waits and is what gets remembered.
+      cancelPending();
+      search(query, { provider: true, commit: true });
       inputRef.current?.blur();
     } else if (e.key === "Escape") {
       if (query) {
@@ -211,6 +323,7 @@ export default function SearchPage() {
   }
 
   function handleClear() {
+    cancelPending();
     setQuery("");
     setResults([]);
     setSearched(false);
@@ -218,8 +331,9 @@ export default function SearchPage() {
   }
 
   function handleHistoryClick(q: string) {
+    cancelPending();
     setQuery(q);
-    search(q);
+    search(q, { provider: true, commit: true });
   }
 
   function handleHistoryRemove(e: React.MouseEvent, q: string) {

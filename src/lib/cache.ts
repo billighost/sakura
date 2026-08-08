@@ -59,9 +59,16 @@ const MAX_MEMORY_CACHE_SIZE = 10000;
  *              artist metadata) that nothing in the app ever invalidates →
  *              hold them far longer, because these are the high-volume reads
  *              and they cannot go stale in a way anyone notices.
+ *
+ * The catalogue window is 15 minutes rather than a token few: no code path
+ * calls `cacheDel` on any of those keys, so the usual reason to keep L1 short —
+ * bounding how long one instance can disagree with an invalidation performed on
+ * another — simply doesn't apply to them. A search result that is 15 minutes
+ * old is the same search result. Measured, this is the single biggest lever on
+ * the Upstash command count, because those keys are also the hottest.
  */
 const L1_VOLATILE_SECONDS = 15;
-const L1_CATALOGUE_SECONDS = 300;
+const L1_CATALOGUE_SECONDS = 900;
 const CATALOGUE_TTL_THRESHOLD = 60 * 60;
 
 function l1TtlFor(l2TtlSeconds: number): number {
@@ -346,6 +353,40 @@ export async function cached<T>(
     }
     return value;
   });
+}
+
+/**
+ * Acquire a distributed lock, atomically.
+ *
+ * `cacheGet` followed by `cacheSet` is not a lock — it's a read and a write
+ * with a window in between, and under the concurrency this app is being sized
+ * for, two callers reliably both observe "unlocked" and both proceed. Redis
+ * `SET key val NX EX ttl` decides the winner in one round trip, which is the
+ * only version of this that actually excludes.
+ *
+ * Returns true only to the caller that acquired it. Fails **closed**: if Redis
+ * is unreachable nobody gets the lock, because the work these guard is
+ * expensive-and-duplicable, and doing it twice is worse than not doing it now.
+ *
+ * `ttlSeconds` must exceed the worst-case duration of the guarded work. A lock
+ * that expires mid-job doesn't protect the tail of that job — it invites a
+ * second worker in alongside the first.
+ */
+export async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+  try {
+    const res = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
+    return res === "OK";
+  } catch {
+    return false;
+  }
+}
+
+export async function releaseLock(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+  } catch {
+    // The TTL will clear it.
+  }
 }
 
 /** TTL constants (seconds) */

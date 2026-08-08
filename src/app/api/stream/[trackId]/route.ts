@@ -37,5 +37,27 @@ export async function GET(
     return NextResponse.json({ error: "Track has no audio yet" }, { status: 409 });
   }
 
-  return NextResponse.redirect(track.audioUrl);
+  /**
+   * `audioUrl` holds two different kinds of value. Cloudinary-hosted tracks
+   * store an absolute URL; Telegram-sourced ones store a relative path
+   * (`/api/stream/telegram/<messageId>`) because the proxy route that serves
+   * them lives in this app.
+   *
+   * `NextResponse.redirect` requires an absolute URL and throws on a relative
+   * one, so every Telegram-sourced track — which is how essentially everything
+   * enters this library — failed with a 500 instead of playing. Resolving
+   * against the incoming request's origin handles both shapes: an absolute
+   * `audioUrl` is returned unchanged by the URL constructor, and a relative one
+   * becomes absolute against whatever host actually served the request, which
+   * keeps it correct behind Vercel's preview domains as well as locally.
+   */
+  let target: string;
+  try {
+    target = new URL(track.audioUrl, req.nextUrl.origin).toString();
+  } catch {
+    console.error(`[Stream] Track ${trackId} has an unusable audioUrl:`, track.audioUrl);
+    return NextResponse.json({ error: "Track audio is unavailable" }, { status: 502 });
+  }
+
+  return NextResponse.redirect(target);
 }

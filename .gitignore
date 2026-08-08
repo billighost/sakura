@@ -43,3 +43,9 @@ next-env.d.ts
 # stray build/debug artifacts
 dev.log
 test-mb.js
+
+# local server logs from perf testing
+.srv.log
+.srv.err
+.server*.log
+.server*.err

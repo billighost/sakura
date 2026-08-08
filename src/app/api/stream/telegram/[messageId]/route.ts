@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Readable } from "stream";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
+import { scheduleCdnPromotion } from "@/lib/audioOffload";
 
 /**
  * Proxy a Telegram message's audio as a streamable response.
@@ -9,6 +10,12 @@ import { getTelegramClient } from "@/lib/telegram";
  * CORS and cache headers are set so the browser can serve this through the
  * audio element, the service worker can cache it, and re-winding the same
  * track doesn't re-fetch from Telegram.
+ *
+ * This route is the fallback path, not the destination. Every byte served here
+ * is host bandwidth, which does not scale — so a full request also schedules
+ * the track's promotion to the CDN, after which `Track.audioUrl` points at
+ * Cloudinary and playback stops reaching this server at all. See
+ * `lib/audioOffload.ts`.
  */
 export async function GET(
   req: NextRequest,
@@ -63,18 +70,23 @@ export async function GET(
       const endPos = limitBytes ? offsetBytes + limitBytes - 1 : (size > 0 ? size - 1 : "*");
       const totalSize = size > 0 ? size : "*";
       headers.set("Content-Range", `bytes ${offsetBytes}-${endPos}/${totalSize}`);
-      
+
       return new Response(webStream as ReadableStream, {
         status: 206,
         headers,
       });
     }
 
+    // Only whole-file requests schedule promotion. A Range request is a seek or
+    // a browser probe, and firing on those would attempt the upload repeatedly
+    // during a single listen — the lock would absorb it, but at the cost of a
+    // Redis round trip per seek for no benefit.
+    scheduleCdnPromotion(msgId);
+
     return new Response(webStream as ReadableStream, {
       status: 200,
       headers,
-    });
-  } catch (error) {
+    });  } catch (error) {
     console.error("[Telegram Stream]", error);
     return new Response("Failed to stream audio from Telegram", { status: 500 });
   }

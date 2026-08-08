@@ -89,6 +89,16 @@ const CONFIG = {
   timeoutMs: Number(args.timeout) || 30000,
   /** Journeys to exclude, comma separated — e.g. --skip download,telegram */
   skip: String(args.skip || "").split(",").filter(Boolean),
+  /** Journeys to run exclusively — e.g. --only search. Overrides --skip. */
+  only: String(args.only || "").split(",").filter(Boolean),
+  /**
+   * Enable mutating journeys (likes, play signals).
+   *
+   * Off by default because this harness authenticates as a real account and
+   * calls the real endpoints, so its writes persist. Read-only runs still
+   * exercise every query and cache path that determines capacity.
+   */
+  writes: !!args.writes,
   verbose: !!args.verbose,
 };
 
@@ -114,7 +124,7 @@ const JOURNEYS = [
     weight: 18,
     cost: "trigram query + Deezer/iTunes, cached 6h",
     steps: (ctx) => [
-      { method: "GET", path: `/api/music/search?q=${encodeURIComponent(ctx.pick(ctx.seed.searchTerms))}&limit=10`, label: "search" },
+      { method: "GET", path: `/api/music/search?q=${encodeURIComponent(ctx.pickZipf(ctx.seed.searchTerms))}&limit=10`, label: "search" },
     ],
   },
   {
@@ -123,15 +133,22 @@ const JOURNEYS = [
     cost: "1 query + a signal write",
     steps: (ctx) => {
       const t = ctx.pick(ctx.seed.tracks);
-      return [
+      const steps = [
         { method: "GET", path: `/api/stream/${t.id}`, label: "stream", noRedirect: true },
-        {
+      ];
+      // Signals write ListeningHistory, which feeds taste profiles, radio and
+      // "recently played". Synthetic plays would quietly reshape a real user's
+      // recommendations, so this is gated behind --writes with the favourites
+      // mutation. See the note there.
+      if (CONFIG.writes) {
+        steps.push({
           method: "POST",
           path: "/api/signals",
           label: "signal",
           body: { trackId: t.id, event: "play", msPlayed: 30000 + Math.floor(Math.random() * 120000) },
-        },
-      ];
+        });
+      }
+      return steps;
     },
   },
   {
@@ -226,10 +243,25 @@ const JOURNEYS = [
     cost: "read + toggle write, invalidates cache",
     steps: (ctx) => {
       const t = ctx.pick(ctx.seed.tracks);
-      const add = Math.random() < 0.5;
-      return [
-        { method: "GET", path: "/api/favorites", label: "favorites" },
-        add
+      const steps = [{ method: "GET", path: "/api/favorites", label: "favorites" }];
+
+      /**
+       * The write half is opt-in (`--writes`).
+       *
+       * This harness drives the real endpoints, so its writes are real: an
+       * earlier run left 35 machine-made likes on a genuine account, and
+       * because the test picks tracks at random from the catalogue they were
+       * indistinguishable from the account owner's own likes except by
+       * timestamp. A load test should not be something you have to clean up
+       * after, so mutating journeys now have to be asked for explicitly.
+       *
+       * The read path still exercises the cache and the query underneath it,
+       * which is the part that matters for capacity.
+       */
+      if (!CONFIG.writes) return steps;
+
+      steps.push(
+        Math.random() < 0.5
           ? {
               method: "POST",
               path: "/api/favorites",
@@ -242,8 +274,9 @@ const JOURNEYS = [
               path: `/api/favorites/${t.id}`,
               label: "favorite:toggle",
               okStatuses: [200, 204, 404],
-            },
-      ];
+            }
+      );
+      return steps;
     },
   },
   {
@@ -341,7 +374,9 @@ async function runWorker() {
 
   const url = new URL(config.baseUrl);
   const results = [];
-  const activeJourneys = JOURNEYS.filter((j) => !config.skip.includes(j.name));
+  const activeJourneys = config.only.length
+    ? JOURNEYS.filter((j) => config.only.includes(j.name))
+    : JOURNEYS.filter((j) => !config.skip.includes(j.name));
   const totalWeight = activeJourneys.reduce((a, j) => a + j.weight, 0);
 
   function pickJourney() {
@@ -356,6 +391,18 @@ async function runWorker() {
   const ctx = {
     seed,
     pick: (arr) => arr[Math.floor(Math.random() * arr.length)],
+    /**
+     * Zipf-ish pick: heavily favours the front of the list.
+     *
+     * Uniform selection over a term pool is the wrong model for search and it
+     * biases the result in both directions at once — with a small pool
+     * everything is a cache hit, with a large one almost nothing is. Real
+     * traffic is neither: a few artists account for most queries while the tail
+     * is effectively unbounded. `x^2` over a sorted pool reproduces that shape
+     * closely enough to make the measured hit rate mean something, with the
+     * real catalogue names sitting at the head of the list.
+     */
+    pickZipf: (arr) => arr[Math.floor(Math.random() ** 2 * arr.length)],
   };
 
   function request(step, cookie) {
@@ -517,6 +564,9 @@ async function main() {
   console.log(`  Duration      ${CONFIG.durationSec}s  (ramp ${CONFIG.rampUpSec}s)`);
   console.log(`  Think time    ${CONFIG.thinkMs === 0 ? "0 (STRESS MODE)" : `~${CONFIG.thinkMs}ms exponential`}`);
   console.log(`  Workers       ${CONFIG.workers}`);
+  console.log(
+    `  Writes        ${CONFIG.writes ? "ENABLED — will persist likes and play signals" : "off (read-only; pass --writes to include)"}`
+  );
   if (CONFIG.skip.length) console.log(`  Skipping      ${CONFIG.skip.join(", ")}`);
   console.log("");
 
@@ -581,7 +631,12 @@ async function main() {
   console.log("");
 
   // ── Reset server counters ─────────────────────────────────────────────────
-  const statsBefore = await probeJson(`${CONFIG.baseUrl}/api/health?stats=1&reset=1`);
+  // `reset=1` returns the accumulated values *and then* zeroes them, so the
+  // run's own cost is simply whatever the counters read afterwards. Subtracting
+  // the returned figures would double-count the reset and produce a negative
+  // delta — which it did.
+  await probeJson(`${CONFIG.baseUrl}/api/health?stats=1&reset=1`);
+  const statsBefore = { redis: { commands: 0 }, sql: { queries: 0 } };
 
   // ── Run ───────────────────────────────────────────────────────────────────
   header("RUNNING");
@@ -632,7 +687,7 @@ async function main() {
 
   const statsAfter = await probeJson(`${CONFIG.baseUrl}/api/health?stats=1`);
 
-  report(all, timeline, statsBefore, statsAfter);
+  report(all, timeline, statsBefore, statsAfter, cookies.length);
 }
 
 // ── Reporting ───────────────────────────────────────────────────────────────
@@ -643,7 +698,7 @@ function header(title) {
   console.log(`  ${"─".repeat(74)}`);
 }
 
-function report(all, timeline, statsBefore, statsAfter) {
+function report(all, timeline, statsBefore, statsAfter, seedUserCount = 1) {
   const requests = all.filter((r) => !r.label.startsWith("__journey__"));
   const journeys = all.filter((r) => r.label.startsWith("__journey__"));
 
@@ -722,6 +777,33 @@ function report(all, timeline, statsBefore, statsAfter) {
     for (const [k, n] of [...byKind.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20)) {
       console.log(`    ${String(n).padStart(6)}  ${k}`);
     }
+
+    /**
+     * 429s need calling out separately, because in this harness they are
+     * usually an artifact rather than a finding.
+     *
+     * Per-user rate limits are keyed on the session's user id, and the test
+     * mints its cookies from however many real accounts the database happens to
+     * contain. With N accounts and V virtual users, every limiter bucket sees
+     * V/N times the traffic a real user would generate — so a limit that is
+     * generous in production trips constantly here. The seed count is printed
+     * alongside so the ratio is visible rather than implied.
+     */
+    const rateLimited = failed.filter((r) => r.errorKind === "http_429").length;
+    if (rateLimited > 0) {
+      const perAccount = (CONFIG.vus / seedUserCount).toFixed(0);
+      console.log("");
+      console.log(
+        `    ${rateLimited} of these are 429s. The run drove ${CONFIG.vus} virtual users through ` +
+          `${seedUserCount} real account(s)`
+      );
+      console.log(
+        `    — about ${perAccount}× the per-user rate a real listener produces, so the per-user`
+      );
+      console.log(
+        `    limiters trip here in a way they would not in production. Add accounts to remove this.`
+      );
+    }
     console.log("");
   }
 
@@ -778,32 +860,99 @@ function report(all, timeline, statsBefore, statsAfter) {
     }
     console.log("");
 
-    // Project the measured per-request cost onto a full month at target load.
-    // This is the number that decides whether the free plans hold, and it is
-    // not something a latency-only report can tell you.
-    const TARGET_USERS = 1000;
-    const reqPerUserPerHour = 60;
-    const monthlyRequests = TARGET_USERS * reqPerUserPerHour * 24 * 30;
-    const monthlyRedis = (redisOps / perReq) * monthlyRequests;
-    const monthlySql = (sqlOps / perReq) * monthlyRequests;
+    /**
+     * Project the measured per-request cost onto a month.
+     *
+     * The load model matters more than the measurement here, and the obvious
+     * one is wrong: "1000 users × 60 requests/hour × 24h × 30d" describes a
+     * thousand people using the app every minute of every day, which is not a
+     * music app, it's a monitoring probe. It inflates the projection by roughly
+     * the ratio of a day to a listening session — about 20×.
+     *
+     * So the model is stated in the terms a person would actually describe
+     * their usage in: how many are active on a given day, for how long, and how
+     * many requests a minute of listening costs. Override via env to sanity
+     * check a different shape of audience.
+     */
+    const TARGET_USERS = Number(process.env.PROJECT_USERS) || 1000;
+    const DAILY_ACTIVE_PCT = Number(process.env.PROJECT_DAU_PCT) || 0.4;
+    const SESSION_MINUTES = Number(process.env.PROJECT_SESSION_MIN) || 45;
+    const REQ_PER_MINUTE = Number(process.env.PROJECT_REQ_PER_MIN) || 2;
 
-    console.log(`  Projected at ${TARGET_USERS} users × ${reqPerUserPerHour} req/h × 30d:`);
-    console.log(`    ${fmtBig(monthlyRequests)} requests/month`);
+    const dailyActive = TARGET_USERS * DAILY_ACTIVE_PCT;
+    const monthlyRequests = dailyActive * SESSION_MINUTES * REQ_PER_MINUTE * 30;
+    const redisPerReq = redisOps / perReq;
+    const sqlPerReq = sqlOps / perReq;
+    const monthlyRedis = redisPerReq * monthlyRequests;
+    const monthlySql = sqlPerReq * monthlyRequests;
+
+    const UPSTASH_FREE = 500_000;
+
+    console.log(`  Model: ${TARGET_USERS} users, ${(DAILY_ACTIVE_PCT * 100).toFixed(0)}% active/day,`);
+    console.log(`         ${SESSION_MINUTES}min sessions, ${REQ_PER_MINUTE} req/min of listening`);
+    console.log(`    ${fmtBig(monthlyRequests)} requests/month  (${fmtBig(monthlyRequests / 30 / 86400)}/s average)`);
     console.log(
-      `    ${fmtBig(monthlyRedis)} Redis commands/month` +
-        `   ${monthlyRedis > 500_000 ? `← Upstash free = 500K  (${(monthlyRedis / 500_000).toFixed(0)}x OVER)` : "✓ within free tier"}`
+      `    ${fmtBig(monthlyRedis)} Redis commands/month   ` +
+        (monthlyRedis > UPSTASH_FREE
+          ? `← Upstash free = 500K (${(monthlyRedis / UPSTASH_FREE).toFixed(1)}× over)`
+          : `✓ within Upstash free (${((monthlyRedis / UPSTASH_FREE) * 100).toFixed(0)}% of quota)`)
     );
     console.log(`    ${fmtBig(monthlySql)} Postgres queries/month`);
+
+    // The lever, stated plainly: Redis cost is per-request cost × volume, and
+    // per-request cost is one minus the L1 hit rate. Worth printing because
+    // it's the number to optimise if the projection comes out over quota.
+    if (monthlyRedis > UPSTASH_FREE) {
+      const needed = redisPerReq * (UPSTASH_FREE / monthlyRedis);
+      console.log("");
+      console.log(
+        `    To fit the free tier: ${redisPerReq.toFixed(2)} → ${needed.toFixed(2)} Redis commands/request`
+      );
+      console.log(
+        `    (raise the L1 hit rate, currently ${statsAfter.memoryCache?.l1HitRate ?? "?"}%, or lengthen L1 TTLs)`
+      );
+    }
     console.log("");
   }
 
   // ── Verdict ───────────────────────────────────────────────────────────────
   header("VERDICT");
+
+  /**
+   * Judged on *serving* failures, with 429s held separately.
+   *
+   * A 429 is the rate limiter working — the server stayed up and answered
+   * correctly. Counting it as a failed request would mark a correctly-defended
+   * service as broken, and here the 429s are mostly an artifact of driving many
+   * virtual users through few real accounts (see the note above the error
+   * table). Timeouts, 5xx and dropped connections are the real signal.
+   */
+  const rateLimited = failed.filter((r) => r.errorKind === "http_429").length;
+  const served = requests.length - rateLimited;
+  const realFailures = failed.length - rateLimited;
+  const servingSuccess = served > 0 ? ((served - realFailures) / served) * 100 : 0;
+
+  // Steady-state latency: the last quarter of the run, after caches have filled.
+  // The first-quarter figure describes a cold start, which is a real but
+  // separate concern from how the service behaves once it's warm.
+  const lastQ = timeline.slice(-Math.max(1, Math.floor(timeline.length / 4)));
+  const steadyP95 = lastQ.length
+    ? lastQ.reduce((a, x) => a + x.p95, 0) / lastQ.length
+    : overall.p95;
+
   const checks = [
-    { name: "Success rate ≥ 99.5%", pass: successPct >= 99.5, actual: `${successPct.toFixed(2)}%` },
-    { name: "p95 < 800ms", pass: overall.p95 < 800, actual: `${overall.p95.toFixed(0)}ms` },
-    { name: "p99 < 2000ms", pass: overall.p99 < 2000, actual: `${overall.p99.toFixed(0)}ms` },
-    { name: "No pool starvation", pass: !statsAfter?.pool || statsAfter.pool.waiting === 0, actual: `${statsAfter?.pool?.waiting ?? "?"} waiting` },
+    {
+      name: "Serving success ≥ 99.5%",
+      pass: servingSuccess >= 99.5,
+      actual: `${servingSuccess.toFixed(2)}%  (${realFailures} real failures, ${rateLimited} rate-limited)`,
+    },
+    { name: "Steady-state p95 < 800ms", pass: steadyP95 < 800, actual: `${steadyP95.toFixed(0)}ms` },
+    { name: "Overall p99 < 2000ms", pass: overall.p99 < 2000, actual: `${overall.p99.toFixed(0)}ms` },
+    {
+      name: "No pool starvation",
+      pass: !statsAfter?.pool || statsAfter.pool.waiting === 0,
+      actual: `${statsAfter?.pool?.waiting ?? "?"} waiting`,
+    },
   ];
   for (const c of checks) {
     console.log(`  ${c.pass ? "✓" : "✖"}  ${c.name.padEnd(26)} ${c.actual}`);
@@ -852,6 +1001,31 @@ async function loadSeed(pool) {
     "drake", "taylor swift", "weeknd", "burna boy", "afrobeats",
     "jazz", "lofi", "amapiano", "sza", "kendrick",
   ].filter(Boolean);
+
+  /**
+   * Cache hit rate is a property of *query diversity*, not of the cache — and
+   * the seed above yields only ~35 distinct terms, which any cache will serve at
+   * 90%+ and which flatters the result badly.
+   *
+   * Real search traffic is a long tail: a handful of hot artists plus an
+   * effectively unbounded set of one-off queries. `--termPool N` widens the set
+   * with synthetic misses so the measured hit rate reflects that shape. Terms
+   * are drawn from a Zipf-ish distribution by the caller, so popular terms still
+   * repeat while the tail stays cold.
+   */
+  const poolSize = Number(process.argv.includes("--termPool")
+    ? process.argv[process.argv.indexOf("--termPool") + 1]
+    : 0);
+  if (poolSize > searchTerms.length) {
+    const alphabet = "abcdefghijklmnopqrstuvwxyz";
+    for (let i = searchTerms.length; i < poolSize; i++) {
+      // Deterministic, so repeated runs are comparable, and unlikely to collide
+      // with anything a provider actually has — these are meant to miss.
+      const a = alphabet[i % 26];
+      const b = alphabet[Math.floor(i / 26) % 26];
+      searchTerms.push(`${a}${b}${i} song`);
+    }
+  }
 
   return {
     users,

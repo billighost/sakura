@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { redis } from "@/lib/redis";
+import { cached, cacheKey as buildKey, TTL } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -16,15 +16,10 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
   const downloadedOnly = searchParams.get("downloaded") === "true";
 
-  const cacheKey = `artists:list:${userId}:${page}:${limit}:${downloadedOnly}`;
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
-    }
-  } catch {
-    // cache failure — continue to DB
-  }
+  // Read-through the shared cache: L1 first, single-flight on miss. See the
+  // note in the tracks route — the hand-rolled `redis.get`/`set` pair this
+  // replaces bypassed both.
+  const key = buildKey("artists:list", userId, page, limit, String(downloadedOnly));
 
   try {
     let whereClause = "";
@@ -36,7 +31,10 @@ export async function GET(req: NextRequest) {
       )`;
     }
 
-    const countResult = await queryOne<{ count: string }>(
+    const result = await cached(key, TTL.ARTISTS, async () => {
+    // Independent queries — issued together rather than back to back.
+    const [countResult, artists] = await Promise.all([
+      queryOne<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM "Artist" a
        WHERE EXISTS (
          SELECT 1 FROM "Favorite" f
@@ -51,10 +49,8 @@ export async function GET(req: NextRequest) {
          WHERE (t."artistId" = a.id OR ta."artistId" = a.id) AND p."userId" = $1
        ) ${whereClause}`,
       [userId]
-    );
-    const total = parseInt(countResult?.count || "0", 10);
-
-    const artists = await query(
+    ),
+      query(
       `SELECT
         a.*,
         COUNT(DISTINCT t.id)::int + COUNT(DISTINCT ta."trackId")::int AS "trackCount",
@@ -76,17 +72,14 @@ export async function GET(req: NextRequest) {
       ORDER BY a.name ASC
       LIMIT $1 OFFSET $2`,
       [limit, offset, userId],
-    );
+    ),
+    ]);
 
-    const result = { artists, total, page, limit, pages: Math.ceil(total / limit) };
+      const total = parseInt(countResult?.count || "0", 10);
+      return { artists, total, page, limit, pages: Math.ceil(total / limit) };
+    });
 
-    try {
-      await redis.set(cacheKey, JSON.stringify(result), { ex: 60 });
-    } catch {
-      // cache write failure — non-critical
-    }
-
-    return NextResponse.json(result, { headers: { "X-Cache": "MISS" } });
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Failed to fetch artists:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

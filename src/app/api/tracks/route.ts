@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { redis } from "@/lib/redis";
+import { cached, cacheKey as buildKey, TTL } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -16,17 +16,16 @@ export async function GET(req: NextRequest) {
   const downloadedOnly = searchParams.get("downloaded") === "true";
   const offset = (page - 1) * limit;
 
-  const cacheKey = `tracks:list:${page}:${limit}:${q}:${downloadedOnly}`;
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, {
-        headers: { "X-Cache": "HIT" },
-      });
-    }
-  } catch {
-    // cache failure — continue to DB
-  }
+  /**
+   * Read through the shared cache rather than talking to Redis directly.
+   *
+   * Going straight to `redis.get` skipped the in-process L1 layer entirely, so
+   * this endpoint paid a network round trip on every single call even when the
+   * answer had not changed — and on a per-command plan that round trip is the
+   * bill. It also had no single-flight, so an expiry under load sent every
+   * concurrent reader to Postgres at once for the same page.
+   */
+  const key = buildKey("tracks:list", page, limit, q, String(downloadedOnly));
 
   let whereClause = "";
   const params: any[] = [];
@@ -57,30 +56,25 @@ export async function GET(req: NextRequest) {
   `;
 
   try {
-    const countParams = [...params];
-    const countResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM "Track" t LEFT JOIN "Artist" a ON t."artistId" = a.id LEFT JOIN "Album" al ON t."albumId" = al.id ${whereClause}`,
-      countParams,
-    );
-    const total = parseInt(countResult?.count || "0", 10);
+    const result = await cached(key, TTL.TRACKS, async () => {
+      // The count and the page are independent; running them in sequence cost
+      // two full round trips to a remote database to answer one request.
+      const [countResult, tracks] = await Promise.all([
+        queryOne<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM "Track" t LEFT JOIN "Artist" a ON t."artistId" = a.id LEFT JOIN "Album" al ON t."albumId" = al.id ${whereClause}`,
+          [...params],
+        ),
+        query(
+          `${baseQuery} ORDER BY t."createdAt" DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+          [...params, limit, offset],
+        ),
+      ]);
 
-    params.push(limit, offset);
-    const tracks = await query(
-      `${baseQuery} ORDER BY t."createdAt" DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      params,
-    );
-
-    const result = { tracks, total, page, limit, pages: Math.ceil(total / limit) };
-
-    try {
-      await redis.set(cacheKey, JSON.stringify(result), { ex: 60 });
-    } catch {
-      // cache write failure — non-critical
-    }
-
-    return NextResponse.json(result, {
-      headers: { "X-Cache": "MISS" },
+      const total = parseInt(countResult?.count || "0", 10);
+      return { tracks, total, page, limit, pages: Math.ceil(total / limit) };
     });
+
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Failed to fetch tracks:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
