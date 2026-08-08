@@ -108,14 +108,11 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
     if (effectiveDownloadState !== "idle") return; // Prevent double clicks during download
 
-    const audioUrlUnusable =
-      !track.audioUrl ||
-      track.audioUrl === "pending" ||
-      track.audioUrl.includes("dzcdn.net") ||
-      track.audioUrl.endsWith("/api/stream/telegram/0");
+    const au = track.audioUrl || "";
+    const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
 
     // If it's already downloaded or has a valid audioUrl from library, just play
-    if (offline || track.source === "library" || !audioUrlUnusable) {
+    if (offline || track.source === "library" || isAudioUsable) {
       playTrack(track.id, track.audioUrl!);
       return;
     }
