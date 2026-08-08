@@ -256,9 +256,9 @@ export async function recordPlaySignals(userId: string, signals: PlaySignal[]): 
   try {
     await execute(
       `INSERT INTO "ListeningHistory"
-         ("userId", "trackId", "playedAt", "skipped", "msPlayed", "completed",
+         (id, "userId", "trackId", "playedAt", "skipped", "msPlayed", "completed",
           "skipAtMs", "context", "contextId", "autoplay", "hourOfDay", "dayOfWeek")
-       SELECT $1, t.t_id, t.at, t.skipped, t.ms_played, t.completed,
+       SELECT gen_random_uuid()::text, $1, t.t_id, t.at, t.skipped, t.ms_played, t.completed,
               t.skip_at_ms, t.context, t.context_id, t.autoplay, t.hour_of_day, t.day_of_week
          FROM UNNEST(
            $2::text[], $3::timestamptz[], $4::boolean[], $5::int[], $6::boolean[],

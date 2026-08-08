@@ -110,6 +110,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
 
     const audioUrlUnusable =
       !track.audioUrl ||
+      track.audioUrl === "pending" ||
       track.audioUrl.includes("dzcdn.net") ||
       track.audioUrl.endsWith("/api/stream/telegram/0");
 
