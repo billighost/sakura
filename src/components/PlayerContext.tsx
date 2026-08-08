@@ -1381,7 +1381,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (!audioRef.current || !currentTrack) return;
 
       // Determine if we should play. Only play if we are changing tracks *after* hydration
-      const wasPlaying = isPlayingRef.current;
       let src = currentTrack.audioUrl;
 
       try {
@@ -1449,7 +1448,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           // through them all in under a second.
           await new Promise((r) => setTimeout(r, 1500));
           if (!active) return;
-          advanceRef.current({ autoplay: wasPlaying });
+          advanceRef.current({ autoplay: isPlayingRef.current });
           return;
         }
       }
@@ -1509,8 +1508,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
         // at the right spot for the person to hit play.
       }
-      
-      if (wasPlaying) {
+      if (isPlayingRef.current) {
         audioRef.current.play().catch(() => {});
       }
     }
