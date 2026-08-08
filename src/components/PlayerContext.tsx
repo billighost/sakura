@@ -1416,7 +1416,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         } catch (err) {
           console.error("Failed to resolve audio for queued track:", err);
           if (!active) return;
-          showToast("Couldn't load that track. Skipping.", "error");
+          showToast("Couldn't load that track — download failed. Skipping.", "error");
+          // Add a small delay before skipping to prevent a rapid-fire cascade
+          // where every track in the queue fails instantly and the player races
+          // through them all in under a second.
+          await new Promise((r) => setTimeout(r, 1500));
+          if (!active) return;
           advanceRef.current({ autoplay: wasPlaying });
           return;
         }

@@ -64,15 +64,22 @@ export class TelegramClient {
   private connected = false;
   private connectPromise: Promise<void> | null = null;
   private botUsername: string;
+  // Stored so we can recreate the GramClient on AUTH_KEY_DUPLICATED
+  private readonly apiId: number;
+  private readonly apiHash: string;
+  private readonly sessionString: string;
   // Shared mutex — bot interactions from ALL concurrent downloads are serialized
   private static botMutex = new AsyncMutex();
 
   constructor(
-    private apiId: number,
-    private apiHash: string,
-    private sessionString: string,
+    apiId: number,
+    apiHash: string,
+    sessionString: string,
     botUsername?: string,
   ) {
+    this.apiId = apiId;
+    this.apiHash = apiHash;
+    this.sessionString = sessionString;
     this.botUsername = botUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
     this.client = new GramClient(
       new StringSession(sessionString),
@@ -96,6 +103,7 @@ export class TelegramClient {
             await this.client.connect();
           }
           this.connected = true;
+          this.connectPromise = null; // clear so future reconnects re-enter
           console.log("[Telegram] Connected");
           return;
         } catch (error: any) {
@@ -108,7 +116,16 @@ export class TelegramClient {
           if (isAuthKeyDuplicated && attempt < 3) {
             const jitterMs = 1500 + Math.floor(Math.random() * 2000);
             console.warn(`[Telegram] AUTH_KEY_DUPLICATED (attempt ${attempt}/3), retrying in ${jitterMs}ms...`);
-            await this.client.disconnect().catch(() => {});
+            // The auth key on this client instance is poisoned — Telegram has
+            // invalidated it. We must recreate the underlying GramJS client
+            // (new MTProto session object) rather than reconnecting the same one.
+            try { await this.client.disconnect(); } catch { /* ignore */ }
+            this.client = new GramClient(
+              new StringSession(this.sessionString),
+              this.apiId,
+              this.apiHash,
+              { connectionRetries: 5, autoReconnect: true },
+            );
             await new Promise((r) => setTimeout(r, jitterMs));
           } else {
             this.connectPromise = null;
@@ -117,6 +134,9 @@ export class TelegramClient {
           }
         }
       }
+      // All retries exhausted
+      this.connectPromise = null;
+      throw new Error("[Telegram] Failed to connect after 3 attempts");
     })();
 
     return this.connectPromise;
@@ -564,8 +584,13 @@ export class TelegramClient {
   private async ensureConnected(): Promise<void> {
     if (!this.connected || !this.client?.connected) {
       this.connected = false;
-      this.connectPromise = null;
-      await this.init();
+      // Only null-out connectPromise if there isn't one in flight already —
+      // concurrent callers should join the same promise, not each start their own.
+      if (!this.connectPromise) {
+        await this.init();
+      } else {
+        await this.connectPromise;
+      }
     }
   }
 }
