@@ -231,10 +231,12 @@ export async function POST(req: NextRequest) {
 
     let albumId: string | null = providedAlbumId || null;
 
-    if (!albumId && metadata.album) {
+    if (metadata.album) {
+      // The frontend might send a Deezer ID ("deezer-...") for the album if it hasn't
+      // been downloaded yet. We must ensure the Album exists in our DB and use its internal UUID.
       const existingAlbum = await queryOne<{ id: string }>(
-        `SELECT id FROM "Album" WHERE "deezerId" = $1`,
-        [metadata.album.deezerId]
+        `SELECT id FROM "Album" WHERE "deezerId" = $1 OR id = $2`,
+        [metadata.album.deezerId, albumId]
       );
 
       if (existingAlbum) {
@@ -269,6 +271,10 @@ export async function POST(req: NextRequest) {
         );
         albumId = newAlbum!.id;
       }
+    } else if (albumId && albumId.startsWith("deezer-")) {
+      // If we got a deezer- albumId but metadata.album is null, we can't create it reliably.
+      // Leave albumId null to avoid foreign key crashes.
+      albumId = null;
     }
 
     let dbTrack = null;
