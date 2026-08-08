@@ -239,9 +239,26 @@ export class TelegramClient {
       console.log(`[Telegram AutoDownload] Got ${buttons.length} results. Selecting index ${selectedIndex}: "${buttons[selectedIndex]?.text}" (score: ${bestScore}) for query "${query}"`);
       const result = await this._selectResult(buttonMessageId, selectedIndex, selectTimeoutMs);
       return result;
-    } catch (err) {
-      this.connected = false;
-      this.connectPromise = null;
+    } catch (err: any) {
+      // Only invalidate the connection for actual MTProto/network errors.
+      // Bot-level errors ("No results", "Bot did not respond", "BOT_RESPONSE_TIMEOUT")
+      // don't mean the session is broken — they're application-level failures.
+      // Marking the connection dead for those forces a full reconnect (with the
+      // AUTH_KEY_DUPLICATED retry loop) on every search miss, adding seconds of
+      // unnecessary latency and making Telegram cascading failures much worse.
+      const isConnectionError =
+        err?.code === 406 ||
+        err?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+        String(err).includes("AUTH_KEY_DUPLICATED") ||
+        err?.message?.includes("ECONNRESET") ||
+        err?.message?.includes("ETIMEDOUT") ||
+        err?.message?.includes("socket") ||
+        err?.message?.includes("network");
+
+      if (isConnectionError) {
+        this.connected = false;
+        this.connectPromise = null;
+      }
       throw err;
     } finally {
       release();

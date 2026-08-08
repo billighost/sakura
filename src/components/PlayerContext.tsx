@@ -609,19 +609,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    try {
-      if (wasLiked) {
-        await fetch(`/api/favorites/${trackId}`, { method: "DELETE" });
-      } else {
-        await fetch("/api/favorites", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackId }),
-        });
-      }
-    } catch (err) {
-      console.error("Failed to toggle liked state", err);
-      // Revert on error
+    const revert = () => {
       setFavoriteTrackIds((prev) => {
         const next = new Set(prev);
         if (wasLiked) {
@@ -631,6 +619,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
         return next;
       });
+    };
+
+    try {
+      let res: Response;
+      if (wasLiked) {
+        res = await fetch(`/api/favorites/${trackId}`, { method: "DELETE" });
+      } else {
+        res = await fetch("/api/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackId }),
+        });
+      }
+      // fetch() doesn't throw on 4xx/5xx — check the status explicitly
+      // so the optimistic update is reverted if the server rejected the request.
+      if (!res.ok) {
+        console.error("Failed to toggle liked state: HTTP", res.status);
+        revert();
+      }
+    } catch (err) {
+      console.error("Failed to toggle liked state", err);
+      revert();
     }
   }, [favoriteTrackIds]);
 
@@ -1057,14 +1067,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Auto-skip on stream playback failure with toast notification.
+      //
+      // Two classes of false-positive must be silenced:
+      //  1. MEDIA_ERR_ABORTED: fires when the player sets a new src and the
+      //     browser cancels the previous fetch. This is a normal skip, not an
+      //     error — advancing again would double-skip.
+      //  2. Rapid re-fires: if the new src also fails (e.g. during a cascade),
+      //     the 2-second gate keeps us from skipping through the whole queue
+      //     before the Telegram client has time to recover.
+      let lastErrorSkipMs = 0;
       audio.addEventListener("error", () => {
-        // Only treat this as a real failure if a source was actually set —
-        // clearing src or an aborted load fires error too, and skipping the
-        // track there would make playback lurch for no reason.
         const el = audioRef.current;
         if (!el || !el.src || el.src === window.location.href) return;
 
-        console.error("Audio playback error for", el.src);
+        // Ignore aborts — these fire during intentional track changes.
+        if (el.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
+
+        // Debounce: suppress if we already skipped within the last 2 seconds.
+        const now = Date.now();
+        if (now - lastErrorSkipMs < 2000) return;
+        lastErrorSkipMs = now;
+
+        console.error("Audio playback error for", el.src, "code:", el.error?.code);
         showToast("Playback failure. Skipping to next track.", "error");
         // Don't record a skip signal: the person didn't reject this track,
         // the stream broke. Counting it would poison their taste profile.

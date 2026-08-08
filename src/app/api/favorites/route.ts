@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const { trackId } = await req.json();
   const userId = session.user.id!;
 
-  if (!trackId) {
+  if (!trackId || typeof trackId !== "string" || trackId.trim().length === 0) {
     return NextResponse.json({ error: "trackId is required" }, { status: 400 });
   }
 

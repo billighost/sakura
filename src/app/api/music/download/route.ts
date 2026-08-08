@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       title: string;
       artistName: string;
       duration: number;
-      audioUrl: string;
+      audioUrl: string | null;
       albumId: string | null;
       coverUrl: string | null;
       telegramMessageId: string | null;
@@ -50,17 +50,35 @@ export async function POST(req: NextRequest) {
     );
 
     if (existingTrack) {
-      console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}". Returning DB track.`);
-      return NextResponse.json({
-        id: existingTrack.id,
-        title: existingTrack.title,
-        artist: existingTrack.artistName,
-        duration: existingTrack.duration,
-        audioUrl: existingTrack.audioUrl,
-        messageId: existingTrack.telegramMessageId ? parseInt(existingTrack.telegramMessageId, 10) : null,
-        albumId: existingTrack.albumId,
-        coverUrl: existingTrack.coverUrl,
-      });
+      /**
+       * Guard against returning a useless audioUrl:
+       *  - null/empty  → track was inserted as a Deezer stub with no audio
+       *  - dzcdn.net   → Deezer 30-second preview; not a real audio stream
+       *  - /api/stream/telegram/0 → broken telegram stream (messageId=0)
+       * In all these cases fall through to Telegram to get a real file.
+       */
+      const au = existingTrack.audioUrl || "";
+      const audioUrlUnusable =
+        !au ||
+        au.includes("dzcdn.net") ||
+        au.endsWith("/api/stream/telegram/0") ||
+        au === "/api/stream/telegram/0";
+
+      if (!audioUrlUnusable) {
+        console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}". Returning DB track.`);
+        return NextResponse.json({
+          id: existingTrack.id,
+          title: existingTrack.title,
+          artist: existingTrack.artistName,
+          duration: existingTrack.duration,
+          audioUrl: existingTrack.audioUrl,
+          messageId: existingTrack.telegramMessageId ? parseInt(existingTrack.telegramMessageId, 10) : null,
+          albumId: existingTrack.albumId,
+          coverUrl: existingTrack.coverUrl,
+        });
+      }
+
+      console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}" but audioUrl is unusable ("${au}"). Re-downloading from Telegram.`);
     }
   } catch (err) {
     console.error("[Telegram AutoDownload] Pre-lookup database error:", err);
@@ -251,9 +269,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (!dbTrack) {
+      // Use ON CONFLICT on (title, "artistId") so two concurrent serverless
+      // instances that both race past the earlier lookups don't create a
+      // duplicate row — the second insert just updates the telegram fields
+      // on the existing row and returns the same id.
       dbTrack = await queryOne<{ id: string; audioUrl: string }>(
         `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "deezerId", isrc, "previewUrl", "coverUrl", "createdAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'telegram', $6, $7, $8, $9, $10, NOW())
+         ON CONFLICT (title, "artistId") DO UPDATE
+           SET "audioUrl"          = EXCLUDED."audioUrl",
+               "telegramMessageId" = EXCLUDED."telegramMessageId",
+               "deezerId"          = COALESCE("Track"."deezerId", EXCLUDED."deezerId"),
+               "coverUrl"          = COALESCE("Track"."coverUrl",  EXCLUDED."coverUrl")
          RETURNING id, "audioUrl"`,
         [
           track.title,
@@ -387,6 +414,22 @@ export async function POST(req: NextRequest) {
 
     // Trigger MusicBrainz enrichment in the background so it does not block the response
     enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
+
+    // If the user had already liked the virtual deezer- version of this track
+    // (e.g. liked before ever playing it), migrate that Favorite row to the
+    // new real track id so the heart icon stays filled after the download.
+    if (metadata.track?.deezerId) {
+      const deezerId = metadata.track.deezerId.toString();
+      const deezerTrackId = `deezer-${deezerId}`;
+      execute(
+        `UPDATE "Favorite" SET "trackId" = $1
+          WHERE "trackId" = $2
+            AND NOT EXISTS (
+              SELECT 1 FROM "Favorite" WHERE "trackId" = $1 AND "userId" = "Favorite"."userId"
+            )`,
+        [dbTrack!.id, deezerTrackId]
+      ).catch((err) => console.warn("[Telegram AutoDownload] Favorite migration failed:", err));
+    }
 
     resolveDownload();
     pendingDownloads.delete(cacheKey);
