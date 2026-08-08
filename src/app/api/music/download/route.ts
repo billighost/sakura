@@ -4,6 +4,14 @@ import { getTelegramClient } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
+import { Redis } from "@upstash/redis";
+
+const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
 const globalForPendingDownloads = globalThis as unknown as {
   pendingDownloads?: Map<string, Promise<any>>;
@@ -96,6 +104,17 @@ export async function POST(req: NextRequest) {
 
   const cacheKey = `${artist.toLowerCase().trim()} - ${title.toLowerCase().trim()}`;
   const searchQuery = `${artist} - ${title}`;
+  const negativeCacheKey = `download:failed:${cacheKey}`;
+
+  if (redis) {
+    const isFailed = await redis.get(negativeCacheKey);
+    if (isFailed) {
+      return NextResponse.json(
+        { error: "Track currently unavailable (cached failure)" },
+        { status: 404 }
+      );
+    }
+  }
 
   if (pendingDownloads.has(cacheKey)) {
     console.log(`[Telegram AutoDownload] Coalescing request for "${searchQuery}". Waiting for active download...`);
@@ -268,7 +287,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!dbTrack) {
+    if (dbTrack) {
+      // The track exists (e.g., as a Deezer stub from the Favorites route).
+      // We just downloaded it from Telegram, so we must upgrade the stub to a real track.
+      const newAudioUrl = `/api/stream/telegram/${track.messageId}`;
+      await execute(
+        `UPDATE "Track" 
+         SET "audioUrl" = $1, "telegramMessageId" = $2, duration = GREATEST(duration, $3), "source" = 'telegram'
+         WHERE id = $4`,
+        [newAudioUrl, track.messageId.toString(), track.duration || 0, dbTrack.id]
+      );
+      (dbTrack as any).audioUrl = newAudioUrl;
+    } else {
       // Two concurrent serverless instances may both pass the earlier lookups
       // and try to insert the same track simultaneously. Wrap in try/catch so
       // the loser of the race falls back to selecting the winner's row.
@@ -462,6 +492,12 @@ export async function POST(req: NextRequest) {
     rejectDownload(error);
     pendingDownloads.delete(cacheKey);
     console.error("[Telegram AutoDownload]", error);
+    
+    if (redis) {
+      // Cache the failure for 5 minutes to prevent slamming the bot
+      await redis.set(negativeCacheKey, "1", { ex: 300 }).catch(console.error);
+    }
+    
     return NextResponse.json(
       { error: "Failed to download track from Telegram" },
       { status: 500 }

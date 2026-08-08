@@ -25,37 +25,76 @@ export interface MusicResult {
   buttonIndex: number;
 }
 
-/**
- * Simple async mutex for serializing bot interactions.
- * The Telegram bot (musicshuntersbot) processes one search at a time;
- * sending multiple queries concurrently confuses its state machine and
- * causes BOT_RESPONSE_TIMEOUT errors. All bot interactions (search →
- * click button → wait for audio) are serialized through this queue.
- * Actual file streaming (the bandwidth-heavy part) is NOT gated and
- * remains fully concurrent, so 100+ simultaneous downloads are supported.
- */
-class AsyncMutex {
-  private queue: (() => void)[] = [];
-  private locked = false;
+import { Redis } from "@upstash/redis";
 
-  async acquire(): Promise<() => void> {
-    return new Promise<() => void>((resolve) => {
-      const tryLock = () => {
-        if (!this.locked) {
-          this.locked = true;
-          resolve(() => {
-            this.locked = false;
-            if (this.queue.length > 0) {
-              const next = this.queue.shift()!;
-              next();
-            }
-          });
-        } else {
-          this.queue.push(tryLock);
-        }
-      };
-      tryLock();
-    });
+/**
+ * Global distributed mutex for serializing bot interactions across all
+ * serverless instances. The Telegram bot processes one search at a time;
+ * sending multiple queries concurrently (e.g. from 10 Vercel edge functions)
+ * triggers 406 AUTH_KEY_DUPLICATED and revokes the session.
+ */
+class RedisMutex {
+  private redis: Redis | null = null;
+  private localQueue: (() => void)[] = [];
+  private localLocked = false;
+
+  constructor() {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      this.redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+    } else {
+      console.warn("[RedisMutex] Missing Upstash Redis credentials. Falling back to local locking.");
+    }
+  }
+
+  async acquire(): Promise<() => Promise<void>> {
+    if (!this.redis) {
+      return new Promise<() => Promise<void>>((resolve) => {
+        const tryLock = () => {
+          if (!this.localLocked) {
+            this.localLocked = true;
+            resolve(async () => {
+              this.localLocked = false;
+              if (this.localQueue.length > 0) {
+                const next = this.localQueue.shift()!;
+                next();
+              }
+            });
+          } else {
+            this.localQueue.push(tryLock);
+          }
+        };
+        tryLock();
+      });
+    }
+
+    const lockKey = "telegram:bot:mutex";
+    const token = Math.random().toString(36).slice(2);
+    const lockTimeoutMs = 60000; 
+
+    while (true) {
+      const acquired = await this.redis.set(lockKey, token, { nx: true, px: lockTimeoutMs });
+      
+      if (acquired) {
+        return async () => {
+          const script = `
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+              return redis.call("del", KEYS[1])
+            else
+              return 0
+            end
+          `;
+          try {
+            await this.redis!.eval(script, [lockKey], [token]);
+          } catch (err) {
+            console.error("[RedisMutex] Failed to release lock", err);
+          }
+        };
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
 }
 
@@ -69,7 +108,7 @@ export class TelegramClient {
   private readonly apiHash: string;
   private readonly sessionString: string;
   // Shared mutex — bot interactions from ALL concurrent downloads are serialized
-  private static botMutex = new AsyncMutex();
+  private static botMutex = new RedisMutex();
 
   constructor(
     apiId: number,
@@ -160,7 +199,7 @@ export class TelegramClient {
     }
     // Note: release is returned to the caller via searchAndSelect
     // This method shouldn't be called directly; use searchAndSelect instead.
-    release();
+    await release();
     throw new Error("Unreachable");
   }
 
@@ -261,7 +300,7 @@ export class TelegramClient {
       }
       throw err;
     } finally {
-      release();
+      await release();
     }
   }
 
