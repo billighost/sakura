@@ -269,33 +269,47 @@ export async function POST(req: NextRequest) {
     }
 
     if (!dbTrack) {
-      // Use ON CONFLICT on (title, "artistId") so two concurrent serverless
-      // instances that both race past the earlier lookups don't create a
-      // duplicate row — the second insert just updates the telegram fields
-      // on the existing row and returns the same id.
-      dbTrack = await queryOne<{ id: string; audioUrl: string }>(
-        `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "deezerId", isrc, "previewUrl", "coverUrl", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'telegram', $6, $7, $8, $9, $10, NOW())
-         ON CONFLICT (title, "artistId") DO UPDATE
-           SET "audioUrl"          = EXCLUDED."audioUrl",
-               "telegramMessageId" = EXCLUDED."telegramMessageId",
-               "deezerId"          = COALESCE("Track"."deezerId", EXCLUDED."deezerId"),
-               "coverUrl"          = COALESCE("Track"."coverUrl",  EXCLUDED."coverUrl")
-         RETURNING id, "audioUrl"`,
-        [
-          track.title,
-          artistId,
-          albumId,
-          track.duration || 0,
-          `/api/stream/telegram/${track.messageId}`,
-          track.messageId.toString(),
-          metadata.track?.deezerId?.toString() || null,
-          metadata.track?.isrc || null,
-          metadata.track?.previewUrl || null,
-          metadata.album?.coverUrl || null,
-        ]
-      );
+      // Two concurrent serverless instances may both pass the earlier lookups
+      // and try to insert the same track simultaneously. Wrap in try/catch so
+      // the loser of the race falls back to selecting the winner's row.
+      try {
+        dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+          `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "deezerId", isrc, "previewUrl", "coverUrl", "createdAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'telegram', $6, $7, $8, $9, $10, NOW())
+           RETURNING id, "audioUrl"`,
+          [
+            track.title,
+            artistId,
+            albumId,
+            track.duration || 0,
+            `/api/stream/telegram/${track.messageId}`,
+            track.messageId.toString(),
+            metadata.track?.deezerId?.toString() || null,
+            metadata.track?.isrc || null,
+            metadata.track?.previewUrl || null,
+            metadata.album?.coverUrl || null,
+          ]
+        );
+      } catch (insertErr: any) {
+        // If the insert failed due to a concurrent duplicate, find the existing row.
+        const isDuplicate =
+          insertErr?.code === "23505" || // PostgreSQL unique_violation
+          String(insertErr?.message).includes("duplicate key");
+
+        if (isDuplicate) {
+          console.warn("[Telegram AutoDownload] Concurrent insert race detected, selecting existing row");
+          dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+            `SELECT id, "audioUrl" FROM "Track"
+              WHERE "telegramMessageId" = $1
+                 OR (lower(title) = lower($2) AND "artistId" = $3)
+              LIMIT 1`,
+            [track.messageId.toString(), track.title, artistId]
+          );
+        }
+        if (!dbTrack) throw insertErr;
+      }
     }
+
 
     // ── Contributors ────────────────────────────────────────────────────────
     // Previously this looped one artist at a time with a SELECT then maybe an
