@@ -22,7 +22,7 @@ export async function GET(
   const { messageId } = await params;
   const msgId = parseInt(messageId, 10);
 
-  if (isNaN(msgId)) {
+  if (isNaN(msgId) || msgId <= 0) {
     return new Response("Invalid messageId", { status: 400 });
   }
 

@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
                 data.title,
                 artistId,
                 data.duration || 0,
-                `/api/stream/telegram/0`,
+                data.preview || null,
                 data.album?.cover_big || data.album?.cover_medium || null,
                 dzId,
                 data.preview || null,

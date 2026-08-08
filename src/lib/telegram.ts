@@ -3,6 +3,19 @@ import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
 import { Readable } from "stream";
 
+// Prevent GramJS background _recvLoop RPC errors (406 AUTH_KEY_DUPLICATED) from bringing down Node process
+if (typeof process !== "undefined" && typeof process.on === "function") {
+  process.on("unhandledRejection", (reason: any) => {
+    if (
+      reason?.code === 406 ||
+      reason?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+      String(reason).includes("AUTH_KEY_DUPLICATED")
+    ) {
+      console.warn("[Telegram] Intercepted GramJS background AUTH_KEY_DUPLICATED error");
+    }
+  });
+}
+
 export interface MusicResult {
   messageId: number;
   title: string;
@@ -77,37 +90,32 @@ export class TelegramClient {
     if (this.connectPromise) return this.connectPromise;
 
     this.connectPromise = (async () => {
-      try {
-        if (!this.client?.connected) {
-          await this.client.connect();
-        }
-        this.connected = true;
-        console.log("[Telegram] Connected");
-      } catch (error: any) {
-        this.connectPromise = null;
-        this.connected = false;
-        if (
-          error?.errorMessage === "AUTH_KEY_DUPLICATED" ||
-          error?.code === 406 ||
-          String(error).includes("AUTH_KEY_DUPLICATED")
-        ) {
-          console.warn("[Telegram] AUTH_KEY_DUPLICATED during connect, waiting 2s before retry...");
-          await new Promise((r) => setTimeout(r, 2000));
-          try {
-            await this.client.disconnect().catch(() => {});
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          if (!this.client?.connected) {
             await this.client.connect();
-            this.connected = true;
-            console.log("[Telegram] Connected on retry");
-            return;
-          } catch (retryErr) {
+          }
+          this.connected = true;
+          console.log("[Telegram] Connected");
+          return;
+        } catch (error: any) {
+          this.connected = false;
+          const isAuthKeyDuplicated =
+            error?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+            error?.code === 406 ||
+            String(error).includes("AUTH_KEY_DUPLICATED");
+
+          if (isAuthKeyDuplicated && attempt < 3) {
+            const jitterMs = 1500 + Math.floor(Math.random() * 2000);
+            console.warn(`[Telegram] AUTH_KEY_DUPLICATED (attempt ${attempt}/3), retrying in ${jitterMs}ms...`);
+            await this.client.disconnect().catch(() => {});
+            await new Promise((r) => setTimeout(r, jitterMs));
+          } else {
             this.connectPromise = null;
-            this.connected = false;
-            console.error("[Telegram] Connection retry failed:", retryErr);
-            throw retryErr;
+            console.error("[Telegram] Connection failed:", error);
+            throw error;
           }
         }
-        console.error("[Telegram] Connection failed:", error);
-        throw error;
       }
     })();
 
