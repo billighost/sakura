@@ -73,12 +73,14 @@ export class TelegramClient {
   }
 
   async init(): Promise<void> {
-    if (this.connected) return;
+    if (this.connected && this.client?.connected) return;
     if (this.connectPromise) return this.connectPromise;
 
     this.connectPromise = (async () => {
       try {
-        await this.client.connect();
+        if (!this.client?.connected) {
+          await this.client.connect();
+        }
         this.connected = true;
         console.log("[Telegram] Connected");
       } catch (error: any) {
@@ -92,11 +94,14 @@ export class TelegramClient {
           console.warn("[Telegram] AUTH_KEY_DUPLICATED during connect, waiting 2s before retry...");
           await new Promise((r) => setTimeout(r, 2000));
           try {
+            await this.client.disconnect().catch(() => {});
             await this.client.connect();
             this.connected = true;
             console.log("[Telegram] Connected on retry");
             return;
           } catch (retryErr) {
+            this.connectPromise = null;
+            this.connected = false;
             console.error("[Telegram] Connection retry failed:", retryErr);
             throw retryErr;
           }
@@ -206,6 +211,10 @@ export class TelegramClient {
       console.log(`[Telegram AutoDownload] Got ${buttons.length} results. Selecting index ${selectedIndex}: "${buttons[selectedIndex]?.text}" (score: ${bestScore}) for query "${query}"`);
       const result = await this._selectResult(buttonMessageId, selectedIndex, selectTimeoutMs);
       return result;
+    } catch (err) {
+      this.connected = false;
+      this.connectPromise = null;
+      throw err;
     } finally {
       release();
     }
@@ -545,7 +554,11 @@ export class TelegramClient {
   }
 
   private async ensureConnected(): Promise<void> {
-    if (!this.connected) await this.init();
+    if (!this.connected || !this.client?.connected) {
+      this.connected = false;
+      this.connectPromise = null;
+      await this.init();
+    }
   }
 }
 
