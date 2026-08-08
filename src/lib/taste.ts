@@ -218,9 +218,17 @@ export async function recordPlaySignals(userId: string, signals: PlaySignal[]): 
   // Cap per request so a buggy or hostile client can't write unbounded rows.
   const batch = valid.slice(0, 200);
 
-  const values: string[] = [];
-  const params: any[] = [userId];
-  let p = 2;
+  const trackIds: string[] = [];
+  const ats: Date[] = [];
+  const skippeds: boolean[] = [];
+  const msPlayeds: number[] = [];
+  const completeds: boolean[] = [];
+  const skipAtMss: (number | null)[] = [];
+  const contexts: (string | null)[] = [];
+  const contextIds: (string | null)[] = [];
+  const autoplays: boolean[] = [];
+  const hourOfDays: number[] = [];
+  const dayOfWeeks: number[] = [];
 
   for (const s of batch) {
     const playedAt = s.playedAt ? new Date(s.playedAt) : new Date();
@@ -230,34 +238,34 @@ export async function recordPlaySignals(userId: string, signals: PlaySignal[]): 
     const completed = s.completed ?? (durationMs > 0 && msPlayed / durationMs >= COMPLETION_THRESHOLD);
     const skipped = s.skipped ?? (!completed && durationMs > 0 && msPlayed / durationMs < COMPLETION_THRESHOLD);
 
-    values.push(
-      `($1, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`
-    );
-    params.push(
-      s.trackId,
-      at,
-      skipped,
-      Math.round(msPlayed),
-      completed,
-      s.skipAtMs != null ? Math.round(s.skipAtMs) : null,
-      s.context ?? null,
-      s.contextId ?? null,
-      s.autoplay ?? false,
-      at.getHours(),
-      at.getDay()
-    );
+    trackIds.push(s.trackId);
+    ats.push(at);
+    skippeds.push(skipped);
+    msPlayeds.push(Math.round(msPlayed));
+    completeds.push(completed);
+    skipAtMss.push(s.skipAtMs != null ? Math.round(s.skipAtMs) : null);
+    contexts.push(s.context ?? null);
+    contextIds.push(s.contextId ?? null);
+    autoplays.push(s.autoplay ?? false);
+    hourOfDays.push(at.getHours());
+    dayOfWeeks.push(at.getDay());
   }
 
-  // Foreign-key violations (a track deleted mid-session) shouldn't 500 the
-  // flush — the client has already moved on and can't do anything useful with
-  // the error.
+  // Foreign-key violations (a track deleted mid-session or un-imported Deezer track)
+  // shouldn't 500 the flush — JOIN "Track" ensures only valid tracks are recorded.
   try {
     await execute(
       `INSERT INTO "ListeningHistory"
          ("userId", "trackId", "playedAt", "skipped", "msPlayed", "completed",
           "skipAtMs", "context", "contextId", "autoplay", "hourOfDay", "dayOfWeek")
-       VALUES ${values.join(", ")}`,
-      params
+       SELECT $1, t.t_id, t.at, t.skipped, t.ms_played, t.completed,
+              t.skip_at_ms, t.context, t.context_id, t.autoplay, t.hour_of_day, t.day_of_week
+         FROM UNNEST(
+           $2::text[], $3::timestamptz[], $4::boolean[], $5::int[], $6::boolean[],
+           $7::int[], $8::text[], $9::text[], $10::boolean[], $11::int[], $12::int[]
+         ) AS t(t_id, at, skipped, ms_played, completed, skip_at_ms, context, context_id, autoplay, hour_of_day, day_of_week)
+         JOIN "Track" tr ON tr.id = t.t_id`,
+      [userId, trackIds, ats, skippeds, msPlayeds, completeds, skipAtMss, contexts, contextIds, autoplays, hourOfDays, dayOfWeeks]
     );
   } catch (err) {
     console.error("[Taste] Failed to record play signals:", err);
