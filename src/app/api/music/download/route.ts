@@ -141,15 +141,15 @@ export async function POST(req: NextRequest) {
     let track: any = null;
     let lastError: any = null;
 
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        track = await client.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 35000, 60000);
+        track = await client.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 20000, 35000);
         break;
       } catch (err) {
         console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${searchQuery}":`, err instanceof Error ? err.message : err);
         lastError = err;
-        if (attempt < 3) {
-          await new Promise((r) => setTimeout(r, 2000));
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1500));
         }
       }
     }

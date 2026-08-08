@@ -230,8 +230,7 @@ export class TelegramClient {
       await new Promise((r) => setTimeout(r, 1200));
 
       const newMessages = await this.client.getMessages(botEntity, {
-        limit: 5,
-        minId: lastKnownId,
+        limit: 10,
       });
 
       for (const msg of newMessages) {
@@ -380,8 +379,7 @@ export class TelegramClient {
       await new Promise((r) => setTimeout(r, 2000));
 
       const newMessages = await this.client.getMessages(botEntity, {
-        limit: 5,
-        minId: buttonMessageId,
+        limit: 10,
       });
 
       for (const msg of newMessages) {
