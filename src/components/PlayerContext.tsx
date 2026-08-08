@@ -213,6 +213,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<{ message: string; type: "accent" | "error" | "success"; visible: boolean } | null>(null);
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
   const sleepTimerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [remoteSyncDone, setRemoteSyncDone] = useState(false);
 
   // ── Radio / endless playback ──────────────────────────────────────────────
   const [autoplayRadio, setAutoplayRadioState] = useState(true);
@@ -1269,40 +1270,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     (async () => {
-      const remote = await fetchPlaybackState();
-      if (cancelled || !remote) return;
+      try {
+        const remote = await fetchPlaybackState();
+        if (cancelled || !remote) return;
 
-      const local = snapshotRef.current;
-      if (
-        !shouldAdoptRemote(remote, {
-          trackId: local.trackId,
-          positionMs: local.positionMs,
-          isPlaying: local.isPlaying,
-        })
-      ) {
-        return;
-      }
+        const local = snapshotRef.current;
+        if (
+          !shouldAdoptRemote(remote, {
+            trackId: local.trackId,
+            positionMs: local.positionMs,
+            isPlaying: local.isPlaying,
+          })
+        ) {
+          return;
+        }
 
-      const remoteQueue = Array.isArray(remote.queue) ? remote.queue : [];
-      if (remoteQueue.length === 0) return;
+        const remoteQueue = Array.isArray(remote.queue) ? remote.queue : [];
+        if (remoteQueue.length === 0) return;
 
-      // `audioUrl` is deliberately absent from synced queues (it can be a
-      // signed, expiring URL). The load effect already resolves an unresolved
-      // track on demand, so an empty string here is the documented "resolve
-      // this for me" state rather than a stall.
-      const restored: Track[] = remoteQueue.map((t) => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist,
-        album: t.album,
-        coverUrl: t.coverUrl,
-        audioUrl: "",
-        duration: t.duration ?? 0,
-      }));
-
-      setQueueState(restored);
-      setUpNextQueue(
-        (Array.isArray(remote.upNext) ? remote.upNext : []).map((t) => ({
+        // `audioUrl` is deliberately absent from synced queues (it can be a
+        // signed, expiring URL). The load effect already resolves an unresolved
+        // track on demand, so an empty string here is the documented "resolve
+        // this for me" state rather than a stall.
+        const restored: Track[] = remoteQueue.map((t) => ({
           id: t.id,
           title: t.title,
           artist: t.artist,
@@ -1310,24 +1300,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           coverUrl: t.coverUrl,
           audioUrl: "",
           duration: t.duration ?? 0,
-        }))
-      );
-      setCurrentIndex(
-        Math.min(Math.max(0, remote.queueIndex ?? 0), Math.max(0, restored.length - 1))
-      );
-      setShuffle(!!remote.shuffle);
-      setRepeat((remote.repeat as "off" | "one" | "all") ?? "off");
+        }));
 
-      // Hand the position to the same mechanism a reload uses, so there's one
-      // code path that applies a resume seek and it's already been proven to
-      // wait for loadedmetadata.
-      const seconds = Math.floor((remote.positionMs ?? 0) / 1000);
-      localStorage.setItem("sakura-player-progress", String(seconds));
-      localStorage.setItem("sakura-player-track-id", remote.trackId!);
-      setProgress(seconds);
-      hasRestoredProgressRef.current = false;
+        setQueueState(restored);
+        setUpNextQueue(
+          (Array.isArray(remote.upNext) ? remote.upNext : []).map((t) => ({
+            id: t.id,
+            title: t.title,
+            artist: t.artist,
+            album: t.album,
+            coverUrl: t.coverUrl,
+            audioUrl: "",
+            duration: t.duration ?? 0,
+          }))
+        );
+        setCurrentIndex(
+          Math.min(Math.max(0, remote.queueIndex ?? 0), Math.max(0, restored.length - 1))
+        );
+        setShuffle(!!remote.shuffle);
+        setRepeat((remote.repeat as "off" | "one" | "all") ?? "off");
 
-      showToast("Picked up where you left off", "accent");
+        // Hand the position to the same mechanism a reload uses, so there's one
+        // code path that applies a resume seek and it's already been proven to
+        // wait for loadedmetadata.
+        const seconds = Math.floor((remote.positionMs ?? 0) / 1000);
+        localStorage.setItem("sakura-player-progress", String(seconds));
+        localStorage.setItem("sakura-player-track-id", remote.trackId!);
+        setProgress(seconds);
+        hasRestoredProgressRef.current = false;
+
+        showToast("Picked up where you left off", "accent");
+      } finally {
+        if (!cancelled) setRemoteSyncDone(true);
+      }
     })();
 
     return () => {
@@ -1337,7 +1342,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Push: heartbeat while playing, plus the moments that must not be lost.
   useEffect(() => {
-    if (!currentTrack) return;
+    if (!currentTrack || !remoteSyncDone) return;
 
     const interval = setInterval(() => {
       if (snapshotRef.current.isPlaying) {
@@ -1346,14 +1351,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }, HEARTBEAT_MS);
 
     return () => clearInterval(interval);
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, remoteSyncDone]);
 
   // Track change and play/pause are the transitions worth syncing immediately —
   // they're exactly when someone is likely to pick up a different device.
   useEffect(() => {
-    if (!currentTrack) return;
+    if (!currentTrack || !remoteSyncDone) return;
     void pushPlaybackState(snapshotRef.current, { force: true });
-  }, [currentTrack?.id, isPlaying]);
+  }, [currentTrack?.id, isPlaying, remoteSyncDone]);
 
   useEffect(() => {
     // sendBeacon is the only transport guaranteed to survive unload — a normal
@@ -1524,6 +1529,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [currentTrack?.id]);
 
   const play = useCallback((track: Track, newQueue?: Track[]) => {
+    if (!remoteSyncDone) return;
     setProgress(0);
     if (audioRef.current) {
       try {
@@ -1576,6 +1582,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const togglePlay = useCallback(() => {
+    if (!remoteSyncDone) return;
     if (!audioRef.current) return;
     if (isPlayingRef.current) {
       audioRef.current.pause();
