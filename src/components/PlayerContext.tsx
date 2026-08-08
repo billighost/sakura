@@ -1504,10 +1504,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             audioRef.current.addEventListener("loadedmetadata", applySavedSeek, { once: true });
           }
         }
-        // Deliberately no autoplay here even if a saved "was playing" flag existed —
-        // browsers block unprompted autoplay, so we just leave playback cued up
         // at the right spot for the person to hit play.
-      } else if (wasPlaying) {
+      }
+      
+      if (wasPlaying) {
         audioRef.current.play().catch(() => {});
       }
     }

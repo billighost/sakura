@@ -149,7 +149,7 @@ export async function generateUserMixes(userId: string): Promise<number> {
     // 10 placeholders here — must stay in lockstep with the 10 params pushed
     // below and with the column list in the INSERT.
     const ph = Array.from({ length: 10 }, () => `$${p++}`).join(", ");
-    values.push(`($1, ${ph}, NOW() + INTERVAL '${MIX_TTL_DAYS} days')`);
+    values.push(`(gen_random_uuid()::text, $1, ${ph}, NOW() + INTERVAL '${MIX_TTL_DAYS} days')`);
     params.push(
       mix.kind,
       mix.slot,
@@ -167,7 +167,7 @@ export async function generateUserMixes(userId: string): Promise<number> {
   // The column list has to match the push order above exactly.
   await execute(
     `INSERT INTO "UserMix"
-       ("userId", kind, slot, label, subtitle, description, tint, "coverUrl", "coverUrls", "seedGenres", "trackIds", "expiresAt")
+       (id, "userId", kind, slot, label, subtitle, description, tint, "coverUrl", "coverUrls", "seedGenres", "trackIds", "expiresAt")
      VALUES ${values.join(", ")}`,
     params
   );

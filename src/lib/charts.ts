@@ -167,8 +167,8 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
       `, [dbTrackIds, systemId]);
     } else {
       await execute(`
-        INSERT INTO "SystemPlaylist" ("systemId", name, "trackIds", "updatedAt")
-        VALUES ($1, $2, $3, NOW())
+        INSERT INTO "SystemPlaylist" (id, "systemId", name, "trackIds", "updatedAt")
+        VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
       `, [systemId, name, dbTrackIds]);
     }
   } catch (err) {
