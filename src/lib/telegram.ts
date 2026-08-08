@@ -49,6 +49,7 @@ class AsyncMutex {
 export class TelegramClient {
   private client: GramClient;
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
   private botUsername: string;
   // Shared mutex — bot interactions from ALL concurrent downloads are serialized
   private static botMutex = new AsyncMutex();
@@ -73,14 +74,39 @@ export class TelegramClient {
 
   async init(): Promise<void> {
     if (this.connected) return;
-    try {
-      await this.client.connect();
-      this.connected = true;
-      console.log("[Telegram] Connected");
-    } catch (error) {
-      console.error("[Telegram] Connection failed:", error);
-      throw error;
-    }
+    if (this.connectPromise) return this.connectPromise;
+
+    this.connectPromise = (async () => {
+      try {
+        await this.client.connect();
+        this.connected = true;
+        console.log("[Telegram] Connected");
+      } catch (error: any) {
+        this.connectPromise = null;
+        this.connected = false;
+        if (
+          error?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+          error?.code === 406 ||
+          String(error).includes("AUTH_KEY_DUPLICATED")
+        ) {
+          console.warn("[Telegram] AUTH_KEY_DUPLICATED during connect, waiting 2s before retry...");
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            await this.client.connect();
+            this.connected = true;
+            console.log("[Telegram] Connected on retry");
+            return;
+          } catch (retryErr) {
+            console.error("[Telegram] Connection retry failed:", retryErr);
+            throw retryErr;
+          }
+        }
+        console.error("[Telegram] Connection failed:", error);
+        throw error;
+      }
+    })();
+
+    return this.connectPromise;
   }
 
   /**
@@ -473,18 +499,21 @@ export class TelegramClient {
       throw new Error(`Message ${messageId} not found or has no media`);
     }
 
-    const chunks: Uint8Array[] = [];
-    const stream = await this.client.downloadMedia(msg);
+    const result = await this.client.downloadMedia(msg);
 
-    if (stream instanceof Readable) {
-      for await (const chunk of stream) {
+    if (Buffer.isBuffer(result)) {
+      return result;
+    }
+
+    if (result && typeof result === "object" && (Symbol.asyncIterator in result || Symbol.iterator in result)) {
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of result as AsyncIterable<Uint8Array>) {
         chunks.push(chunk);
       }
       return Buffer.concat(chunks);
     }
 
-    if (Buffer.isBuffer(stream)) return stream;
-    throw new Error("Unexpected download result type");
+    throw new Error(`Unexpected download result type: ${typeof result}`);
   }
 
   async getAudioStream(messageId: number): Promise<Readable> {
@@ -500,17 +529,21 @@ export class TelegramClient {
       throw new Error(`Message ${messageId} not found or has no media`);
     }
 
-    const stream = await this.client.downloadMedia(msg);
-    if (stream instanceof Readable) return stream;
+    const result = await this.client.downloadMedia(msg);
 
-    if (Buffer.isBuffer(stream)) {
-      const readable = new Readable();
-      readable.push(stream);
-      readable.push(null);
-      return readable;
+    if (Buffer.isBuffer(result)) {
+      return Readable.from(result);
     }
 
-    throw new Error("Unexpected download result type");
+    if (result && (result as any) instanceof Readable) {
+      return result as unknown as Readable;
+    }
+
+    if (result && typeof result === "object" && (Symbol.asyncIterator in result || Symbol.iterator in result)) {
+      return Readable.from(result as AsyncIterable<Uint8Array>);
+    }
+
+    throw new Error(`Unexpected download result type: ${typeof result}`);
   }
 
   private async ensureConnected(): Promise<void> {

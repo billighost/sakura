@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Readable } from "stream";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 
@@ -28,9 +29,10 @@ export async function GET(
   try {
     const client = getTelegramClient();
     await client.init();
-    const stream = await client.getAudioStream(msgId);
+    const nodeStream = await client.getAudioStream(msgId);
+    const webStream = Readable.toWeb(nodeStream);
 
-    return new Response(stream as unknown as ReadableStream, {
+    return new Response(webStream as ReadableStream, {
       headers: {
         "Content-Type": "audio/mpeg",
         // Long cache: a Telegram file is immutable. Let the browser and the
