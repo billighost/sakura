@@ -1,6 +1,6 @@
 import { query, queryOne, softFail } from "@/lib/sql";
 import { after } from "next/server";
-import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
+import { cacheGet, cacheKey, cached, TTL } from "@/lib/cache";
 import { updateSystemPlaylist } from "@/lib/charts";
 import { generateUserMixes } from "@/lib/mixes";
 
@@ -50,25 +50,40 @@ function scheduleDailyChartUpdate() {
 
 export async function getHomeData(userId: string): Promise<HomeData> {
   const key = cacheKey("home", userId);
-  const cached = await cacheGet<HomeData>(key);
-  if (cached) return cached;
+  const hit = await cacheGet<HomeData>(key);
+  if (hit) return hit;
 
-  // Check whether system playlists need updating. Awaited rather than
-  // floated: the check is a single indexed lookup, and a dangling promise
-  // during a server render is exactly the pattern that made the old
-  // setTimeout version unreliable.
-  try {
-    const globalPl = await queryOne<{ updatedAt: Date }>(
-      `SELECT "updatedAt" FROM "SystemPlaylist" WHERE "systemId" = 'top-50-global'`
-    );
-    if (!globalPl || Date.now() - new Date(globalPl.updatedAt).getTime() > 24 * 60 * 60 * 1000) {
+  /**
+   * Everything below is the cache-miss path, and it costs eleven Postgres
+   * round trips. Running it under `cached` rather than open-coding
+   * get-then-set is what stops a popular expiry from becoming a stampede: when
+   * an entry lapses and thirty requests for the same user arrive together — a
+   * reload, a service worker sync, several open tabs — only the first rebuilds
+   * and the rest wait on it. Open-coded, all thirty would run all eleven
+   * queries.
+   */
+  return cached(key, TTL.HOME, async () => {
+    // Check whether system playlists need updating. Awaited rather than
+    // floated: the check is a single indexed lookup, and a dangling promise
+    // during a server render is exactly the pattern that made the old
+    // setTimeout version unreliable.
+    try {
+      const globalPl = await queryOne<{ updatedAt: Date }>(
+        `SELECT "updatedAt" FROM "SystemPlaylist" WHERE "systemId" = 'top-50-global'`
+      );
+      if (!globalPl || Date.now() - new Date(globalPl.updatedAt).getTime() > 24 * 60 * 60 * 1000) {
+        scheduleDailyChartUpdate();
+      }
+    } catch (e) {
+      console.error("[HomeData] Chart freshness check failed:", e);
       scheduleDailyChartUpdate();
     }
-  } catch (e) {
-    console.error("[HomeData] Chart freshness check failed:", e);
-    scheduleDailyChartUpdate();
-  }
 
+    return buildHomeData(userId);
+  });
+}
+
+async function buildHomeData(userId: string): Promise<HomeData> {
   const [user, taste, quickPicks, recentlyPlayed, topArtists, playlists, mixes, systemPlaylists] =
     await Promise.all([
       // 1. User info
@@ -230,6 +245,7 @@ export async function getHomeData(userId: string): Promise<HomeData> {
     });
   }
 
-  await cacheSet(key, result, TTL.HOME);
+  // Storing is `cached`'s job now — doing it here as well would write the entry
+  // twice on every miss, which on a metered Redis is a doubled bill for nothing.
   return result;
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { cacheGet, cacheSet, cacheKey, TTL } from "@/lib/cache";
+import { cacheGet, cacheKey, cached, TTL } from "@/lib/cache";
 import { callProvider, HttpError } from "@/lib/resilience";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,11 +19,31 @@ export async function GET(
   const key = cacheKey("artist", id);
 
   try {
-    const cached = await cacheGet(key);
-    if (cached) {
-      return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+    const hit = await cacheGet(key);
+    if (hit) {
+      return NextResponse.json(hit, { headers: { "X-Cache": "HIT" } });
     }
 
+    /**
+     * Single-flighted: a miss here costs two local queries plus three Deezer
+     * calls, and artist pages are exactly the kind of link several people open
+     * at once. Without coalescing, ten simultaneous views of the same artist
+     * meant thirty provider calls — enough to trip the breaker on a resource
+     * that was working perfectly well.
+     */
+    const result = await cached(key, TTL.ARTIST, () => buildArtist(id));
+    if (!result) {
+      return NextResponse.json({ error: "Artist not found" }, { status: 404 });
+    }
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("Failed to fetch artist:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function buildArtist(id: string) {
+  {
     let deezerId: string | null = null;
     let localArtist = null;
     let isUuid = UUID_REGEX.test(id);
@@ -192,21 +212,14 @@ export async function GET(
       }
     }
 
-    if (!finalArtist) {
-      return NextResponse.json({ error: "Artist not found" }, { status: 404 });
-    }
+    if (!finalArtist) return null;
 
-    const result = { 
-      ...finalArtist, 
-      albums: finalAlbums, 
+    return {
+      ...finalArtist,
+      albums: finalAlbums,
       tracks: finalTracks,
       trackCount: finalTracks.length,
       albumCount: finalAlbums.length
     };
-    await cacheSet(key, result, TTL.ARTIST);
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error("Failed to fetch artist:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

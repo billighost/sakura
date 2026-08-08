@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, execute, query } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { enrichTrackMetadata } from "@/lib/metadata";
+import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
 
 export async function POST(
   req: NextRequest,
@@ -115,6 +115,9 @@ export async function POST(
     } catch {
       // Ignored if track is already in playlist
     }
+
+    // Trigger MusicBrainz enrichment in the background so it does not block the response
+    enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
 
     return NextResponse.json({ ok: true, trackId: dbTrack!.id });
   } catch (error) {

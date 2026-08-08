@@ -1,5 +1,6 @@
 import { fetchJsonResilient } from './resilience';
 import { cachedWithStale, cacheKey, TTL } from './cache';
+import { execute, query } from './sql';
 
 interface DeezerTrack {
   id: number;
@@ -400,11 +401,33 @@ export async function enrichTrackMetadata(
     }
   }
 
-  // MusicBrainz: run in parallel with Deezer artist/album when we already
-  // have the track data. The result feeds credits, genres and ISRC — none of
-  // them block creating the track row.
+  return result;
+}
+
+export async function enrichAlbumTracks(
+  albumId: number,
+): Promise<{ title: string; artist: string; duration: number; position: number }[]> {
+  const album = await getDeezerAlbum(albumId);
+  if (!album?.tracks?.data) return [];
+
+  return album.tracks.data.map((t) => ({
+    title: t.title,
+    artist: t.artist.name,
+    duration: t.duration,
+    position: t.track_position,
+  }));
+}
+
+export async function enrichMusicBrainzAndSave(
+  trackId: string,
+  title: string,
+  artistName: string,
+  artistId: string
+): Promise<void> {
+  const normalisedTitle = title.toLowerCase().replace(/[^\w]/g, '');
+
   try {
-    const searchQuery = encodeURIComponent(`recording:"${title}" AND artist:"${artistName}"`);
+    const searchQuery = encodeURIComponent(`recording:"${title.replace(/[^\w\s]/g, '')}" AND artist:"${artistName.replace(/[^\w\s]/g, '')}"`);
     const mbSearch = await fetchMusicBrainz<{ recordings: MusicBrainzRecording[] }>(
       `/recording?query=${searchQuery}&limit=5&fmt=json`,
       'search.recording',
@@ -421,23 +444,27 @@ export async function enrichTrackMetadata(
           return rTitle.includes(normTitle) || normTitle.includes(rTitle) || rArtist.includes(normArtist);
         }) ?? mbSearch.recordings[0];
 
-      // ISRC
-      if (recording.isrcs?.length && !result.track?.isrc) {
-        if (!result.track) result.track = { deezerId: 0 };
-        result.track.isrc = recording.isrcs[0];
+      // 1. Save ISRC to Track if present
+      if (recording.isrcs?.length) {
+        await execute(
+          `UPDATE "Track" SET isrc = COALESCE(isrc, $1) WHERE id = $2`,
+          [recording.isrcs[0], trackId]
+        );
       }
 
-      // Genres
-      if (recording.tags?.length && !result.artist?.genres) {
+      // 2. Save Genres to Artist if present
+      if (recording.tags?.length) {
         const genres = recording.tags
           .sort((a, b) => b.count - a.count)
           .slice(0, 5)
           .map((t) => t.name);
-        if (!result.artist) result.artist = { deezerId: 0, name: artistName };
-        result.artist.genres = genres;
+        await execute(
+          `UPDATE "Artist" SET "genres" = $1 WHERE id = $2`,
+          [genres, artistId]
+        );
       }
 
-      // Full recording details with relations
+      // 3. Fetch details
       const mbDetail = await cachedWithStale(
         cacheKey('ext', 'mb', 'recording', recording.id),
         TTL.EXT_CREDITS,
@@ -451,7 +478,7 @@ export async function enrichTrackMetadata(
 
       if (mbDetail) {
         const credits: { name: string; role: string }[] = [];
-        const samples: { trackId?: string; trackTitle: string; artistName: string; type: string }[] = [];
+        const samples: { trackTitle: string; artistName: string; type: string }[] = [];
 
         if (mbDetail.relations?.length) {
           for (const rel of mbDetail.relations) {
@@ -476,7 +503,7 @@ export async function enrichTrackMetadata(
           }
         }
 
-        // Work relations: fetch in parallel, not serially in a loop.
+        // Work relations
         const workRels = mbDetail.relations?.filter(
           (r: any) => r['target-type'] === 'work' || r.work
         );
@@ -517,27 +544,53 @@ export async function enrichTrackMetadata(
           }
         }
 
-        if (credits.length > 0) result.credits = credits;
-        if (samples.length > 0) result.samples = samples;
+        // Save credits
+        if (credits.length > 0) {
+          await execute(
+            `INSERT INTO "TrackCredit" (id, "trackId", name, role, "createdAt")
+             SELECT gen_random_uuid()::text, $1, n, r, NOW()
+               FROM UNNEST($2::text[], $3::text[]) AS t(n, r)
+              WHERE NOT EXISTS (
+                SELECT 1 FROM "TrackCredit" c
+                 WHERE c."trackId" = $1 AND c.name = t.n AND c.role = t.r
+              )`,
+            [trackId, credits.map((c) => c.name), credits.map((c) => c.role)]
+          );
+        }
+
+        // Save samples
+        if (samples.length > 0) {
+          const sampleTitles = samples.map((s) => s.trackTitle);
+          const matches = await query<{ id: string; title: string }>(
+            `SELECT DISTINCT ON (lower(title)) id, title
+               FROM "Track"
+              WHERE lower(title) = ANY(SELECT lower(x) FROM UNNEST($1::text[]) AS x)`,
+            [sampleTitles]
+          ).catch(() => [] as { id: string; title: string }[]);
+
+          const idByTitle = new Map(matches.map((m) => [m.title.toLowerCase(), m.id]));
+          const resolved = samples
+            .map((s) => ({
+              sampledId: idByTitle.get(s.trackTitle.toLowerCase()),
+              type: s.type === "samples" ? "samples" : "sampled",
+            }))
+            .filter((s): s is { sampledId: string; type: string } =>
+              !!s.sampledId && s.sampledId !== trackId
+            );
+
+          if (resolved.length > 0) {
+            await execute(
+              `INSERT INTO "SampledTrack" (id, "trackId", "sampledTrackId", "sampleType", "createdAt")
+               SELECT gen_random_uuid()::text, $1, s, ty, NOW()
+                 FROM UNNEST($2::text[], $3::text[]) AS t(s, ty)
+               ON CONFLICT DO NOTHING`,
+              [trackId, resolved.map((r) => r.sampledId), resolved.map((r) => r.type)]
+            );
+          }
+        }
       }
     }
-  } catch {
-    // MusicBrainz is best-effort.
+  } catch (err) {
+    console.error(`[Background MusicBrainz Enrichment Failed] for track ${trackId}:`, err);
   }
-
-  return result;
-}
-
-export async function enrichAlbumTracks(
-  albumId: number,
-): Promise<{ title: string; artist: string; duration: number; position: number }[]> {
-  const album = await getDeezerAlbum(albumId);
-  if (!album?.tracks?.data) return [];
-
-  return album.tracks.data.map((t) => ({
-    title: t.title,
-    artist: t.artist.name,
-    duration: t.duration,
-    position: t.track_position,
-  }));
 }

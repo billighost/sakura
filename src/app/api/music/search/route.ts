@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/sql";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { callProvider, HttpError } from "@/lib/resilience";
-import { cachedWithStale, cacheKey, TTL } from "@/lib/cache";
+import { cachedWithStale, cached, cacheKey, TTL } from "@/lib/cache";
 import { searchTracksITunes } from "@/lib/metadata";
 
 interface DeezerTrack {
@@ -35,29 +35,42 @@ export async function GET(req: NextRequest) {
 
   try {
     const term = q.trim();
+    const termKey = term.toLowerCase();
 
     // Run local catalogue lookup and provider search in parallel. The local
     // half is authoritative for "do we already have this?", the provider half
     // supplies the result set.
-    const localPromise = query<{ id: string; deezerId: number; title: string; audioUrl: string }>(
-      `SELECT t.id, t."deezerId", t.title, t."audioUrl"
-         FROM "Track" t
-         JOIN "Artist" a ON a.id = t."artistId"
-        WHERE t.title % $1
-        UNION
-       SELECT t.id, t."deezerId", t.title, t."audioUrl"
-         FROM "Track" t
-         JOIN "Artist" a ON a.id = t."artistId"
-        WHERE a.name % $1
-        LIMIT $2`,
-      [term, limit]
-    ).catch(() => [] as { id: string; deezerId: number; title: string; audioUrl: string }[]);
+    //
+    // The local half is cached too. It's a pair of trigram similarity scans
+    // joined against Artist — not free — and it was re-running on every
+    // keystroke-driven request even though the provider half beside it was
+    // already served from cache. A short TTL keeps "I just downloaded this"
+    // showing up as downloaded quickly while removing the query from the hot
+    // path entirely.
+    const localPromise = cached(
+      cacheKey("search:local", termKey, limit),
+      TTL.SEARCH_LOCAL,
+      () =>
+        query<{ id: string; deezerId: number; title: string; audioUrl: string }>(
+          `SELECT t.id, t."deezerId", t.title, t."audioUrl"
+             FROM "Track" t
+             JOIN "Artist" a ON a.id = t."artistId"
+            WHERE t.title % $1
+            UNION
+           SELECT t.id, t."deezerId", t.title, t."audioUrl"
+             FROM "Track" t
+             JOIN "Artist" a ON a.id = t."artistId"
+            WHERE a.name % $1
+            LIMIT $2`,
+          [term, limit]
+        ).catch(() => [] as { id: string; deezerId: number; title: string; audioUrl: string }[]),
+    );
 
     // Search results are cached with a stale fallback. A repeated query costs
     // one Redis read instead of a round-trip to Deezer, and if Deezer is down
     // or rate-limiting, a previously-seen query still returns results.
     const searchPromise = cachedWithStale<{ tracks: DeezerTrack[]; total: number }>(
-      cacheKey("search", term.toLowerCase(), limit),
+      cacheKey("search", termKey, limit),
       TTL.search,
       () => searchProviders(term, limit),
       { label: "search" },

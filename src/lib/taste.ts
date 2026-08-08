@@ -718,7 +718,16 @@ export async function invalidateTasteCaches(userId: string): Promise<void> {
   await cacheDel(
     cacheKey("home", userId),
     cacheKey("taste", userId),
-    cacheKey("radio", userId)
+    cacheKey("radio", userId),
+    // The radio scorer's cached inputs — affinities and exclusion lists. Signal
+    // writes are the only thing that changes them, so this is where they have
+    // to be dropped; without it the radio would keep scoring against
+    // pre-feedback affinities until the TTL lapsed.
+    cacheKey("radioctx", userId),
+    // The candidate pool is derived from those same affinities, so it has to go
+    // with them — otherwise feedback would reshape the scoring but keep drawing
+    // from a pool built before the user said what they wanted.
+    cacheKey("radio-pool", userId),
   );
 }
 

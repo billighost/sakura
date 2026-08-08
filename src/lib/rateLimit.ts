@@ -1,7 +1,7 @@
 import { redis } from "./redis";
 
 /**
- * Redis-backed fixed-window rate limiting.
+ * Redis-backed fixed-window rate limiting, with a local pre-filter.
  *
  * Fixed windows can allow up to 2× the limit across a boundary. That's an
  * acceptable trade here — the goal is stopping a client from hammering the
@@ -20,28 +20,70 @@ export type RateLimitResult = {
   resetInSeconds: number;
 };
 
+/**
+ * Per-instance memory of counters already known to be over the limit.
+ *
+ * Rate limiting ran two Redis commands (INCR, then EXPIRE) on every single
+ * call to a limited endpoint. On a metered plan that is the most expensive
+ * thing in the request: the limiter cost more commands than the cache it was
+ * protecting. Two changes fix it, and both matter for different reasons.
+ *
+ * First, INCR and EXPIRE go in one pipeline — Upstash bills a pipeline as one
+ * request, so the steady-state cost halves with no behavioural change at all.
+ *
+ * Second, once a key is known to be over its limit, further requests in that
+ * same window are rejected locally. The answer cannot change until the window
+ * rolls over, so asking Redis again buys nothing — and a client being actively
+ * rate limited is precisely the one sending the most traffic. Without this, the
+ * abusive case is also the most expensive case, which is exactly backwards.
+ */
+const globalForRlCache = globalThis as unknown as {
+  rlBlocked?: Map<string, number>;
+};
+if (!globalForRlCache.rlBlocked) globalForRlCache.rlBlocked = new Map();
+const blockedUntil = globalForRlCache.rlBlocked;
+
+function sweepBlocked(now: number): void {
+  if (blockedUntil.size < 5000) return;
+  for (const [k, until] of blockedUntil) {
+    if (now >= until) blockedUntil.delete(k);
+  }
+}
+
 export async function rateLimit(
   key: string,
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
-  const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
+  const nowMs = Date.now();
+  const bucket = Math.floor(nowMs / 1000 / windowSeconds);
   const redisKey = `rl:${key}:${bucket}`;
+  const resetInSeconds = windowSeconds - (Math.floor(nowMs / 1000) % windowSeconds);
+
+  const blocked = blockedUntil.get(redisKey);
+  if (blocked !== undefined && nowMs < blocked) {
+    return { allowed: false, remaining: 0, resetInSeconds };
+  }
 
   try {
-    const count = await redis.incr(redisKey);
+    // INCR and EXPIRE in one pipelined round trip. Setting the TTL
+    // unconditionally would slide the expiry forward under sustained load and
+    // the key would never expire, so it stays guarded by the first-hit check —
+    // just evaluated after the fact rather than costing a second round trip to
+    // decide.
+    const pipe = redis.pipeline();
+    pipe.incr(redisKey);
+    pipe.expire(redisKey, windowSeconds, "NX");
+    const [count] = (await pipe.exec()) as [number, number];
 
-    // Only set the TTL on the first hit of a window. Re-setting it on every
-    // request would slide the expiry forward and the key would never expire
-    // under sustained load.
-    if (count === 1) {
-      await redis.expire(redisKey, windowSeconds);
+    const allowed = count <= limit;
+    if (!allowed) {
+      sweepBlocked(nowMs);
+      blockedUntil.set(redisKey, nowMs + resetInSeconds * 1000);
     }
 
-    const resetInSeconds = windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds);
-
     return {
-      allowed: count <= limit,
+      allowed,
       remaining: Math.max(0, limit - count),
       resetInSeconds,
     };

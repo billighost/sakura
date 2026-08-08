@@ -1,5 +1,5 @@
 import { query, softFail } from "@/lib/sql";
-import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
+import { cacheKey, cached, TTL } from "@/lib/cache";
 import { getTasteProfile, normaliseGenre, type TasteProfile } from "@/lib/taste";
 import { buildCandidatePool, resolveArtistDeezerIds, type VirtualTrack } from "@/lib/catalog";
 import { setVirtualTrackMeta } from "@/lib/virtualTracks";
@@ -58,6 +58,13 @@ type Candidate = {
   source: string;
 };
 
+/**
+ * How many candidates to assemble per user, independent of the requested
+ * limit. Scoring and diversification discard most of the pool, so this needs
+ * headroom; keeping it fixed is what lets the pool be cached under one key.
+ */
+const RADIO_POOL_SIZE = 220;
+
 const SCORING = {
   artistAffinity: 3.2,
   genreAffinity: 2.4,
@@ -89,20 +96,9 @@ export async function buildRadio(
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
   const excludeSet = new Set(opts.excludeTrackIds ?? []);
 
-  const [profile, seed, affinities, genreAffinities, excluded] = await Promise.all([
-    getTasteProfile(userId),
+  const [{ profile, affinities, genreAffinities, excluded }, seed] = await Promise.all([
+    getRadioContext(userId),
     opts.seedTrackId ? fetchSeed(opts.seedTrackId) : Promise.resolve(null),
-    query<{ artistId: string; score: number }>(
-      `SELECT "artistId", score FROM "ArtistAffinity"
-       WHERE "userId" = $1 ORDER BY score DESC LIMIT 60`,
-      [userId]
-    ).catch(softFail("radio:artistAffinity", [])),
-    query<{ genre: string; score: number }>(
-      `SELECT genre, score FROM "GenreAffinity"
-       WHERE "userId" = $1 AND score > 0 ORDER BY score DESC LIMIT 25`,
-      [userId]
-    ).catch(softFail("radio:genreAffinity", [])),
-    fetchExclusions(userId),
   ]);
 
   for (const id of excluded.trackIds) excludeSet.add(id);
@@ -133,35 +129,73 @@ export async function buildRadio(
 
   const bannedArtistIds = affinities.filter((a) => a.score < -3).map((a) => a.artistId);
 
-  // 1. Gather. Each source runs independently and failures are isolated —
-  //    a broken source degrades the mix, it doesn't empty it.
-  const dbCandidates = await gatherCandidates(userId, {
-    artistIds: positiveArtistIds,
-    genres: topGenres,
-    bannedArtistIds,
-    // Pull well beyond `limit` — scoring and diversification both discard a
-    // lot, and a thin candidate pool produces a repetitive radio.
-    poolSize: Math.max(220, limit * 10),
-  });
+  /**
+   * 1. Gather the candidate pool — cached per user.
+   *
+   * This is the expensive half of a radio build: several wide Postgres scans
+   * plus, on a thin library, a fan-out of provider lookups. It was rerunning on
+   * every single request, which is what made radio the most expensive endpoint
+   * in the app by a wide margin.
+   *
+   * It's cacheable because the pool depends only on the taste inputs computed
+   * above (artists, genres, bans, size) — all of which change on the timescale
+   * of listening habits, not requests. Everything that makes one radio differ
+   * from the next — the seed, scoring, played-track exclusion, artist
+   * diversification — happens in memory *after* this point, over the pool. So a
+   * cached pool still yields a different station per seed and per play; it just
+   * stops rediscovering the same few hundred candidate songs every time.
+   *
+   * `cached` single-flights it too, so the burst of radio requests that follows
+   * a queue running out rebuilds the pool once rather than once per listener.
+   */
+  /**
+   * The pool is built at one fixed size regardless of the requested limit.
+   *
+   * Sizing it from `limit` would key the cache by limit too, so a 20-track
+   * continuation and a 50-track one would each build and store their own pool
+   * of largely the same songs — and every invalidation site would have to know
+   * every limit ever used in order to clear them. Building the largest useful
+   * pool once and letting scoring take what it needs is both cheaper and
+   * leaves exactly one key per user to invalidate.
+   */
+  const virtualLimit = Math.max(120, limit * 6);
+  const discoveryLevel = clamp(profile?.discovery ?? 0.35, 0, 1);
 
-  // 1b. Top up from the provider catalogue.
-  //
-  // The DB only holds tracks someone has actually fetched, so on a small or
-  // genre-narrow library the local pool collapses to the same few dozen songs
-  // and the radio loops. Virtual candidates make the reachable catalogue as
-  // wide as the provider's without storing anything. They're only fetched when
-  // the local pool is genuinely thin, so a well-stocked library pays nothing.
-  const wantVirtual = dbCandidates.length < Math.max(60, limit * 4);
-  const virtualCandidates = wantVirtual
-    ? await gatherVirtualCandidates(userId, {
+  const candidates = await cached(
+    cacheKey("radio-pool", userId),
+    TTL.RADIO_POOL,
+    async () => {
+      // Each source runs independently and failures are isolated — a broken
+      // source degrades the mix, it doesn't empty it.
+      const dbCandidates = await gatherCandidates(userId, {
+        artistIds: positiveArtistIds,
         genres: topGenres,
-        positiveArtistIds,
-        discovery: clamp(profile?.discovery ?? 0.35, 0, 1),
-        limit: Math.max(120, limit * 6),
-      })
-    : [];
+        bannedArtistIds,
+        // Pull well beyond any `limit` — scoring and diversification both
+        // discard a lot, and a thin candidate pool produces a repetitive radio.
+        poolSize: RADIO_POOL_SIZE,
+      });
 
-  const candidates = [...dbCandidates, ...virtualCandidates];
+      // Top up from the provider catalogue.
+      //
+      // The DB only holds tracks someone has actually fetched, so on a small or
+      // genre-narrow library the local pool collapses to the same few dozen
+      // songs and the radio loops. Virtual candidates make the reachable
+      // catalogue as wide as the provider's without storing anything. They're
+      // only fetched when the local pool is genuinely thin, so a well-stocked
+      // library pays nothing.
+      const wantVirtual = dbCandidates.length < Math.max(60, limit * 4);      const virtualCandidates = wantVirtual
+        ? await gatherVirtualCandidates(userId, {
+            genres: topGenres,
+            positiveArtistIds,
+            discovery: discoveryLevel,
+            limit: virtualLimit,
+          })
+        : [];
+
+      return [...dbCandidates, ...virtualCandidates];
+    },
+  );
 
   // 2. Score.
   const discovery = clamp(profile?.discovery ?? 0.35, 0, 1);
@@ -505,6 +539,48 @@ function tag(rows: Candidate[], source: string): Candidate[] {
   return rows;
 }
 
+/**
+ * Everything the scorer needs about a user, in one cached read.
+ *
+ * These five queries — profile, artist affinity, genre affinity, and the three
+ * exclusion lists — were re-run on every radio call, and they were the bulk of
+ * the 17 Postgres round trips the endpoint was measured at. None of them can
+ * change except through a signal write, and every path that writes one already
+ * calls `invalidateTasteCaches`, which clears this key. So the cache is exact
+ * rather than merely tolerable: a stale read is only possible in the window
+ * between a play finishing and its signal landing, where the correct radio is
+ * the one computed a moment ago anyway.
+ *
+ * The TTL is a backstop for signals that arrive by paths that don't invalidate,
+ * not the primary freshness mechanism.
+ */
+type RadioContext = {
+  profile: TasteProfile | null;
+  affinities: { artistId: string; score: number }[];
+  genreAffinities: { genre: string; score: number }[];
+  excluded: { trackIds: string[] };
+};
+
+async function getRadioContext(userId: string): Promise<RadioContext> {
+  return cached(cacheKey("radioctx", userId), TTL.RADIO, async () => {
+    const [profile, affinities, genreAffinities, excluded] = await Promise.all([
+      getTasteProfile(userId),
+      query<{ artistId: string; score: number }>(
+        `SELECT "artistId", score FROM "ArtistAffinity"
+         WHERE "userId" = $1 ORDER BY score DESC LIMIT 60`,
+        [userId]
+      ).catch(softFail("radio:artistAffinity", [])),
+      query<{ genre: string; score: number }>(
+        `SELECT genre, score FROM "GenreAffinity"
+         WHERE "userId" = $1 AND score > 0 ORDER BY score DESC LIMIT 25`,
+        [userId]
+      ).catch(softFail("radio:genreAffinity", [])),
+      fetchExclusions(userId),
+    ]);
+    return { profile, affinities, genreAffinities, excluded };
+  });
+}
+
 async function fetchSeed(trackId: string) {
   return query<{ artistId: string | null; genres: string[] | null; genre: string | null }>(
     `SELECT t."artistId", a.genres, t.genre
@@ -556,15 +632,19 @@ async function fetchExclusions(userId: string): Promise<{ trackIds: string[] }> 
  * Cached wrapper for the home page and other hot paths. The radio itself is
  * intentionally *not* cached when a seed track is involved — that call needs
  * to reflect what's playing right now.
+ *
+ * The key deliberately omits `limit`. It used to be `radio:{user}:{limit}`,
+ * which meant `invalidateTasteCaches` — deleting `radio:{user}` — never matched
+ * anything, so this cache was invalidated by nothing at all and a user's radio
+ * could ignore their feedback for as long as the entry lived. Caching the
+ * largest reasonable list once and slicing per caller both fixes the
+ * invalidation and stops two different limits doing the same work twice.
  */
 export async function getCachedRadio(userId: string, limit = 20): Promise<RadioTrack[]> {
-  const key = cacheKey("radio", userId, limit);
-  const cached = await cacheGet<RadioTrack[]>(key);
-  if (cached?.length) return cached;
-
-  const tracks = await buildRadio(userId, { limit });
-  if (tracks.length > 0) await cacheSet(key, tracks, 120);
-  return tracks;
+  const tracks = await cached(cacheKey("radio", userId), 120, () =>
+    buildRadio(userId, { limit: 50 }),
+  );
+  return (tracks ?? []).slice(0, limit);
 }
 
 function clamp(n: number, min: number, max: number): number {

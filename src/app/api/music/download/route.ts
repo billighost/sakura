@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
-import { enrichTrackMetadata } from "@/lib/metadata";
+import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 
 const globalForPendingDownloads = globalThis as unknown as {
@@ -384,6 +384,9 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    // Trigger MusicBrainz enrichment in the background so it does not block the response
+    enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
 
     resolveDownload();
     pendingDownloads.delete(cacheKey);

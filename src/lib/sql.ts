@@ -18,20 +18,34 @@ const globalForPool = globalThis as unknown as { pgPool?: Pool };
  *
  *   - One long-lived server: the pool is the whole story. 20 is reasonable.
  *   - Serverless / many instances: each instance opens its own pool, so the
- *     effective connection count is `max × instances`. Postgres defaults to
- *     100 total, so 20 per instance exhausts it at the 5th concurrent
- *     instance — long before user load is the limit.
+ *     effective connection count is `max × instances`. Neon's free tier caps
+ *     out around 100 connections, so 10 per instance exhausts it at the 10th
+ *     concurrent instance — and Vercel will happily run more than ten
+ *     instances long before 1000 users are anywhere near the real limit.
  *
- * `PG_POOL_MAX` makes this deployment-time configuration rather than a
- * hardcoded guess. The default of 10 is safe for a single server and survives
- * a modest serverless fan-out; behind a pooler (PgBouncer/Neon/Supabase in
- * transaction mode) you can raise it freely because the pooler multiplexes
+ * So the default is deployment-aware rather than a single number. On Vercel
+ * (`VERCEL` is set in every deployment) the instance is a lambda handling a
+ * handful of concurrent requests, and a small pool per instance multiplied
+ * across many instances is what keeps the total inside Neon's ceiling. Anywhere
+ * else, assume one long-lived server and pool properly.
+ *
+ * `PG_POOL_MAX` overrides both. Behind a pooler (PgBouncer, or Neon's own
+ * `-pooler` endpoint) you can raise it freely, because the pooler multiplexes
  * onto a much smaller set of real backends.
+ *
+ * NOTE: this sizing assumes DATABASE_URL points at Neon's **pooled** endpoint —
+ * the hostname containing `-pooler`. Against a direct endpoint, connections are
+ * real Postgres backends and the ceiling arrives far sooner. `assertPooled()`
+ * below warns when that's the case rather than letting it be discovered at peak.
  */
-const POOL_MAX = Number(process.env.PG_POOL_MAX) || 10;
+const IS_SERVERLESS = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+const POOL_MAX =
+  Number(process.env.PG_POOL_MAX) || (IS_SERVERLESS ? 3 : 20);
 
 /**
- * Keep a couple of connections permanently open.
+ * Keep a couple of connections permanently open — but only where "the process"
+ * is a durable thing.
  *
  * The database is remote: a bare `SELECT 1` on a cold pool measured ~3.1 s
  * (TCP + TLS + auth), against ~190 ms once a connection exists. With `min: 0`
@@ -40,21 +54,44 @@ const POOL_MAX = Number(process.env.PG_POOL_MAX) || 10;
  * person is waiting on. Holding 2 warm connections converts that into a normal
  * round trip.
  *
- * `allowExitOnIdle` has to go with it: it lets the process exit while idle
- * connections exist, which would defeat the point of holding them.
+ * On serverless that reasoning inverts. A frozen lambda still holds its
+ * connections while serving nobody, so warm minimums across many idle instances
+ * consume the connection budget that active instances need. There, the right
+ * minimum is zero.
  */
-const POOL_MIN = Number(process.env.PG_POOL_MIN) || 2;
+const POOL_MIN = Number(process.env.PG_POOL_MIN) || (IS_SERVERLESS ? 0 : 2);
+
+function assertPooled(connectionString: string | undefined): void {
+  if (!connectionString) return;
+  try {
+    const host = new URL(connectionString).hostname;
+    if (host.includes("neon.tech") && !host.includes("-pooler")) {
+      console.warn(
+        "[SQL] DATABASE_URL points at Neon's DIRECT endpoint. Every pool slot is " +
+          "a real Postgres backend, and the free tier runs out of them well before " +
+          "the app runs out of capacity. Use the '-pooler' hostname from the Neon " +
+          "dashboard (Connection Details → Pooled connection).",
+      );
+    }
+  } catch {
+    // An unparseable URL is the connection's problem, not this warning's.
+  }
+}
 
 function createPool(): Pool {
+  const connectionString =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL;
+
+  assertPooled(connectionString);
+
   const pool = new Pool({
-    connectionString:
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_URL ||
-      process.env.POSTGRES_PRISMA_URL,
+    connectionString,
     max: POOL_MAX,
     min: POOL_MIN,
     // Long enough that normal gaps between requests don't cycle connections.
-    idleTimeoutMillis: 300_000,
+    idleTimeoutMillis: IS_SERVERLESS ? 10_000 : 300_000,
     connectionTimeoutMillis: 10_000,
     // Queries that hang hold a pool slot hostage. Under load that's how a
     // slow query turns into a total outage: every slot ends up parked on the
@@ -62,7 +99,7 @@ function createPool(): Pool {
     // make a hung query fail its own request instead of the whole instance.
     statement_timeout: 15000,
     query_timeout: 15000,
-    allowExitOnIdle: false,
+    allowExitOnIdle: IS_SERVERLESS,
   });
 
   // An idle client erroring (server restart, network blip) emits on the pool.
@@ -89,14 +126,42 @@ export const sql = globalForPool.pgPool ?? createPool();
 // until Postgres starts refusing connections.
 globalForPool.pgPool = sql;
 
+/**
+ * Query counters, for the same reason the Redis ones exist: on a metered
+ * database the interesting number is round trips per HTTP request, and that is
+ * invisible from either end on its own. `slow` is tracked separately so a
+ * capacity report can distinguish "too many queries" from "one bad query".
+ */
+const globalForSqlStats = globalThis as unknown as {
+  sqlStats?: { queries: number; slow: number; totalMs: number };
+};
+
+if (!globalForSqlStats.sqlStats) {
+  globalForSqlStats.sqlStats = { queries: 0, slow: 0, totalMs: 0 };
+}
+
+export const sqlStats = globalForSqlStats.sqlStats;
+
+export function resetSqlStats(): void {
+  sqlStats.queries = 0;
+  sqlStats.slow = 0;
+  sqlStats.totalMs = 0;
+}
+
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
   const start = Date.now();
-  const result = await sql.query(text, params);
-  const duration = Date.now() - start;
-  if (duration > 200) {
-    console.warn(`[SQL SLOW ${duration}ms]`, text.slice(0, 100));
+  sqlStats.queries += 1;
+  try {
+    const result = await sql.query(text, params);
+    return result.rows as T[];
+  } finally {
+    const duration = Date.now() - start;
+    sqlStats.totalMs += duration;
+    if (duration > 200) {
+      sqlStats.slow += 1;
+      console.warn(`[SQL SLOW ${duration}ms]`, text.slice(0, 100));
+    }
   }
-  return result.rows as T[];
 }
 
 export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
@@ -105,8 +170,19 @@ export async function queryOne<T = any>(text: string, params?: any[]): Promise<T
 }
 
 export async function execute(text: string, params?: any[]): Promise<{ rowCount: number }> {
-  const result = await sql.query(text, params);
-  return { rowCount: result.rowCount || 0 };
+  const start = Date.now();
+  sqlStats.queries += 1;
+  try {
+    const result = await sql.query(text, params);
+    return { rowCount: result.rowCount || 0 };
+  } finally {
+    const duration = Date.now() - start;
+    sqlStats.totalMs += duration;
+    if (duration > 200) {
+      sqlStats.slow += 1;
+      console.warn(`[SQL SLOW ${duration}ms]`, text.slice(0, 100));
+    }
+  }
 }
 
 /**

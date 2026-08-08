@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import { sql } from "@/lib/sql";
-import { redis } from "@/lib/redis";
+import { NextRequest, NextResponse } from "next/server";
+import { sql, sqlStats, resetSqlStats } from "@/lib/sql";
+import { redis, redisStats, resetRedisStats } from "@/lib/redis";
 import { breakerSnapshots } from "@/lib/resilience";
+import { memoryCacheStats } from "@/lib/cache";
 
 /**
  * Health check for load balancers, monitoring, and the SW's periodic sync.
@@ -13,7 +14,39 @@ import { breakerSnapshots } from "@/lib/resilience";
  * down. Reporting them separately is the point — it turns "the site feels
  * wrong" into a specific, visible answer.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+
+  /**
+   * `?stats=1` reports the per-instance cost counters without touching either
+   * dependency, so a load test can sample it mid-run for free. The plain check
+   * deliberately still pings both, because "can I reach my dependencies" is the
+   * question a load balancer is asking.
+   */
+  if (searchParams.get("stats") === "1") {
+    const body = {
+      redis: { commands: redisStats.commands, byMethod: redisStats.byMethod },
+      sql: {
+        queries: sqlStats.queries,
+        slow: sqlStats.slow,
+        avgMs: sqlStats.queries ? +(sqlStats.totalMs / sqlStats.queries).toFixed(2) : 0,
+      },
+      memoryCache: memoryCacheStats(),
+      pool: {
+        total: (sql as unknown as { totalCount?: number }).totalCount ?? -1,
+        idle: (sql as unknown as { idleCount?: number }).idleCount ?? -1,
+        waiting: (sql as unknown as { waitingCount?: number }).waitingCount ?? -1,
+      },
+      breakers: breakerSnapshots(),
+      rss: Math.round(process.memoryUsage().rss / 1048576),
+    };
+    if (searchParams.get("reset") === "1") {
+      resetRedisStats();
+      resetSqlStats();
+    }
+    return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+  }
+
   let dbOk = false;
   let poolStats: Record<string, unknown> = {};
 
