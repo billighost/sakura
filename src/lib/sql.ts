@@ -96,14 +96,30 @@ function getValidConnectionString(): string | undefined {
     }
   }
 
-  return candidates[0];
+  // Never return an invalid placeholder host like 'base'
+  const fallback = candidates[0];
+  if (fallback) {
+    try {
+      const parsed = new URL(fallback);
+      if (parsed.hostname === "base" || parsed.hostname.endsWith(".base")) {
+        return undefined;
+      }
+    } catch {
+      if (fallback === "base" || fallback.includes("@base")) {
+        return undefined;
+      }
+    }
+  }
+
+  return fallback;
 }
 
 function createPool(): Pool {
   const connectionString = getValidConnectionString();
-  if (!connectionString || connectionString.includes("@base") || connectionString === "base") {
+  if (!connectionString) {
     console.error(
-      "[SQL] Invalid DATABASE_URL or POSTGRES_URL configured (hostname is 'base'). Please set a valid PostgreSQL connection URL in your Vercel / environment variables.",
+      "[SQL CRITICAL] No valid DATABASE_URL configured in environment variables (found invalid or missing hostname 'base'). " +
+      "Please go to Vercel Dashboard -> Project Settings -> Environment Variables and set DATABASE_URL to your Neon pooled connection string.",
     );
   }
 
