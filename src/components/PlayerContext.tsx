@@ -1337,6 +1337,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cancelled = true;
+      remoteRestoreAttemptedRef.current = false;
     };
   }, [showToast]);
 

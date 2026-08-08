@@ -34,15 +34,17 @@ export async function POST(
 
   const pos = position ?? ((maxRow?.maxPos ?? -1) + 1);
 
-  try {
-    await execute(
-      `INSERT INTO "PlaylistTrack" ("playlistId", "trackId", position) VALUES ($1, $2, $3)`,
-      [id, trackId, pos]
-    );
-    return NextResponse.json({ ok: true }, { status: 201 });
-  } catch {
+  const { rowCount } = await execute(
+    `INSERT INTO "PlaylistTrack" ("playlistId", "trackId", position) VALUES ($1, $2, $3)
+     ON CONFLICT ("playlistId", "trackId") DO NOTHING`,
+    [id, trackId, pos]
+  );
+  
+  if (rowCount === 0) {
     return NextResponse.json({ error: "Track already in playlist" }, { status: 409 });
   }
+  
+  return NextResponse.json({ ok: true }, { status: 201 });
 }
 
 export async function DELETE(

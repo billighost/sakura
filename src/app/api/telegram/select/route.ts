@@ -32,44 +32,34 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id as string;
 
-    // Get or create artist
-    let artistId: string;
-    const existingArtist = await queryOne<{ id: string }>(
-      `SELECT id FROM artists WHERE name = $1`,
+    const artistId = (await queryOne<{ id: string }>(
+      `INSERT INTO "Artist" (id, name, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, NOW())
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
       [track.artist]
-    );
-
-    if (existingArtist) {
-      artistId = existingArtist.id;
-    } else {
-      const newArtist = await queryOne<{ id: string }>(
-        `INSERT INTO artists (name) VALUES ($1) RETURNING id`,
-        [track.artist]
-      );
-      artistId = newArtist!.id;
-    }
+    ))!.id;
 
     // Check if track already exists by telegramMessageId
-    let dbTrack = await queryOne<{ id: string; path: string }>(
-      `SELECT id, path FROM tracks WHERE "telegramMessageId" = $1`,
+    let dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+      `SELECT id, "audioUrl" FROM "Track" WHERE "telegramMessageId" = $1`,
       [track.messageId.toString()]
     );
 
     if (!dbTrack) {
       // Insert new track
-      dbTrack = await queryOne<{ id: string; path: string }>(
-        `INSERT INTO tracks (
-          title, duration, path, "telegramMessageId",
-          "artistId", "addedById"
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, path`,
+      dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+        `INSERT INTO "Track" (
+          id, title, duration, "audioUrl", source, "telegramMessageId",
+          "artistId", "createdAt"
+        ) VALUES (gen_random_uuid()::text, $1, $2, $3, 'telegram', $4, $5, NOW())
+        RETURNING id, "audioUrl"`,
         [
           track.title,
           track.duration || 0,
           `/api/stream/telegram/${track.messageId}`,
           track.messageId.toString(),
           artistId,
-          userId,
         ]
       );
     }
@@ -79,7 +69,7 @@ export async function POST(req: NextRequest) {
       title: track.title,
       artist: track.artist,
       duration: track.duration,
-      path: dbTrack!.path,
+      path: dbTrack!.audioUrl,
       messageId: track.messageId,
     });
   } catch (error) {

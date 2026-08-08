@@ -24,16 +24,13 @@ export async function POST(req: NextRequest) {
   for (const track of tracks) {
     try {
       // Upsert artist
-      let artist = await queryOne<{ id: string }>(
-        `SELECT id FROM "Artist" WHERE name = $1`,
+      const artist = await queryOne<{ id: string }>(
+        `INSERT INTO "Artist" (id, name, "createdAt")
+         VALUES (gen_random_uuid()::text, $1, NOW())
+         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
         [track.artist]
       );
-      if (!artist) {
-        artist = await queryOne<{ id: string }>(
-          `INSERT INTO "Artist" (id, name) VALUES (gen_random_uuid()::text, $1) RETURNING id`,
-          [track.artist]
-        );
-      }
 
       // Check for duplicate track by title + artist
       const existing = await queryOne<{ id: string }>(

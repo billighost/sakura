@@ -32,24 +32,13 @@ export async function POST(
     const track = telegramMetadata;
     const metadata = await enrichTrackMetadata(track.title, track.artist);
 
-    // Get or Create Artist
-    let artistId: string;
-    const existingArtist = await queryOne<{ id: string }>(
-      `SELECT id FROM "Artist" WHERE name = $1`,
-      [track.artist]
-    );
-
-    if (existingArtist) {
-      artistId = existingArtist.id;
-    } else {
-      const newArtist = await queryOne<{ id: string }>(
-        `INSERT INTO "Artist" (id, name, "imageUrl", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, NOW())
-         RETURNING id`,
-        [track.artist, metadata.artist?.imageUrl || null]
-      );
-      artistId = newArtist!.id;
-    }
+    const artistId = (await queryOne<{ id: string }>(
+      `INSERT INTO "Artist" (id, name, "imageUrl", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, NOW())
+       ON CONFLICT (name) DO UPDATE SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
+       RETURNING id`,
+      [track.artist, metadata.artist?.imageUrl || null]
+    ))!.id;
 
     // Get or Create Album (simplified for playlist import)
     let albumId: string | null = null;
@@ -107,14 +96,11 @@ export async function POST(
 
     const pos = (maxRow?.maxPos ?? -1) + 1;
 
-    try {
-      await execute(
-        `INSERT INTO "PlaylistTrack" ("playlistId", "trackId", position) VALUES ($1, $2, $3)`,
-        [id, dbTrack!.id, pos]
-      );
-    } catch {
-      // Ignored if track is already in playlist
-    }
+    await execute(
+      `INSERT INTO "PlaylistTrack" ("playlistId", "trackId", position) VALUES ($1, $2, $3)
+       ON CONFLICT ("playlistId", "trackId") DO NOTHING`,
+      [id, dbTrack!.id, pos]
+    );
 
     // Trigger MusicBrainz enrichment in the background so it does not block the response
     enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
