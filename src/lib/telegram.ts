@@ -189,18 +189,56 @@ export class TelegramClient {
     buttonMessageId: number;
     buttons: Array<{ index: number; text: string }>;
   }> {
-    await this.ensureConnected();
-    const release = await TelegramClient.botMutex.acquire();
-    try {
-      return await this._searchMusic(query, timeoutMs);
-    } finally {
-      // Don't release here — the caller must call selectResult, which releases
-      // This is handled by the wrapper in searchAndSelect
+    return this.withRetry(async () => {
+      const release = await TelegramClient.botMutex.acquire();
+      try {
+        return await this._searchMusic(query, timeoutMs);
+      } finally {
+        await release();
+      }
+    });
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let lastErr: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await this.ensureConnected();
+        return await fn();
+      } catch (err: any) {
+        lastErr = err;
+        const isConnectionError =
+          err?.code === 406 ||
+          err?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+          String(err).includes("AUTH_KEY_DUPLICATED") ||
+          err?.message?.includes("ECONNRESET") ||
+          err?.message?.includes("ETIMEDOUT") ||
+          err?.message?.includes("socket") ||
+          err?.message?.includes("network");
+
+        if (isConnectionError) {
+          this.connected = false;
+          this.connectPromise = null;
+          try { await this.client.disconnect(); } catch { /* ignore */ }
+          
+          this.client = new GramClient(
+            new StringSession(this.sessionString),
+            this.apiId,
+            this.apiHash,
+            { connectionRetries: 5, autoReconnect: true }
+          );
+
+          if (attempt < 3) {
+            const jitterMs = 1500 + Math.floor(Math.random() * 2000);
+            console.warn(`[Telegram] Connection error (${err.message || err.errorMessage || "AUTH_KEY_DUPLICATED"}), attempt ${attempt}/3. Recreated client and retrying in ${jitterMs}ms...`);
+            await new Promise((r) => setTimeout(r, jitterMs));
+            continue;
+          }
+        }
+        throw err;
+      }
     }
-    // Note: release is returned to the caller via searchAndSelect
-    // This method shouldn't be called directly; use searchAndSelect instead.
-    await release();
-    throw new Error("Unreachable");
+    throw lastErr || new Error("Unreachable");
   }
 
   /**
@@ -214,9 +252,9 @@ export class TelegramClient {
     searchTimeoutMs = 20000,
     selectTimeoutMs = 45000
   ): Promise<MusicResult> {
-    await this.ensureConnected();
-    const release = await TelegramClient.botMutex.acquire();
-    try {
+    return this.withRetry(async () => {
+      const release = await TelegramClient.botMutex.acquire();
+      try {
       const { buttonMessageId, buttons } = await this._searchMusic(query, searchTimeoutMs);
       if (buttons.length === 0) {
         throw new Error("No results found on Telegram");
@@ -278,30 +316,10 @@ export class TelegramClient {
       console.log(`[Telegram AutoDownload] Got ${buttons.length} results. Selecting index ${selectedIndex}: "${buttons[selectedIndex]?.text}" (score: ${bestScore}) for query "${query}"`);
       const result = await this._selectResult(buttonMessageId, selectedIndex, selectTimeoutMs);
       return result;
-    } catch (err: any) {
-      // Only invalidate the connection for actual MTProto/network errors.
-      // Bot-level errors ("No results", "Bot did not respond", "BOT_RESPONSE_TIMEOUT")
-      // don't mean the session is broken — they're application-level failures.
-      // Marking the connection dead for those forces a full reconnect (with the
-      // AUTH_KEY_DUPLICATED retry loop) on every search miss, adding seconds of
-      // unnecessary latency and making Telegram cascading failures much worse.
-      const isConnectionError =
-        err?.code === 406 ||
-        err?.errorMessage === "AUTH_KEY_DUPLICATED" ||
-        String(err).includes("AUTH_KEY_DUPLICATED") ||
-        err?.message?.includes("ECONNRESET") ||
-        err?.message?.includes("ETIMEDOUT") ||
-        err?.message?.includes("socket") ||
-        err?.message?.includes("network");
-
-      if (isConnectionError) {
-        this.connected = false;
-        this.connectPromise = null;
-      }
-      throw err;
     } finally {
       await release();
     }
+    });
   }
 
   private async _searchMusic(query: string, timeoutMs: number): Promise<{
@@ -511,7 +529,7 @@ export class TelegramClient {
    * Polls for audio files until no more arrive for a while.
    */
   async importPlaylist(url: string, onTrack?: (track: MusicResult) => void): Promise<MusicResult[]> {
-    await this.ensureConnected();
+    return this.withRetry(async () => {
 
     const botEntity = await this.client.getEntity(this.botUsername);
 
@@ -572,13 +590,14 @@ export class TelegramClient {
     }
 
     return results;
+    });
   }
 
   /**
    * Download audio for a specific message (after it's been sent by the bot).
    */
   async downloadAudio(messageId: number): Promise<Buffer> {
-    await this.ensureConnected();
+    return this.withRetry(async () => {
 
     const botEntity = await this.client.getEntity(this.botUsername);
     const messages = await this.client.getMessages(botEntity, {
@@ -605,10 +624,11 @@ export class TelegramClient {
     }
 
     throw new Error(`Unexpected download result type: ${typeof result}`);
+    });
   }
 
   async getAudioStream(messageId: number, offsetBytes?: number, limitBytes?: number): Promise<{ stream: Readable; size: number }> {
-    await this.ensureConnected();
+    return this.withRetry(async () => {
 
     const botEntity = await this.client.getEntity(this.botUsername);
     const messages = await this.client.getMessages(botEntity, {
@@ -652,6 +672,7 @@ export class TelegramClient {
     }
 
     throw new Error(`Unexpected download result type: ${typeof result}`);
+    });
   }
 
   private async ensureConnected(): Promise<void> {
