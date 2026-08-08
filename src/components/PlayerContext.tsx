@@ -1572,7 +1572,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     nextQueue.splice(insertAt, 0, track);
     setQueueState(nextQueue);
     setCurrentIndex(insertAt);
-  }, []);
+  }, [remoteSyncDone]);
 
   const playNext = useCallback((track: Track) => {
     setUpNextQueue((prev) => [track, ...prev]);
@@ -1590,7 +1590,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       audioRef.current.play().catch(() => {});
     }
-  }, []);
+  }, [remoteSyncDone]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
