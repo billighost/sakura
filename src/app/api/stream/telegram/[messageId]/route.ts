@@ -27,19 +27,52 @@ export async function GET(
   }
 
   try {
+    const rangeHeader = req.headers.get("Range");
+    let offsetBytes: number | undefined;
+    let limitBytes: number | undefined;
+    
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(.*)/);
+      if (match) {
+        offsetBytes = parseInt(match[1], 10);
+        if (match[2]) {
+          const end = parseInt(match[2], 10);
+          limitBytes = end - offsetBytes + 1;
+        }
+      }
+    }
+
     const client = getTelegramClient();
     await client.init();
-    const nodeStream = await client.getAudioStream(msgId);
+    
+    const { stream: nodeStream, size } = await client.getAudioStream(msgId, offsetBytes, limitBytes);
     const webStream = Readable.toWeb(nodeStream);
 
+    const headers = new Headers({
+      "Content-Type": "audio/mpeg",
+      "Cache-Control": "public, max-age=604800, immutable",
+      "Accept-Ranges": "bytes",
+    });
+
+    if (size > 0) {
+      const length = limitBytes ? limitBytes : (size - (offsetBytes || 0));
+      headers.set("Content-Length", length.toString());
+    }
+
+    if (offsetBytes !== undefined) {
+      const endPos = limitBytes ? offsetBytes + limitBytes - 1 : (size > 0 ? size - 1 : "*");
+      const totalSize = size > 0 ? size : "*";
+      headers.set("Content-Range", `bytes ${offsetBytes}-${endPos}/${totalSize}`);
+      
+      return new Response(webStream as ReadableStream, {
+        status: 206,
+        headers,
+      });
+    }
+
     return new Response(webStream as ReadableStream, {
-      headers: {
-        "Content-Type": "audio/mpeg",
-        // Long cache: a Telegram file is immutable. Let the browser and the
-        // service worker keep it aggressively.
-        "Cache-Control": "public, max-age=604800, immutable",
-        "Accept-Ranges": "none",
-      },
+      status: 200,
+      headers,
     });
   } catch (error) {
     console.error("[Telegram Stream]", error);

@@ -607,7 +607,7 @@ export class TelegramClient {
     throw new Error(`Unexpected download result type: ${typeof result}`);
   }
 
-  async getAudioStream(messageId: number): Promise<Readable> {
+  async getAudioStream(messageId: number, offsetBytes?: number, limitBytes?: number): Promise<{ stream: Readable; size: number }> {
     await this.ensureConnected();
 
     const botEntity = await this.client.getEntity(this.botUsername);
@@ -620,18 +620,35 @@ export class TelegramClient {
       throw new Error(`Message ${messageId} not found or has no media`);
     }
 
+    let size = 0;
+    if ("document" in msg.media) {
+      size = Number((msg.media as any).document.size) || 0;
+    }
+
+    if (offsetBytes !== undefined) {
+      // GramJS requires big-integer for offsets
+      const bigInt = require("big-integer");
+      const iter = this.client.iterDownload({
+        file: msg.media,
+        offset: bigInt(offsetBytes),
+        limit: limitBytes,
+        requestSize: 512 * 1024,
+      });
+      return { stream: Readable.from(iter), size };
+    }
+
     const result = await this.client.downloadMedia(msg);
 
     if (Buffer.isBuffer(result)) {
-      return Readable.from(result);
+      return { stream: Readable.from(result), size };
     }
 
     if (result && (result as any) instanceof Readable) {
-      return result as unknown as Readable;
+      return { stream: result as unknown as Readable, size };
     }
 
     if (result && typeof result === "object" && (Symbol.asyncIterator in result || Symbol.iterator in result)) {
-      return Readable.from(result as AsyncIterable<Uint8Array>);
+      return { stream: Readable.from(result as AsyncIterable<Uint8Array>), size };
     }
 
     throw new Error(`Unexpected download result type: ${typeof result}`);

@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from "idb";
 
 const DB_NAME = "sakura-offline";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 interface SakuraDB {
   tracks: {
@@ -24,6 +24,10 @@ interface SakuraDB {
   audio: {
     key: string; // compound key: `${userId}:${deviceId}:${trackId}`
     value: { id: string; userId: string; deviceId: string; blob: Blob };
+  };
+  partial_audio: {
+    key: string; // compound key: `${userId}:${deviceId}:${trackId}`
+    value: { id: string; userId: string; deviceId: string; chunks: Blob[]; totalBytes: number; downloadedBytes: number };
   };
   playlists: {
     key: string;
@@ -77,6 +81,11 @@ function getDB() {
             if (!store.indexNames.contains("by-user-device")) {
               store.createIndex("by-user-device", ["userId", "deviceId"]);
             }
+          }
+        }
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains("partial_audio")) {
+            db.createObjectStore("partial_audio", { keyPath: "id" });
           }
         }
       },
@@ -165,6 +174,24 @@ export async function getAudioBlob(id: string, userId = getCachedUserId(), devic
   const key = `${userId}:${deviceId}:${id}`;
   const result = await db.get("audio", key);
   return result?.blob;
+}
+
+export async function savePartialAudio(id: string, chunks: Blob[], totalBytes: number, downloadedBytes: number, userId = getCachedUserId(), deviceId = getDeviceId()) {
+  const db = await getDB();
+  const key = `${userId}:${deviceId}:${id}`;
+  await db.put("partial_audio", { id: key, userId, deviceId, chunks, totalBytes, downloadedBytes });
+}
+
+export async function getPartialAudio(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
+  const db = await getDB();
+  const key = `${userId}:${deviceId}:${id}`;
+  return db.get("partial_audio", key);
+}
+
+export async function removePartialAudio(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
+  const db = await getDB();
+  const key = `${userId}:${deviceId}:${id}`;
+  await db.delete("partial_audio", key);
 }
 
 export async function isTrackDownloaded(id: string, userId = getCachedUserId(), deviceId = getDeviceId()): Promise<boolean> {

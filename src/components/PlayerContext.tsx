@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob, findDownloadedTrackByMetadata, cloneDownloadedTrack } from "@/lib/offline-db";
+import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrackOffline, saveAudioBlob, findDownloadedTrackByMetadata, cloneDownloadedTrack, getPartialAudio, savePartialAudio, removePartialAudio } from "@/lib/offline-db";
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { signalTracker } from "@/lib/signals";
@@ -412,16 +412,54 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           finalCoverUrl = data.coverUrl || finalCoverUrl;
         }
 
-        const blobRes = await fetch(finalAudioUrl!);
-        if (!blobRes.ok) throw new Error("Failed to fetch audio stream");
+        let chunks: BlobPart[] = [];
+        let bytesLoaded = 0;
+        
+        const partial = await getPartialAudio(finalId, uId, dId);
+        if (partial) {
+          chunks = partial.chunks;
+          bytesLoaded = partial.downloadedBytes;
+        }
 
-        const contentLength = blobRes.headers.get("content-length");
-        const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+        const headers = new Headers();
+        if (bytesLoaded > 0) {
+          headers.set("Range", `bytes=${bytesLoaded}-`);
+        }
+
+        const blobRes = await fetch(finalAudioUrl!, { headers });
+        if (!blobRes.ok && blobRes.status !== 206) {
+          if (blobRes.status === 416) { // Range Not Satisfiable
+            chunks = [];
+            bytesLoaded = 0;
+            const retryRes = await fetch(finalAudioUrl!);
+            if (!retryRes.ok) throw new Error("Failed to fetch audio stream");
+            Object.defineProperty(blobRes, 'body', { value: retryRes.body });
+            Object.defineProperty(blobRes, 'headers', { value: retryRes.headers });
+            Object.defineProperty(blobRes, 'status', { value: retryRes.status });
+          } else {
+             throw new Error(`Failed to fetch audio stream: ${blobRes.status}`);
+          }
+        }
+
+        if (blobRes.status === 200 && bytesLoaded > 0) {
+          // Server ignored Range header or we didn't send one
+          chunks = [];
+          bytesLoaded = 0;
+        }
+
+        const contentLengthHeader = blobRes.headers.get("content-length");
+        const contentRangeHeader = blobRes.headers.get("content-range");
+        let totalBytes = 0;
+        if (contentRangeHeader) {
+          const match = contentRangeHeader.match(/\/(\d+)$/);
+          if (match) totalBytes = parseInt(match[1], 10);
+        } else if (contentLengthHeader) {
+          totalBytes = parseInt(contentLengthHeader, 10);
+        }
         
         const reader = blobRes.body!.getReader();
-        const chunks: BlobPart[] = [];
-        let bytesLoaded = 0;
         const startTime = Date.now();
+        let lastSaveTime = Date.now();
 
         while (true) {
           const { done, value } = await reader.read();
@@ -443,6 +481,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               : `${(bytesPerSec / 1024).toFixed(0)}K/s`;
             setDownloadSpeed((prev) => ({ ...prev, [item.id]: speedText, [finalId]: speedText }));
           }
+
+          // Save partial progress every 1s
+          if (Date.now() - lastSaveTime > 1000) {
+             await savePartialAudio(finalId, chunks as Blob[], totalBytes, bytesLoaded, uId, dId);
+             lastSaveTime = Date.now();
+          }
         }
 
         const blob = new Blob(chunks, { type: blobRes.headers.get("content-type") || "audio/mpeg" });
@@ -457,6 +501,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           duration: item.duration,
         }, uId, dId);
         await saveAudioBlob(finalId, blob, uId, dId);
+        await removePartialAudio(finalId, uId, dId);
 
         setDownloadStates((prev) => ({ ...prev, [item.id]: "completed", [finalId]: "completed" }));
       } catch (err) {
