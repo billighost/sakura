@@ -195,35 +195,22 @@ export async function POST(req: NextRequest) {
 
     const metadata = await enrichTrackMetadata(track.title, track.artist);
 
-    let artistId: string;
-    const existingArtist = await queryOne<{ id: string }>(
-      `SELECT id FROM "Artist" WHERE name = $1`,
-      [track.artist]
-    );
-
-    if (existingArtist) {
-      artistId = existingArtist.id;
-      if (metadata.artist?.imageUrl) {
-        await queryOne(
-          `UPDATE "Artist" SET "imageUrl" = COALESCE("imageUrl", $1), "bio" = COALESCE("bio", $2), "deezerId" = COALESCE("deezerId", $3) WHERE id = $4`,
-          [metadata.artist.imageUrl, metadata.artist.bio || null, metadata.artist.deezerId || null, artistId]
-        );
-      }
-    } else {
-      const newArtist = await queryOne<{ id: string }>(
-        `INSERT INTO "Artist" (id, name, "imageUrl", bio, "deezerId", "genres", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())
-         RETURNING id`,
-        [
-          metadata.artist?.name || track.artist,
-          metadata.artist?.imageUrl || null,
-          metadata.artist?.bio || null,
-          metadata.artist?.deezerId || null,
-          metadata.artist?.genres || [],
-        ]
-      );
-      artistId = newArtist!.id;
-    }
+    const artistId = (await queryOne<{ id: string }>(
+      `INSERT INTO "Artist" (id, name, "imageUrl", bio, "deezerId", "genres", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (name) DO UPDATE SET
+         "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl"),
+         bio = COALESCE("Artist".bio, EXCLUDED.bio),
+         "deezerId" = COALESCE("Artist"."deezerId", EXCLUDED."deezerId")
+       RETURNING id`,
+      [
+        track.artist,
+        metadata.artist?.imageUrl || null,
+        metadata.artist?.bio || null,
+        metadata.artist?.deezerId || null,
+        metadata.artist?.genres || [],
+      ]
+    ))!.id;
 
     let albumId: string | null = providedAlbumId || null;
 

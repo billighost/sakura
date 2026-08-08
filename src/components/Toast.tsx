@@ -26,7 +26,7 @@ export function Toast({
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [visible, duration, onClose]);
+  }, [visible, duration, onClose, message]);
 
   const typeClass =
     type === "error"
@@ -40,8 +40,9 @@ export function Toast({
       className={`${styles.toast} ${visible ? styles.visible : ""} ${typeClass}`}
       role="alert"
       aria-live="assertive"
+      onPointerDown={onClose}
       onClick={onClose}
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", pointerEvents: visible ? "auto" : "none" }}
     >
       {message}
     </div>
