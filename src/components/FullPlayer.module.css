@@ -223,7 +223,7 @@
   align-items: center;
   justify-content: center;
   color: var(--on-media-secondary);
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.35), rgba(201, 166, 224, 0.35));
+  background: var(--accent);
 }
 
 .controls {

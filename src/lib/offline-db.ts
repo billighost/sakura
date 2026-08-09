@@ -18,6 +18,19 @@ interface SakuraDB {
       // Scoped keys for user & device isolation
       userId?: string;
       deviceId?: string;
+      /**
+       * Where this track's audio actually lives, when it isn't under this id.
+       *
+       * A virtual `deezer-<id>` track becomes a real database id once Telegram
+       * has served the file, so the download finishes under a different id than
+       * the one that was queued. Both ids need to resolve — the queued one
+       * because that's what the row in the UI and the play queue still hold.
+       * Recording the real id here lets `getAudioBlob` follow the pointer
+       * instead of the alternative, which was writing the whole blob a second
+       * time under the second id and doubling on-device storage for every
+       * download that originated from Deezer.
+       */
+      blobId?: string;
     };
     indexes: { "by-artist": string; "by-user-device": [string, string] };
   };
@@ -131,6 +144,7 @@ export async function saveTrackOffline(track: {
   audioUrl: string;
   coverUrl?: string;
   duration: number;
+  blobId?: string;
 }, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
   await db.put("tracks", {
@@ -173,7 +187,20 @@ export async function getAudioBlob(id: string, userId = getCachedUserId(), devic
   const db = await getDB();
   const key = `${userId}:${deviceId}:${id}`;
   const result = await db.get("audio", key);
-  return result?.blob;
+  if (result?.blob) return result.blob;
+
+  // Nothing stored under this id directly. If it's the queued-side id of a
+  // track that finished under a resolved one, follow the pointer rather than
+  // reporting the track as un-downloaded. Costs one extra read, and only on a
+  // miss, so the common path is unchanged.
+  const track = await db.get("tracks", id);
+  const aliasId = track?.blobId;
+  if (aliasId && aliasId !== id) {
+    const aliased = await db.get("audio", `${userId}:${deviceId}:${aliasId}`);
+    return aliased?.blob;
+  }
+
+  return undefined;
 }
 
 export async function savePartialAudio(id: string, chunks: Blob[], totalBytes: number, downloadedBytes: number, userId = getCachedUserId(), deviceId = getDeviceId()) {
@@ -233,6 +260,16 @@ export async function cloneDownloadedTrack(
   const blob = await getAudioBlob(existingTrackId, userId, deviceId);
   if (!blob) return false;
 
+  // Point at the existing audio instead of copying it. This path exists because
+  // the same recording can already be on the device under a different id, so
+  // copying would store a second full copy of a file we demonstrably already
+  // have — the one case where the duplicate is most obviously avoidable.
+  //
+  // If the source is itself an alias, point at its target rather than at the
+  // alias, so a chain never forms and one lookup always resolves.
+  const sourceRecord = await db.get("tracks", existingTrackId);
+  const target = sourceRecord?.blobId ?? existingTrackId;
+
   await saveTrackOffline({
     id: newTrackId,
     title: newTrackData.title,
@@ -241,9 +278,9 @@ export async function cloneDownloadedTrack(
     coverUrl: newTrackData.coverUrl,
     audioUrl: newTrackData.audioUrl,
     duration: newTrackData.duration,
+    blobId: target === newTrackId ? undefined : target,
   }, userId, deviceId);
 
-  await saveAudioBlob(newTrackId, blob, userId, deviceId);
   return true;
 }
 
@@ -255,6 +292,39 @@ export async function getAllDownloadedTracks(userId = getCachedUserId(), deviceI
 
 export async function removeDownloadedTrack(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
+
+  /**
+   * Deleting a track's audio has to account for other ids pointing at it.
+   *
+   * Since a Deezer-sourced download stores metadata under the queued id and the
+   * audio under the resolved one, deleting either id alone leaves the other
+   * half behind: delete the alias and the blob is orphaned with nothing
+   * referencing it; delete the target and every alias silently resolves to
+   * nothing while still appearing downloaded.
+   *
+   * So resolve to whichever id owns the audio, remove that blob, then remove
+   * every metadata row that referred to it — the alias and the target alike.
+   */
+  const record = await db.get("tracks", id);
+  const audioOwnerId = record?.blobId ?? id;
+
+  const all = await db.getAll("tracks");
+  const affected = all.filter(
+    (t) =>
+      t.userId === userId &&
+      t.deviceId === deviceId &&
+      (t.id === id || t.id === audioOwnerId || t.blobId === audioOwnerId),
+  );
+
+  await db.delete("audio", `${userId}:${deviceId}:${audioOwnerId}`);
+  await db.delete("partial_audio", `${userId}:${deviceId}:${audioOwnerId}`);
+
+  for (const t of affected) {
+    await db.delete("tracks", t.id);
+    await db.delete("audio", `${userId}:${deviceId}:${t.id}`);
+  }
+
+  // Guard the case where the id had no metadata row at all.
   await db.delete("tracks", id);
   await db.delete("audio", `${userId}:${deviceId}:${id}`);
 }

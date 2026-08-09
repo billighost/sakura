@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cached, cacheKey } from "@/lib/cache";
 
 interface TrackRow {
   id: string;
@@ -22,13 +23,19 @@ export async function POST(
   const { trackId } = await params;
 
   try {
-    const track = await queryOne<TrackRow>(
-      `SELECT t.id, t.title, t."audioUrl", t."coverUrl", a.name AS "artistName"
-       FROM "Track" t
-       JOIN "Artist" a ON t."artistId" = a.id
-       WHERE t.id = $1`,
-      [trackId],
-    );
+    // Track metadata (title, artist, audioUrl, coverUrl) is effectively
+    // immutable after a Telegram download sets it. Cache for 5 minutes so
+    // repeated requests from the download queue worker hit L1 instead of DB.
+    const key = cacheKey("dl:meta", trackId);
+    const track = await cached<TrackRow | null>(key, 5 * 60, async () => {
+      return await queryOne<TrackRow>(
+        `SELECT t.id, t.title, t."audioUrl", t."coverUrl", a.name AS "artistName"
+         FROM "Track" t
+         JOIN "Artist" a ON t."artistId" = a.id
+         WHERE t.id = $1`,
+        [trackId],
+      ) ?? null;
+    });
 
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 404 });

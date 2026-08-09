@@ -4,7 +4,17 @@ import { getTelegramClient } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { Redis } from "@upstash/redis";
+
+/**
+ * How long a "requested title → stored track id" alias lives.
+ *
+ * Long, because it records a fact that doesn't change: the song Telegram
+ * returned for a given search phrase. Anything shorter re-opens the window
+ * where a differently-titled match costs a fresh bot download.
+ */
+const ALIAS_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
   ? new Redis({
@@ -39,6 +49,9 @@ export async function POST(req: NextRequest) {
   }
 
   // 1. Try to find the track in our database first to avoid hitting Telegram
+  const requestKey = `${artist.toLowerCase().trim()} - ${title.toLowerCase().trim()}`;
+  const aliasKey = `dl:alias:${requestKey}`;
+
   try {
     const existingTrack = await queryOne<{
       id: string;
@@ -84,6 +97,48 @@ export async function POST(req: NextRequest) {
 
       console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}" but audioUrl is unusable ("${au}"). Re-downloading from Telegram.`);
     }
+
+    /**
+     * Second chance: the same song under a different canonical title.
+     *
+     * The lookup above matches the requested title exactly, which misses every
+     * track Telegram stored under a fuller name — remasters, "(feat. …)"
+     * suffixes, deluxe editions. Those are not rare, and each miss costs a
+     * 30-60s bot download for a file we already have.
+     */
+    const aliasId = await cacheGet<string>(aliasKey);
+    if (aliasId) {
+      const aliased = await queryOne<{
+        id: string;
+        title: string;
+        artistName: string;
+        duration: number;
+        audioUrl: string | null;
+        albumId: string | null;
+        coverUrl: string | null;
+        telegramMessageId: string | null;
+      }>(
+        `SELECT t.id, t.title, a.name as "artistName", t.duration, t."audioUrl", t."albumId", t."coverUrl", t."telegramMessageId"
+         FROM "Track" t
+         JOIN "Artist" a ON t."artistId" = a.id
+         WHERE t.id = $1`,
+        [aliasId]
+      );
+      const aliasUrl = aliased?.audioUrl || "";
+      if (aliased && aliasUrl.startsWith("/api/stream/telegram/") && !aliasUrl.endsWith("/0")) {
+        console.log(`[Telegram AutoDownload] Alias hit for "${artist} - ${title}" → "${aliased.title}".`);
+        return NextResponse.json({
+          id: aliased.id,
+          title: aliased.title,
+          artist: aliased.artistName,
+          duration: aliased.duration,
+          audioUrl: aliased.audioUrl,
+          messageId: aliased.telegramMessageId ? parseInt(aliased.telegramMessageId, 10) : null,
+          albumId: aliased.albumId,
+          coverUrl: aliased.coverUrl,
+        });
+      }
+    }
   } catch (err) {
     console.error("[Telegram AutoDownload] Pre-lookup database error:", err);
   }
@@ -98,7 +153,7 @@ export async function POST(req: NextRequest) {
   );
   if (!limited.allowed) return rateLimitResponse(limited);
 
-  const cacheKey = `${artist.toLowerCase().trim()} - ${title.toLowerCase().trim()}`;
+  const cacheKey = requestKey;
   const searchQuery = `${artist} - ${title}`;
   const negativeCacheKey = `download:failed:${cacheKey}`;
 
@@ -115,8 +170,28 @@ export async function POST(req: NextRequest) {
   if (pendingDownloads.has(cacheKey)) {
     console.log(`[Telegram AutoDownload] Coalescing request for "${searchQuery}". Waiting for active download...`);
     try {
-      await pendingDownloads.get(cacheKey);
-      // Retrieve the newly created track
+      /**
+       * Take the winner's answer directly.
+       *
+       * This used to await the promise for its side effect and then re-query by
+       * `lower(title) = lower($1)` using the *requested* title — which silently
+       * failed whenever Telegram's canonical title differed from what was asked
+       * for. Asking for "Dreams" stores "Dreams (2004 Remaster)", the lookup
+       * missed, and the waiter fell through to start its own download. Measured:
+       * five concurrent requests for one new song produced five separate
+       * Telegram downloads with five different messageIds, each overwriting the
+       * last — precisely what this block exists to prevent.
+       *
+       * The resolved payload is the response the winner is about to send, so
+       * there's nothing to look up and nothing to mismatch.
+       */
+      const shared = await pendingDownloads.get(cacheKey);
+      if (shared) {
+        return NextResponse.json(shared);
+      }
+
+      // Older in-flight entries (or a winner that resolved without a payload)
+      // still fall back to the lookup rather than starting a second download.
       const newTrack = await queryOne<{
         id: string;
         title: string;
@@ -157,7 +232,7 @@ export async function POST(req: NextRequest) {
   // If we get here, we are the first downloader. Register the promise wrapper:
   let resolveDownload: (value?: any) => void = () => {};
   let rejectDownload: (reason?: any) => void = () => {};
-  const downloadPromise = new Promise((resolve, reject) => {
+  const downloadPromise = new Promise<any>((resolve, reject) => {
     resolveDownload = resolve;
     rejectDownload = reject;
   });
@@ -466,10 +541,7 @@ export async function POST(req: NextRequest) {
       ).catch((err) => console.warn("[Telegram AutoDownload] Favorite migration failed:", err));
     }
 
-    resolveDownload();
-    pendingDownloads.delete(cacheKey);
-
-    return NextResponse.json({
+    const payload = {
       id: dbTrack!.id,
       title: track.title,
       artist: track.artist,
@@ -478,7 +550,27 @@ export async function POST(req: NextRequest) {
       messageId: track.messageId,
       albumId,
       coverUrl: metadata.album?.coverUrl || null,
-    });
+    };
+
+    /**
+     * Remember which request produced this track.
+     *
+     * Telegram's canonical title routinely differs from what was asked for
+     * ("Dreams" → "Dreams (2004 Remaster)"), and the cache check at the top of
+     * this route matches on exact title. Without an alias, every future request
+     * phrased the original way misses the row that already exists and pays for
+     * a fresh 30-60s bot download — permanently, not just once.
+     *
+     * Written through `cacheSet` so the in-process L1 absorbs the reads; on
+     * Upstash's per-command billing an uncached lookup per play would be far
+     * more expensive than the row it saves.
+     */
+    await cacheSet(aliasKey, dbTrack!.id, ALIAS_TTL_SECONDS).catch(() => {});
+
+    resolveDownload(payload);
+    pendingDownloads.delete(cacheKey);
+
+    return NextResponse.json(payload);
   } catch (error) {
     rejectDownload(error);
     pendingDownloads.delete(cacheKey);

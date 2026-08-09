@@ -71,7 +71,8 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     downloadStates,
     downloadProgress,
     downloadSpeed,
-    addToDownloadQueue
+    addToDownloadQueue,
+    removeFromDownloadQueue,
   } = usePlayer();
   const liked = favoriteTrackIds?.has(track.id) || false;
   const isActive = currentTrack?.id === track.id;
@@ -158,6 +159,11 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     } catch (err) {
       console.error("Auto-download failed:", err);
       showToast("Download failed. Please try again.", "error");
+      // BUG-4 FIX: Clear the queued state from the download queue so the
+      // spinner resets and the user can retry by tapping again. Without this,
+      // stateInQueue stays "queued" and effectiveDownloadState stays "telegram",
+      // making the row show an infinite spinner with no way to retry.
+      removeFromDownloadQueue(track.id);
       setLocalDownloadState("idle");
     }
   }

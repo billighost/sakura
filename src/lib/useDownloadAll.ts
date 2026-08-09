@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { usePlayer } from "@/components/PlayerContext";
 import { isTrackDownloaded, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 
@@ -35,11 +35,26 @@ const CONFIRM_THRESHOLD = 5;
 
 export function useDownloadAll() {
   const { addToDownloadQueue, downloadStates, showToast } = usePlayer();
+  /**
+   * The guard and the spinner need different mechanisms, and using one for both
+   * breaks the other.
+   *
+   * The ref is the mutex: `useState` doesn't flush synchronously, so two taps in
+   * the same tick both read `checking === false` and both run the pre-flight.
+   * Only a ref rejects the second one.
+   *
+   * The state is what `checking` returns, and it has to stay: four pages bind it
+   * to a spinner (`checking: downloading` in artist, liked, mix and system
+   * playlist pages). Returning the ref instead means mutating it never triggers
+   * a render, so those spinners read `false` forever and never appear.
+   */
+  const checkingRef = useRef(false);
   const [checking, setChecking] = useState(false);
 
   const downloadAll = useCallback(
     async (tracks: DownloadableTrack[], label = "tracks") => {
-      if (tracks.length === 0 || checking) return;
+      if (tracks.length === 0 || checkingRef.current) return;
+      checkingRef.current = true;
       setChecking(true);
 
       try {
@@ -96,10 +111,11 @@ export function useDownloadAll() {
           "success"
         );
       } finally {
+        checkingRef.current = false;
         setChecking(false);
       }
     },
-    [addToDownloadQueue, downloadStates, showToast, checking]
+    [addToDownloadQueue, downloadStates, showToast]
   );
 
   /** True while the pre-flight "what's missing" check runs. */

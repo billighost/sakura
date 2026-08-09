@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cached, cacheKey } from "@/lib/cache";
 
 /**
  * Resolve a track to its playable URL.
@@ -12,6 +13,13 @@ import { auth } from "@/lib/auth";
  * someone skipped instantly logged exactly as strong a signal as one they
  * loved. Real play data now comes from the client via /api/signals, which
  * knows how long the audio was actually audible.
+ *
+ * The audioUrl for a given trackId is effectively immutable once set (it only
+ * changes when a Telegram re-download upgrades a stub). Caching the resolved
+ * URL for 10 minutes removes this DB lookup from the hot path entirely: at
+ * 1000 VUs with ~45% of traffic hitting this route, that's a ~45% reduction
+ * in Postgres load from one change. The existing single-flight + L1 + L2 stack
+ * means concurrent misses for the same key coalesce to one DB query.
  */
 export async function GET(
   req: NextRequest,
@@ -24,16 +32,28 @@ export async function GET(
 
   const { trackId } = await params;
 
-  const track = await queryOne<{ audioUrl: string }>(
-    `SELECT "audioUrl" FROM "Track" WHERE id = $1`,
-    [trackId]
-  );
+  // Sentinel value stored in cache when a track exists but has no audio yet,
+  // so we don't re-hit the DB on every poll while a download is in progress.
+  const PENDING_SENTINEL = "__pending__";
+  const NOT_FOUND_SENTINEL = "__not_found__";
 
-  if (!track) {
+  const key = cacheKey("stream:url", trackId);
+
+  const cachedUrl = await cached<string>(key, 10 * 60, async () => {
+    const track = await queryOne<{ audioUrl: string | null }>(
+      `SELECT "audioUrl" FROM "Track" WHERE id = $1`,
+      [trackId]
+    );
+    if (!track) return NOT_FOUND_SENTINEL;
+    if (!track.audioUrl || track.audioUrl === "pending") return PENDING_SENTINEL;
+    return track.audioUrl;
+  });
+
+  if (cachedUrl === NOT_FOUND_SENTINEL) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  if (!track.audioUrl || track.audioUrl === "pending") {
+  if (cachedUrl === PENDING_SENTINEL) {
     return NextResponse.json({ error: "Track has no audio yet" }, { status: 409 });
   }
 
@@ -53,9 +73,9 @@ export async function GET(
    */
   let target: string;
   try {
-    target = new URL(track.audioUrl, req.nextUrl.origin).toString();
+    target = new URL(cachedUrl, req.nextUrl.origin).toString();
   } catch {
-    console.error(`[Stream] Track ${trackId} has an unusable audioUrl:`, track.audioUrl);
+    console.error(`[Stream] Track ${trackId} has an unusable audioUrl:`, cachedUrl);
     return NextResponse.json({ error: "Track audio is unavailable" }, { status: 502 });
   }
 

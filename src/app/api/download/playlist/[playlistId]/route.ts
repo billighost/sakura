@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/sql";
+import { query, queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
+import { cached, cacheKey } from "@/lib/cache";
 
 interface PlaylistTrackRow {
   id: string;
@@ -22,23 +23,33 @@ export async function POST(
   const { playlistId } = await params;
 
   try {
-    const playlistOwner = await query<{ userId: string }>(
+    // BUG-5 FIX: Separate "not found" (404) from "access denied" (403)
+    // so callers can distinguish a missing playlist from a permission error.
+    const playlist = await queryOne<{ userId: string }>(
       `SELECT "userId" FROM "Playlist" WHERE id = $1`,
       [playlistId],
     );
 
-    if (!playlistOwner.length || playlistOwner[0].userId !== session.user.id) {
+    if (!playlist) {
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
     }
 
-    const tracks = await query<PlaylistTrackRow>(
-      `SELECT t.id, t.title, t."audioUrl", t."coverUrl", a.name AS "artistName"
-       FROM "PlaylistTrack" pt
-       JOIN "Track" t ON pt."trackId" = t.id
-       JOIN "Artist" a ON t."artistId" = a.id
-       WHERE pt."playlistId" = $1
-       ORDER BY pt.position ASC`,
-      [playlistId],
+    if (playlist.userId !== session.user.id) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const tracks = await cached<PlaylistTrackRow[]>(
+      cacheKey("dl:playlist", playlistId),
+      60,
+      () => query<PlaylistTrackRow>(
+        `SELECT t.id, t.title, t."audioUrl", t."coverUrl", a.name AS "artistName"
+         FROM "PlaylistTrack" pt
+         JOIN "Track" t ON pt."trackId" = t.id
+         JOIN "Artist" a ON t."artistId" = a.id
+         WHERE pt."playlistId" = $1
+         ORDER BY pt.position ASC`,
+        [playlistId],
+      )
     );
 
     return NextResponse.json(

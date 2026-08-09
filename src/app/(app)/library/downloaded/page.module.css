@@ -20,10 +20,7 @@
   position: absolute;
   inset: 0;
   z-index: -2;
-  background:
-    radial-gradient(60% 90% at 12% 0%, rgba(242, 120, 159, 0.3), transparent 65%),
-    radial-gradient(55% 80% at 90% 15%, rgba(201, 166, 224, 0.24), transparent 60%),
-    var(--sakura-bg);
+  background: var(--surface-1);
 }
 
 .headerGradient::after {
@@ -31,7 +28,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(180deg, transparent 40%, var(--sakura-bg) 100%);
+  background: linear-gradient(180deg, transparent, var(--bg));
 }
 
 .header {
@@ -70,7 +67,7 @@
   width: clamp(6rem, 22vw, 9rem);
   height: clamp(6rem, 22vw, 9rem);
   border-radius: var(--sakura-radius-lg);
-  background: linear-gradient(135deg, var(--sakura-accent) 0%, var(--sakura-accent-2) 100%);
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -24,10 +24,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(60% 90% at 12% -10%, rgba(242, 120, 159, 0.28), transparent 70%),
-    radial-gradient(55% 80% at 100% 0%, rgba(201, 166, 224, 0.22), transparent 65%),
-    var(--sakura-surface);
+  background: var(--surface-1);
   z-index: -1;
 }
 
@@ -35,7 +32,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, var(--sakura-bg) 130%);
+  background: linear-gradient(180deg, transparent, var(--bg));
   opacity: 0.5;
   z-index: -1;
 }
@@ -332,7 +329,7 @@
 
 .trackCardFallbackAlt {
   composes: trackCardFallback;
-  background: linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end));
+  background: var(--accent);
 }
 
 .trackCardTitle {
@@ -448,7 +445,7 @@
   width: 100%;
   aspect-ratio: 1;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--sakura-accent-2), var(--sakura-gradient-end));
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;

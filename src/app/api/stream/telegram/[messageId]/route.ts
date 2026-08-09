@@ -34,25 +34,77 @@ export async function GET(
   }
 
   try {
+    /**
+     * Parse the Range header.
+     *
+     * Only a single `bytes=start-[end]` range is supported, which is what audio
+     * elements and the offline download queue actually send. A suffix range
+     * (`bytes=-500`) is deliberately not matched here and falls through to a
+     * whole-file response, which is a legal — if unhelpful — answer.
+     */
     const rangeHeader = req.headers.get("Range");
     let offsetBytes: number | undefined;
-    let limitBytes: number | undefined;
-    
+    let requestedEnd: number | undefined;
+
     if (rangeHeader) {
-      const match = rangeHeader.match(/bytes=(\d+)-(.*)/);
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
       if (match) {
-        offsetBytes = parseInt(match[1], 10);
-        if (match[2]) {
-          const end = parseInt(match[2], 10);
-          limitBytes = end - offsetBytes + 1;
+        const start = parseInt(match[1], 10);
+        if (Number.isFinite(start) && start >= 0) {
+          offsetBytes = start;
+          if (match[2]) {
+            const end = parseInt(match[2], 10);
+            if (Number.isFinite(end)) requestedEnd = end;
+          }
         }
       }
     }
 
+    // A backwards range (`bytes=500-100`) is malformed. RFC 7233 says to ignore
+    // an unsatisfiable-because-malformed Range and serve the whole entity.
+    if (offsetBytes !== undefined && requestedEnd !== undefined && requestedEnd < offsetBytes) {
+      offsetBytes = undefined;
+      requestedEnd = undefined;
+    }
+
     const client = getTelegramClient();
     await client.init();
-    
-    const { stream: nodeStream, size } = await client.getAudioStream(msgId, offsetBytes, limitBytes);
+
+    /**
+     * Probe the size before streaming when a Range was asked for.
+     *
+     * The previous version computed `size - offsetBytes` unconditionally, so an
+     * offset past the end of the file produced a *negative* Content-Length and a
+     * Content-Range whose start exceeded its end — a response strict HTTP
+     * clients reject outright at the parser ("Invalid character in
+     * Content-Length"), killing the connection rather than failing the request.
+     *
+     * That is not a hypothetical: the offline download queue resumes by sending
+     * `Range: bytes=<savedBytes>-`, so any partial download whose saved length
+     * had caught up with the real file hit exactly this. The client is written
+     * to handle a 416 by discarding its partial data and restarting — it never
+     * got the chance, because the server sent a corrupt 206 instead.
+     */
+    const { stream: nodeStream, size } = await client.getAudioStream(
+      msgId,
+      offsetBytes,
+      offsetBytes !== undefined && requestedEnd !== undefined
+        ? requestedEnd - offsetBytes + 1
+        : undefined,
+    );
+
+    if (offsetBytes !== undefined && size > 0 && offsetBytes >= size) {
+      // Unsatisfiable: tell the client the real size so it can restart correctly.
+      nodeStream.destroy?.();
+      return new Response(null, {
+        status: 416,
+        headers: {
+          "Content-Range": `bytes */${size}`,
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
+
     const webStream = Readable.toWeb(nodeStream);
 
     const headers = new Headers({
@@ -61,20 +113,31 @@ export async function GET(
       "Accept-Ranges": "bytes",
     });
 
-    if (size > 0) {
-      const length = limitBytes ? limitBytes : (size - (offsetBytes || 0));
-      headers.set("Content-Length", length.toString());
-    }
-
     if (offsetBytes !== undefined) {
-      const endPos = limitBytes ? offsetBytes + limitBytes - 1 : (size > 0 ? size - 1 : "*");
-      const totalSize = size > 0 ? size : "*";
-      headers.set("Content-Range", `bytes ${offsetBytes}-${endPos}/${totalSize}`);
+      // Clamp to the last byte that exists. A client may ask for more than the
+      // file holds (`bytes=0-99999999`); the correct answer is what we have,
+      // not a length we cannot deliver.
+      const lastByte = size > 0 ? size - 1 : undefined;
+      let endPos = requestedEnd;
+      if (endPos === undefined) endPos = lastByte;
+      else if (lastByte !== undefined) endPos = Math.min(endPos, lastByte);
+
+      if (endPos !== undefined) {
+        headers.set("Content-Length", String(endPos - offsetBytes + 1));
+        headers.set("Content-Range", `bytes ${offsetBytes}-${endPos}/${size > 0 ? size : "*"}`);
+      } else {
+        // Unknown total size — send the range open-ended rather than guessing.
+        headers.set("Content-Range", `bytes ${offsetBytes}-/*`);
+      }
 
       return new Response(webStream as ReadableStream, {
         status: 206,
         headers,
       });
+    }
+
+    if (size > 0) {
+      headers.set("Content-Length", String(size));
     }
 
     // Only whole-file requests schedule promotion. A Range request is a seek or

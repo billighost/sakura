@@ -164,7 +164,7 @@
 }
 
 .rowActive {
-  background: linear-gradient(90deg, rgba(242, 120, 159, 0.16), rgba(201, 166, 224, 0.08));
+  background: var(--accent);
   border-left: 2px solid var(--track-accent, var(--sakura-accent));
   padding-left: 10px;
 }

@@ -220,7 +220,7 @@
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--sakura-accent), var(--sakura-accent-2));
+  background: var(--accent);
   border-radius: 2px;
   transition: width 0.3s ease;
 }

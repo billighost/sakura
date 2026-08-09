@@ -238,11 +238,11 @@
 }
 
 .pinnedArtLiked {
-  background: linear-gradient(135deg, #7C3AED 0%, var(--sakura-accent) 100%);
+  background: var(--accent);
 }
 
 .pinnedArtDownloaded {
-  background: linear-gradient(135deg, var(--sakura-accent) 0%, var(--sakura-accent-2) 100%);
+  background: var(--accent);
 }
 
 .pinnedTitle {
@@ -395,7 +395,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, var(--sakura-surface-2), var(--sakura-surface));
+  background: var(--accent);
   color: var(--sakura-text-secondary);
 }
 
@@ -487,7 +487,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  background: linear-gradient(135deg, var(--sakura-surface-2), var(--sakura-surface));
+  background: var(--accent);
   color: var(--sakura-text-secondary);
 }
 

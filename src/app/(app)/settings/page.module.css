@@ -19,7 +19,7 @@
   width: 1.875rem;
   height: 1.875rem;
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.18), rgba(201, 166, 224, 0.18));
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -397,7 +397,7 @@
   font-size: 0.6875rem;
   font-weight: 700;
   color: var(--sakura-accent);
-  background: linear-gradient(135deg, rgba(242, 120, 159, 0.18), rgba(201, 166, 224, 0.18));
+  background: var(--accent);
   padding: 0.25rem 0.75rem;
   border-radius: 10px;
   margin-bottom: 0.4375rem;

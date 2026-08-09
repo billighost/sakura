@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background: radial-gradient(circle at 50% 40%, var(--sakura-surface) 0%, var(--sakura-bg) 68%);
+  background: var(--surface-1);
   cursor: pointer;
   opacity: 1;
   transition: opacity 0.5s ease;

@@ -426,29 +426,41 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           headers.set("Range", `bytes=${bytesLoaded}-`);
         }
 
-        const blobRes = await fetch(finalAudioUrl!, { headers });
-        if (!blobRes.ok && blobRes.status !== 206) {
-          if (blobRes.status === 416) { // Range Not Satisfiable
+        // BUG-3 FIX: Never mutate a Response — it's sealed in modern runtimes.
+        // Instead, pick the right fetch response and use it directly.
+        let activeRes: Response;
+        if (bytesLoaded > 0) {
+          // Attempt a range request first.
+          const rangeRes = await fetch(finalAudioUrl!, { headers });
+          if (rangeRes.status === 206) {
+            // Partial content — resume download from where we left off.
+            activeRes = rangeRes;
+          } else if (rangeRes.status === 416 || rangeRes.status === 200) {
+            // 416: range not satisfiable (file changed/shorter than saved offset).
+            // 200: server ignored the Range header and returned the whole file.
+            // In both cases discard our partial data and start fresh.
             chunks = [];
             bytesLoaded = 0;
-            const retryRes = await fetch(finalAudioUrl!);
-            if (!retryRes.ok) throw new Error("Failed to fetch audio stream");
-            Object.defineProperty(blobRes, 'body', { value: retryRes.body });
-            Object.defineProperty(blobRes, 'headers', { value: retryRes.headers });
-            Object.defineProperty(blobRes, 'status', { value: retryRes.status });
+            if (rangeRes.status === 200) {
+              activeRes = rangeRes;
+            } else {
+              // Re-fetch without a Range header.
+              const freshRes = await fetch(finalAudioUrl!);
+              if (!freshRes.ok) throw new Error(`Failed to fetch audio stream: ${freshRes.status}`);
+              activeRes = freshRes;
+            }
           } else {
-             throw new Error(`Failed to fetch audio stream: ${blobRes.status}`);
+            throw new Error(`Failed to fetch audio stream: ${rangeRes.status}`);
           }
+        } else {
+          // No partial data — plain fetch.
+          const plainRes = await fetch(finalAudioUrl!);
+          if (!plainRes.ok) throw new Error(`Failed to fetch audio stream: ${plainRes.status}`);
+          activeRes = plainRes;
         }
 
-        if (blobRes.status === 200 && bytesLoaded > 0) {
-          // Server ignored Range header or we didn't send one
-          chunks = [];
-          bytesLoaded = 0;
-        }
-
-        const contentLengthHeader = blobRes.headers.get("content-length");
-        const contentRangeHeader = blobRes.headers.get("content-range");
+        const contentLengthHeader = activeRes.headers.get("content-length");
+        const contentRangeHeader = activeRes.headers.get("content-range");
         let totalBytes = 0;
         if (contentRangeHeader) {
           const match = contentRangeHeader.match(/\/(\d+)$/);
@@ -456,8 +468,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         } else if (contentLengthHeader) {
           totalBytes = parseInt(contentLengthHeader, 10);
         }
-        
-        const reader = blobRes.body!.getReader();
+
+        const reader = activeRes.body!.getReader();
         const startTime = Date.now();
         let lastSaveTime = Date.now();
 
@@ -489,7 +501,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const blob = new Blob(chunks, { type: blobRes.headers.get("content-type") || "audio/mpeg" });
+        const blob = new Blob(chunks, { type: activeRes.headers.get("content-type") || "audio/mpeg" });
 
         await saveTrackOffline({
           id: finalId,
@@ -502,6 +514,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }, uId, dId);
         await saveAudioBlob(finalId, blob, uId, dId);
         await removePartialAudio(finalId, uId, dId);
+
+        /**
+         * A Deezer-sourced track finishes under a different id than the one that
+         * was queued: `item.id` is `deezer-<id>`, and `finalId` is the real row
+         * the Telegram download created. The rows in the UI and the entries in
+         * the play queue still hold the queued id, so it has to resolve too or
+         * the track reads as never downloaded and is fetched again on next play.
+         *
+         * The metadata row is written under the queued id, with `blobId`
+         * pointing at where the audio really is. `getAudioBlob` follows that on
+         * a miss. Writing the blob itself twice would also work and is what this
+         * did first, but it doubles on-device storage for every Deezer-sourced
+         * download — a 50-track playlist would cost ~500 MB instead of ~250 MB.
+         */
+        if (finalId !== item.id) {
+          await saveTrackOffline({
+            id: item.id,
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+            audioUrl: finalAudioUrl!,
+            coverUrl: finalCoverUrl,
+            duration: item.duration,
+            blobId: finalId,
+          }, uId, dId);
+        }
 
         setDownloadStates((prev) => ({ ...prev, [item.id]: "completed", [finalId]: "completed" }));
       } catch (err) {
@@ -1316,7 +1354,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        const remote = await fetchPlaybackState();
+        // BUG-2 FIX: Race the network call against a 5-second timeout.
+        // If fetchPlaybackState() hangs (slow server, no connection), we must
+        // still set remoteSyncDone so play() and togglePlay() become usable.
+        const remote = await Promise.race([
+          fetchPlaybackState(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
         if (cancelled || !remote) return;
 
         const local = snapshotRef.current;
@@ -1376,12 +1420,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
         showToast("Picked up where you left off", "accent");
       } finally {
+        // Always unblock the player — even if the sync failed or timed out.
         if (!cancelled) setRemoteSyncDone(true);
       }
     })();
 
+    // Unconditional safety valve: if the IIFE somehow never resolves the
+    // finally (e.g. an uncaught exception before the try block), unblock
+    // after 6 seconds so the player doesn't stay frozen indefinitely.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setRemoteSyncDone(true);
+    }, 6000);
+
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
       remoteRestoreAttemptedRef.current = false;
     };
   }, [showToast]);

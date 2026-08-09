@@ -1,113 +1,300 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  SAKURA — DESIGN FOUNDATION
+ *
+ *  Design brief, so future edits don't drift:
+ *
+ *  1. NO DECORATIVE GRADIENTS. Colour comes from flat, tonally-related
+ *     surfaces that step by luminance, not from two-stop hue ramps. A gradient
+ *     is permitted in exactly two places and they are both functional:
+ *       - scrim: an opacity ramp over artwork so text stays legible;
+ *       - progress fills, where the ramp encodes elapsed time.
+ *     Anything else — button fills, card backgrounds, headings, icon washes —
+ *     is a flat token. Two-stop pink→purple fills are the single loudest tell
+ *     of a machine-generated interface and they are gone.
+ *
+ *  2. SURFACES STEP, THEY DON'T FLOAT. Four elevation levels, each a real
+ *     colour rather than a translucent white overlay. Blur is used only where
+ *     content genuinely scrolls underneath (app chrome), never as decoration.
+ *
+ *  3. MOTION HAS PHYSICS. Every transition uses one of five named curves.
+ *     Durations are short. Springs overshoot slightly on entry so controls feel
+ *     like objects rather than fades.
+ *
+ *  4. ONE ACCENT. Sakura pink. It marks the active thing and nothing else,
+ *     so "highlighted" keeps meaning something.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Palette: dark (default) ───────────────────────────────────────────────
+ *
+ * Neutrals carry a trace of warm violet so the pink accent sits in the same
+ * family rather than vibrating against a pure grey. Steps are ~4% luminance
+ * apart, which is enough to read as a distinct surface without a border.
+ */
 :root,
 [data-theme="dark"] {
-  --sakura-bg: #0E0B0F;
-  --sakura-surface: #1A1620;
-  --sakura-surface-2: #241E29;
-  --sakura-accent: #F2789F;
-  --sakura-accent-2: #C9A6E0;
-  --sakura-text: #F5F0F2;
-  --sakura-text-secondary: #A8A0A8;
-  --sakura-border: #2A242E;
-  --sakura-overlay: rgba(14, 11, 15, 0.85);
-  --sakura-shadow: rgba(0, 0, 0, 0.5);
-  --sakura-input-bg: #1A1620;
-  --sakura-input-border: #2A242E;
-  --sakura-hover: rgba(242, 120, 159, 0.1);
-  --sakura-active: rgba(242, 120, 159, 0.18);
-  --sakura-skeleton: #241E29;
-  --sakura-skeleton-shimmer: #2A242E;
-  --sakura-danger: #E85D75;
-  --sakura-success: #5EC49E;
-  --sakura-warning: #E8A84C;
-  --sakura-card-bg: rgba(26, 22, 32, 0.6);
-  --sakura-card-border: #2A242E;
-  --sakura-gradient-start: #F2789F;
-  --sakura-gradient-end: #C9A6E0;
-  --sakura-scrollbar-track: #1A1620;
-  --sakura-scrollbar-thumb: #2A242E;
+  --bg: #0c0a0d;
+  --surface-1: #141117;
+  --surface-2: #1c1820;
+  --surface-3: #262029;
+  --surface-4: #322b36;
 
-  /* --- shared player design tokens --- */
-  --sakura-font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --sakura-font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
-  --sakura-glass: rgba(26, 22, 32, 0.62);
-  --sakura-glass-strong: rgba(20, 16, 23, 0.82);
-  --sakura-glass-border: rgba(255, 255, 255, 0.09);
-  --sakura-glass-highlight: rgba(255, 255, 255, 0.06);
-  --sakura-radius-lg: 20px;
-  --sakura-radius-xl: 28px;
+  --text: #f6f3f6;
+  --text-2: #a79fa9;
+  --text-3: #726a75;
+
+  --line: #262029;
+  --line-strong: #383040;
+
+  --accent: #ef6d97;
+  --accent-press: #e05384;
+  --accent-soft: rgba(239, 109, 151, 0.14);
+  --accent-softer: rgba(239, 109, 151, 0.07);
+  --on-accent: #17070e;
+
+  --danger: #f2617a;
+  --danger-soft: rgba(242, 97, 122, 0.14);
+  --success: #4fc79b;
+  --success-soft: rgba(79, 199, 155, 0.14);
+  --warning: #e0a34e;
+  --warning-soft: rgba(224, 163, 78, 0.14);
+
+  /* App chrome that content scrolls beneath. The only sanctioned blur. */
+  --chrome: rgba(14, 11, 16, 0.78);
+  --chrome-line: rgba(255, 255, 255, 0.07);
+
+  /* Modal backdrop. */
+  --scrim: rgba(6, 4, 7, 0.62);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.34);
+  --shadow-3: 0 12px 34px rgba(0, 0, 0, 0.46);
+  --shadow-4: 0 24px 60px rgba(0, 0, 0, 0.56);
+
+  --skeleton: #1c1820;
+  --skeleton-hi: #262029;
+
   color-scheme: dark;
 }
 
+/* ── Palette: light ───────────────────────────────────────────────────────
+ *
+ * Not an inversion. Light mode gets a warm paper base and *darker* accents,
+ * because the dark-mode pink fails contrast on white.
+ */
 [data-theme="light"] {
-  --sakura-bg: #FAF8FA;
-  --sakura-surface: #FFFFFF;
-  --sakura-surface-2: #F0ECF2;
-  --sakura-accent: #D4547A;
-  --sakura-accent-2: #9B6FC0;
-  --sakura-text: #1A1620;
-  --sakura-text-secondary: #6B6370;
-  --sakura-border: #D4CDDA;
-  --sakura-overlay: rgba(250, 248, 250, 0.92);
-  --sakura-shadow: rgba(0, 0, 0, 0.15);
-  --sakura-input-bg: #F0ECF2;
-  --sakura-input-border: #D4CDDA;
-  --sakura-hover: rgba(212, 84, 122, 0.08);
-  --sakura-active: rgba(212, 84, 122, 0.14);
-  --sakura-skeleton: #F0ECF2;
-  --sakura-skeleton-shimmer: #E2DCE6;
-  --sakura-danger: #D44040;
-  --sakura-success: #3BA876;
-  --sakura-warning: #C48A30;
-  --sakura-card-bg: rgba(255, 255, 255, 0.7);
-  --sakura-card-border: #D4CDDA;
-  --sakura-gradient-start: #D4547A;
-  --sakura-gradient-end: #9B6FC0;
-  --sakura-scrollbar-track: #F0ECF2;
-  --sakura-scrollbar-thumb: #C4BCC8;
+  --bg: #fbf9fb;
+  --surface-1: #ffffff;
+  --surface-2: #f5f1f6;
+  --surface-3: #ece6ee;
+  --surface-4: #e0d8e3;
 
-  --sakura-font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --sakura-font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --sakura-accent-gradient: linear-gradient(135deg, var(--sakura-gradient-start), var(--sakura-gradient-end));
-  --sakura-glass: rgba(255, 255, 255, 0.66);
-  --sakura-glass-strong: rgba(255, 255, 255, 0.86);
-  --sakura-glass-border: rgba(20, 10, 20, 0.07);
-  --sakura-glass-highlight: rgba(255, 255, 255, 0.5);
-  --sakura-radius-lg: 20px;
-  --sakura-radius-xl: 28px;
+  --text: #191320;
+  --text-2: #635b6a;
+  --text-3: #8d8494;
+
+  --line: #e6e0e9;
+  --line-strong: #d2c9d6;
+
+  --accent: #c94271;
+  --accent-press: #ad3560;
+  --accent-soft: rgba(201, 66, 113, 0.1);
+  --accent-softer: rgba(201, 66, 113, 0.05);
+  --on-accent: #ffffff;
+
+  --danger: #c8324a;
+  --danger-soft: rgba(200, 50, 74, 0.1);
+  --success: #1e8f66;
+  --success-soft: rgba(30, 143, 102, 0.1);
+  --warning: #a8722a;
+  --warning-soft: rgba(168, 114, 42, 0.1);
+
+  --chrome: rgba(251, 249, 251, 0.82);
+  --chrome-line: rgba(25, 19, 32, 0.08);
+
+  --scrim: rgba(28, 20, 32, 0.36);
+
+  --shadow-1: 0 1px 2px rgba(40, 28, 46, 0.07);
+  --shadow-2: 0 4px 14px rgba(40, 28, 46, 0.09);
+  --shadow-3: 0 12px 34px rgba(40, 28, 46, 0.12);
+  --shadow-4: 0 24px 60px rgba(40, 28, 46, 0.16);
+
+  --skeleton: #efeaf0;
+  --skeleton-hi: #e4dde6;
+
   color-scheme: light;
 }
 
+/* System preference, when the user hasn't chosen explicitly. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --sakura-bg: #FAF8FA;
-    --sakura-surface: #FFFFFF;
-    --sakura-surface-2: #F0ECF2;
-    --sakura-accent: #D4547A;
-    --sakura-accent-2: #9B6FC0;
-    --sakura-text: #1A1620;
-    --sakura-text-secondary: #6B6370;
-    --sakura-border: #D4CDDA;
-    --sakura-overlay: rgba(250, 248, 250, 0.92);
-    --sakura-shadow: rgba(0, 0, 0, 0.15);
-    --sakura-input-bg: #F0ECF2;
-    --sakura-input-border: #D4CDDA;
-    --sakura-hover: rgba(212, 84, 122, 0.08);
-    --sakura-active: rgba(212, 84, 122, 0.14);
-    --sakura-skeleton: #F0ECF2;
-    --sakura-skeleton-shimmer: #E2DCE6;
-    --sakura-danger: #D44040;
-    --sakura-success: #3BA876;
-    --sakura-warning: #C48A30;
-    --sakura-card-bg: rgba(255, 255, 255, 0.7);
-    --sakura-card-border: #D4CDDA;
-    --sakura-gradient-start: #D4547A;
-    --sakura-gradient-end: #9B6FC0;
-    --sakura-scrollbar-track: #F0ECF2;
-    --sakura-scrollbar-thumb: #C4BCC8;
+    --bg: #fbf9fb;
+    --surface-1: #ffffff;
+    --surface-2: #f5f1f6;
+    --surface-3: #ece6ee;
+    --surface-4: #e0d8e3;
+    --text: #191320;
+    --text-2: #635b6a;
+    --text-3: #8d8494;
+    --line: #e6e0e9;
+    --line-strong: #d2c9d6;
+    --accent: #c94271;
+    --accent-press: #ad3560;
+    --accent-soft: rgba(201, 66, 113, 0.1);
+    --accent-softer: rgba(201, 66, 113, 0.05);
+    --on-accent: #ffffff;
+    --danger: #c8324a;
+    --danger-soft: rgba(200, 50, 74, 0.1);
+    --success: #1e8f66;
+    --success-soft: rgba(30, 143, 102, 0.1);
+    --warning: #a8722a;
+    --warning-soft: rgba(168, 114, 42, 0.1);
+    --chrome: rgba(251, 249, 251, 0.82);
+    --chrome-line: rgba(25, 19, 32, 0.08);
+    --scrim: rgba(28, 20, 32, 0.36);
+    --shadow-1: 0 1px 2px rgba(40, 28, 46, 0.07);
+    --shadow-2: 0 4px 14px rgba(40, 28, 46, 0.09);
+    --shadow-3: 0 12px 34px rgba(40, 28, 46, 0.12);
+    --shadow-4: 0 24px 60px rgba(40, 28, 46, 0.16);
+    --skeleton: #efeaf0;
+    --skeleton-hi: #e4dde6;
     color-scheme: light;
   }
 }
+
+/* ── Legacy alias layer ────────────────────────────────────────────────────
+ *
+ * The codebase has ~40 stylesheets referencing `--sakura-*`. Rather than a
+ * risky mass rename, the old names are re-pointed at the new palette. Files
+ * get migrated to the short names as they're touched; until then everything
+ * inherits the new colours automatically.
+ *
+ * Note what's deliberately *not* here: `--sakura-accent-gradient` now resolves
+ * to a flat accent, so every existing `background: var(--sakura-accent-gradient)`
+ * renders as a solid fill without editing those files.
+ */
+:root,
+[data-theme="dark"],
+[data-theme="light"],
+:root:not([data-theme]) {
+  --sakura-bg: var(--bg);
+  --sakura-surface: var(--surface-1);
+  --sakura-surface-2: var(--surface-2);
+  --sakura-surface-3: var(--surface-3);
+  --sakura-accent: var(--accent);
+  --sakura-accent-2: var(--accent);
+  --sakura-text: var(--text);
+  --sakura-text-secondary: var(--text-2);
+  --sakura-text-tertiary: var(--text-3);
+  --sakura-border: var(--line);
+  --sakura-overlay: var(--scrim);
+  --sakura-shadow: rgba(0, 0, 0, 0.4);
+  --sakura-input-bg: var(--surface-2);
+  --sakura-input-border: var(--line);
+  --sakura-hover: var(--accent-softer);
+  --sakura-active: var(--accent-soft);
+  --sakura-skeleton: var(--skeleton);
+  --sakura-skeleton-shimmer: var(--skeleton-hi);
+  --sakura-danger: var(--danger);
+  --sakura-success: var(--success);
+  --sakura-warning: var(--warning);
+  --sakura-card-bg: var(--surface-1);
+  --sakura-card-border: var(--line);
+  --sakura-gradient-start: var(--accent);
+  --sakura-gradient-end: var(--accent);
+  --sakura-scrollbar-track: transparent;
+  --sakura-scrollbar-thumb: var(--surface-4);
+
+  --sakura-font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --sakura-font-body: var(--font-inter), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+
+  /* Flat, not a ramp. See design note 1. */
+  --sakura-accent-gradient: var(--accent);
+
+  --sakura-glass: var(--chrome);
+  --sakura-glass-strong: var(--chrome);
+  --sakura-glass-border: var(--chrome-line);
+  --sakura-glass-highlight: transparent;
+  --sakura-radius-lg: var(--r-lg);
+  --sakura-radius-xl: var(--r-xl);
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────────
+ *
+ * Two families. Fraunces (display) for names of things — track titles, page
+ * headings, artist names. Inter (body) for everything functional. The split is
+ * semantic: if it's a *name*, it's display; if it's an instruction, a label or
+ * a number, it's body. That's what keeps the app feeling edited rather than
+ * generically styled.
+ */
+:root {
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --t-2xs: 0.6875rem;
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.25rem;
+  --t-xl: 1.5rem;
+  --t-2xl: 1.875rem;
+  --t-3xl: 2.375rem;
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.35;
+  --lh-normal: 1.55;
+  --lh-loose: 1.7;
+
+  /* Optical tracking: large text needs negative, small text needs positive. */
+  --track-tight: -0.022em;
+  --track-snug: -0.012em;
+  --track-wide: 0.02em;
+  --track-caps: 0.07em;
+}
+
+/* ── Radii ─────────────────────────────────────────────────────────────────
+ * A consistent ladder. Nested corners use the next step down so the visual
+ * gap between an inner and outer radius stays constant.
+ */
+:root {
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 13px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-2xl: 32px;
+  --r-full: 999px;
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+ *
+ * Five curves, each with a job. Naming them stops every component inventing
+ * its own cubic-bezier, which is how an interface ends up feeling incoherent
+ * even when every individual screen looks fine.
+ */
+:root {
+  /* Default. Fast out, settles gently. Almost everything uses this. */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Entering the screen — decelerate into place. */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Leaving — accelerate away, no lingering. */
+  --ease-out: cubic-bezier(0.4, 0, 1, 1);
+  /* Springy, ~4% overshoot. Buttons, toggles, likes: things that "pop". */
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Heavier spring for sheets and full-screen transitions. */
+  --spring-soft: cubic-bezier(0.22, 1.2, 0.36, 1);
+
+  --d-instant: 0.09s;
+  --d-fast: 0.16s;
+  --d-base: 0.24s;
+  --d-slow: 0.36s;
+  --d-slower: 0.52s;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
 
 *,
 *::before,
@@ -118,16 +305,9 @@
 }
 
 /*
- * Interactive elements get a default colour transition. This used to be a
- * universal `*` rule paired with
- * `*:not([style*="transform"]):not([class*="anim"]):not([class*="transition"])`.
- * Two problems with that: substring attribute matching against every element
- * is re-evaluated on every style recalculation, which is measurable on a long
- * track list; and transitioning `opacity` on *everything* made skeleton →
- * content swaps cross-fade through a visible flicker.
- *
- * Scoping to the elements that actually have hover/active states keeps the
- * feel and drops the cost. Components that need more define it themselves.
+ * Interactive elements get a default colour transition. Scoped to elements
+ * that actually have hover/active states — a universal `*` rule re-evaluates
+ * on every style recalculation and is measurable on a long track list.
  */
 a,
 button,
@@ -137,22 +317,25 @@ textarea,
 summary,
 [role="button"],
 [role="tab"],
-[role="option"] {
-  transition: background-color 0.18s ease, color 0.18s ease,
-    border-color 0.18s ease, box-shadow 0.18s ease;
+[role="option"],
+[role="switch"] {
+  transition: background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease),
+    box-shadow var(--d-fast) var(--ease), opacity var(--d-fast) var(--ease);
 }
 
 /*
- * Theme switching is the one moment a whole-page colour transition is worth
- * paying for. `ThemeInit` adds this class for the duration of the swap and
- * removes it, so the cost is bounded to ~300ms instead of permanent.
+ * Theme switching is the one moment a whole-page colour transition earns its
+ * cost. `ThemeInit` adds this class for the duration of the swap and removes
+ * it, so the cost is bounded to ~300ms rather than permanent.
  */
 .theme-transition,
 .theme-transition *,
 .theme-transition *::before,
 .theme-transition *::after {
-  transition: background-color 0.25s ease, color 0.25s ease,
-    border-color 0.25s ease, fill 0.25s ease, stroke 0.25s ease !important;
+  transition: background-color 0.28s var(--ease-in-out),
+    color 0.28s var(--ease-in-out), border-color 0.28s var(--ease-in-out),
+    fill 0.28s var(--ease-in-out), stroke 0.28s var(--ease-in-out) !important;
 }
 
 html,
@@ -163,9 +346,11 @@ body,
 }
 
 body {
-  font-family: var(--sakura-font-body);
-  background: var(--sakura-bg);
-  color: var(--sakura-text);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  line-height: var(--lh-normal);
+  background: var(--bg);
+  color: var(--text);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -174,30 +359,77 @@ body {
   /* Stops the double-tap-to-zoom delay without disabling pinch zoom. */
   touch-action: manipulation;
   text-rendering: optimizeLegibility;
+  /* Native apps don't let you accidentally select the UI chrome. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* …but text people might want to copy stays selectable. */
+p,
+input,
+textarea,
+[contenteditable],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+}
+
+/*
+ * Standing-alone-in-the-app default: images never show a broken-icon or a
+ * transparent hole while loading.
+ */
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+ * Overlay style: invisible until the region is hovered, so a scrollbar never
+ * occupies layout space or draws a permanent line down the side of a list.
+ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--sakura-scrollbar-track);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--sakura-scrollbar-thumb);
-  border-radius: 3px;
+  background: transparent;
+  border-radius: var(--r-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--surface-4);
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--sakura-text-secondary);
+  background: var(--text-3);
+  background-clip: content-box;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--sakura-scrollbar-thumb) var(--sakura-scrollbar-track);
+  scrollbar-color: var(--surface-4) transparent;
 }
+
+/* ── Safe areas ───────────────────────────────────────────────────────────── */
 
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
@@ -218,14 +450,13 @@ body {
 /* ── Responsive scale ──────────────────────────────────────────────────────
  *
  * Two axes, not one. Width alone is the usual approach and it's wrong for a
- * player: an iPhone SE / mini in landscape, or any phone with the keyboard
- * open, has plenty of width and almost no height. Sizing album art off `vw`
- * there pushes the transport controls off-screen entirely.
+ * player: a phone in landscape, or any phone with the keyboard open, has
+ * plenty of width and almost no height. Sizing album art off `vw` there pushes
+ * the transport controls off-screen entirely.
  *
- * `--ui-density` is the single knob every component reads. It shrinks on
- * short viewports, so vertical space is reclaimed from padding and art before
- * anything gets clipped. Components use `--space-*` / `--art-max` rather than
- * hardcoded rems so they all respond together.
+ * `--ui-density` is the single knob every component reads. It shrinks on short
+ * viewports, so vertical space is reclaimed from padding and art before
+ * anything gets clipped.
  */
 :root {
   --ui-density: 1;
@@ -236,11 +467,15 @@ body {
   --space-4: calc(1rem * var(--ui-density));
   --space-5: calc(1.5rem * var(--ui-density));
   --space-6: calc(2rem * var(--ui-density));
+  --space-7: calc(3rem * var(--ui-density));
 
-  /* Bottom chrome, exported so pages can pad their scroll area correctly
-   * instead of each guessing a magic number. */
-  --tabbar-h: 3.5rem;
-  --miniplayer-h: 3.75rem;
+  /* Horizontal page gutter. One value, so every screen aligns. */
+  --gutter: clamp(1rem, 4.5vw, 1.5rem);
+
+  /* Bottom chrome, exported so pages pad their scroll area correctly instead
+   * of each guessing a magic number. */
+  --tabbar-h: 3.75rem;
+  --miniplayer-h: 4rem;
   --bottom-chrome: calc(
     var(--tabbar-h) + var(--miniplayer-h) + env(safe-area-inset-bottom, 0px)
   );
@@ -253,8 +488,6 @@ body {
   --tap-min: 44px;
 }
 
-/* Short viewports: phones in landscape, small phones with a keyboard up,
- * split-screen. Reclaim vertical space progressively. */
 @media (max-height: 740px) {
   :root {
     --ui-density: 0.85;
@@ -265,8 +498,8 @@ body {
 @media (max-height: 640px) {
   :root {
     --ui-density: 0.72;
-    --tabbar-h: 3.125rem;
-    --miniplayer-h: 3.25rem;
+    --tabbar-h: 3.25rem;
+    --miniplayer-h: 3.5rem;
     --art-max: min(48vw, 34vh, 12rem);
   }
 }
@@ -274,13 +507,12 @@ body {
 @media (max-height: 540px) {
   :root {
     --ui-density: 0.62;
-    --tabbar-h: 2.875rem;
-    --miniplayer-h: 3rem;
+    --tabbar-h: 3rem;
+    --miniplayer-h: 3.25rem;
     --art-max: min(40vw, 30vh, 9.5rem);
   }
 }
 
-/* Narrow phones (iPhone SE/mini are 320–375 CSS px). */
 @media (max-width: 380px) {
   :root {
     --ui-density: 0.88;
@@ -293,7 +525,6 @@ body {
   }
 }
 
-/* Landscape phone: both axes are tight and the safe areas move to the sides. */
 @media (max-height: 480px) and (orientation: landscape) {
   :root {
     --ui-density: 0.6;
@@ -301,20 +532,33 @@ body {
   }
 }
 
-/* Every interactive control clears the minimum tap target, regardless of how
- * small its icon renders at the current density. */
+/* ── Tap targets ───────────────────────────────────────────────────────────
+ *
+ * Every interactive control clears the minimum, regardless of how small its
+ * icon renders at the current density.
+ */
 button,
 a[role="button"],
 [role="tab"],
+[role="switch"],
 input[type="checkbox"],
 input[type="radio"] {
   min-height: var(--tap-min);
   min-width: var(--tap-min);
 }
 
-/* Opt-out for controls that are legitimately inline (a chip inside a row, an
+/*
+ * Opt-out for controls that are legitimately inline (a chip inside a row, an
  * icon inside a text link) where a 44px box would break the layout. Those
- * still need the hit area, so they get it via a padded ::before instead. */
+ * still need the hit area, so they get it via a padded ::before.
+ *
+ * CRITICAL: `position: relative` is on the same rule as the pseudo-element.
+ * A `.tapTarget` that is `position: static` anchors its ::before to whatever
+ * ancestor happens to be positioned, and `max(100%, 44px)` then resolves
+ * against *that* box — which silently turns a 44px hit area into an invisible
+ * full-width shield over the entire container. That exact bug made every tap
+ * on the mini player hit the play button.
+ */
 .tapTarget {
   position: relative;
 }
@@ -328,6 +572,8 @@ input[type="radio"] {
   height: max(100%, var(--tap-min));
   transform: translate(-50%, -50%);
 }
+
+/* ── Type utilities ───────────────────────────────────────────────────────── */
 
 .text-xs {
   font-size: clamp(0.75rem, 0.7rem + 0.15vw, 0.8125rem);
@@ -357,6 +603,22 @@ input[type="radio"] {
   font-size: clamp(1.625rem, 1.3rem + 0.9vw, 2.375rem);
 }
 
+/* Small-caps eyebrow above a section. Used instead of a second heading size. */
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* ── Motion primitives ─────────────────────────────────────────────────────
+ *
+ * Shared keyframes. Components reference these rather than redefining a
+ * fade-in for the fifteenth time.
+ */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -369,11 +631,33 @@ input[type="radio"] {
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translate3d(0, 14px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -387,38 +671,112 @@ input[type="radio"] {
   }
 }
 
+/* A single-pass sheen used for "this just happened" confirmations. */
+@keyframes sheen {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
 .anim-fade-in {
-  animation: fadeIn 0.3s ease both;
+  animation: fadeIn var(--d-base) var(--ease) both;
 }
 
 .anim-slide-up {
-  animation: slideUp 0.35s ease both;
+  animation: slideUp var(--d-slow) var(--spring-soft) both;
+}
+
+.anim-scale-in {
+  animation: scaleIn var(--d-base) var(--spring) both;
 }
 
 .anim-pulse {
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: pulse 1.6s var(--ease-in-out) infinite;
 }
 
+/*
+ * Staggered list entry. Set `--i` per row (capped by the caller) and children
+ * cascade in. Capping matters: an uncapped index means row 200 waits six
+ * seconds to appear.
+ */
+.anim-stagger > * {
+  animation: slideUp 0.34s var(--spring-soft) both;
+  animation-delay: calc(var(--i, 0) * 26ms);
+}
+
+/* ── Skeletons ─────────────────────────────────────────────────────────────
+ * The sweep is a functional gradient (it encodes "loading"), and it's the one
+ * animated gradient the design language keeps.
+ */
 .skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--skeleton);
+  border-radius: var(--r-sm);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
   background: linear-gradient(
     90deg,
-    var(--sakura-skeleton) 25%,
-    var(--sakura-skeleton-shimmer) 50%,
-    var(--sakura-skeleton) 75%
+    transparent,
+    var(--skeleton-hi),
+    transparent
   );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: 6px;
+  animation: skeletonSweep 1.5s var(--ease-in-out) infinite;
 }
 
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
+@keyframes skeletonSweep {
   100% {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
+
+/* ── Pressable ─────────────────────────────────────────────────────────────
+ *
+ * The single most important interaction primitive in the app. Any tappable
+ * surface that isn't a plain link should carry it.
+ *
+ * Why it's built this way:
+ *   - Scale-down on `:active` is what makes a control feel physical. 0.96 is
+ *     enough to perceive and small enough not to look like a bug.
+ *   - The scale-down is *instant* and the release is sprung. Symmetric timing
+ *     feels mushy; a fast press with a sprung release reads as a real button.
+ *   - Hover is a no-op on touch (`@media (hover: hover)`), otherwise mobile
+ *     Safari leaves the hover state stuck after a tap.
+ */
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--d-base) var(--spring),
+    background-color var(--d-fast) var(--ease),
+    opacity var(--d-fast) var(--ease);
+  will-change: transform;
+}
+
+.pressable:active {
+  transform: scale(0.96);
+  transition-duration: var(--d-instant);
+  transition-timing-function: var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pressable:hover {
+    background-color: var(--accent-softer);
+  }
+}
+
+/* Deeper press for large targets (cards, artwork) where 0.96 is imperceptible. */
+.pressable-lg:active {
+  transform: scale(0.975);
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
 
 .no-scrollbar {
   scrollbar-width: none;
@@ -427,6 +785,17 @@ input[type="radio"] {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Horizontal rails snap like a native carousel. */
+.snap-x {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.snap-x > * {
+  scroll-snap-align: start;
 }
 
 .srOnly {
@@ -441,18 +810,40 @@ input[type="radio"] {
   border: 0;
 }
 
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two-line clamp — the standard for card titles. */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────────────
+ * Visible for keyboard users, absent for pointer users. Never removed.
+ */
+*:focus {
+  outline: none;
+}
+
 *:focus-visible {
-  outline: 2px solid var(--sakura-accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-xs);
 }
 
-button:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--sakura-accent);
-  outline-offset: 2px;
-}
-
+/* ── Reduced motion ────────────────────────────────────────────────────────
+ *
+ * Not a blanket kill. Opacity fades are kept (they don't trigger vestibular
+ * discomfort and removing them makes content pop in jarringly); movement,
+ * scaling and looping animations are what actually get disabled.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -461,5 +852,10 @@ a:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .pressable:active,
+  .pressable-lg:active {
+    transform: none;
   }
 }
