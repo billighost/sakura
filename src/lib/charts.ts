@@ -1,6 +1,7 @@
 import { query, queryOne, execute } from './sql';
 import { searchDeezerTrack } from './metadata';
 import { acquireLock, releaseLock } from './cache';
+import { setChartTrackMeta, virtualIdFor, type ChartTrackMeta } from './chartTracks';
 
 // Providers Configuration
 const PROVIDERS = ['apple', 'deezer', 'lastfm', 'audiomack', 'shazam'];
@@ -159,8 +160,33 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
         });
       }
 
-      if (dzResults.size > 0) {
-        await insertResolvedChartTracks(chartTracks, dzResults, resolved);
+      /**
+       * Entries the library doesn't own become virtual references rather than
+       * placeholder rows.
+       *
+       * The previous version INSERTed a `Track` with audioUrl='pending' for
+       * every unmatched chart entry, so a daily refresh of five 50-song charts
+       * minted up to 250 unplayable rows a day, each ~1.2KB across eleven
+       * indexes. Storing `deezer-<id>` plus display metadata in Redis costs
+       * nothing in Postgres and renders identically; the row gets created for
+       * real the first time somebody plays the song.
+       */
+      const virtualMeta: ChartTrackMeta[] = [];
+      for (const [idx, dz] of dzResults) {
+        if (!dz?.id) continue;
+        const id = virtualIdFor(dz.id);
+        resolved[idx] = id;
+        virtualMeta.push({
+          id,
+          title: dz.title ?? chartTracks[idx].title,
+          artist: dz.artist?.name ?? chartTracks[idx].artist,
+          coverUrl: dz.album?.cover_big ?? chartTracks[idx].coverUrl ?? null,
+          duration: dz.duration || 180,
+          deezerId: String(dz.id),
+        });
+      }
+      if (virtualMeta.length > 0) {
+        await setChartTrackMeta(systemId, virtualMeta);
       }
 
       dbTrackIds = resolved.filter((id): id is string => id !== null);
@@ -189,90 +215,3 @@ export async function updateSystemPlaylist(systemId: string, name: string, type:
   }
 }
 
-/**
- * Insert the chart entries that weren't already in the catalogue.
- *
- * Two multi-row statements rather than two per track: artists upserted in one
- * pass, then tracks in a second pass now that their artist ids are known.
- * `resolved` is filled in positionally so chart order survives.
- *
- * Both batches are de-duplicated first, and that is not optional. Postgres
- * rejects an `ON CONFLICT DO UPDATE` whose input contains the same conflict key
- * twice — "cannot affect row a second time" — and a Top 50 routinely lists one
- * artist three times, so the un-deduplicated version failed on virtually every
- * real chart. It failed *quietly*, too: the error was caught and logged inside
- * `after()`, so charts simply stopped updating while everything looked healthy.
- */
-async function insertResolvedChartTracks(
-  chartTracks: ChartTrack[],
-  dzResults: Map<number, any>,
-  resolved: (string | null)[],
-): Promise<void> {
-  const entries = [...dzResults.entries()];
-  if (entries.length === 0) return;
-
-  // One row per artist name, first occurrence wins.
-  const artistImageByName = new Map<string, string | null>();
-  for (const [, dz] of entries) {
-    const name = dz?.artist?.name;
-    if (!name || artistImageByName.has(name)) continue;
-    artistImageByName.set(name, dz.artist.picture_medium ?? null);
-  }
-  if (artistImageByName.size === 0) return;
-
-  const artistRows = await query<{ id: string; name: string }>(
-    `INSERT INTO "Artist" (id, name, "imageUrl")
-     SELECT gen_random_uuid()::text, n, i
-       FROM UNNEST($1::text[], $2::text[]) AS t(n, i)
-     ON CONFLICT (name) DO UPDATE
-       SET "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl")
-     RETURNING id, name`,
-    [[...artistImageByName.keys()], [...artistImageByName.values()]],
-  );
-
-  const artistIdByName = new Map(artistRows.map((r) => [r.name, r.id]));
-
-  // One row per deezerId. Two chart positions can legitimately point at the
-  // same recording; both are recorded here so each position can be filled in
-  // from the single inserted row afterwards.
-  const positionsByDeezerId = new Map<string, number[]>();
-  const rowByDeezerId = new Map<string, { idx: number; dz: any }>();
-  for (const [idx, dz] of entries) {
-    const dzId = dz?.id?.toString();
-    if (!dzId || !artistIdByName.has(dz?.artist?.name)) continue;
-    if (!positionsByDeezerId.has(dzId)) {
-      positionsByDeezerId.set(dzId, []);
-      rowByDeezerId.set(dzId, { idx, dz });
-    }
-    positionsByDeezerId.get(dzId)!.push(idx);
-  }
-  if (rowByDeezerId.size === 0) return;
-
-  const unique = [...rowByDeezerId.values()];
-
-  // DO UPDATE rather than DO NOTHING: a chart entry may already exist from a
-  // previous refresh or a user download, and only DO UPDATE returns a row for
-  // every input, which is what lets each chart position be resolved below.
-  const trackRows = await query<{ id: string; deezerId: string }>(
-    `INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", "coverUrl", "deezerId")
-     SELECT gen_random_uuid()::text, ti, ar, du, 'pending', co, dz
-       FROM UNNEST($1::text[], $2::text[], $3::int[], $4::text[], $5::text[])
-            AS t(ti, ar, du, co, dz)
-     ON CONFLICT ("deezerId") DO UPDATE
-       SET "coverUrl" = COALESCE("Track"."coverUrl", EXCLUDED."coverUrl")
-     RETURNING id, "deezerId"`,
-    [
-      unique.map(({ idx, dz }) => dz.title ?? chartTracks[idx].title),
-      unique.map(({ dz }) => artistIdByName.get(dz.artist.name)!),
-      unique.map(({ dz }) => dz.duration || 180),
-      unique.map(({ idx, dz }) => dz.album?.cover_big ?? chartTracks[idx].coverUrl ?? null),
-      unique.map(({ dz }) => dz.id.toString()),
-    ],
-  );
-
-  for (const row of trackRows) {
-    for (const idx of positionsByDeezerId.get(row.deezerId) ?? []) {
-      resolved[idx] = row.id;
-    }
-  }
-}

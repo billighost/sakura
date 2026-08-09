@@ -42,19 +42,41 @@ const { Pool } = require("pg");
     console.log(`    ${n === 0 ? "✓" : "✖"} ${table}.${col}: ${n}`);
   }
 
-  // System playlists store track ids in an array, outside FK enforcement — so
-  // they can point at deleted rows without the database objecting.
+  /**
+   * System playlists store ids in a text[], outside FK enforcement.
+   *
+   * Since charts were virtualised, most of those ids deliberately have no Track
+   * row — they are `deezer-<id>` references whose display metadata lives in
+   * Redis. Counting those as stale reported "8/41 still valid" on healthy
+   * charts, which is alarming and wrong. A reference is only broken if it
+   * resolves to neither a row nor cached chart metadata, so that is what this
+   * checks; the per-chart metadata key is consulted directly.
+   */
+  const { Redis } = require("@upstash/redis");
+  const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+
   const { rows: sp } = await pool.query(`
-    SELECT "systemId",
-           COALESCE(array_length("trackIds", 1), 0) AS listed,
-           (SELECT COUNT(*)::int FROM UNNEST("trackIds") tid
-             WHERE EXISTS (SELECT 1 FROM "Track" t WHERE t.id = tid)) AS alive
+    SELECT "systemId", COALESCE("trackIds", ARRAY[]::text[]) AS ids,
+           (SELECT COALESCE(ARRAY_AGG(tid), ARRAY[]::text[]) FROM UNNEST("trackIds") tid
+             WHERE EXISTS (SELECT 1 FROM "Track" t WHERE t.id = tid)) AS real_ids
       FROM "SystemPlaylist" ORDER BY "systemId"
   `);
+
   console.log(`\n  System playlists (array refs, not FK-enforced):`);
   for (const r of sp) {
-    const stale = r.listed - r.alive;
-    console.log(`    ${stale === 0 ? "✓" : "⚠"} ${r.systemId}: ${r.alive}/${r.listed} still valid`);
+    const meta = (await redis.get(`chartmeta:${r.systemId}`)) ?? {};
+    const realSet = new Set(r.real_ids);
+    const resolvable = r.ids.filter((id) => realSet.has(id) || meta[id]);
+    const broken = r.ids.length - resolvable.length;
+    if (broken > 0) bad += broken;
+    console.log(
+      `    ${broken === 0 ? "✓" : "✖"} ${r.systemId.padEnd(18)} ${r.ids.length} refs = ` +
+        `${realSet.size} real + ${resolvable.length - realSet.size} virtual` +
+        (broken > 0 ? `  ✖ ${broken} unresolvable` : "")
+    );
   }
 
   /**

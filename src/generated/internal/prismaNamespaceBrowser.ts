@@ -72,7 +72,8 @@ export const ModelName = {
   UserMix: 'UserMix',
   SystemPlaylist: 'SystemPlaylist',
   PlaybackState: 'PlaybackState',
-  Share: 'Share'
+  Share: 'Share',
+  PlayAggregate: 'PlayAggregate'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -410,6 +411,21 @@ export const ShareScalarFieldEnum = {
 } as const
 
 export type ShareScalarFieldEnum = (typeof ShareScalarFieldEnum)[keyof typeof ShareScalarFieldEnum]
+
+
+export const PlayAggregateScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  plays: 'plays',
+  completions: 'completions',
+  skips: 'skips',
+  totalMsPlayed: 'totalMsPlayed',
+  signalSum: 'signalSum',
+  firstPlayedAt: 'firstPlayedAt',
+  lastPlayedAt: 'lastPlayedAt'
+} as const
+
+export type PlayAggregateScalarFieldEnum = (typeof PlayAggregateScalarFieldEnum)[keyof typeof PlayAggregateScalarFieldEnum]
 
 
 export const SortOrder = {

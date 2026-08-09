@@ -185,7 +185,7 @@ export type TasteFeedbackWhereInput = {
   OR?: Prisma.TasteFeedbackWhereInput[]
   NOT?: Prisma.TasteFeedbackWhereInput | Prisma.TasteFeedbackWhereInput[]
   id?: Prisma.StringFilter<"TasteFeedback"> | string
-  userId?: Prisma.StringFilter<"TasteFeedback"> | string
+  userId?: Prisma.UuidFilter<"TasteFeedback"> | string
   target?: Prisma.StringFilter<"TasteFeedback"> | string
   targetId?: Prisma.StringFilter<"TasteFeedback"> | string
   kind?: Prisma.StringFilter<"TasteFeedback"> | string
@@ -209,7 +209,7 @@ export type TasteFeedbackWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.TasteFeedbackWhereInput | Prisma.TasteFeedbackWhereInput[]
   OR?: Prisma.TasteFeedbackWhereInput[]
   NOT?: Prisma.TasteFeedbackWhereInput | Prisma.TasteFeedbackWhereInput[]
-  userId?: Prisma.StringFilter<"TasteFeedback"> | string
+  userId?: Prisma.UuidFilter<"TasteFeedback"> | string
   target?: Prisma.StringFilter<"TasteFeedback"> | string
   targetId?: Prisma.StringFilter<"TasteFeedback"> | string
   kind?: Prisma.StringFilter<"TasteFeedback"> | string
@@ -234,7 +234,7 @@ export type TasteFeedbackScalarWhereWithAggregatesInput = {
   OR?: Prisma.TasteFeedbackScalarWhereWithAggregatesInput[]
   NOT?: Prisma.TasteFeedbackScalarWhereWithAggregatesInput | Prisma.TasteFeedbackScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"TasteFeedback"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"TasteFeedback"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"TasteFeedback"> | string
   target?: Prisma.StringWithAggregatesFilter<"TasteFeedback"> | string
   targetId?: Prisma.StringWithAggregatesFilter<"TasteFeedback"> | string
   kind?: Prisma.StringWithAggregatesFilter<"TasteFeedback"> | string
@@ -435,7 +435,7 @@ export type TasteFeedbackScalarWhereInput = {
   OR?: Prisma.TasteFeedbackScalarWhereInput[]
   NOT?: Prisma.TasteFeedbackScalarWhereInput | Prisma.TasteFeedbackScalarWhereInput[]
   id?: Prisma.StringFilter<"TasteFeedback"> | string
-  userId?: Prisma.StringFilter<"TasteFeedback"> | string
+  userId?: Prisma.UuidFilter<"TasteFeedback"> | string
   target?: Prisma.StringFilter<"TasteFeedback"> | string
   targetId?: Prisma.StringFilter<"TasteFeedback"> | string
   kind?: Prisma.StringFilter<"TasteFeedback"> | string

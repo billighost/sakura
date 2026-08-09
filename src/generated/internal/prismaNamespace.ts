@@ -418,7 +418,8 @@ export const ModelName = {
   UserMix: 'UserMix',
   SystemPlaylist: 'SystemPlaylist',
   PlaybackState: 'PlaybackState',
-  Share: 'Share'
+  Share: 'Share',
+  PlayAggregate: 'PlayAggregate'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -434,7 +435,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist" | "playbackState" | "share"
+    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist" | "playbackState" | "share" | "playAggregate"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2066,6 +2067,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PlayAggregate: {
+      payload: Prisma.$PlayAggregatePayload<ExtArgs>
+      fields: Prisma.PlayAggregateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlayAggregateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlayAggregateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        findFirst: {
+          args: Prisma.PlayAggregateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlayAggregateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        findMany: {
+          args: Prisma.PlayAggregateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>[]
+        }
+        create: {
+          args: Prisma.PlayAggregateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        createMany: {
+          args: Prisma.PlayAggregateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlayAggregateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>[]
+        }
+        delete: {
+          args: Prisma.PlayAggregateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        update: {
+          args: Prisma.PlayAggregateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        deleteMany: {
+          args: Prisma.PlayAggregateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlayAggregateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlayAggregateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>[]
+        }
+        upsert: {
+          args: Prisma.PlayAggregateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlayAggregatePayload>
+        }
+        aggregate: {
+          args: Prisma.PlayAggregateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlayAggregate>
+        }
+        groupBy: {
+          args: Prisma.PlayAggregateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlayAggregateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlayAggregateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlayAggregateCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2426,6 +2501,21 @@ export const ShareScalarFieldEnum = {
 export type ShareScalarFieldEnum = (typeof ShareScalarFieldEnum)[keyof typeof ShareScalarFieldEnum]
 
 
+export const PlayAggregateScalarFieldEnum = {
+  userId: 'userId',
+  trackId: 'trackId',
+  plays: 'plays',
+  completions: 'completions',
+  skips: 'skips',
+  totalMsPlayed: 'totalMsPlayed',
+  signalSum: 'signalSum',
+  firstPlayedAt: 'firstPlayedAt',
+  lastPlayedAt: 'lastPlayedAt'
+} as const
+
+export type PlayAggregateScalarFieldEnum = (typeof PlayAggregateScalarFieldEnum)[keyof typeof PlayAggregateScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2526,6 +2616,20 @@ export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
     
 
 
@@ -2729,6 +2833,7 @@ export type GlobalOmitConfig = {
   systemPlaylist?: Prisma.SystemPlaylistOmit
   playbackState?: Prisma.PlaybackStateOmit
   share?: Prisma.ShareOmit
+  playAggregate?: Prisma.PlayAggregateOmit
 }
 
 /* Types for Logging */

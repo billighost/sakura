@@ -2,6 +2,7 @@ import { query, queryOne, softFail } from "@/lib/sql";
 import { after } from "next/server";
 import { cacheGet, cacheKey, cached, TTL } from "@/lib/cache";
 import { updateSystemPlaylist } from "@/lib/charts";
+import { pruneListeningHistory } from "@/lib/historyRetention";
 import { generateUserMixes } from "@/lib/mixes";
 
 export type HomeData = {
@@ -44,6 +45,21 @@ function scheduleDailyChartUpdate() {
       await updateSystemPlaylist("top-50-community", "Sakura Global Top 50", "community");
     } catch (e) {
       console.error("[HomeData] Failed to update system playlists:", e);
+    }
+
+    /**
+     * Fold aged-out listening history on the same daily cadence.
+     *
+     * ListeningHistory is the only table that grows with time rather than with
+     * catalogue or userbase — ~290MB/month at 1000 users against a 500MB
+     * budget — so something has to bound it, and this is already the one job
+     * that runs once a day behind a lock. It is guarded separately from the
+     * chart work above so a provider outage doesn't also stop the pruning.
+     */
+    try {
+      await pruneListeningHistory();
+    } catch (e) {
+      console.error("[HomeData] History prune failed:", e);
     }
   });
 }

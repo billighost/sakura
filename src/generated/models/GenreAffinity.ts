@@ -226,7 +226,7 @@ export type GenreAffinityWhereInput = {
   AND?: Prisma.GenreAffinityWhereInput | Prisma.GenreAffinityWhereInput[]
   OR?: Prisma.GenreAffinityWhereInput[]
   NOT?: Prisma.GenreAffinityWhereInput | Prisma.GenreAffinityWhereInput[]
-  userId?: Prisma.StringFilter<"GenreAffinity"> | string
+  userId?: Prisma.UuidFilter<"GenreAffinity"> | string
   genre?: Prisma.StringFilter<"GenreAffinity"> | string
   score?: Prisma.FloatFilter<"GenreAffinity"> | number
   plays?: Prisma.IntFilter<"GenreAffinity"> | number
@@ -250,7 +250,7 @@ export type GenreAffinityWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.GenreAffinityWhereInput | Prisma.GenreAffinityWhereInput[]
   OR?: Prisma.GenreAffinityWhereInput[]
   NOT?: Prisma.GenreAffinityWhereInput | Prisma.GenreAffinityWhereInput[]
-  userId?: Prisma.StringFilter<"GenreAffinity"> | string
+  userId?: Prisma.UuidFilter<"GenreAffinity"> | string
   genre?: Prisma.StringFilter<"GenreAffinity"> | string
   score?: Prisma.FloatFilter<"GenreAffinity"> | number
   plays?: Prisma.IntFilter<"GenreAffinity"> | number
@@ -277,7 +277,7 @@ export type GenreAffinityScalarWhereWithAggregatesInput = {
   AND?: Prisma.GenreAffinityScalarWhereWithAggregatesInput | Prisma.GenreAffinityScalarWhereWithAggregatesInput[]
   OR?: Prisma.GenreAffinityScalarWhereWithAggregatesInput[]
   NOT?: Prisma.GenreAffinityScalarWhereWithAggregatesInput | Prisma.GenreAffinityScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"GenreAffinity"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"GenreAffinity"> | string
   genre?: Prisma.StringWithAggregatesFilter<"GenreAffinity"> | string
   score?: Prisma.FloatWithAggregatesFilter<"GenreAffinity"> | number
   plays?: Prisma.IntWithAggregatesFilter<"GenreAffinity"> | number
@@ -489,7 +489,7 @@ export type GenreAffinityScalarWhereInput = {
   AND?: Prisma.GenreAffinityScalarWhereInput | Prisma.GenreAffinityScalarWhereInput[]
   OR?: Prisma.GenreAffinityScalarWhereInput[]
   NOT?: Prisma.GenreAffinityScalarWhereInput | Prisma.GenreAffinityScalarWhereInput[]
-  userId?: Prisma.StringFilter<"GenreAffinity"> | string
+  userId?: Prisma.UuidFilter<"GenreAffinity"> | string
   genre?: Prisma.StringFilter<"GenreAffinity"> | string
   score?: Prisma.FloatFilter<"GenreAffinity"> | number
   plays?: Prisma.IntFilter<"GenreAffinity"> | number

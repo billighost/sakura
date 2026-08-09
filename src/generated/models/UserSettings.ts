@@ -282,7 +282,7 @@ export type UserSettingsWhereInput = {
   OR?: Prisma.UserSettingsWhereInput[]
   NOT?: Prisma.UserSettingsWhereInput | Prisma.UserSettingsWhereInput[]
   id?: Prisma.StringFilter<"UserSettings"> | string
-  userId?: Prisma.StringFilter<"UserSettings"> | string
+  userId?: Prisma.UuidFilter<"UserSettings"> | string
   theme?: Prisma.StringFilter<"UserSettings"> | string
   audioQuality?: Prisma.StringFilter<"UserSettings"> | string
   downloadQuality?: Prisma.StringFilter<"UserSettings"> | string
@@ -368,7 +368,7 @@ export type UserSettingsScalarWhereWithAggregatesInput = {
   OR?: Prisma.UserSettingsScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UserSettingsScalarWhereWithAggregatesInput | Prisma.UserSettingsScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"UserSettings"> | string
   theme?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
   audioQuality?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string
   downloadQuality?: Prisma.StringWithAggregatesFilter<"UserSettings"> | string

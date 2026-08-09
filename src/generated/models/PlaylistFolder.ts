@@ -171,7 +171,7 @@ export type PlaylistFolderWhereInput = {
   OR?: Prisma.PlaylistFolderWhereInput[]
   NOT?: Prisma.PlaylistFolderWhereInput | Prisma.PlaylistFolderWhereInput[]
   id?: Prisma.StringFilter<"PlaylistFolder"> | string
-  userId?: Prisma.StringFilter<"PlaylistFolder"> | string
+  userId?: Prisma.UuidFilter<"PlaylistFolder"> | string
   name?: Prisma.StringFilter<"PlaylistFolder"> | string
   createdAt?: Prisma.DateTimeFilter<"PlaylistFolder"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -192,7 +192,7 @@ export type PlaylistFolderWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.PlaylistFolderWhereInput | Prisma.PlaylistFolderWhereInput[]
   OR?: Prisma.PlaylistFolderWhereInput[]
   NOT?: Prisma.PlaylistFolderWhereInput | Prisma.PlaylistFolderWhereInput[]
-  userId?: Prisma.StringFilter<"PlaylistFolder"> | string
+  userId?: Prisma.UuidFilter<"PlaylistFolder"> | string
   name?: Prisma.StringFilter<"PlaylistFolder"> | string
   createdAt?: Prisma.DateTimeFilter<"PlaylistFolder"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -214,7 +214,7 @@ export type PlaylistFolderScalarWhereWithAggregatesInput = {
   OR?: Prisma.PlaylistFolderScalarWhereWithAggregatesInput[]
   NOT?: Prisma.PlaylistFolderScalarWhereWithAggregatesInput | Prisma.PlaylistFolderScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"PlaylistFolder"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"PlaylistFolder"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"PlaylistFolder"> | string
   name?: Prisma.StringWithAggregatesFilter<"PlaylistFolder"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PlaylistFolder"> | Date | string
 }
@@ -410,7 +410,7 @@ export type PlaylistFolderScalarWhereInput = {
   OR?: Prisma.PlaylistFolderScalarWhereInput[]
   NOT?: Prisma.PlaylistFolderScalarWhereInput | Prisma.PlaylistFolderScalarWhereInput[]
   id?: Prisma.StringFilter<"PlaylistFolder"> | string
-  userId?: Prisma.StringFilter<"PlaylistFolder"> | string
+  userId?: Prisma.UuidFilter<"PlaylistFolder"> | string
   name?: Prisma.StringFilter<"PlaylistFolder"> | string
   createdAt?: Prisma.DateTimeFilter<"PlaylistFolder"> | Date | string
 }

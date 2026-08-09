@@ -170,7 +170,7 @@ export type SnoozedTrackWhereInput = {
   AND?: Prisma.SnoozedTrackWhereInput | Prisma.SnoozedTrackWhereInput[]
   OR?: Prisma.SnoozedTrackWhereInput[]
   NOT?: Prisma.SnoozedTrackWhereInput | Prisma.SnoozedTrackWhereInput[]
-  userId?: Prisma.StringFilter<"SnoozedTrack"> | string
+  userId?: Prisma.UuidFilter<"SnoozedTrack"> | string
   trackId?: Prisma.StringFilter<"SnoozedTrack"> | string
   snoozedAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string
@@ -192,7 +192,7 @@ export type SnoozedTrackWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.SnoozedTrackWhereInput | Prisma.SnoozedTrackWhereInput[]
   OR?: Prisma.SnoozedTrackWhereInput[]
   NOT?: Prisma.SnoozedTrackWhereInput | Prisma.SnoozedTrackWhereInput[]
-  userId?: Prisma.StringFilter<"SnoozedTrack"> | string
+  userId?: Prisma.UuidFilter<"SnoozedTrack"> | string
   trackId?: Prisma.StringFilter<"SnoozedTrack"> | string
   snoozedAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string
@@ -214,7 +214,7 @@ export type SnoozedTrackScalarWhereWithAggregatesInput = {
   AND?: Prisma.SnoozedTrackScalarWhereWithAggregatesInput | Prisma.SnoozedTrackScalarWhereWithAggregatesInput[]
   OR?: Prisma.SnoozedTrackScalarWhereWithAggregatesInput[]
   NOT?: Prisma.SnoozedTrackScalarWhereWithAggregatesInput | Prisma.SnoozedTrackScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"SnoozedTrack"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"SnoozedTrack"> | string
   trackId?: Prisma.StringWithAggregatesFilter<"SnoozedTrack"> | string
   snoozedAt?: Prisma.DateTimeWithAggregatesFilter<"SnoozedTrack"> | Date | string
   expiresAt?: Prisma.DateTimeWithAggregatesFilter<"SnoozedTrack"> | Date | string
@@ -429,7 +429,7 @@ export type SnoozedTrackScalarWhereInput = {
   AND?: Prisma.SnoozedTrackScalarWhereInput | Prisma.SnoozedTrackScalarWhereInput[]
   OR?: Prisma.SnoozedTrackScalarWhereInput[]
   NOT?: Prisma.SnoozedTrackScalarWhereInput | Prisma.SnoozedTrackScalarWhereInput[]
-  userId?: Prisma.StringFilter<"SnoozedTrack"> | string
+  userId?: Prisma.UuidFilter<"SnoozedTrack"> | string
   trackId?: Prisma.StringFilter<"SnoozedTrack"> | string
   snoozedAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"SnoozedTrack"> | Date | string

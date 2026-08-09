@@ -127,3 +127,16 @@ export type PlaybackState = Prisma.PlaybackStateModel
  * 
  */
 export type Share = Prisma.ShareModel
+/**
+ * Model PlayAggregate
+ * Rolled-up listening history. One row per (user, track) replaces every
+ * individual play older than HISTORY_RAW_DAYS, which is what keeps
+ * ListeningHistory — the only table that grows with time rather than with
+ * catalogue or userbase — bounded on a 500MB tier.
+ * 
+ * signalSum is the exact sum of signalWeight() over the folded rows, computed
+ * while they still existed. It is stored rather than re-derived because
+ * signalWeight is continuous in the played/duration ratio: reconstructing it
+ * from counts and averages measured 90% high and reordered users' top artists.
+ */
+export type PlayAggregate = Prisma.PlayAggregateModel

@@ -244,7 +244,7 @@ export type ShareWhereInput = {
   NOT?: Prisma.ShareWhereInput | Prisma.ShareWhereInput[]
   id?: Prisma.StringFilter<"Share"> | string
   slug?: Prisma.StringFilter<"Share"> | string
-  userId?: Prisma.StringFilter<"Share"> | string
+  userId?: Prisma.UuidFilter<"Share"> | string
   kind?: Prisma.StringFilter<"Share"> | string
   targetId?: Prisma.StringNullableFilter<"Share"> | string | null
   payload?: Prisma.JsonFilter<"Share">
@@ -275,7 +275,7 @@ export type ShareWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.ShareWhereInput | Prisma.ShareWhereInput[]
   OR?: Prisma.ShareWhereInput[]
   NOT?: Prisma.ShareWhereInput | Prisma.ShareWhereInput[]
-  userId?: Prisma.StringFilter<"Share"> | string
+  userId?: Prisma.UuidFilter<"Share"> | string
   kind?: Prisma.StringFilter<"Share"> | string
   targetId?: Prisma.StringNullableFilter<"Share"> | string | null
   payload?: Prisma.JsonFilter<"Share">
@@ -310,7 +310,7 @@ export type ShareScalarWhereWithAggregatesInput = {
   NOT?: Prisma.ShareScalarWhereWithAggregatesInput | Prisma.ShareScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Share"> | string
   slug?: Prisma.StringWithAggregatesFilter<"Share"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"Share"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"Share"> | string
   kind?: Prisma.StringWithAggregatesFilter<"Share"> | string
   targetId?: Prisma.StringNullableWithAggregatesFilter<"Share"> | string | null
   payload?: Prisma.JsonWithAggregatesFilter<"Share">
@@ -563,7 +563,7 @@ export type ShareScalarWhereInput = {
   NOT?: Prisma.ShareScalarWhereInput | Prisma.ShareScalarWhereInput[]
   id?: Prisma.StringFilter<"Share"> | string
   slug?: Prisma.StringFilter<"Share"> | string
-  userId?: Prisma.StringFilter<"Share"> | string
+  userId?: Prisma.UuidFilter<"Share"> | string
   kind?: Prisma.StringFilter<"Share"> | string
   targetId?: Prisma.StringNullableFilter<"Share"> | string | null
   payload?: Prisma.JsonFilter<"Share">

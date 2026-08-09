@@ -274,7 +274,7 @@ export type PlaybackStateWhereInput = {
   AND?: Prisma.PlaybackStateWhereInput | Prisma.PlaybackStateWhereInput[]
   OR?: Prisma.PlaybackStateWhereInput[]
   NOT?: Prisma.PlaybackStateWhereInput | Prisma.PlaybackStateWhereInput[]
-  userId?: Prisma.StringFilter<"PlaybackState"> | string
+  userId?: Prisma.UuidFilter<"PlaybackState"> | string
   trackId?: Prisma.StringNullableFilter<"PlaybackState"> | string | null
   positionMs?: Prisma.IntFilter<"PlaybackState"> | number
   durationMs?: Prisma.IntFilter<"PlaybackState"> | number
@@ -356,7 +356,7 @@ export type PlaybackStateScalarWhereWithAggregatesInput = {
   AND?: Prisma.PlaybackStateScalarWhereWithAggregatesInput | Prisma.PlaybackStateScalarWhereWithAggregatesInput[]
   OR?: Prisma.PlaybackStateScalarWhereWithAggregatesInput[]
   NOT?: Prisma.PlaybackStateScalarWhereWithAggregatesInput | Prisma.PlaybackStateScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"PlaybackState"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"PlaybackState"> | string
   trackId?: Prisma.StringNullableWithAggregatesFilter<"PlaybackState"> | string | null
   positionMs?: Prisma.IntWithAggregatesFilter<"PlaybackState"> | number
   durationMs?: Prisma.IntWithAggregatesFilter<"PlaybackState"> | number

@@ -148,6 +148,48 @@ export function decayFactor(playedAt: Date | string, now = new Date()): number {
   return Math.pow(0.5, days / DECAY_HALF_LIFE_DAYS);
 }
 
+/**
+ * Mean decay across a group of plays spread between two timestamps.
+ *
+ * A rolled-up row records that a track was played N times between `first` and
+ * `last`, but not when each play happened. Decaying the whole group at `last`
+ * — the obvious shortcut — treats every play as though it happened at the most
+ * recent one, which inflates old listening enormously: a track played seven
+ * times from 400 down to 150 days ago scored ~170% too high in testing, and
+ * that was enough to reorder the user's top artists.
+ *
+ * Assuming the plays are spread evenly across the interval, the right factor is
+ * the average of the decay curve over it rather than its endpoint. For
+ * decay(d) = e^(-λd), that average has a closed form:
+ *
+ *     (e^(-λ·dLast) - e^(-λ·dFirst)) / (λ · (dFirst - dLast))
+ *
+ * Even spread is an assumption, but a far better one than "all at the end", and
+ * it degrades gracefully: as the interval shrinks the expression converges on
+ * the plain point decay, which is what the degenerate branch returns directly.
+ */
+export function meanDecayFactor(
+  first: Date | string,
+  last: Date | string,
+  now = new Date(),
+): number {
+  const dFirst = (now.getTime() - new Date(first).getTime()) / 86_400_000;
+  const dLast = (now.getTime() - new Date(last).getTime()) / 86_400_000;
+
+  if (!isFinite(dFirst) || !isFinite(dLast)) return 1;
+  const oldest = Math.max(dFirst, dLast, 0);
+  const newest = Math.max(Math.min(dFirst, dLast), 0);
+
+  const lambda = Math.LN2 / DECAY_HALF_LIFE_DAYS;
+  const span = oldest - newest;
+
+  // Everything inside a day is a point as far as a 60-day half-life cares, and
+  // the closed form divides by the span.
+  if (span < 1) return Math.pow(0.5, newest / DECAY_HALF_LIFE_DAYS);
+
+  return (Math.exp(-lambda * newest) - Math.exp(-lambda * oldest)) / (lambda * span);
+}
+
 // ── Profile reads ───────────────────────────────────────────────────────────
 
 export async function getTasteProfile(userId: string): Promise<TasteProfile | null> {
@@ -253,12 +295,17 @@ export async function recordPlaySignals(userId: string, signals: PlaySignal[]): 
 
   // Foreign-key violations (a track deleted mid-session or un-imported Deezer track)
   // shouldn't 500 the flush — JOIN "Track" ensures only valid tracks are recorded.
+  //
+  // `id` is omitted deliberately: it is a bigint identity column now, so the
+  // database assigns it. It used to be a text UUID written by hand here, which
+  // cost 37 bytes in the row plus another 47 in its index on the largest table
+  // in the schema — for a value nothing ever read.
   try {
     await execute(
       `INSERT INTO "ListeningHistory"
-         (id, "userId", "trackId", "playedAt", "skipped", "msPlayed", "completed",
+         ("userId", "trackId", "playedAt", "skipped", "msPlayed", "completed",
           "skipAtMs", "context", "contextId", "autoplay", "hourOfDay", "dayOfWeek")
-       SELECT gen_random_uuid()::text, $1, t.t_id, t.at, t.skipped, t.ms_played, t.completed,
+       SELECT $1, t.t_id, t.at, t.skipped, t.ms_played, t.completed,
               t.skip_at_ms, t.context, t.context_id, t.autoplay, t.hour_of_day, t.day_of_week
          FROM UNNEST(
            $2::text[], $3::timestamptz[], $4::boolean[], $5::int[], $6::boolean[],
@@ -339,6 +386,41 @@ export async function recomputeTaste(userId: string): Promise<TasteProfile> {
     [userId]
   );
 
+  /**
+   * Rolled-up plays that have aged out of the raw window.
+   *
+   * `pruneListeningHistory` folds old rows into one summary per (user, track),
+   * so without this the recompute would see only the recent window and quietly
+   * rewrite a long-standing profile as though the user had just arrived. Read
+   * alongside the raw rows and replayed below as weighted aggregates.
+   */
+  const aggregates = await query<{
+    trackId: string;
+    artistId: string | null;
+    genres: string[] | null;
+    trackGenre: string | null;
+    releaseYear: number | null;
+    duration: number;
+    plays: number;
+    completions: number;
+    skips: number;
+    totalMsPlayed: string;
+    signalSum: number;
+    firstPlayedAt: Date;
+    lastPlayedAt: Date;
+  }>(
+    `SELECT pa."trackId", t."artistId", a.genres, t.genre AS "trackGenre",
+            al."releaseYear", t.duration,
+            pa.plays, pa.completions, pa.skips, pa."totalMsPlayed", pa."signalSum",
+            pa."firstPlayedAt", pa."lastPlayedAt"
+       FROM "PlayAggregate" pa
+       JOIN "Track" t   ON t.id = pa."trackId"
+       LEFT JOIN "Artist" a ON a.id = t."artistId"
+       LEFT JOIN "Album"  al ON al.id = t."albumId"
+      WHERE pa."userId" = $1`,
+    [userId]
+  ).catch(softFail("taste:aggregates", []));
+
   const [favorites, feedback, playlistAdds, snoozes] = await Promise.all([
     query<{ trackId: string; artistId: string | null; genres: string[] | null; createdAt: Date }>(
       `SELECT f."trackId", t."artistId", a.genres, f."createdAt"
@@ -404,6 +486,47 @@ export async function recomputeTaste(userId: string): Promise<TasteProfile> {
     }
   };
 
+  /**
+   * Counted variants, for rolled-up history.
+   *
+   * The single-play helpers above increment their counters by one, which is
+   * right for a raw row and wrong for a summary standing in for fifty plays.
+   * These take the counts directly so an aggregate contributes the same totals
+   * the individual rows would have.
+   */
+  const bumpArtistBy = (
+    artistId: string | null,
+    delta: number,
+    counts: { plays: number; completions: number; skips: number; at: Date | null },
+  ) => {
+    if (!artistId) return;
+    const cur = artistScores.get(artistId) ?? { score: 0, plays: 0, completions: 0, skips: 0, likes: 0, last: null };
+    cur.score += delta;
+    cur.plays += counts.plays;
+    cur.completions += counts.completions;
+    cur.skips += counts.skips;
+    if (counts.at && (!cur.last || counts.at > cur.last)) cur.last = counts.at;
+    artistScores.set(artistId, cur);
+  };
+
+  const bumpGenresBy = (
+    genres: string[] | null | undefined,
+    delta: number,
+    counts: { plays: number; skips: number },
+  ) => {
+    if (!genres?.length) return;
+    const share = delta / genres.length;
+    for (const raw of genres) {
+      const g = normaliseGenre(raw);
+      if (!g) continue;
+      const cur = genreScores.get(g) ?? { score: 0, plays: 0, skips: 0 };
+      cur.score += share;
+      cur.plays += counts.plays;
+      cur.skips += counts.skips;
+      genreScores.set(g, cur);
+    }
+  };
+
   const now = new Date();
   let totalWeighted = 0;
   let totalDuration = 0;
@@ -442,6 +565,58 @@ export async function recomputeTaste(userId: string): Promise<TasteProfile> {
     if (decayed > 0) {
       if (p.releaseYear) eraWeights.set(p.releaseYear, (eraWeights.get(p.releaseYear) ?? 0) + decayed);
       if (p.hourOfDay != null) hourWeights.set(p.hourOfDay, (hourWeights.get(p.hourOfDay) ?? 0) + decayed);
+    }
+  }
+
+  /**
+   * Replay the rolled-up plays.
+   *
+   * A summary row stands in for `plays` individual plays, so it contributes the
+   * per-play weight multiplied by the count rather than once. Two deliberate
+   * approximations, both conservative:
+   *
+   *   - Decay is the mean of the decay curve across the group's span rather
+   *     than its value at either endpoint. Using `lastPlayedAt` alone treats
+   *     every play as though it were the most recent and overweights old
+   *     listening badly — measured at 170% too high, enough to reorder a user's
+   *     top artists.
+   *   - The signal weight is NOT re-derived here. `signalSum` was computed at
+   *     fold time from the individual rows, so it is exact; reconstructing it
+   *     from counts and average milliseconds was measured 90% high, because
+   *     signalWeight is continuous in the played/duration ratio and three
+   *     completions plus one early skip is not "mostly completed".
+   *
+   * hourOfDay is not replayed: time-of-day mixes only look at recent listening,
+   * and averaging an hour across months would be meaningless anyway.
+   */
+  for (const p of aggregates) {
+    if (!p.plays || p.plays <= 0) continue;
+    const durationMs = (p.duration || 0) * 1000;
+
+    skipCount += p.skips;
+    if (durationMs > 0) {
+      totalDuration += durationMs * p.plays;
+      durationCount += p.plays;
+    }
+
+    const signalSum = Number(p.signalSum) || 0;
+    if (signalSum === 0) continue;
+
+    const decayed = signalSum * meanDecayFactor(p.firstPlayedAt, p.lastPlayedAt, now);
+    totalWeighted += decayed;
+
+    bumpArtistBy(p.artistId, decayed, {
+      plays: p.plays,
+      completions: p.completions,
+      skips: p.skips,
+      at: p.lastPlayedAt,
+    });
+
+    const genreList = p.genres?.length ? p.genres : p.trackGenre ? [p.trackGenre] : null;
+    bumpGenresBy(genreList, decayed, { plays: p.plays, skips: p.skips });
+
+    if (decayed > 0 && p.releaseYear) {
+      eraWeights.set(p.releaseYear, (eraWeights.get(p.releaseYear) ?? 0) + decayed);
     }
   }
 

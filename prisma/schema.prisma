@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id               String             @id @default(uuid())
+  id               String             @id @default(uuid()) @db.Uuid
   username         String             @unique
   email            String             @unique
   passwordHash     String
@@ -29,11 +29,12 @@ model User {
   tasteFeedback    TasteFeedback[]
   playbackState    PlaybackState?
   shares           Share[]
+  playAggregates   PlayAggregate[]
 }
 
 model UserSettings {
   id                   String   @id @default(uuid())
-  userId               String   @unique
+  userId               String   @unique @db.Uuid
   theme                String   @default("dark")
   audioQuality         String   @default("high")
   downloadQuality      String   @default("high")
@@ -118,6 +119,7 @@ model Track {
   @@index([telegramMessageId])
   @@index([title])
   @@index([createdAt])
+  playAggregates PlayAggregate[]
 }
 
 model TrackArtist {
@@ -135,7 +137,7 @@ model TrackArtist {
 
 model Playlist {
   id          String   @id @default(uuid())
-  userId      String
+  userId      String @db.Uuid
   name        String
   description String?
   coverUrl    String?
@@ -149,7 +151,7 @@ model Playlist {
 
 model PlaylistFolder {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String @db.Uuid
   name      String
   createdAt DateTime @default(now())
 
@@ -198,7 +200,7 @@ model SampledTrack {
 }
 
 model Favorite {
-  userId  String
+  userId  String @db.Uuid
   trackId String
   createdAt DateTime @default(now())
 
@@ -211,7 +213,7 @@ model Favorite {
 }
 
 model SnoozedTrack {
-  userId    String
+  userId    String @db.Uuid
   trackId   String
   snoozedAt DateTime @default(now())
   expiresAt DateTime
@@ -225,8 +227,8 @@ model SnoozedTrack {
 }
 
 model ListeningHistory {
-  id       String   @id @default(uuid())
-  userId   String
+  id       BigInt   @id @default(autoincrement())
+  userId   String @db.Uuid
   trackId  String
   playedAt DateTime @default(now())
   skipped  Boolean  @default(false)
@@ -264,7 +266,7 @@ model ListeningHistory {
 // feedback rather than incremented blindly, so a rebuild is always idempotent.
 
 model TasteProfile {
-  userId          String   @id
+  userId          String   @id @db.Uuid
   onboarded       Boolean  @default(false)
   seedArtistIds   String[]                  // artists picked during onboarding
   seedGenres      String[]                  // genres picked during onboarding
@@ -288,7 +290,7 @@ model TasteProfile {
 }
 
 model ArtistAffinity {
-  userId      String
+  userId      String @db.Uuid
   artistId    String
   score       Float    @default(0)   // decayed, signed. negative = actively disliked
   plays       Int      @default(0)
@@ -307,7 +309,7 @@ model ArtistAffinity {
 }
 
 model GenreAffinity {
-  userId    String
+  userId    String @db.Uuid
   genre     String
   score     Float    @default(0)
   plays     Int      @default(0)
@@ -325,7 +327,7 @@ model GenreAffinity {
 // target: "track" | "artist" | "genre"
 model TasteFeedback {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String @db.Uuid
   target    String
   targetId  String              // trackId / artistId / genre string
   kind      String
@@ -343,7 +345,7 @@ model TasteFeedback {
 // track IDs stored as a simple array; no join table needed at this scale.
 model UserMix {
   id          String   @id @default(uuid())
-  userId      String
+  userId      String @db.Uuid
   kind        String   @default("generic") // "daily" | "discover" | "repeat" | "timeofday" | "deepcuts" | "throwback" | "artist" | "genre"
   slot        Int      @default(0)         // stable ordering within a kind (Daily Mix 1/2/3)
   label       String                // e.g. "Discover Weekly", "Daily Mix 1"
@@ -391,7 +393,7 @@ model SystemPlaylist {
 // since been removed from the catalogue should still display rather than
 // vanish.
 model PlaybackState {
-  userId      String   @id
+  userId      String   @id @db.Uuid
   trackId     String?
   positionMs  Int      @default(0)
   durationMs  Int      @default(0)
@@ -422,7 +424,7 @@ model PlaybackState {
 model Share {
   id        String   @id @default(uuid())
   slug      String   @unique          // short, URL-safe public identifier
-  userId    String
+  userId    String @db.Uuid
   kind      String                    // "lyric" | "track" | "playlist" | "album" | "artist" | "mix"
 
   targetId  String?                   // track/playlist/album id this points at
@@ -440,4 +442,31 @@ model Share {
   @@index([userId])
   @@index([kind])
   @@index([createdAt])
+}
+
+/// Rolled-up listening history. One row per (user, track) replaces every
+/// individual play older than HISTORY_RAW_DAYS, which is what keeps
+/// ListeningHistory — the only table that grows with time rather than with
+/// catalogue or userbase — bounded on a 500MB tier.
+///
+/// signalSum is the exact sum of signalWeight() over the folded rows, computed
+/// while they still existed. It is stored rather than re-derived because
+/// signalWeight is continuous in the played/duration ratio: reconstructing it
+/// from counts and averages measured 90% high and reordered users' top artists.
+model PlayAggregate {
+  userId        String   @db.Uuid
+  trackId       String
+  plays         Int      @default(0)
+  completions   Int      @default(0)
+  skips         Int      @default(0)
+  totalMsPlayed BigInt   @default(0)
+  signalSum     Float    @default(0)
+  firstPlayedAt DateTime
+  lastPlayedAt  DateTime
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+  @@index([userId])
 }

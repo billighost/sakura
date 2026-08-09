@@ -191,7 +191,7 @@ export type UserWhereInput = {
   AND?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
-  id?: Prisma.StringFilter<"User"> | string
+  id?: Prisma.UuidFilter<"User"> | string
   username?: Prisma.StringFilter<"User"> | string
   email?: Prisma.StringFilter<"User"> | string
   passwordHash?: Prisma.StringFilter<"User"> | string
@@ -211,6 +211,7 @@ export type UserWhereInput = {
   tasteFeedback?: Prisma.TasteFeedbackListRelationFilter
   playbackState?: Prisma.XOR<Prisma.PlaybackStateNullableScalarRelationFilter, Prisma.PlaybackStateWhereInput> | null
   shares?: Prisma.ShareListRelationFilter
+  playAggregates?: Prisma.PlayAggregateListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -234,6 +235,7 @@ export type UserOrderByWithRelationInput = {
   tasteFeedback?: Prisma.TasteFeedbackOrderByRelationAggregateInput
   playbackState?: Prisma.PlaybackStateOrderByWithRelationInput
   shares?: Prisma.ShareOrderByRelationAggregateInput
+  playAggregates?: Prisma.PlayAggregateOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -260,6 +262,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   tasteFeedback?: Prisma.TasteFeedbackListRelationFilter
   playbackState?: Prisma.XOR<Prisma.PlaybackStateNullableScalarRelationFilter, Prisma.PlaybackStateWhereInput> | null
   shares?: Prisma.ShareListRelationFilter
+  playAggregates?: Prisma.PlayAggregateListRelationFilter
 }, "id" | "username" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -279,7 +282,7 @@ export type UserScalarWhereWithAggregatesInput = {
   AND?: Prisma.UserScalarWhereWithAggregatesInput | Prisma.UserScalarWhereWithAggregatesInput[]
   OR?: Prisma.UserScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UserScalarWhereWithAggregatesInput | Prisma.UserScalarWhereWithAggregatesInput[]
-  id?: Prisma.StringWithAggregatesFilter<"User"> | string
+  id?: Prisma.UuidWithAggregatesFilter<"User"> | string
   username?: Prisma.StringWithAggregatesFilter<"User"> | string
   email?: Prisma.StringWithAggregatesFilter<"User"> | string
   passwordHash?: Prisma.StringWithAggregatesFilter<"User"> | string
@@ -309,6 +312,7 @@ export type UserCreateInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -332,6 +336,7 @@ export type UserUncheckedCreateInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -355,6 +360,7 @@ export type UserUpdateInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -378,6 +384,7 @@ export type UserUncheckedUpdateInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -639,6 +646,20 @@ export type UserUpdateOneRequiredWithoutSharesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSharesInput, Prisma.UserUpdateWithoutSharesInput>, Prisma.UserUncheckedUpdateWithoutSharesInput>
 }
 
+export type UserCreateNestedOneWithoutPlayAggregatesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPlayAggregatesInput, Prisma.UserUncheckedCreateWithoutPlayAggregatesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPlayAggregatesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutPlayAggregatesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutPlayAggregatesInput, Prisma.UserUncheckedCreateWithoutPlayAggregatesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutPlayAggregatesInput
+  upsert?: Prisma.UserUpsertWithoutPlayAggregatesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPlayAggregatesInput, Prisma.UserUpdateWithoutPlayAggregatesInput>, Prisma.UserUncheckedUpdateWithoutPlayAggregatesInput>
+}
+
 export type UserCreateWithoutSettingsInput = {
   id?: string
   username: string
@@ -659,6 +680,7 @@ export type UserCreateWithoutSettingsInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSettingsInput = {
@@ -681,6 +703,7 @@ export type UserUncheckedCreateWithoutSettingsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSettingsInput = {
@@ -719,6 +742,7 @@ export type UserUpdateWithoutSettingsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSettingsInput = {
@@ -741,6 +765,7 @@ export type UserUncheckedUpdateWithoutSettingsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPlaylistsInput = {
@@ -763,6 +788,7 @@ export type UserCreateWithoutPlaylistsInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPlaylistsInput = {
@@ -785,6 +811,7 @@ export type UserUncheckedCreateWithoutPlaylistsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPlaylistsInput = {
@@ -823,6 +850,7 @@ export type UserUpdateWithoutPlaylistsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPlaylistsInput = {
@@ -845,6 +873,7 @@ export type UserUncheckedUpdateWithoutPlaylistsInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPlaylistFoldersInput = {
@@ -867,6 +896,7 @@ export type UserCreateWithoutPlaylistFoldersInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPlaylistFoldersInput = {
@@ -889,6 +919,7 @@ export type UserUncheckedCreateWithoutPlaylistFoldersInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPlaylistFoldersInput = {
@@ -927,6 +958,7 @@ export type UserUpdateWithoutPlaylistFoldersInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPlaylistFoldersInput = {
@@ -949,6 +981,7 @@ export type UserUncheckedUpdateWithoutPlaylistFoldersInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFavoritesInput = {
@@ -971,6 +1004,7 @@ export type UserCreateWithoutFavoritesInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFavoritesInput = {
@@ -993,6 +1027,7 @@ export type UserUncheckedCreateWithoutFavoritesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFavoritesInput = {
@@ -1031,6 +1066,7 @@ export type UserUpdateWithoutFavoritesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFavoritesInput = {
@@ -1053,6 +1089,7 @@ export type UserUncheckedUpdateWithoutFavoritesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSnoozedTracksInput = {
@@ -1075,6 +1112,7 @@ export type UserCreateWithoutSnoozedTracksInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSnoozedTracksInput = {
@@ -1097,6 +1135,7 @@ export type UserUncheckedCreateWithoutSnoozedTracksInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSnoozedTracksInput = {
@@ -1135,6 +1174,7 @@ export type UserUpdateWithoutSnoozedTracksInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSnoozedTracksInput = {
@@ -1157,6 +1197,7 @@ export type UserUncheckedUpdateWithoutSnoozedTracksInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutListeningHistoryInput = {
@@ -1179,6 +1220,7 @@ export type UserCreateWithoutListeningHistoryInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutListeningHistoryInput = {
@@ -1201,6 +1243,7 @@ export type UserUncheckedCreateWithoutListeningHistoryInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutListeningHistoryInput = {
@@ -1239,6 +1282,7 @@ export type UserUpdateWithoutListeningHistoryInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutListeningHistoryInput = {
@@ -1261,6 +1305,7 @@ export type UserUncheckedUpdateWithoutListeningHistoryInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTasteProfileInput = {
@@ -1283,6 +1328,7 @@ export type UserCreateWithoutTasteProfileInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTasteProfileInput = {
@@ -1305,6 +1351,7 @@ export type UserUncheckedCreateWithoutTasteProfileInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTasteProfileInput = {
@@ -1343,6 +1390,7 @@ export type UserUpdateWithoutTasteProfileInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTasteProfileInput = {
@@ -1365,6 +1413,7 @@ export type UserUncheckedUpdateWithoutTasteProfileInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutArtistAffinitiesInput = {
@@ -1387,6 +1436,7 @@ export type UserCreateWithoutArtistAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutArtistAffinitiesInput = {
@@ -1409,6 +1459,7 @@ export type UserUncheckedCreateWithoutArtistAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutArtistAffinitiesInput = {
@@ -1447,6 +1498,7 @@ export type UserUpdateWithoutArtistAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutArtistAffinitiesInput = {
@@ -1469,6 +1521,7 @@ export type UserUncheckedUpdateWithoutArtistAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutGenreAffinitiesInput = {
@@ -1491,6 +1544,7 @@ export type UserCreateWithoutGenreAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutGenreAffinitiesInput = {
@@ -1513,6 +1567,7 @@ export type UserUncheckedCreateWithoutGenreAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGenreAffinitiesInput = {
@@ -1551,6 +1606,7 @@ export type UserUpdateWithoutGenreAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGenreAffinitiesInput = {
@@ -1573,6 +1629,7 @@ export type UserUncheckedUpdateWithoutGenreAffinitiesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTasteFeedbackInput = {
@@ -1595,6 +1652,7 @@ export type UserCreateWithoutTasteFeedbackInput = {
   genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTasteFeedbackInput = {
@@ -1617,6 +1675,7 @@ export type UserUncheckedCreateWithoutTasteFeedbackInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTasteFeedbackInput = {
@@ -1655,6 +1714,7 @@ export type UserUpdateWithoutTasteFeedbackInput = {
   genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTasteFeedbackInput = {
@@ -1677,6 +1737,7 @@ export type UserUncheckedUpdateWithoutTasteFeedbackInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMixesInput = {
@@ -1699,6 +1760,7 @@ export type UserCreateWithoutMixesInput = {
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMixesInput = {
@@ -1721,6 +1783,7 @@ export type UserUncheckedCreateWithoutMixesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMixesInput = {
@@ -1759,6 +1822,7 @@ export type UserUpdateWithoutMixesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMixesInput = {
@@ -1781,6 +1845,7 @@ export type UserUncheckedUpdateWithoutMixesInput = {
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPlaybackStateInput = {
@@ -1803,6 +1868,7 @@ export type UserCreateWithoutPlaybackStateInput = {
   genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPlaybackStateInput = {
@@ -1825,6 +1891,7 @@ export type UserUncheckedCreateWithoutPlaybackStateInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPlaybackStateInput = {
@@ -1863,6 +1930,7 @@ export type UserUpdateWithoutPlaybackStateInput = {
   genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPlaybackStateInput = {
@@ -1885,6 +1953,7 @@ export type UserUncheckedUpdateWithoutPlaybackStateInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSharesInput = {
@@ -1907,6 +1976,7 @@ export type UserCreateWithoutSharesInput = {
   genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
   tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSharesInput = {
@@ -1929,6 +1999,7 @@ export type UserUncheckedCreateWithoutSharesInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
   tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
   playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSharesInput = {
@@ -1967,6 +2038,7 @@ export type UserUpdateWithoutSharesInput = {
   genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
   tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSharesInput = {
@@ -1989,6 +2061,115 @@ export type UserUncheckedUpdateWithoutSharesInput = {
   genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
   tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
   playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutPlayAggregatesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackCreateNestedManyWithoutUserInput
+  playbackState?: Prisma.PlaybackStateCreateNestedOneWithoutUserInput
+  shares?: Prisma.ShareCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutPlayAggregatesInput = {
+  id?: string
+  username: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string | null
+  bio?: string | null
+  createdAt?: Date | string
+  settings?: Prisma.UserSettingsUncheckedCreateNestedOneWithoutUserInput
+  playlists?: Prisma.PlaylistUncheckedCreateNestedManyWithoutUserInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedCreateNestedManyWithoutUserInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutUserInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutUserInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutUserInput
+  mixes?: Prisma.UserMixUncheckedCreateNestedManyWithoutUserInput
+  tasteProfile?: Prisma.TasteProfileUncheckedCreateNestedOneWithoutUserInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedCreateNestedManyWithoutUserInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedCreateNestedManyWithoutUserInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedCreateNestedManyWithoutUserInput
+  playbackState?: Prisma.PlaybackStateUncheckedCreateNestedOneWithoutUserInput
+  shares?: Prisma.ShareUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutPlayAggregatesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutPlayAggregatesInput, Prisma.UserUncheckedCreateWithoutPlayAggregatesInput>
+}
+
+export type UserUpsertWithoutPlayAggregatesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutPlayAggregatesInput, Prisma.UserUncheckedUpdateWithoutPlayAggregatesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutPlayAggregatesInput, Prisma.UserUncheckedCreateWithoutPlayAggregatesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutPlayAggregatesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutPlayAggregatesInput, Prisma.UserUncheckedUpdateWithoutPlayAggregatesInput>
+}
+
+export type UserUpdateWithoutPlayAggregatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUpdateManyWithoutUserNestedInput
+  playbackState?: Prisma.PlaybackStateUpdateOneWithoutUserNestedInput
+  shares?: Prisma.ShareUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutPlayAggregatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+  playlists?: Prisma.PlaylistUncheckedUpdateManyWithoutUserNestedInput
+  playlistFolders?: Prisma.PlaylistFolderUncheckedUpdateManyWithoutUserNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutUserNestedInput
+  snoozedTracks?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutUserNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutUserNestedInput
+  mixes?: Prisma.UserMixUncheckedUpdateManyWithoutUserNestedInput
+  tasteProfile?: Prisma.TasteProfileUncheckedUpdateOneWithoutUserNestedInput
+  artistAffinities?: Prisma.ArtistAffinityUncheckedUpdateManyWithoutUserNestedInput
+  genreAffinities?: Prisma.GenreAffinityUncheckedUpdateManyWithoutUserNestedInput
+  tasteFeedback?: Prisma.TasteFeedbackUncheckedUpdateManyWithoutUserNestedInput
+  playbackState?: Prisma.PlaybackStateUncheckedUpdateOneWithoutUserNestedInput
+  shares?: Prisma.ShareUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -2007,6 +2188,7 @@ export type UserCountOutputType = {
   genreAffinities: number
   tasteFeedback: number
   shares: number
+  playAggregates: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2020,6 +2202,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   genreAffinities?: boolean | UserCountOutputTypeCountGenreAffinitiesArgs
   tasteFeedback?: boolean | UserCountOutputTypeCountTasteFeedbackArgs
   shares?: boolean | UserCountOutputTypeCountSharesArgs
+  playAggregates?: boolean | UserCountOutputTypeCountPlayAggregatesArgs
 }
 
 /**
@@ -2102,6 +2285,13 @@ export type UserCountOutputTypeCountSharesArgs<ExtArgs extends runtime.Types.Ext
   where?: Prisma.ShareWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountPlayAggregatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PlayAggregateWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2124,6 +2314,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   tasteFeedback?: boolean | Prisma.User$tasteFeedbackArgs<ExtArgs>
   playbackState?: boolean | Prisma.User$playbackStateArgs<ExtArgs>
   shares?: boolean | Prisma.User$sharesArgs<ExtArgs>
+  playAggregates?: boolean | Prisma.User$playAggregatesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -2172,6 +2363,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   tasteFeedback?: boolean | Prisma.User$tasteFeedbackArgs<ExtArgs>
   playbackState?: boolean | Prisma.User$playbackStateArgs<ExtArgs>
   shares?: boolean | Prisma.User$sharesArgs<ExtArgs>
+  playAggregates?: boolean | Prisma.User$playAggregatesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -2193,6 +2385,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     tasteFeedback: Prisma.$TasteFeedbackPayload<ExtArgs>[]
     playbackState: Prisma.$PlaybackStatePayload<ExtArgs> | null
     shares: Prisma.$SharePayload<ExtArgs>[]
+    playAggregates: Prisma.$PlayAggregatePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2609,6 +2802,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   tasteFeedback<T extends Prisma.User$tasteFeedbackArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tasteFeedbackArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TasteFeedbackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   playbackState<T extends Prisma.User$playbackStateArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$playbackStateArgs<ExtArgs>>): Prisma.Prisma__PlaybackStateClient<runtime.Types.Result.GetResult<Prisma.$PlaybackStatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   shares<T extends Prisma.User$sharesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$sharesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SharePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  playAggregates<T extends Prisma.User$playAggregatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$playAggregatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlayAggregatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3332,6 +3526,30 @@ export type User$sharesArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   distinct?: Prisma.ShareScalarFieldEnum | Prisma.ShareScalarFieldEnum[]
+}
+
+/**
+ * User.playAggregates
+ */
+export type User$playAggregatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PlayAggregate
+   */
+  select?: Prisma.PlayAggregateSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PlayAggregate
+   */
+  omit?: Prisma.PlayAggregateOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PlayAggregateInclude<ExtArgs> | null
+  where?: Prisma.PlayAggregateWhereInput
+  orderBy?: Prisma.PlayAggregateOrderByWithRelationInput | Prisma.PlayAggregateOrderByWithRelationInput[]
+  cursor?: Prisma.PlayAggregateWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PlayAggregateScalarFieldEnum | Prisma.PlayAggregateScalarFieldEnum[]
 }
 
 /**

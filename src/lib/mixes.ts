@@ -419,18 +419,50 @@ async function buildVirtualStarter(collected: VirtualTrack[]): Promise<MixDraft 
 
 /** Time Capsule: things they loved once and haven't played in months. */
 async function buildTimeCapsule(userId: string): Promise<MixDraft | null> {
+  /**
+   * Reads PlayAggregate as well as raw history, and must.
+   *
+   * This mix is defined entirely by plays *older* than 90 days — exactly the
+   * rows the retention job folds away. Querying only ListeningHistory would
+   * make Time Capsule quietly stop appearing once pruning caught up, with
+   * nothing to indicate why. The aggregate carries `lastPlayedAt`, `plays` and
+   * `completions`, which is precisely the shape this needs.
+   *
+   * The two sources are combined per track: a song may have recent raw rows and
+   * older folded ones, and "haven't touched in months" has to consider both or
+   * a single recent listen would be invisible and the track wrongly offered.
+   */
   const tracks = await query<{ id: string; artistName: string }>(
-    `SELECT h."trackId" AS id, ar.name AS "artistName"
-     FROM "ListeningHistory" h
-     JOIN "Track" t ON t.id = h."trackId"
-     LEFT JOIN "Artist" ar ON ar.id = t."artistId"
-     WHERE h."userId" = $1
-       AND t."audioUrl" IS NOT NULL AND t."audioUrl" <> '' AND t."audioUrl" <> 'pending'
-     GROUP BY h."trackId", ar.name
-     HAVING MAX(h."playedAt") < NOW() - INTERVAL '90 days'
-        AND COUNT(*) FILTER (WHERE h.completed) >= 2
-     ORDER BY COUNT(*) DESC
-     LIMIT 30`,
+    `WITH combined AS (
+       SELECT h."trackId" AS track_id,
+              MAX(h."playedAt") AS last_played,
+              COUNT(*) FILTER (WHERE h.completed)::int AS completions,
+              COUNT(*)::int AS plays
+         FROM "ListeningHistory" h
+        WHERE h."userId" = $1
+        GROUP BY h."trackId"
+       UNION ALL
+       SELECT pa."trackId", pa."lastPlayedAt", pa.completions, pa.plays
+         FROM "PlayAggregate" pa
+        WHERE pa."userId" = $1
+     ),
+     rolled AS (
+       SELECT track_id,
+              MAX(last_played) AS last_played,
+              SUM(completions)::int AS completions,
+              SUM(plays)::int AS plays
+         FROM combined
+        GROUP BY track_id
+     )
+     SELECT r.track_id AS id, ar.name AS "artistName"
+       FROM rolled r
+       JOIN "Track" t ON t.id = r.track_id
+       LEFT JOIN "Artist" ar ON ar.id = t."artistId"
+      WHERE t."audioUrl" IS NOT NULL AND t."audioUrl" <> '' AND t."audioUrl" <> 'pending'
+        AND r.last_played < NOW() - INTERVAL '90 days'
+        AND r.completions >= 2
+      ORDER BY r.plays DESC
+      LIMIT 30`,
     [userId]
   ).catch(softFail("mixes:timeCapsule", []));
 

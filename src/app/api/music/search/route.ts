@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/sql";
+import { query, softFail } from "@/lib/sql";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { callProvider, HttpError } from "@/lib/resilience";
 import { cachedWithStale, cached, cacheKey, TTL } from "@/lib/cache";
@@ -63,7 +63,19 @@ export async function GET(req: NextRequest) {
             WHERE a.name % $1
             LIMIT $2`,
           [term, limit]
-        ).catch(() => [] as { id: string; deezerId: number; title: string; audioUrl: string }[]),
+        ).catch(
+          // Not a bare `.catch(() => [])`. This query depends on the pg_trgm
+          // extension and a GIN trigram index; without them the `%` operator
+          // does not exist and every call throws. That was the state of things
+          // for a long time, and because the failure returned an empty array it
+          // looked exactly like "nothing in your library matches" — so nobody's
+          // downloaded tracks ever appeared in search results, silently.
+          // softFail keeps the degradation but says so in the logs.
+          softFail<{ id: string; deezerId: number; title: string; audioUrl: string }[]>(
+            "search:local",
+            [],
+          ),
+        ),
     );
 
     // Search results are cached with a stale fallback. A repeated query costs
@@ -168,5 +180,14 @@ async function searchProviders(
     return { tracks: itunes, total: itunes.length };
   }
 
+  // Deezer answered and had nothing; iTunes added nothing either. That is a
+  // real answer about this term, so hand back an empty result set for the cache
+  // to keep. Typos and half-typed prefixes land here, and they are precisely
+  // the queries that would otherwise re-ask both providers forever.
+  if (deezerAnswered) {
+    return { tracks: [], total: 0 };
+  }
+
+  // Nobody answered — don't record that as "no such music".
   return null;
 }

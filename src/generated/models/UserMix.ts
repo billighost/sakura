@@ -263,7 +263,7 @@ export type UserMixWhereInput = {
   OR?: Prisma.UserMixWhereInput[]
   NOT?: Prisma.UserMixWhereInput | Prisma.UserMixWhereInput[]
   id?: Prisma.StringFilter<"UserMix"> | string
-  userId?: Prisma.StringFilter<"UserMix"> | string
+  userId?: Prisma.UuidFilter<"UserMix"> | string
   kind?: Prisma.StringFilter<"UserMix"> | string
   slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string
@@ -302,7 +302,7 @@ export type UserMixWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.UserMixWhereInput | Prisma.UserMixWhereInput[]
   OR?: Prisma.UserMixWhereInput[]
   NOT?: Prisma.UserMixWhereInput | Prisma.UserMixWhereInput[]
-  userId?: Prisma.StringFilter<"UserMix"> | string
+  userId?: Prisma.UuidFilter<"UserMix"> | string
   kind?: Prisma.StringFilter<"UserMix"> | string
   slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string
@@ -345,7 +345,7 @@ export type UserMixScalarWhereWithAggregatesInput = {
   OR?: Prisma.UserMixScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UserMixScalarWhereWithAggregatesInput | Prisma.UserMixScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"UserMix"> | string
   kind?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
   slot?: Prisma.IntWithAggregatesFilter<"UserMix"> | number
   label?: Prisma.StringWithAggregatesFilter<"UserMix"> | string
@@ -673,7 +673,7 @@ export type UserMixScalarWhereInput = {
   OR?: Prisma.UserMixScalarWhereInput[]
   NOT?: Prisma.UserMixScalarWhereInput | Prisma.UserMixScalarWhereInput[]
   id?: Prisma.StringFilter<"UserMix"> | string
-  userId?: Prisma.StringFilter<"UserMix"> | string
+  userId?: Prisma.UuidFilter<"UserMix"> | string
   kind?: Prisma.StringFilter<"UserMix"> | string
   slot?: Prisma.IntFilter<"UserMix"> | number
   label?: Prisma.StringFilter<"UserMix"> | string

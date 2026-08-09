@@ -192,7 +192,7 @@ export type PlaylistWhereInput = {
   OR?: Prisma.PlaylistWhereInput[]
   NOT?: Prisma.PlaylistWhereInput | Prisma.PlaylistWhereInput[]
   id?: Prisma.StringFilter<"Playlist"> | string
-  userId?: Prisma.StringFilter<"Playlist"> | string
+  userId?: Prisma.UuidFilter<"Playlist"> | string
   name?: Prisma.StringFilter<"Playlist"> | string
   description?: Prisma.StringNullableFilter<"Playlist"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"Playlist"> | string | null
@@ -221,7 +221,7 @@ export type PlaylistWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.PlaylistWhereInput | Prisma.PlaylistWhereInput[]
   OR?: Prisma.PlaylistWhereInput[]
   NOT?: Prisma.PlaylistWhereInput | Prisma.PlaylistWhereInput[]
-  userId?: Prisma.StringFilter<"Playlist"> | string
+  userId?: Prisma.UuidFilter<"Playlist"> | string
   name?: Prisma.StringFilter<"Playlist"> | string
   description?: Prisma.StringNullableFilter<"Playlist"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"Playlist"> | string | null
@@ -250,7 +250,7 @@ export type PlaylistScalarWhereWithAggregatesInput = {
   OR?: Prisma.PlaylistScalarWhereWithAggregatesInput[]
   NOT?: Prisma.PlaylistScalarWhereWithAggregatesInput | Prisma.PlaylistScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Playlist"> | string
-  userId?: Prisma.StringWithAggregatesFilter<"Playlist"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"Playlist"> | string
   name?: Prisma.StringWithAggregatesFilter<"Playlist"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Playlist"> | string | null
   coverUrl?: Prisma.StringNullableWithAggregatesFilter<"Playlist"> | string | null
@@ -524,7 +524,7 @@ export type PlaylistScalarWhereInput = {
   OR?: Prisma.PlaylistScalarWhereInput[]
   NOT?: Prisma.PlaylistScalarWhereInput | Prisma.PlaylistScalarWhereInput[]
   id?: Prisma.StringFilter<"Playlist"> | string
-  userId?: Prisma.StringFilter<"Playlist"> | string
+  userId?: Prisma.UuidFilter<"Playlist"> | string
   name?: Prisma.StringFilter<"Playlist"> | string
   description?: Prisma.StringNullableFilter<"Playlist"> | string | null
   coverUrl?: Prisma.StringNullableFilter<"Playlist"> | string | null

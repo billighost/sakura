@@ -163,7 +163,7 @@ export type FavoriteWhereInput = {
   AND?: Prisma.FavoriteWhereInput | Prisma.FavoriteWhereInput[]
   OR?: Prisma.FavoriteWhereInput[]
   NOT?: Prisma.FavoriteWhereInput | Prisma.FavoriteWhereInput[]
-  userId?: Prisma.StringFilter<"Favorite"> | string
+  userId?: Prisma.UuidFilter<"Favorite"> | string
   trackId?: Prisma.StringFilter<"Favorite"> | string
   createdAt?: Prisma.DateTimeFilter<"Favorite"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -183,7 +183,7 @@ export type FavoriteWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.FavoriteWhereInput | Prisma.FavoriteWhereInput[]
   OR?: Prisma.FavoriteWhereInput[]
   NOT?: Prisma.FavoriteWhereInput | Prisma.FavoriteWhereInput[]
-  userId?: Prisma.StringFilter<"Favorite"> | string
+  userId?: Prisma.UuidFilter<"Favorite"> | string
   trackId?: Prisma.StringFilter<"Favorite"> | string
   createdAt?: Prisma.DateTimeFilter<"Favorite"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -203,7 +203,7 @@ export type FavoriteScalarWhereWithAggregatesInput = {
   AND?: Prisma.FavoriteScalarWhereWithAggregatesInput | Prisma.FavoriteScalarWhereWithAggregatesInput[]
   OR?: Prisma.FavoriteScalarWhereWithAggregatesInput[]
   NOT?: Prisma.FavoriteScalarWhereWithAggregatesInput | Prisma.FavoriteScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"Favorite"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"Favorite"> | string
   trackId?: Prisma.StringWithAggregatesFilter<"Favorite"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Favorite"> | Date | string
 }
@@ -405,7 +405,7 @@ export type FavoriteScalarWhereInput = {
   AND?: Prisma.FavoriteScalarWhereInput | Prisma.FavoriteScalarWhereInput[]
   OR?: Prisma.FavoriteScalarWhereInput[]
   NOT?: Prisma.FavoriteScalarWhereInput | Prisma.FavoriteScalarWhereInput[]
-  userId?: Prisma.StringFilter<"Favorite"> | string
+  userId?: Prisma.UuidFilter<"Favorite"> | string
   trackId?: Prisma.StringFilter<"Favorite"> | string
   createdAt?: Prisma.DateTimeFilter<"Favorite"> | Date | string
 }

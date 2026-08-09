@@ -326,6 +326,7 @@ export type TrackWhereInput = {
   samples?: Prisma.SampledTrackListRelationFilter
   sampledBy?: Prisma.SampledTrackListRelationFilter
   snoozedBy?: Prisma.SnoozedTrackListRelationFilter
+  playAggregates?: Prisma.PlayAggregateListRelationFilter
 }
 
 export type TrackOrderByWithRelationInput = {
@@ -356,6 +357,7 @@ export type TrackOrderByWithRelationInput = {
   samples?: Prisma.SampledTrackOrderByRelationAggregateInput
   sampledBy?: Prisma.SampledTrackOrderByRelationAggregateInput
   snoozedBy?: Prisma.SnoozedTrackOrderByRelationAggregateInput
+  playAggregates?: Prisma.PlayAggregateOrderByRelationAggregateInput
 }
 
 export type TrackWhereUniqueInput = Prisma.AtLeast<{
@@ -389,6 +391,7 @@ export type TrackWhereUniqueInput = Prisma.AtLeast<{
   samples?: Prisma.SampledTrackListRelationFilter
   sampledBy?: Prisma.SampledTrackListRelationFilter
   snoozedBy?: Prisma.SnoozedTrackListRelationFilter
+  playAggregates?: Prisma.PlayAggregateListRelationFilter
 }, "id" | "sourceHash" | "telegramFileId">
 
 export type TrackOrderByWithAggregationInput = {
@@ -465,6 +468,7 @@ export type TrackCreateInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateInput = {
@@ -493,6 +497,7 @@ export type TrackUncheckedCreateInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUpdateInput = {
@@ -521,6 +526,7 @@ export type TrackUpdateInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateInput = {
@@ -549,6 +555,7 @@ export type TrackUncheckedUpdateInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateManyInput = {
@@ -890,6 +897,20 @@ export type TrackUpdateOneRequiredWithoutListeningHistoryNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutListeningHistoryInput, Prisma.TrackUpdateWithoutListeningHistoryInput>, Prisma.TrackUncheckedUpdateWithoutListeningHistoryInput>
 }
 
+export type TrackCreateNestedOneWithoutPlayAggregatesInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutPlayAggregatesInput, Prisma.TrackUncheckedCreateWithoutPlayAggregatesInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutPlayAggregatesInput
+  connect?: Prisma.TrackWhereUniqueInput
+}
+
+export type TrackUpdateOneRequiredWithoutPlayAggregatesNestedInput = {
+  create?: Prisma.XOR<Prisma.TrackCreateWithoutPlayAggregatesInput, Prisma.TrackUncheckedCreateWithoutPlayAggregatesInput>
+  connectOrCreate?: Prisma.TrackCreateOrConnectWithoutPlayAggregatesInput
+  upsert?: Prisma.TrackUpsertWithoutPlayAggregatesInput
+  connect?: Prisma.TrackWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TrackUpdateToOneWithWhereWithoutPlayAggregatesInput, Prisma.TrackUpdateWithoutPlayAggregatesInput>, Prisma.TrackUncheckedUpdateWithoutPlayAggregatesInput>
+}
+
 export type TrackCreateWithoutArtistInput = {
   id?: string
   title: string
@@ -915,6 +936,7 @@ export type TrackCreateWithoutArtistInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutArtistInput = {
@@ -942,6 +964,7 @@ export type TrackUncheckedCreateWithoutArtistInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutArtistInput = {
@@ -1018,6 +1041,7 @@ export type TrackCreateWithoutAlbumInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutAlbumInput = {
@@ -1045,6 +1069,7 @@ export type TrackUncheckedCreateWithoutAlbumInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutAlbumInput = {
@@ -1098,6 +1123,7 @@ export type TrackCreateWithoutTrackArtistsInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutTrackArtistsInput = {
@@ -1125,6 +1151,7 @@ export type TrackUncheckedCreateWithoutTrackArtistsInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutTrackArtistsInput = {
@@ -1168,6 +1195,7 @@ export type TrackUpdateWithoutTrackArtistsInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutTrackArtistsInput = {
@@ -1195,6 +1223,7 @@ export type TrackUncheckedUpdateWithoutTrackArtistsInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutPlaylistTracksInput = {
@@ -1222,6 +1251,7 @@ export type TrackCreateWithoutPlaylistTracksInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutPlaylistTracksInput = {
@@ -1249,6 +1279,7 @@ export type TrackUncheckedCreateWithoutPlaylistTracksInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutPlaylistTracksInput = {
@@ -1292,6 +1323,7 @@ export type TrackUpdateWithoutPlaylistTracksInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutPlaylistTracksInput = {
@@ -1319,6 +1351,7 @@ export type TrackUncheckedUpdateWithoutPlaylistTracksInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutCreditsInput = {
@@ -1346,6 +1379,7 @@ export type TrackCreateWithoutCreditsInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutCreditsInput = {
@@ -1373,6 +1407,7 @@ export type TrackUncheckedCreateWithoutCreditsInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutCreditsInput = {
@@ -1416,6 +1451,7 @@ export type TrackUpdateWithoutCreditsInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutCreditsInput = {
@@ -1443,6 +1479,7 @@ export type TrackUncheckedUpdateWithoutCreditsInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutSamplesInput = {
@@ -1470,6 +1507,7 @@ export type TrackCreateWithoutSamplesInput = {
   credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutSamplesInput = {
@@ -1497,6 +1535,7 @@ export type TrackUncheckedCreateWithoutSamplesInput = {
   credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutSamplesInput = {
@@ -1529,6 +1568,7 @@ export type TrackCreateWithoutSampledByInput = {
   credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutSampledByInput = {
@@ -1556,6 +1596,7 @@ export type TrackUncheckedCreateWithoutSampledByInput = {
   credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutSampledByInput = {
@@ -1599,6 +1640,7 @@ export type TrackUpdateWithoutSamplesInput = {
   credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutSamplesInput = {
@@ -1626,6 +1668,7 @@ export type TrackUncheckedUpdateWithoutSamplesInput = {
   credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUpsertWithoutSampledByInput = {
@@ -1664,6 +1707,7 @@ export type TrackUpdateWithoutSampledByInput = {
   credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutSampledByInput = {
@@ -1691,6 +1735,7 @@ export type TrackUncheckedUpdateWithoutSampledByInput = {
   credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutFavoritesInput = {
@@ -1718,6 +1763,7 @@ export type TrackCreateWithoutFavoritesInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutFavoritesInput = {
@@ -1745,6 +1791,7 @@ export type TrackUncheckedCreateWithoutFavoritesInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutFavoritesInput = {
@@ -1788,6 +1835,7 @@ export type TrackUpdateWithoutFavoritesInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutFavoritesInput = {
@@ -1815,6 +1863,7 @@ export type TrackUncheckedUpdateWithoutFavoritesInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutSnoozedByInput = {
@@ -1842,6 +1891,7 @@ export type TrackCreateWithoutSnoozedByInput = {
   credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutSnoozedByInput = {
@@ -1869,6 +1919,7 @@ export type TrackUncheckedCreateWithoutSnoozedByInput = {
   credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutSnoozedByInput = {
@@ -1912,6 +1963,7 @@ export type TrackUpdateWithoutSnoozedByInput = {
   credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutSnoozedByInput = {
@@ -1939,6 +1991,7 @@ export type TrackUncheckedUpdateWithoutSnoozedByInput = {
   credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackCreateWithoutListeningHistoryInput = {
@@ -1966,6 +2019,7 @@ export type TrackCreateWithoutListeningHistoryInput = {
   samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateCreateNestedManyWithoutTrackInput
 }
 
 export type TrackUncheckedCreateWithoutListeningHistoryInput = {
@@ -1993,6 +2047,7 @@ export type TrackUncheckedCreateWithoutListeningHistoryInput = {
   samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
   sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+  playAggregates?: Prisma.PlayAggregateUncheckedCreateNestedManyWithoutTrackInput
 }
 
 export type TrackCreateOrConnectWithoutListeningHistoryInput = {
@@ -2036,6 +2091,7 @@ export type TrackUpdateWithoutListeningHistoryInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutListeningHistoryInput = {
@@ -2059,6 +2115,135 @@ export type TrackUncheckedUpdateWithoutListeningHistoryInput = {
   trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
   playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
   favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackCreateWithoutPlayAggregatesInput = {
+  id?: string
+  title: string
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  artist: Prisma.ArtistCreateNestedOneWithoutTracksInput
+  album?: Prisma.AlbumCreateNestedOneWithoutTracksInput
+  trackArtists?: Prisma.TrackArtistCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackCreateNestedManyWithoutTrackInput
+}
+
+export type TrackUncheckedCreateWithoutPlayAggregatesInput = {
+  id?: string
+  title: string
+  artistId: string
+  albumId?: string | null
+  duration: number
+  trackNumber?: number | null
+  genre?: string | null
+  audioUrl: string
+  coverUrl?: string | null
+  sourceHash?: string | null
+  source?: string
+  telegramFileId?: string | null
+  telegramMessageId?: string | null
+  deezerId?: string | null
+  isrc?: string | null
+  previewUrl?: string | null
+  createdAt?: Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedCreateNestedManyWithoutTrackInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedCreateNestedManyWithoutTrackInput
+  favorites?: Prisma.FavoriteUncheckedCreateNestedManyWithoutTrackInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedCreateNestedManyWithoutTrackInput
+  credits?: Prisma.TrackCreditUncheckedCreateNestedManyWithoutTrackInput
+  samples?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutTrackInput
+  sampledBy?: Prisma.SampledTrackUncheckedCreateNestedManyWithoutSampledTrackInput
+  snoozedBy?: Prisma.SnoozedTrackUncheckedCreateNestedManyWithoutTrackInput
+}
+
+export type TrackCreateOrConnectWithoutPlayAggregatesInput = {
+  where: Prisma.TrackWhereUniqueInput
+  create: Prisma.XOR<Prisma.TrackCreateWithoutPlayAggregatesInput, Prisma.TrackUncheckedCreateWithoutPlayAggregatesInput>
+}
+
+export type TrackUpsertWithoutPlayAggregatesInput = {
+  update: Prisma.XOR<Prisma.TrackUpdateWithoutPlayAggregatesInput, Prisma.TrackUncheckedUpdateWithoutPlayAggregatesInput>
+  create: Prisma.XOR<Prisma.TrackCreateWithoutPlayAggregatesInput, Prisma.TrackUncheckedCreateWithoutPlayAggregatesInput>
+  where?: Prisma.TrackWhereInput
+}
+
+export type TrackUpdateToOneWithWhereWithoutPlayAggregatesInput = {
+  where?: Prisma.TrackWhereInput
+  data: Prisma.XOR<Prisma.TrackUpdateWithoutPlayAggregatesInput, Prisma.TrackUncheckedUpdateWithoutPlayAggregatesInput>
+}
+
+export type TrackUpdateWithoutPlayAggregatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  artist?: Prisma.ArtistUpdateOneRequiredWithoutTracksNestedInput
+  album?: Prisma.AlbumUpdateOneWithoutTracksNestedInput
+  trackArtists?: Prisma.TrackArtistUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUpdateManyWithoutTrackNestedInput
+  credits?: Prisma.TrackCreditUpdateManyWithoutTrackNestedInput
+  samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
+  sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
+  snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+}
+
+export type TrackUncheckedUpdateWithoutPlayAggregatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  artistId?: Prisma.StringFieldUpdateOperationsInput | string
+  albumId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  duration?: Prisma.IntFieldUpdateOperationsInput | number
+  trackNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  genre?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  audioUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  coverUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  telegramFileId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deezerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isrc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  previewUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trackArtists?: Prisma.TrackArtistUncheckedUpdateManyWithoutTrackNestedInput
+  playlistTracks?: Prisma.PlaylistTrackUncheckedUpdateManyWithoutTrackNestedInput
+  favorites?: Prisma.FavoriteUncheckedUpdateManyWithoutTrackNestedInput
+  listeningHistory?: Prisma.ListeningHistoryUncheckedUpdateManyWithoutTrackNestedInput
   credits?: Prisma.TrackCreditUncheckedUpdateManyWithoutTrackNestedInput
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
@@ -2109,6 +2294,7 @@ export type TrackUpdateWithoutArtistInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutArtistInput = {
@@ -2136,6 +2322,7 @@ export type TrackUncheckedUpdateWithoutArtistInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateManyWithoutArtistInput = {
@@ -2201,6 +2388,7 @@ export type TrackUpdateWithoutAlbumInput = {
   samples?: Prisma.SampledTrackUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateWithoutAlbumInput = {
@@ -2228,6 +2416,7 @@ export type TrackUncheckedUpdateWithoutAlbumInput = {
   samples?: Prisma.SampledTrackUncheckedUpdateManyWithoutTrackNestedInput
   sampledBy?: Prisma.SampledTrackUncheckedUpdateManyWithoutSampledTrackNestedInput
   snoozedBy?: Prisma.SnoozedTrackUncheckedUpdateManyWithoutTrackNestedInput
+  playAggregates?: Prisma.PlayAggregateUncheckedUpdateManyWithoutTrackNestedInput
 }
 
 export type TrackUncheckedUpdateManyWithoutAlbumInput = {
@@ -2263,6 +2452,7 @@ export type TrackCountOutputType = {
   samples: number
   sampledBy: number
   snoozedBy: number
+  playAggregates: number
 }
 
 export type TrackCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2274,6 +2464,7 @@ export type TrackCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   samples?: boolean | TrackCountOutputTypeCountSamplesArgs
   sampledBy?: boolean | TrackCountOutputTypeCountSampledByArgs
   snoozedBy?: boolean | TrackCountOutputTypeCountSnoozedByArgs
+  playAggregates?: boolean | TrackCountOutputTypeCountPlayAggregatesArgs
 }
 
 /**
@@ -2342,6 +2533,13 @@ export type TrackCountOutputTypeCountSnoozedByArgs<ExtArgs extends runtime.Types
   where?: Prisma.SnoozedTrackWhereInput
 }
 
+/**
+ * TrackCountOutputType without action
+ */
+export type TrackCountOutputTypeCountPlayAggregatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PlayAggregateWhereInput
+}
+
 
 export type TrackSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2371,6 +2569,7 @@ export type TrackSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   samples?: boolean | Prisma.Track$samplesArgs<ExtArgs>
   sampledBy?: boolean | Prisma.Track$sampledByArgs<ExtArgs>
   snoozedBy?: boolean | Prisma.Track$snoozedByArgs<ExtArgs>
+  playAggregates?: boolean | Prisma.Track$playAggregatesArgs<ExtArgs>
   _count?: boolean | Prisma.TrackCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["track"]>
 
@@ -2450,6 +2649,7 @@ export type TrackInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   samples?: boolean | Prisma.Track$samplesArgs<ExtArgs>
   sampledBy?: boolean | Prisma.Track$sampledByArgs<ExtArgs>
   snoozedBy?: boolean | Prisma.Track$snoozedByArgs<ExtArgs>
+  playAggregates?: boolean | Prisma.Track$playAggregatesArgs<ExtArgs>
   _count?: boolean | Prisma.TrackCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TrackIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2474,6 +2674,7 @@ export type $TrackPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     samples: Prisma.$SampledTrackPayload<ExtArgs>[]
     sampledBy: Prisma.$SampledTrackPayload<ExtArgs>[]
     snoozedBy: Prisma.$SnoozedTrackPayload<ExtArgs>[]
+    playAggregates: Prisma.$PlayAggregatePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2897,6 +3098,7 @@ export interface Prisma__TrackClient<T, Null = never, ExtArgs extends runtime.Ty
   samples<T extends Prisma.Track$samplesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$samplesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SampledTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sampledBy<T extends Prisma.Track$sampledByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$sampledByArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SampledTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   snoozedBy<T extends Prisma.Track$snoozedByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$snoozedByArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SnoozedTrackPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  playAggregates<T extends Prisma.Track$playAggregatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Track$playAggregatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlayAggregatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3552,6 +3754,30 @@ export type Track$snoozedByArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   distinct?: Prisma.SnoozedTrackScalarFieldEnum | Prisma.SnoozedTrackScalarFieldEnum[]
+}
+
+/**
+ * Track.playAggregates
+ */
+export type Track$playAggregatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PlayAggregate
+   */
+  select?: Prisma.PlayAggregateSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PlayAggregate
+   */
+  omit?: Prisma.PlayAggregateOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PlayAggregateInclude<ExtArgs> | null
+  where?: Prisma.PlayAggregateWhereInput
+  orderBy?: Prisma.PlayAggregateOrderByWithRelationInput | Prisma.PlayAggregateOrderByWithRelationInput[]
+  cursor?: Prisma.PlayAggregateWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PlayAggregateScalarFieldEnum | Prisma.PlayAggregateScalarFieldEnum[]
 }
 
 /**

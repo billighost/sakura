@@ -288,7 +288,7 @@ export type TasteProfileWhereInput = {
   AND?: Prisma.TasteProfileWhereInput | Prisma.TasteProfileWhereInput[]
   OR?: Prisma.TasteProfileWhereInput[]
   NOT?: Prisma.TasteProfileWhereInput | Prisma.TasteProfileWhereInput[]
-  userId?: Prisma.StringFilter<"TasteProfile"> | string
+  userId?: Prisma.UuidFilter<"TasteProfile"> | string
   onboarded?: Prisma.BoolFilter<"TasteProfile"> | boolean
   seedArtistIds?: Prisma.StringNullableListFilter<"TasteProfile">
   seedGenres?: Prisma.StringNullableListFilter<"TasteProfile">
@@ -378,7 +378,7 @@ export type TasteProfileScalarWhereWithAggregatesInput = {
   AND?: Prisma.TasteProfileScalarWhereWithAggregatesInput | Prisma.TasteProfileScalarWhereWithAggregatesInput[]
   OR?: Prisma.TasteProfileScalarWhereWithAggregatesInput[]
   NOT?: Prisma.TasteProfileScalarWhereWithAggregatesInput | Prisma.TasteProfileScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"TasteProfile"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"TasteProfile"> | string
   onboarded?: Prisma.BoolWithAggregatesFilter<"TasteProfile"> | boolean
   seedArtistIds?: Prisma.StringNullableListFilter<"TasteProfile">
   seedGenres?: Prisma.StringNullableListFilter<"TasteProfile">

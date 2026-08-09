@@ -255,7 +255,7 @@ export type ArtistAffinityWhereInput = {
   AND?: Prisma.ArtistAffinityWhereInput | Prisma.ArtistAffinityWhereInput[]
   OR?: Prisma.ArtistAffinityWhereInput[]
   NOT?: Prisma.ArtistAffinityWhereInput | Prisma.ArtistAffinityWhereInput[]
-  userId?: Prisma.StringFilter<"ArtistAffinity"> | string
+  userId?: Prisma.UuidFilter<"ArtistAffinity"> | string
   artistId?: Prisma.StringFilter<"ArtistAffinity"> | string
   score?: Prisma.FloatFilter<"ArtistAffinity"> | number
   plays?: Prisma.IntFilter<"ArtistAffinity"> | number
@@ -287,7 +287,7 @@ export type ArtistAffinityWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.ArtistAffinityWhereInput | Prisma.ArtistAffinityWhereInput[]
   OR?: Prisma.ArtistAffinityWhereInput[]
   NOT?: Prisma.ArtistAffinityWhereInput | Prisma.ArtistAffinityWhereInput[]
-  userId?: Prisma.StringFilter<"ArtistAffinity"> | string
+  userId?: Prisma.UuidFilter<"ArtistAffinity"> | string
   artistId?: Prisma.StringFilter<"ArtistAffinity"> | string
   score?: Prisma.FloatFilter<"ArtistAffinity"> | number
   plays?: Prisma.IntFilter<"ArtistAffinity"> | number
@@ -321,7 +321,7 @@ export type ArtistAffinityScalarWhereWithAggregatesInput = {
   AND?: Prisma.ArtistAffinityScalarWhereWithAggregatesInput | Prisma.ArtistAffinityScalarWhereWithAggregatesInput[]
   OR?: Prisma.ArtistAffinityScalarWhereWithAggregatesInput[]
   NOT?: Prisma.ArtistAffinityScalarWhereWithAggregatesInput | Prisma.ArtistAffinityScalarWhereWithAggregatesInput[]
-  userId?: Prisma.StringWithAggregatesFilter<"ArtistAffinity"> | string
+  userId?: Prisma.UuidWithAggregatesFilter<"ArtistAffinity"> | string
   artistId?: Prisma.StringWithAggregatesFilter<"ArtistAffinity"> | string
   score?: Prisma.FloatWithAggregatesFilter<"ArtistAffinity"> | number
   plays?: Prisma.IntWithAggregatesFilter<"ArtistAffinity"> | number
@@ -617,7 +617,7 @@ export type ArtistAffinityScalarWhereInput = {
   AND?: Prisma.ArtistAffinityScalarWhereInput | Prisma.ArtistAffinityScalarWhereInput[]
   OR?: Prisma.ArtistAffinityScalarWhereInput[]
   NOT?: Prisma.ArtistAffinityScalarWhereInput | Prisma.ArtistAffinityScalarWhereInput[]
-  userId?: Prisma.StringFilter<"ArtistAffinity"> | string
+  userId?: Prisma.UuidFilter<"ArtistAffinity"> | string
   artistId?: Prisma.StringFilter<"ArtistAffinity"> | string
   score?: Prisma.FloatFilter<"ArtistAffinity"> | number
   plays?: Prisma.IntFilter<"ArtistAffinity"> | number
