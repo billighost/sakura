@@ -1,5 +1,5 @@
-import { TelegramClient as GramClient } from "telegram";
-import { StringSession } from "telegram/sessions";
+import { TelegramClient as GramClient, sessions } from "telegram";
+const { StringSession } = sessions;
 import { Api } from "telegram/tl";
 import { Readable } from "stream";
 
