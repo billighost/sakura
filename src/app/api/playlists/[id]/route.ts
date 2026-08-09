@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { cacheGet, cacheSet, cacheDel, cacheKey, TTL } from "@/lib/cache";
+import {
+  cacheGet,
+  cacheSet,
+  cacheDel,
+  cacheKey,
+  bumpNamespace,
+  TTL,
+} from "@/lib/cache";
 
 export async function GET(
   req: NextRequest,
@@ -59,12 +66,46 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { name, description } = await req.json();
+  const { name, description, isPublic } = await req.json();
   const userId = session.user.id!;
 
+  /*
+   * Patch only the fields the caller actually sent.
+   *
+   * This used to be `SET name = $1, description = $2` unconditionally, which
+   * made the handler destructive for any partial update: renaming a playlist
+   * wiped its description, and a visibility-only toggle would have blanked
+   * both. Build the SET list from present keys instead.
+   */
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (name !== undefined) {
+    if (typeof name !== "string" || !name.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    fields.push(`name = $${idx++}`);
+    values.push(name.trim().slice(0, 100));
+  }
+  if (description !== undefined) {
+    fields.push(`description = $${idx++}`);
+    values.push(typeof description === "string" ? description.slice(0, 500) : null);
+  }
+  if (isPublic !== undefined) {
+    fields.push(`"isPublic" = $${idx++}`);
+    values.push(Boolean(isPublic));
+  }
+
+  if (fields.length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  values.push(id, userId);
   const { rowCount } = await execute(
-    `UPDATE "Playlist" SET name = $1, description = $2 WHERE id = $3 AND "userId" = $4`,
-    [name, description, id, userId]
+    `UPDATE "Playlist" SET ${fields.join(", ")}
+     WHERE id = $${idx++} AND "userId" = $${idx}`,
+    values
   );
 
   if (rowCount === 0) {
@@ -72,6 +113,13 @@ export async function PATCH(
   }
 
   await cacheDel(cacheKey("playlist", id), cacheKey("playlists", userId));
+  // Visibility is read by search, which caches per query. Bumping the
+  // namespace orphans every cached entity-search result in one command, so a
+  // freshly published playlist is findable right away (and an unpublished one
+  // stops showing up) without scanning the keyspace.
+  if (isPublic !== undefined) {
+    await bumpNamespace("search:entities");
+  }
   return NextResponse.json({ ok: true });
 }
 

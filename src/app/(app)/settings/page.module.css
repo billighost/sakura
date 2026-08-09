@@ -1,39 +1,287 @@
 .page {
-  padding: clamp(0.75rem, 3vw, 1.25rem);
-  padding-bottom: calc(var(--bottom-chrome) + 1rem);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: var(--space-5) var(--gutter) calc(var(--bottom-chrome) + var(--space-6));
+  background: var(--bg);
 }
 
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.backBtn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: -0.5rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  color: var(--text);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.backBtn:active {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .backBtn:hover {
+    background: var(--surface-2);
+  }
+}
+
+.headerStatus {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+}
+
+.saveHint {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+}
+
+.saveError {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+}
+
+.bannerBtn {
+  flex-shrink: 0;
+  padding: 0 0.875rem;
+  height: 2rem;
+  min-height: 2rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+
 .section {
-  margin-bottom: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: var(--space-6);
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0 clamp(0.25rem, 1vw, 0.375rem);
-  margin-bottom: 0.75rem;
-}
-
-.sectionIcon {
-  width: 1.875rem;
-  height: 1.875rem;
-  border-radius: 8px;
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sakura-accent);
+  margin-bottom: var(--space-3);
+  color: var(--text-2);
 }
 
 .sectionTitle {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.0625rem, 3vw, 1.25rem);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
   font-weight: 600;
-  letter-spacing: -0.005em;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
 }
 
-.themeGrid {
+/* ── Group (card holding rows) ────────────────────────────────────────────── */
+
+.group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.group + .group {
+  margin-top: 0.625rem;
+}
+
+/* ── Row ──────────────────────────────────────────────────────────────────── */
+
+.row {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--line);
+  min-height: 3.625rem;
+  box-sizing: border-box;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowTappable {
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.rowTappable:active {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rowTappable:hover {
+    background: var(--surface-2);
+  }
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rowLabel {
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.rowLabelDanger {
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--danger);
+}
+
+.rowSublabel {
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-3);
+  max-width: 38ch;
+}
+
+.rowAction {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rowValue {
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.chevron {
+  color: var(--text-3);
+}
+
+/* ── Toggle ───────────────────────────────────────────────────────────────
+ * 48×28 with a sprung knob. The old one was a 30px pill — under the minimum
+ * comfortable target, and part of why this page felt fiddly to use.
+ */
+.toggle {
+  all: unset;
+  position: relative;
+  width: 3rem;
+  height: 1.75rem;
+  min-width: 3rem;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toggleOn {
+  background: var(--accent);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--r-full);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--d-base) var(--spring);
+}
+
+.toggleOn .toggleKnob {
+  transform: translateX(1.25rem);
+}
+
+/* ── Radio ────────────────────────────────────────────────────────────────── */
+
+.radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-full);
+  box-sizing: border-box;
+  transition: border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+.radioOn {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.radioOn::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--r-full);
+  background: var(--on-accent);
+}
+
+/* ── Theme cards ──────────────────────────────────────────────────────────
+ * Icons over flat surfaces. These were three decorative 135° gradient
+ * swatches standing in for previews — the exact pattern the redesign drops.
+ */
+.themeRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.625rem;
@@ -41,381 +289,184 @@
 
 .themeCard {
   all: unset;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5625rem;
-  padding: 0.875rem 0.75rem;
-  background: var(--sakura-glass);
-  backdrop-filter: blur(20px);
-  border: 2px solid var(--sakura-glass-border);
-  border-radius: 14px;
+  gap: 0.625rem;
+  padding: 1.125rem 0.75rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.2s cubic-bezier(.16,1,.3,1), box-shadow 0.2s;
+  box-sizing: border-box;
+  transition: border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
 }
 
-.themeCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px var(--sakura-shadow);
+.themeCard:active {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .themeCard:hover {
+    background: var(--surface-2);
+  }
 }
 
 .themeCardActive {
-  border-color: var(--sakura-accent);
-  box-shadow: 0 0 0 1px var(--sakura-accent), 0 10px 24px rgba(242, 120, 159, 0.2);
+  border-color: var(--accent);
+  background: var(--accent-softer);
 }
 
-.themePreview {
-  width: 100%;
-  height: 3.25rem;
-  border-radius: 9px;
-  box-shadow: inset 0 0 0 1px var(--sakura-glass-border);
-}
-
-.themeName {
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.group {
-  background: var(--sakura-glass);
-  backdrop-filter: blur(20px);
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid var(--sakura-glass-border);
-}
-
-.row {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: clamp(0.8125rem, 2.5vw, 0.9375rem) clamp(0.875rem, 3vw, 1.125rem);
-  min-height: clamp(2.75rem, 7vh, 3.25rem);
-  border-bottom: 1px solid var(--sakura-glass-border);
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.15s;
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.row:hover {
-  background: var(--sakura-hover);
-}
-
-.rowLabel {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.rowLabelWithIcon {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--sakura-text);
-}
-
-/* Two-line row label: title plus an explanatory line underneath. Used where a
-   toggle's effect isn't obvious from its name alone. */
-.rowLabelStack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-
-.rowSublabel {
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--sakura-text-secondary);
-  line-height: 1.35;
-  max-width: 15rem;
-}
-
-.rowValue {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-}
-
-.rowAction {
+.themeIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2rem, 6vw, 2.5rem);
-  height: clamp(2rem, 6vw, 2.5rem);
-  border-radius: 50%;
-  color: var(--sakura-text-secondary);
-  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--text-2);
+  transition: background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease);
 }
 
-.qualityInfo {
-  padding: 0.5rem clamp(0.875rem, 3vw, 1.125rem) 0.875rem;
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
+.themeCardActive .themeIcon {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-.crossfadeVisual {
-  padding: clamp(0.875rem, 2.5vw, 1rem) clamp(0.875rem, 3vw, 1.125rem) 0;
-  margin-bottom: 0.5rem;
+.themeName {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-2);
 }
 
-.crossfadeTrack {
-  width: 100%;
-  height: 4px;
-  background: var(--sakura-border);
-  border-radius: 2px;
-  position: relative;
-  margin-bottom: 0.625rem;
+.themeCardActive .themeName {
+  color: var(--text);
 }
 
-.crossfadeFill {
-  height: 100%;
-  background: var(--sakura-accent-gradient);
-  border-radius: 2px;
-  transition: width 0.2s;
-}
-
-.crossfadeSlider {
-  width: 100%;
-  height: 4px;
-  appearance: none;
-  background: transparent;
-  outline: none;
-  cursor: pointer;
-  position: relative;
-  top: -4px;
-}
-
-.crossfadeSlider::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-  border: 3px solid var(--sakura-bg);
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(242, 120, 159, 0.5);
-}
-
-.crossfadeSlider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-  border: 3px solid var(--sakura-bg);
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(242, 120, 159, 0.5);
-}
-
-.crossfadeLabels {
+.themeCheck {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
   display: flex;
-  justify-content: space-between;
-  padding: 0 clamp(0.875rem, 3vw, 1.125rem);
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.875rem;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: scaleIn var(--d-base) var(--spring);
 }
 
-.storageBar {
-  padding: clamp(0.8125rem, 2.5vw, 0.9375rem) clamp(0.875rem, 3vw, 1.125rem);
+/* ── Storage ──────────────────────────────────────────────────────────────── */
+
+.storage {
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .storageLabel {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.5625rem;
+  gap: var(--space-2);
+  margin-bottom: 0.625rem;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.storageQuota {
+  color: var(--text-3);
+  font-weight: 500;
 }
 
 .storageTrack {
-  width: 100%;
-  height: 6px;
-  background: var(--sakura-border);
-  border-radius: 3px;
+  position: relative;
+  height: 0.5rem;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
   overflow: hidden;
 }
 
 .storageFill {
   height: 100%;
-  background: var(--sakura-accent-gradient);
-  border-radius: 3px;
-  transition: width 0.4s cubic-bezier(.16,1,.3,1);
+  border-radius: var(--r-full);
+  background: var(--accent);
+  transition: width var(--d-slow) var(--ease);
 }
 
-.select {
-  background: var(--sakura-input-bg);
-  border: 1px solid var(--sakura-input-border);
-  border-radius: 9px;
-  color: var(--sakura-text);
-  padding: 0.4375rem 0.625rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  outline: none;
-  max-width: 9.5rem;
-  transition: border-color 0.15s;
+.storageUnknown {
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-3);
 }
 
-.select:focus,
-.select:hover {
-  border-color: var(--sakura-accent);
-}
-
-.toggle {
-  width: clamp(2.5rem, 7vw, 2.75rem);
-  height: clamp(1.375rem, 4vw, 1.5rem);
-  border-radius: 9999px;
-  background: var(--sakura-border);
-  border: none;
-  cursor: pointer;
-  position: relative;
-  transition: background 0.25s;
-  flex-shrink: 0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
-.toggleOn {
-  background: var(--sakura-accent-gradient);
-  box-shadow: 0 0 0 1px rgba(242, 120, 159, 0.3), inset 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.toggleKnob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: clamp(1rem, 3vw, 1.125rem);
-  height: clamp(1rem, 3vw, 1.125rem);
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
-}
-
-.toggleKnobOn {
-  transform: translateX(clamp(1.125rem, 3vw, 1.25rem));
-}
-
-.whatsNewContent {
-  padding: 0 clamp(0.875rem, 3vw, 1.125rem) 0.875rem;
-}
-
-.whatsNewList {
-  list-style: none;
-  padding: 0;
-}
-
-.whatsNewList li {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  padding: 0.4375rem 0;
-  padding-left: 1.125rem;
-  position: relative;
-  line-height: 1.4;
-}
-
-.whatsNewList li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.6875rem;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-}
+/* ── Sign out ─────────────────────────────────────────────────────────────── */
 
 .logoutBtn {
   all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5625rem;
+  gap: 0.625rem;
   width: 100%;
-  padding: 0.9375rem 1rem;
-  background: var(--sakura-glass);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--sakura-danger);
-  border-radius: 14px;
-  font-size: 0.875rem;
+  height: 3rem;
+  margin-top: var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
   font-weight: 600;
-  color: var(--sakura-danger);
   cursor: pointer;
-  transition: background 0.15s, transform 0.2s cubic-bezier(.16,1,.3,1);
-}
-
-.logoutBtn:hover {
-  background: rgba(232, 93, 117, 0.12);
-  transform: translateY(-1px);
+  box-sizing: border-box;
+  transition: background-color var(--d-fast) var(--ease);
 }
 
 .logoutBtn:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  cursor: default;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .logoutBtn:hover {
+    background: var(--surface-2);
+  }
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.version {
+  margin-top: var(--space-4);
+  text-align: center;
+  font-size: var(--t-xs);
+  color: var(--text-3);
+}
+
+/* ── Spinner + icons ──────────────────────────────────────────────────────── */
+
 .spinner {
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid var(--sakura-border);
-  border-top-color: var(--sakura-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--r-full);
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.appInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: clamp(1.75rem, 4vw, 2.25rem);
-  margin-top: 1rem;
-}
-
-.appLogo {
-  font-size: 2.25rem;
-  margin-bottom: 0.5625rem;
-  filter: drop-shadow(0 4px 12px rgba(242, 120, 159, 0.3));
-}
-
-.appName {
-  font-family: var(--sakura-font-display);
-  font-size: 1.1875rem;
-  font-weight: 600;
-  margin-bottom: 0.4375rem;
-}
-
-.versionBadge {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--sakura-accent);
-  background: var(--accent);
-  padding: 0.25rem 0.75rem;
-  border-radius: 10px;
-  margin-bottom: 0.4375rem;
-}
-
-.buildInfo {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-}
-
-.appDesc {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 0.1875rem;
-}
-
-@media (max-width: 480px) {
-  .themeGrid {
-    grid-template-columns: repeat(3, 1fr);
+  to {
+    transform: rotate(360deg);
   }
+}
+
+.okIcon {
+  color: var(--success);
 }

@@ -830,6 +830,50 @@ export function MoonIcon(p: IconProps) {
   );
 }
 
+/**
+ * "Follow the system" — a disc split light/dark down the middle. Reads as a
+ * relationship between the two themes rather than as a third theme.
+ */
+export function ContrastIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="8.9" />
+      <path
+        d="M12 3.1a8.9 8.9 0 0 1 0 17.8Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </Svg>
+  );
+}
+
+/** Painter's palette with three wells — appearance and theming. */
+export function PaletteIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 3.1a8.9 8.9 0 0 0 0 17.8 1.9 1.9 0 0 0 1.9-1.9 1.5 1.5 0 0 1 1.5-1.5h1.7a3 3 0 0 0 3-3A8.9 8.9 0 0 0 12 3.1Z" />
+      <circle data-part="spark-1" cx="7.6" cy="12.2" r="1.05" fill="currentColor" stroke="none" />
+      <circle data-part="spark-2" cx="10.4" cy="7.9" r="1.05" fill="currentColor" stroke="none" />
+      <circle data-part="spark-3" cx="15.4" cy="9.4" r="1.05" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+/**
+ * Speaker with radiating arcs. Distinct from `VolumeIcon`, which is a live
+ * level readout whose arcs appear and disappear with the value; this one is a
+ * static section marker for playback settings.
+ */
+export function SoundIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M11 4.6 6.4 8.6H3.2v6.8h3.2L11 19.4Z" />
+      <path data-part="wave-1" d="M14.6 9.4a3.6 3.6 0 0 1 0 5.2" />
+      <path data-part="wave-2" d="M17.4 6.4a7.6 7.6 0 0 1 0 11.2" />
+    </Svg>
+  );
+}
+
 export function BellIcon(p: IconProps) {
   return (
     <Svg {...p}>

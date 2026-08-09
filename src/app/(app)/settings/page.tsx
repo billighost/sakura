@@ -1,399 +1,581 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlayer } from "@/components/PlayerContext";
+import {
+  PaletteIcon,
+  SoundIcon,
+  ShieldIcon,
+  DatabaseIcon,
+  InfoIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  LogOutIcon,
+  SunIcon,
+  MoonIcon,
+  ContrastIcon,
+  CheckIcon,
+} from "@/components/Icons";
+import { getStorageEstimate, clearAudioCache } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
-/* ────────────────────────────────────────────────────────────
-   Icons
-──────────────────────────────────────────────────────────── */
-function PaletteIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2 1.5 1.5 0 0 1 1.5-1.5H17a3 3 0 0 0 3-3 10 10 0 0 0-8-13.5z" />
-      <circle cx="7.5" cy="10.5" r="1" fill="currentColor" />
-      <circle cx="11.5" cy="7" r="1" fill="currentColor" />
-      <circle cx="16" cy="9.5" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-function SoundIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 5 6 9H2v6h4l5 4V5z" />
-      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-    </svg>
-  );
-}
-function ShieldIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3z" />
-    </svg>
-  );
-}
-function BellIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-    </svg>
-  );
-}
-function InfoIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4M12 8h.01" />
-    </svg>
-  );
-}
-function ChevronRight() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18l6-6-6-6" />
-    </svg>
-  );
-}
-function LogOutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-    </svg>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────
-   Small reusable controls
-──────────────────────────────────────────────────────────── */
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+/* ── Controls ──────────────────────────────────────────────────────────────
+ * A switch with a real 44px target. The old one was a 30px pill, below the
+ * minimum comfortable touch size, which is part of why settings felt fiddly.
+ */
+function Toggle({
+  on,
+  onChange,
+  label,
+  busy,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  busy?: boolean;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      disabled={busy}
       className={`${styles.toggle} ${on ? styles.toggleOn : ""}`}
-      onClick={() => onChange(!on)}
+      onClick={() => {
+        import("@/lib/haptics").then((h) => h.vibrate(8));
+        onChange(!on);
+      }}
     >
-      <span className={`${styles.toggleKnob} ${on ? styles.toggleKnobOn : ""}`} />
+      <span className={styles.toggleKnob} />
     </button>
   );
 }
 
 function Row({
-  icon,
   label,
   sublabel,
-  value,
-  onClick,
   control,
+  href,
+  onClick,
+  value,
+  danger,
 }: {
-  icon?: React.ReactNode;
   label: string;
   sublabel?: string;
-  value?: string;
-  onClick?: () => void;
   control?: React.ReactNode;
+  href?: string;
+  onClick?: () => void;
+  value?: string;
+  danger?: boolean;
 }) {
-  const content = (
+  const body = (
     <>
-      <span className={icon ? styles.rowLabelWithIcon : styles.rowLabel}>
-        {icon}
-        {sublabel ? (
-          <span className={styles.rowLabelStack}>
-            <span>{label}</span>
-            <span className={styles.rowSublabel}>{sublabel}</span>
-          </span>
-        ) : (
-          label
+      <span className={styles.rowText}>
+        <span className={danger ? styles.rowLabelDanger : styles.rowLabel}>
+          {label}
+        </span>
+        {sublabel && <span className={styles.rowSublabel}>{sublabel}</span>}
+      </span>
+      <span className={styles.rowAction}>
+        {value && <span className={styles.rowValue}>{value}</span>}
+        {control}
+        {(href || onClick) && !control && (
+          <ChevronRightIcon size={16} className={styles.chevron} />
         )}
       </span>
-      {control ?? (
-        <span className={styles.rowAction} style={{ display: "flex", gap: "0.5rem" }}>
-          {value && <span className={styles.rowValue}>{value}</span>}
-          {onClick && <ChevronRight />}
-        </span>
-      )}
     </>
   );
 
-  if (onClick && !control) {
+  if (href) {
     return (
-      <button type="button" className={styles.row} onClick={onClick}>
-        {content}
+      <Link href={href} className={`${styles.row} ${styles.rowTappable}`}>
+        {body}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${styles.row} ${styles.rowTappable}`}
+        onClick={onClick}
+      >
+        {body}
       </button>
     );
   }
-  return <div className={styles.row}>{content}</div>;
+  return <div className={styles.row}>{body}</div>;
 }
 
-/* ────────────────────────────────────────────────────────────
-   Theme options — tokens pulled straight from globals.css
-──────────────────────────────────────────────────────────── */
-const THEMES: { id: "dark" | "light" | "system"; name: string; preview: string }[] = [
-  { id: "dark", name: "Dark", preview: "linear-gradient(135deg, #0E0B0F, #1A1620)" },
-  { id: "light", name: "Light", preview: "linear-gradient(135deg, #FAF8FA, #F0ECF2)" },
-  { id: "system", name: "System", preview: "linear-gradient(135deg, #0E0B0F 50%, #FAF8FA 50%)" },
-];
+/* ── Theme ─────────────────────────────────────────────────────────────────
+ * Swatches drawn from real surface tokens instead of the three decorative
+ * 135° gradients that used to stand in for previews.
+ */
+const THEMES = [
+  { id: "light", name: "Light", Icon: SunIcon },
+  { id: "dark", name: "Dark", Icon: MoonIcon },
+  { id: "system", name: "Auto", Icon: ContrastIcon },
+] as const;
 
-const AUDIO_QUALITIES = ["Low (96 kbps)", "Normal (160 kbps)", "High (320 kbps)", "Lossless"];
+type ThemeId = (typeof THEMES)[number]["id"];
+
+/**
+ * Quality is stored as a stable token, never as the label shown on screen.
+ *
+ * The previous version wrote the display string ("High (320 kbps)") into the
+ * database column whose default was `"high"`. Nothing read it back correctly:
+ * on reload the `<select>` got a value that matched no `<option>`, so the
+ * control silently reset to the first entry and the user's choice appeared to
+ * have been forgotten.
+ */
+const QUALITIES = [
+  { id: "low", label: "Data saver", detail: "Uses the least data" },
+  { id: "normal", label: "Balanced", detail: "Good quality, moderate data" },
+  { id: "high", label: "High", detail: "Best quality, most data" },
+] as const;
+
+function formatBytes(bytes: number) {
+  if (bytes <= 0) return "0 MB";
+  const gb = bytes / 1024 ** 3;
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
+}
+
+/**
+ * Keep the browser/OS chrome in step with the active theme.
+ *
+ * The layout declares theme-color via prefers-color-scheme media queries, so
+ * when the user overrides the system theme the *page* switches but the status
+ * bar and tab colour keep following the OS. Rewriting the meta tags to the
+ * resolved palette fixes the mismatch.
+ */
+function syncThemeColor(next: ThemeId) {
+  const DARK = "#0E0B0F";
+  const LIGHT = "#FAF8FA";
+
+  const existing = Array.from(
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+  );
+
+  if (next === "system") {
+    /*
+     * Hand control back to the OS. Restoring the two media-scoped tags the
+     * layout ships means Auto tracks a change to the system appearance while
+     * the app is open, which a single resolved colour would freeze.
+     */
+    for (const m of existing) m.remove();
+    for (const [scheme, color] of [
+      ["dark", DARK],
+      ["light", LIGHT],
+    ] as const) {
+      const m = document.createElement("meta");
+      m.name = "theme-color";
+      m.media = `(prefers-color-scheme: ${scheme})`;
+      m.content = color;
+      document.head.appendChild(m);
+    }
+    return;
+  }
+
+  // An explicit choice outranks the OS, so collapse to one unscoped tag —
+  // leaving the media-scoped pair in place would let the OS win again.
+  for (const m of existing.slice(1)) m.remove();
+  const meta = existing[0] ?? document.createElement("meta");
+  meta.name = "theme-color";
+  meta.removeAttribute("media");
+  meta.content = next === "light" ? LIGHT : DARK;
+  if (!meta.parentNode) document.head.appendChild(meta);
+}
 
 export default function SettingsPage() {
   const router = useRouter();
-
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
-  // Autoplay lives in the player (localStorage-backed) rather than in
-  // UserSettings — it's a device preference, and it has to be readable
-  // synchronously by the playback loop.
   const { autoplayRadio, setAutoplayRadio } = usePlayer();
-  const [quality, setQuality] = useState("High (320 kbps)");
-  const [downloadQuality, setDownloadQuality] = useState("High (320 kbps)");
-  const [crossfade, setCrossfade] = useState(4);
-  const [gaplessPlayback, setGaplessPlayback] = useState(true);
-  const [normalizeVolume, setNormalizeVolume] = useState(true);
-  const [explicitContent, setExplicitContent] = useState(true);
+
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>("dark");
+  const [quality, setQuality] = useState<string>("high");
   const [privateSession, setPrivateSession] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [newReleaseAlerts, setNewReleaseAlerts] = useState(true);
+
+  const [storage, setStorage] = useState<{ used: number; quota: number } | null>(
+    null
+  );
+  const [clearing, setClearing] = useState(false);
+  const [cleared, setCleared] = useState(false);
+
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [loggingOut, setLoggingOut] = useState(false);
 
+  /* One in-flight PATCH at a time, coalescing rapid toggles. */
+  const pending = useRef<Record<string, unknown>>({});
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        setTheme(data.theme || "dark");
-        setQuality(data.audioQuality || "High (320 kbps)");
-        setDownloadQuality(data.downloadQuality || "High (320 kbps)");
-        setCrossfade(data.crossfadeSeconds || 0);
-        setGaplessPlayback(data.gaplessPlayback ?? true);
-        setNormalizeVolume(data.normalizeVolume ?? true);
-        setExplicitContent(data.explicitContent ?? true);
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!alive) return;
+
+        const serverTheme = (data.theme as ThemeId) || "dark";
+        setTheme(serverTheme);
+
+        /*
+         * Reconcile the server's theme with what this device actually painted.
+         *
+         * The boot script in the root layout paints from localStorage, which
+         * is per-device. If the theme was last changed on another device the
+         * two disagree, and the radio would show "Light" over a dark page.
+         * Re-apply only on a mismatch, so the common case does no DOM work.
+         */
+        let localTheme: string | null = null;
+        try {
+          localTheme = localStorage.getItem("sakura-theme");
+        } catch {
+          // Storage unavailable — fall through and apply.
+        }
+        if (localTheme !== serverTheme) {
+          applyTheme(serverTheme, { fromServer: true });
+        }
+
+        setQuality(data.audioQuality || "high");
         setPrivateSession(data.privateSession ?? false);
-        setPushNotifications(data.pushNotifications ?? true);
-        setNewReleaseAlerts(data.newReleaseAlerts ?? true);
-        
-        setSettingsLoaded(true);
-      });
+        setLoaded(true);
+      } catch {
+        // The old code had no error branch: a failed load left `settingsLoaded`
+        // false forever, and because `updateSetting` early-returns on that
+        // flag, every control on the page silently stopped saving.
+        if (alive) setLoadFailed(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // applyTheme is re-created each render but only closes over `save`, which
+    // is itself inert until `loaded` flips — so running this once is correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function updateSetting(key: string, value: any) {
-    if (!settingsLoaded) return;
-    fetch("/api/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [key]: value }),
-    });
+  useEffect(() => {
+    getStorageEstimate().then(setStorage).catch(() => {});
+  }, []);
+
+  const flush = useCallback(async () => {
+    const body = pending.current;
+    pending.current = {};
+    if (Object.keys(body).length === 0) return;
+
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      setSaveState("idle");
+    } catch {
+      // Previously this was fire-and-forget with no `.catch`, so a failed save
+      // was invisible *and* produced an unhandled rejection.
+      setSaveState("error");
+    }
+  }, []);
+
+  const save = useCallback(
+    (key: string, value: unknown) => {
+      if (!loaded) return;
+      pending.current[key] = value;
+      if (flushTimer.current) clearTimeout(flushTimer.current);
+      flushTimer.current = setTimeout(flush, 350);
+    },
+    [loaded, flush]
+  );
+
+  // Don't lose a debounced write if the page unmounts mid-timer.
+  useEffect(() => {
+    return () => {
+      if (flushTimer.current) {
+        clearTimeout(flushTimer.current);
+        flush();
+      }
+    };
+  }, [flush]);
+
+  /**
+   * Paints a theme and records it.
+   *
+   * `fromServer: true` skips the server write — the value already came from
+   * there, so saving it back is a pointless round trip that also races the
+   * debounced flush.
+   */
+  function applyTheme(next: ThemeId, opts?: { fromServer?: boolean }) {
+    setTheme(next);
+    if (!opts?.fromServer) save("theme", next);
+    try {
+      localStorage.setItem("sakura-theme", next);
+    } catch {
+      // Private-mode Safari throws on write; the in-memory change still applies.
+    }
+    const root = document.documentElement;
+    if (next === "system") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", next);
+    syncThemeColor(next);
   }
 
-  function applyTheme(next: "dark" | "light" | "system") {
-    setTheme(next);
-    updateSetting("theme", next);
-    localStorage.setItem("sakura-theme", next);
-    if (next === "system") {
-      document.documentElement.removeAttribute("data-theme");
-    } else {
-      document.documentElement.setAttribute("data-theme", next);
+  async function handleClearCache() {
+    setClearing(true);
+    try {
+      await clearAudioCache();
+      const next = await getStorageEstimate();
+      setStorage(next);
+      setCleared(true);
+      setTimeout(() => setCleared(false), 2400);
+    } catch {
+      // Leave the number as-is; the button returns to rest and can be retried.
+    } finally {
+      setClearing(false);
     }
   }
 
   async function handleLogout() {
     setLoggingOut(true);
-    await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/login");
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+    } catch {
+      // Sign out locally even if the round trip fails.
+    }
+    // `replace`, not `push` — otherwise Back returns to a signed-out app shell.
+    router.replace("/login");
   }
 
-  const storageUsedGb = 3.4;
-  const storageTotalGb = 8;
-  const storagePct = Math.round((storageUsedGb / storageTotalGb) * 100);
+  const usedPct =
+    storage && storage.quota > 0
+      ? Math.min(100, Math.round((storage.used / storage.quota) * 100))
+      : 0;
 
   return (
     <div className={styles.page}>
-      {/* ── Appearance ── */}
+      <header className={styles.header}>
+        {/* Settings is a push destination from the profile, not a tab. Without
+            a back control the only way out is the browser gesture, which
+            doesn't exist in a standalone PWA window. */}
+        <button
+          type="button"
+          className={styles.backBtn}
+          onClick={() => router.back()}
+          aria-label="Back"
+        >
+          <ChevronLeftIcon size={20} />
+        </button>
+        <h1 className={styles.title}>Settings</h1>
+        <span className={styles.headerStatus}>
+          {saveState === "saving" && <span className={styles.saveHint}>Saving…</span>}
+          {saveState === "error" && (
+            <span className={styles.saveError}>Couldn&apos;t save</span>
+          )}
+        </span>
+      </header>
+
+      {loadFailed && (
+        <div className={styles.banner}>
+          We couldn&apos;t load your settings, so changes won&apos;t be saved.
+          <button
+            type="button"
+            className={styles.bannerBtn}
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      )}
+
+      {/* ── Appearance ───────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            <PaletteIcon />
-          </span>
+          <PaletteIcon size={15} />
           <h2 className={styles.sectionTitle}>Appearance</h2>
         </div>
-        <div className={styles.themeGrid}>
+        <div className={styles.themeRow} role="radiogroup" aria-label="Theme">
           {THEMES.map((t) => (
             <button
               key={t.id}
               type="button"
+              role="radio"
+              aria-checked={theme === t.id}
               className={`${styles.themeCard} ${theme === t.id ? styles.themeCardActive : ""}`}
               onClick={() => applyTheme(t.id)}
-              aria-pressed={theme === t.id}
             >
-              <div className={styles.themePreview} style={{ background: t.preview }} />
+              <span className={styles.themeIcon}>
+                <t.Icon size={20} />
+              </span>
               <span className={styles.themeName}>{t.name}</span>
+              {theme === t.id && (
+                <span className={styles.themeCheck}>
+                  <CheckIcon size={12} />
+                </span>
+              )}
             </button>
           ))}
         </div>
       </section>
 
-      {/* ── Playback ── */}
+      {/* ── Playback ─────────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            <SoundIcon />
-          </span>
+          <SoundIcon size={15} />
           <h2 className={styles.sectionTitle}>Playback</h2>
         </div>
         <div className={styles.group}>
-          <Row
-            label="Streaming quality"
-            control={
-              <select className={styles.select} value={quality} onChange={(e) => {
-                setQuality(e.target.value);
-                updateSetting("audioQuality", e.target.value);
-              }}>
-                {AUDIO_QUALITIES.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
-            }
-          />
-          <Row
-            label="Download quality"
-            control={
-              <select className={styles.select} value={downloadQuality} onChange={(e) => {
-                setDownloadQuality(e.target.value);
-                updateSetting("downloadQuality", e.target.value);
-              }}>
-                {AUDIO_QUALITIES.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
-            }
-          />
-          <Row label="Gapless playback" control={<Toggle on={gaplessPlayback} onChange={(v) => { setGaplessPlayback(v); updateSetting("gaplessPlayback", v); }} label="Gapless playback" />} />
-          <Row label="Normalize volume" control={<Toggle on={normalizeVolume} onChange={(v) => { setNormalizeVolume(v); updateSetting("normalizeVolume", v); }} label="Normalize volume" />} />
-          <Row
-            label="Autoplay similar music"
-            sublabel="Keep playing songs that match your taste when a queue ends"
-            control={<Toggle on={autoplayRadio} onChange={setAutoplayRadio} label="Autoplay similar music" />}
-          />
-        </div>
-        <div className={styles.qualityInfo}>Higher quality uses more data and storage.</div>
-
-        <div className={styles.group} style={{ marginTop: "0.75rem" }}>
-          <div className={styles.crossfadeVisual}>
-            <div className={styles.crossfadeTrack}>
-              <div className={styles.crossfadeFill} style={{ width: `${(crossfade / 12) * 100}%` }} />
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={12}
-              value={crossfade}
-              onChange={(e) => {
-                setCrossfade(Number(e.target.value));
-                updateSetting("crossfadeSeconds", Number(e.target.value));
+          {QUALITIES.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              role="radio"
+              aria-checked={quality === q.id}
+              className={`${styles.row} ${styles.rowTappable}`}
+              onClick={() => {
+                setQuality(q.id);
+                save("audioQuality", q.id);
               }}
-              className={styles.crossfadeSlider}
-              aria-label="Crossfade duration"
-            />
-          </div>
-          <div className={styles.crossfadeLabels}>
-            <span>Off</span>
-            <span>Crossfade — {crossfade}s</span>
-            <span>12s</span>
-          </div>
+            >
+              <span className={styles.rowText}>
+                <span className={styles.rowLabel}>{q.label}</span>
+                <span className={styles.rowSublabel}>{q.detail}</span>
+              </span>
+              <span className={styles.rowAction}>
+                <span
+                  className={`${styles.radio} ${quality === q.id ? styles.radioOn : ""}`}
+                />
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className={styles.group}>
+          <Row
+            label="Keep the music going"
+            sublabel="When a playlist ends, play more songs like it"
+            control={
+              <Toggle
+                on={autoplayRadio}
+                onChange={setAutoplayRadio}
+                label="Keep the music going"
+              />
+            }
+          />
         </div>
       </section>
 
-      {/* ── Privacy ── */}
+      {/* ── Privacy ──────────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            <ShieldIcon />
-          </span>
+          <ShieldIcon size={15} />
           <h2 className={styles.sectionTitle}>Privacy</h2>
         </div>
         <div className={styles.group}>
-          <Row label="Allow explicit content" control={<Toggle on={explicitContent} onChange={(v) => { setExplicitContent(v); updateSetting("explicitContent", v); }} label="Allow explicit content" />} />
           <Row
             label="Private session"
-            control={<Toggle on={privateSession} onChange={(v) => { setPrivateSession(v); updateSetting("privateSession", v); }} label="Private session" />}
+            sublabel="Nothing you play is used for your recommendations"
+            control={
+              <Toggle
+                on={privateSession}
+                onChange={(v) => {
+                  setPrivateSession(v);
+                  save("privateSession", v);
+                }}
+                label="Private session"
+              />
+            }
+          />
+          {/* An "Allow explicit content" toggle used to live here. Nothing
+              could honour it: the Track model carries no explicit flag, so
+              there is no field to filter playback on. It has been dropped
+              rather than left as a switch that silently does nothing. */}
+        </div>
+      </section>
+
+      {/* ── Storage ──────────────────────────────────────────────────────── */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <DatabaseIcon size={15} />
+          <h2 className={styles.sectionTitle}>Downloads</h2>
+        </div>
+        <div className={styles.group}>
+          {/* Real numbers from the Storage API. This panel previously showed a
+              hardcoded "3.4 GB of 8 GB" to every user on every device. */}
+          <div className={styles.storage}>
+            {storage && storage.quota > 0 ? (
+              <>
+                <div className={styles.storageLabel}>
+                  <span>{formatBytes(storage.used)} used on this device</span>
+                  <span className={styles.storageQuota}>
+                    {formatBytes(storage.quota)} available
+                  </span>
+                </div>
+                <div
+                  className={styles.storageTrack}
+                  role="progressbar"
+                  aria-valuenow={usedPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Storage used"
+                >
+                  <div
+                    className={styles.storageFill}
+                    style={{ width: `${Math.max(1.5, usedPct)}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className={styles.storageUnknown}>
+                Your browser doesn&apos;t report how much space is in use.
+              </p>
+            )}
+          </div>
+          <Row
+            label={cleared ? "Downloads cleared" : "Clear downloads"}
+            sublabel="Frees up space. You can download songs again any time."
+            onClick={clearing || cleared ? undefined : handleClearCache}
+            control={
+              clearing ? (
+                <span className={styles.spinner} />
+              ) : cleared ? (
+                <CheckIcon size={16} className={styles.okIcon} />
+              ) : undefined
+            }
           />
         </div>
       </section>
 
-      {/* ── Notifications ── */}
+      {/* ── About ────────────────────────────────────────────────────────── */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            <BellIcon />
-          </span>
-          <h2 className={styles.sectionTitle}>Notifications</h2>
-        </div>
-        <div className={styles.group}>
-          <Row label="Push notifications" control={<Toggle on={pushNotifications} onChange={(v) => { setPushNotifications(v); updateSetting("pushNotifications", v); }} label="Push notifications" />} />
-          <Row label="New release alerts" control={<Toggle on={newReleaseAlerts} onChange={(v) => { setNewReleaseAlerts(v); updateSetting("newReleaseAlerts", v); }} label="New release alerts" />} />
-        </div>
-      </section>
-
-      {/* ── Storage ── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Storage</h2>
-        </div>
-        <div className={styles.group}>
-          <div className={styles.storageBar}>
-            <div className={styles.storageLabel}>
-              <span>{storageUsedGb} GB used</span>
-              <span>{storageTotalGb} GB total</span>
-            </div>
-            <div className={styles.storageTrack}>
-              <div className={styles.storageFill} style={{ width: `${storagePct}%` }} />
-            </div>
-          </div>
-          <Row label="Clear download cache" onClick={() => {}} />
-        </div>
-      </section>
-
-      {/* ── About ── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionIcon}>
-            <InfoIcon />
-          </span>
+          <InfoIcon size={15} />
           <h2 className={styles.sectionTitle}>About</h2>
         </div>
         <div className={styles.group}>
-          <Row label="What's new" onClick={() => {}} />
-          <div className={styles.whatsNewContent}>
-            <ul className={styles.whatsNewList}>
-              <li>Faster search results across your library</li>
-              <li>Crossfade now works between downloaded tracks</li>
-              <li>Fixed playback glitches on lock screen</li>
-            </ul>
-          </div>
-          <Row label="Terms of service" onClick={() => {}} />
-          <Row label="Privacy policy" onClick={() => {}} />
+          {/* These four rows were `onClick={() => {}}` — they looked tappable,
+              highlighted on press, and did nothing. Now they go somewhere. */}
+          <Row label="Terms of use" href="/terms" />
+          <Row label="Privacy policy" href="/privacy" />
         </div>
       </section>
 
-      <button type="button" className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
-        {loggingOut ? <span className={styles.spinner} /> : <LogOutIcon />}
+      <button
+        type="button"
+        className={`${styles.logoutBtn} pressable`}
+        onClick={handleLogout}
+        disabled={loggingOut}
+      >
+        {loggingOut ? <span className={styles.spinner} /> : <LogOutIcon size={16} />}
         {loggingOut ? "Signing out…" : "Sign out"}
       </button>
 
-      <div className={styles.appInfo}>
-        <div className={styles.appLogo}>🌸</div>
-        <div className={styles.appName}>Sakura</div>
-        <div className={styles.versionBadge}>Version 1.4.2</div>
-        <div className={styles.buildInfo}>Build 2026.08.01</div>
-        <div className={styles.appDesc}>Your personal music library</div>
-      </div>
+      <p className={styles.version}>Sakura · Version 1.4.2</p>
     </div>
   );
 }

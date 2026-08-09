@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { query, softFail } from "@/lib/sql";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
-import { cachedWithStale, cacheKey, TTL } from "@/lib/cache";
+import { cachedWithStale, versionedKey, TTL } from "@/lib/cache";
 import { callProvider, HttpError } from "@/lib/resilience";
 
 /**
@@ -80,8 +80,13 @@ export async function GET(req: NextRequest) {
   if (!rl.allowed) return rateLimitResponse(rl);
 
   try {
+    /*
+     * Versioned namespace, so publishing or unpublishing a playlist can
+     * invalidate every cached search result in a single command rather than
+     * scanning the keyspace for matching prefixes.
+     */
     const result = await cachedWithStale(
-      cacheKey("search:entities", q.toLowerCase(), limit),
+      await versionedKey("search:entities", q.toLowerCase(), limit),
       TTL.search,
       async () => {
         const [localArtists, localPlaylists, dzArtists, dzPlaylists] =

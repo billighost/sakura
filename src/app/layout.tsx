@@ -71,13 +71,25 @@ export const viewport: Viewport = {
  * (where it lived) means the document renders once with the default dark
  * palette and then repaints, so every light-mode user saw a dark flash on
  * every navigation that remounted the shell.
+ *
+ * "system" is a stored value, not a palette, so it has to be resolved to an
+ * absent attribute rather than written through. The previous version called
+ * setAttribute unconditionally and produced `data-theme="system"`, which no
+ * stylesheet matches — the palette fell through to the `:root` dark default, so
+ * picking Auto always rendered dark no matter what the OS was set to. Leaving
+ * the attribute off instead hands the choice to the
+ * `:root:not([data-theme])` media query in globals.css, which also keeps it
+ * live if the OS setting changes while the app is open.
  */
 const themeScript = `
 (function () {
   try {
     var saved = localStorage.getItem("sakura-theme");
-    var theme = saved || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    document.documentElement.setAttribute("data-theme", theme);
+    if (saved === "light" || saved === "dark") {
+      document.documentElement.setAttribute("data-theme", saved);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
   } catch (e) {}
 })();
 `;

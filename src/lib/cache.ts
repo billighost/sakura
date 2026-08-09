@@ -212,6 +212,62 @@ export function cacheKey(...parts: (string | number)[]): string {
 }
 
 /**
+ * Invalidate a whole family of keys at once, without knowing them.
+ *
+ * The obvious implementation is SCAN + DEL over a prefix. On Upstash that's
+ * billed per command and takes a round trip per page — a bad trade for
+ * something on a write path, and it degrades as the keyspace grows.
+ *
+ * Instead each namespace carries a version number that's folded into its keys.
+ * Bumping the version orphans every old key at once (one INCR); the orphans
+ * are never read again and expire on their own TTL. Invalidating a namespace
+ * of any size therefore costs exactly one command.
+ *
+ * Use `versionedKey` to build keys in a versioned namespace, and
+ * `bumpNamespace` to invalidate them all.
+ */
+const nsVersions = new Map<string, { v: number; readAt: number }>();
+const NS_TTL_MS = 5_000;
+
+export async function versionedKey(
+  namespace: string,
+  ...parts: (string | number)[]
+): Promise<string> {
+  const cachedV = nsVersions.get(namespace);
+  if (cachedV && Date.now() - cachedV.readAt < NS_TTL_MS) {
+    return cacheKey(namespace, `v${cachedV.v}`, ...parts);
+  }
+
+  let v = 0;
+  try {
+    v = Number((await redis.get<number>(`ns:${namespace}`)) ?? 0);
+  } catch {
+    // Redis unavailable — fall back to v0. Worst case is a stale read, which
+    // is what a cache miss would have produced anyway.
+  }
+  nsVersions.set(namespace, { v, readAt: Date.now() });
+  return cacheKey(namespace, `v${v}`, ...parts);
+}
+
+export async function bumpNamespace(namespace: string): Promise<void> {
+  try {
+    const next = await redis.incr(`ns:${namespace}`);
+    nsVersions.set(namespace, { v: Number(next), readAt: Date.now() });
+  } catch {
+    // non-critical
+  }
+  // Drop the local L1 entries for this namespace as well; the version bump
+  // only redirects future *key construction*, and this process may still hold
+  // pre-bump values under the old key.
+  for (const k of Array.from(memoryCache.keys())) {
+    if (k.startsWith(`${namespace}:`)) {
+      memoryCache.delete(k);
+      inflight.delete(k);
+    }
+  }
+}
+
+/**
  * Run `load` at most once per key across all concurrent callers.
  *
  * Exported because the pattern is needed by call sites that cache in their own
