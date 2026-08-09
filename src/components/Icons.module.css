@@ -1,0 +1,403 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  ICON MOTION
+ *
+ *  Every icon that animates does so with its OWN keyframes, driven by what the
+ *  object would really do. A generic "spin on hover" applied to twenty glyphs
+ *  is the thing that makes an interface feel machine-assembled; a piano whose
+ *  keys depress, a needle that drops onto a record, and a flame that flickers
+ *  are the thing that makes it feel authored.
+ *
+ *  Convention:
+ *    - Animations run when an ancestor carries `[data-anim]` (hover/focus on
+ *      pointer devices) or `[data-anim="always"]` (ambient, e.g. now-playing).
+ *    - Parts are targeted by `data-part` attributes set in Icons.tsx.
+ *    - Everything is transform/opacity only, so it stays on the compositor.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.icon {
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+/* Parts animate; the SVG root never does. */
+.icon [data-part] {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--d-base) var(--spring),
+    opacity var(--d-base) var(--ease);
+}
+
+/* ── Piano: keys depress in sequence, like a played chord ─────────────────── */
+
+@keyframes keyPress {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(1.4px);
+  }
+}
+
+[data-anim] .icon [data-part^="key-"] {
+  animation: keyPress 1.6s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="key-1"] { animation-delay: 0s; }
+[data-anim] .icon [data-part="key-2"] { animation-delay: 0.18s; }
+[data-anim] .icon [data-part="key-3"] { animation-delay: 0.36s; }
+
+/* The pianist's head nods with the phrase. */
+@keyframes headNod {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(0.5px) rotate(-3deg); }
+}
+
+[data-anim] .icon [data-part="head"] {
+  animation: headNod 1.6s var(--ease-in-out) infinite;
+}
+
+/* Arms rock slightly, opposed, so it reads as playing rather than sitting. */
+@keyframes armPlayL {
+  0%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(4deg); }
+}
+@keyframes armPlayR {
+  0%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(-4deg); }
+}
+
+[data-anim] .icon [data-part="arm-l"] { animation: armPlayL 1.6s var(--ease-in-out) infinite; transform-origin: top left; }
+[data-anim] .icon [data-part="arm-r"] { animation: armPlayR 1.6s var(--ease-in-out) infinite 0.2s; transform-origin: top right; }
+
+/* ── Turntable: platter spins, tonearm drops in ───────────────────────────── */
+
+@keyframes platterSpin {
+  to { transform: rotate(360deg); }
+}
+
+[data-anim] .icon [data-part="platter"] {
+  animation: platterSpin 2.6s linear infinite;
+}
+
+[data-anim] .icon [data-part="tonearm"] {
+  transform-origin: 84% 16%;
+  transform: rotate(11deg);
+}
+
+/* ── Vinyl / album: slow authentic rotation ───────────────────────────────── */
+
+@keyframes discSpin {
+  to { transform: rotate(360deg); }
+}
+
+[data-anim] .icon [data-part="disc"] {
+  animation: discSpin 3.4s linear infinite;
+}
+
+/* ── Guitar: strings vibrate ──────────────────────────────────────────────── */
+
+@keyframes stringVibrate {
+  0%, 100% { transform: scaleY(1); opacity: 0.9; }
+  50% { transform: scaleY(1.6); opacity: 0.5; }
+}
+
+[data-anim] .icon [data-part^="string-"] {
+  animation: stringVibrate 0.22s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="string-2"] { animation-delay: 0.05s; }
+[data-anim] .icon [data-part="string-3"] { animation-delay: 0.1s; }
+
+/* ── Waveform / equaliser: bars dance at differing rates ──────────────────── */
+
+@keyframes barDance {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+.icon [data-part^="bar-"] {
+  transform-origin: center bottom;
+}
+
+[data-anim] .icon [data-part^="bar-"] {
+  animation: barDance 0.9s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="bar-1"] { animation-duration: 0.7s; }
+[data-anim] .icon [data-part="bar-2"] { animation-duration: 1.1s; animation-delay: 0.1s; }
+[data-anim] .icon [data-part="bar-3"] { animation-duration: 0.85s; animation-delay: 0.22s; }
+[data-anim] .icon [data-part="bar-4"] { animation-duration: 1.25s; animation-delay: 0.05s; }
+
+/* ── Flame: flickers and leans ────────────────────────────────────────────── */
+
+@keyframes flicker {
+  0%, 100% { transform: scaleY(1) skewX(0deg); }
+  30% { transform: scaleY(1.07) skewX(2.5deg); }
+  60% { transform: scaleY(0.95) skewX(-2deg); }
+}
+
+[data-anim] .icon [data-part="flame"] {
+  animation: flicker 0.85s var(--ease-in-out) infinite;
+  transform-origin: center bottom;
+}
+
+/* ── Sparkles: twinkle out of phase ───────────────────────────────────────── */
+
+@keyframes twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: scale(0.55) rotate(45deg); opacity: 0.55; }
+}
+
+[data-anim] .icon [data-part^="spark-"] {
+  animation: twinkle 1.5s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="spark-2"] { animation-delay: 0.35s; }
+[data-anim] .icon [data-part="spark-3"] { animation-delay: 0.7s; }
+
+/* ── Radio / broadcast: waves pulse outward ───────────────────────────────── */
+
+@keyframes broadcast {
+  0% { transform: scale(0.75); opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+[data-anim] .icon [data-part^="wave-"] {
+  animation: broadcast 1.9s var(--ease-out) infinite;
+}
+[data-anim] .icon [data-part="wave-2"] { animation-delay: 0.45s; }
+[data-anim] .icon [data-part="wave-3"] { animation-delay: 0.9s; }
+
+/* ── Search: the lens sweeps ──────────────────────────────────────────────── */
+
+@keyframes lensSweep {
+  0%, 100% { transform: translate(0, 0); }
+  35% { transform: translate(1.4px, -1.1px); }
+  70% { transform: translate(-1px, 0.9px); }
+}
+
+[data-anim] .icon [data-part="lens"] {
+  animation: lensSweep 1.5s var(--ease-in-out) infinite;
+}
+
+/* ── Download: arrow dives to the tray, repeatedly ────────────────────────── */
+
+@keyframes diveIn {
+  0% { transform: translateY(-3px); opacity: 0; }
+  25% { opacity: 1; }
+  70% { transform: translateY(1px); opacity: 1; }
+  100% { transform: translateY(3.5px); opacity: 0; }
+}
+
+[data-anim] .icon [data-part="dl-arrow"] {
+  animation: diveIn 1.3s var(--ease-in-out) infinite;
+}
+
+/* ── Trash: lid lifts ─────────────────────────────────────────────────────── */
+
+[data-anim] .icon [data-part="lid"] {
+  transform: translateY(-1.8px) rotate(-9deg);
+  transform-origin: left center;
+}
+
+/* ── Bell / notification: rings ───────────────────────────────────────────── */
+
+@keyframes ring {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(11deg); }
+  30% { transform: rotate(-9deg); }
+  45% { transform: rotate(6deg); }
+  60% { transform: rotate(-3deg); }
+}
+
+[data-anim] .icon [data-part="bell"] {
+  animation: ring 1.7s var(--ease-in-out) infinite;
+  transform-origin: top center;
+}
+
+/* ── Heart / petal: a real heartbeat, not a linear pulse ──────────────────── */
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.16); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.1); }
+  70% { transform: scale(1); }
+}
+
+[data-anim] .icon [data-part="heart"] {
+  animation: heartbeat 1.4s var(--ease-in-out) infinite;
+}
+
+/* ── Blossom: petals breathe open ─────────────────────────────────────────── */
+
+@keyframes bloom {
+  0%, 100% { transform: scale(1) rotate(var(--petal-rot, 0deg)); }
+  50% { transform: scale(1.09) rotate(calc(var(--petal-rot, 0deg) + 5deg)); }
+}
+
+[data-anim] .icon [data-part="petal"] {
+  animation: bloom 2.4s var(--ease-in-out) infinite;
+}
+
+/* ── Settings: the cog turns, deliberately ────────────────────────────────── */
+
+@keyframes cogTurn {
+  to { transform: rotate(60deg); }
+}
+
+[data-anim] .icon [data-part="cog"] {
+  animation: cogTurn 2.2s var(--ease-in-out) infinite alternate;
+}
+
+/* ── Microphone: sings, with a pulse ring ─────────────────────────────────── */
+
+@keyframes micPulse {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.14); opacity: 0.8; }
+}
+
+[data-anim] .icon [data-part="mic-ring"] {
+  animation: micPulse 1.2s var(--ease-in-out) infinite;
+}
+
+/* ── Headphones: cups thump to a beat ─────────────────────────────────────── */
+
+@keyframes thump {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.13); }
+}
+
+[data-anim] .icon [data-part^="cup-"] {
+  animation: thump 0.75s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="cup-r"] { animation-delay: 0.12s; }
+
+/* ── Share: node network lights up along the path ─────────────────────────── */
+
+@keyframes nodeHop {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.32); }
+}
+
+[data-anim] .icon [data-part^="node-"] {
+  animation: nodeHop 1.1s var(--spring) infinite;
+}
+[data-anim] .icon [data-part="node-2"] { animation-delay: 0.16s; }
+[data-anim] .icon [data-part="node-3"] { animation-delay: 0.32s; }
+
+/* ── Shuffle / repeat: arrows travel their loop ───────────────────────────── */
+
+@keyframes dashTravel {
+  to { stroke-dashoffset: -18; }
+}
+
+[data-anim] .icon [data-part="loop-path"] {
+  stroke-dasharray: 3 3;
+  animation: dashTravel 0.9s linear infinite;
+}
+
+/* ── Cloud: drifts ────────────────────────────────────────────────────────── */
+
+@keyframes drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(1.6px); }
+}
+
+[data-anim] .icon [data-part="cloud"] {
+  animation: drift 2.6s var(--ease-in-out) infinite;
+}
+
+/* ── Globe: meridians rotate ──────────────────────────────────────────────── */
+
+@keyframes meridian {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(0.25); }
+}
+
+[data-anim] .icon [data-part="meridian"] {
+  animation: meridian 3s var(--ease-in-out) infinite;
+}
+
+/* ── Drum: the skin ripples when struck ───────────────────────────────────── */
+
+@keyframes strike {
+  0%, 100% { transform: scaleY(1); }
+  20% { transform: scaleY(0.86); }
+  45% { transform: scaleY(1.05); }
+}
+
+[data-anim] .icon [data-part="drum-skin"] {
+  animation: strike 0.9s var(--ease-in-out) infinite;
+}
+
+@keyframes stickHit {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-22deg); }
+}
+
+[data-anim] .icon [data-part="stick"] {
+  animation: stickHit 0.9s var(--ease-in-out) infinite;
+  transform-origin: bottom right;
+}
+
+/* ── Saxophone: keys work, bell shimmers ──────────────────────────────────── */
+
+@keyframes valve {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(0.9px); opacity: 0.6; }
+}
+
+[data-anim] .icon [data-part^="valve-"] {
+  animation: valve 0.7s var(--ease-in-out) infinite;
+}
+[data-anim] .icon [data-part="valve-2"] { animation-delay: 0.22s; }
+
+/* ── Folder: opens a crack ────────────────────────────────────────────────── */
+
+[data-anim] .icon [data-part="flap"] {
+  transform: rotate(-7deg) translateY(-0.6px);
+  transform-origin: bottom left;
+}
+
+/* ── Plus: rotates into an X-adjacent tilt, signalling "adds" ─────────────── */
+
+[data-anim] .icon [data-part="plus"] {
+  transform: rotate(90deg);
+}
+
+/* ── Chevrons: nudge in their direction of travel ─────────────────────────── */
+
+[data-anim] .icon [data-part="chev-r"] { transform: translateX(1.6px); }
+[data-anim] .icon [data-part="chev-l"] { transform: translateX(-1.6px); }
+[data-anim] .icon [data-part="chev-d"] { transform: translateY(1.6px); }
+
+/* ── Transport: skip arrows lean into the direction ───────────────────────── */
+
+[data-anim] .icon [data-part="skip-fwd"] { transform: translateX(1.4px); }
+[data-anim] .icon [data-part="skip-back"] { transform: translateX(-1.4px); }
+
+/* ── Now-playing: the ambient bars used in track rows ─────────────────────── */
+
+.eqBars [data-part^="bar-"] {
+  animation: barDance 0.9s var(--ease-in-out) infinite;
+  transform-origin: center bottom;
+}
+.eqBars [data-part="bar-1"] { animation-duration: 0.72s; }
+.eqBars [data-part="bar-2"] { animation-duration: 1.05s; animation-delay: 0.1s; }
+.eqBars [data-part="bar-3"] { animation-duration: 0.86s; animation-delay: 0.2s; }
+.eqBars [data-part="bar-4"] { animation-duration: 1.2s; animation-delay: 0.04s; }
+
+/* Paused: bars freeze low rather than vanishing, so the row doesn't reflow. */
+.eqBars[data-paused="true"] [data-part^="bar-"] {
+  animation-play-state: paused;
+  transform: scaleY(0.32);
+}
+
+/* ── Respect the setting ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .icon [data-part] {
+    animation: none !important;
+    transform: none !important;
+  }
+}

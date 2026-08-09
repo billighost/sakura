@@ -1,162 +1,151 @@
 .page {
-  padding: clamp(0.75rem, 3vw, 1.25rem);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 var(--gutter) calc(var(--bottom-chrome) + var(--space-5));
+  background: var(--bg);
 }
 
+/* ── Search field ─────────────────────────────────────────────────────────
+ * Sticky, because the field is the whole point of the screen; scrolling a
+ * long result list shouldn't strand you without a way to refine the query.
+ */
 .topRow {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: clamp(0.5rem, 1.5vw, 0.75rem);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--gutter)
+    var(--space-3);
+  background: var(--chrome);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
 }
 
 .searchBox {
-  position: relative;
-  flex: 1;
   display: flex;
   align-items: center;
-  height: clamp(2.75rem, 7.5vw, 3.25rem);
-  background: var(--sakura-glass);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border: 1.5px solid var(--sakura-glass-border);
-  border-radius: 9999px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  gap: 0.625rem;
+  height: 2.875rem;
+  padding: 0 0.875rem;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  transition: border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
 }
 
 .searchBox:focus-within {
-  border-color: var(--sakura-accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sakura-accent) 14%, transparent);
-  background: var(--sakura-surface);
+  background: var(--surface-1);
+  border-color: var(--accent);
 }
 
 .searchIcon {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sakura-text-secondary);
-  pointer-events: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 18px;
+  color: var(--text-3);
+  flex-shrink: 0;
 }
 
 .searchBox:focus-within .searchIcon {
-  color: var(--sakura-accent);
-}
-
-.spinnerSmall {
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid var(--sakura-border);
-  border-top-color: var(--sakura-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  color: var(--accent);
 }
 
 .searchInput {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
-  padding: 0 2.75rem 0 2.75rem;
-  background: transparent;
   border: none;
-  border-radius: 9999px;
-  color: var(--sakura-text);
-  font-size: 0.9375rem;
   outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  /* 16px floor, or iOS Safari zooms the viewport on focus. */
+  font-size: max(16px, var(--t-base));
 }
 
 .searchInput::placeholder {
-  color: var(--sakura-text-secondary);
-  opacity: 0.7;
+  color: var(--text-3);
 }
 
 .clearBtn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
+  all: unset;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: none;
-  background: var(--sakura-surface-2);
-  color: var(--sakura-text-secondary);
-  border-radius: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--r-full);
+  background: var(--surface-4);
+  color: var(--text-2);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, transform 0.1s;
+  flex-shrink: 0;
 }
 
-.clearBtn:hover {
-  color: var(--sakura-text);
-  background: var(--sakura-hover);
+.clearBtn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
 }
 
-.clearBtn:active {
-  transform: translateY(-50%) scale(0.88);
+.spinnerSmall {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--surface-4);
+  border-top-color: var(--accent);
+  border-radius: var(--r-full);
+  animation: spin 0.7s linear infinite;
 }
 
-.shortcutHint {
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
-  opacity: 0.6;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.shortcutHint kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.25rem;
-  background: var(--sakura-surface-2);
-  border: 1px solid var(--sakura-border);
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--sakura-text-secondary);
-  margin: 0 0.125rem;
-}
+/* ── Section headings ─────────────────────────────────────────────────────── */
 
 .sectionTitle {
-  font-family: var(--sakura-font-display);
-  font-size: 1.125rem;
+  font-family: var(--font-display);
+  font-size: var(--t-md);
   font-weight: 600;
-  display: block;
-  margin-bottom: 0.625rem;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  margin-bottom: var(--space-3);
 }
 
+/* ── Recent searches ──────────────────────────────────────────────────────── */
+
 .historySection {
-  margin-bottom: clamp(1.25rem, 3.5vw, 1.75rem);
+  margin-top: var(--space-4);
 }
 
 .historyHeader {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.historyHeader .sectionTitle {
+  margin-bottom: 0;
 }
 
 .clearHistoryBtn {
-  border: none;
-  background: none;
-  color: var(--sakura-text-secondary);
-  font-size: 0.75rem;
+  all: unset;
+  font-size: var(--t-xs);
   font-weight: 600;
+  color: var(--text-3);
   cursor: pointer;
-  padding: 0.25rem 0;
-  transition: color 0.15s;
-}
-
-.clearHistoryBtn:hover {
-  color: var(--sakura-accent);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--r-xs);
 }
 
 .historyChips {
@@ -166,28 +155,22 @@
 }
 
 .historyChip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
-  border: 1px solid var(--sakura-border);
-  background: var(--sakura-surface);
-  color: var(--sakura-text);
-  font-size: 0.8125rem;
+  height: 2.125rem;
+  padding: 0 0.5rem 0 0.75rem;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--t-sm);
   cursor: pointer;
-  border-radius: 9999px;
-  transition: background 0.15s, border-color 0.15s;
   max-width: 100%;
 }
 
-.historyChip:hover {
-  background: var(--sakura-hover);
-  border-color: var(--sakura-text-secondary);
-}
-
 .historyIcon {
+  color: var(--text-3);
   flex-shrink: 0;
-  color: var(--sakura-text-secondary);
 }
 
 .historyChipText {
@@ -203,138 +186,150 @@
   justify-content: center;
   width: 1.25rem;
   height: 1.25rem;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  border-radius: 50%;
+  border-radius: var(--r-full);
+  color: var(--text-3);
   flex-shrink: 0;
-  opacity: 0.55;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
 }
 
-.historyChipRemove:hover {
-  opacity: 1;
-  color: var(--sakura-danger);
-  background: var(--sakura-hover);
+@media (hover: hover) and (pointer: fine) {
+  .historyChipRemove:hover {
+    background: var(--surface-4);
+    color: var(--text);
+  }
+  .clearHistoryBtn:hover {
+    color: var(--text);
+  }
 }
 
-.quickPicksSection {
-  margin-bottom: clamp(1.25rem, 3.5vw, 1.75rem);
-}
-
-.quickPicksRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.quickPickChip {
-  padding: 0.5rem 0.9375rem;
-  border: 1.5px solid var(--sakura-border);
-  background: var(--sakura-card-bg);
-  color: var(--sakura-text);
-  border-radius: 9999px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.quickPickChip:hover {
-  border-color: var(--sakura-accent);
-  color: var(--sakura-accent);
-  transform: translateY(-1px);
-}
-
-.quickPickChip:active {
-  transform: translateY(0) scale(0.97);
-}
-
+/* ── Genre grid ───────────────────────────────────────────────────────────
+ *
+ * Flat tiles. Each card previously carried a two-stop 135° ramp from a
+ * hardcoded colour pair — eight cards, eight unrelated gradients, which is the
+ * most recognisable "generated interface" pattern there is.
+ *
+ * Colour now lives in the illustration and a faint tint, over a neutral
+ * surface. Genres stay distinguishable at a glance (the actual job) and the
+ * drawn scenes carry the personality.
+ */
 .categoriesSection {
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  margin-top: var(--space-5);
 }
 
 .categoriesGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
   gap: 0.625rem;
-}
-
-@media (min-width: 640px) {
-  .categoriesGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 900px) {
-  .categoriesGrid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 .categoryCard {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  padding: 1rem;
-  height: 5.5rem;
-  border: none;
-  border-radius: 12px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.9375rem;
-  font-weight: 700;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  height: 6.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 650;
+  text-align: left;
   cursor: pointer;
   overflow: hidden;
-  text-align: left;
-  transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .categoryCard::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    transparent 30%,
-    rgba(0, 0, 0, 0.25) 100%
-  );
+  background: var(--tone);
+  opacity: 0.07;
+  transition: opacity var(--d-base) var(--ease);
   pointer-events: none;
 }
 
-.categoryCard:hover {
-  transform: scale(1.03);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-
-.categoryCard:active {
-  transform: scale(0.98);
+@media (hover: hover) and (pointer: fine) {
+  .categoryCard:hover::before {
+    opacity: 0.15;
+  }
+  .categoryCard:hover {
+    border-color: var(--tone);
+  }
 }
 
 .categoryIcon {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  opacity: 0.85;
-  transform: rotate(-8deg);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tone);
 }
 
 .categoryLabel {
   position: relative;
-  z-index: 1;
+  letter-spacing: var(--track-snug);
+}
+
+/* ── Result tabs ──────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 0.375rem;
+  margin: var(--space-4) 0 var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  all: unset;
+  flex-shrink: 0;
+  padding: 0.4rem 0.875rem;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabActive {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .resultsSummary {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: var(--t-sm);
+  color: var(--text-2);
 }
 
+.browsingLabel {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--track-tight);
+}
+
+/* ── Results ──────────────────────────────────────────────────────────────── */
+
 .results {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  padding-bottom: var(--space-4);
+}
+
+.entitySection {
+  margin-bottom: var(--space-5);
 }
 
 .resultsList {
@@ -342,149 +337,223 @@
   flex-direction: column;
 }
 
-.emptyState {
+/* Artists: a horizontal rail of circular avatars. Circles read as "person"
+ * instantly and separate this section from the square playlist covers. */
+.artistRow {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 var(--gutter) var(--space-2);
+}
+
+.artistRow::-webkit-scrollbar {
+  display: none;
+}
+
+.artistCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  width: 5.5rem;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  text-decoration: none;
+  color: inherit;
+}
+
+.artistAvatarWrap {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: var(--r-full);
+  overflow: hidden;
+  background: var(--surface-3);
+  box-shadow: var(--shadow-2);
+}
+
+.artistAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artistAvatarFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+}
+
+.artistName {
+  font-size: var(--t-sm);
+  font-weight: 600;
   text-align: center;
-  padding: clamp(2.5rem, 10vh, 5rem) clamp(1rem, 4vw, 2rem);
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artistMeta {
+  font-size: var(--t-2xs);
+  color: var(--text-3);
+}
+
+/* Playlists: full-width rows, because the name and owner both matter and a
+ * tile would truncate them. */
+.playlistList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.playlistRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.playlistCover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+.playlistCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlistInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.playlistName {
+  font-size: var(--t-base);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlistMeta {
+  font-size: var(--t-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlistChevron {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
 }
 
 .emptyIcon {
-  margin-bottom: clamp(1rem, 4vw, 1.5rem);
-  opacity: 0.6;
+  color: var(--text-3);
+  margin-bottom: var(--space-2);
 }
 
 .emptyText {
-  font-size: clamp(1rem, 2.5vw, 1.125rem);
-  font-weight: 700;
-  margin-bottom: 0.375rem;
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text);
 }
 
 .emptySubtext {
-  font-size: 0.875rem;
-  color: var(--sakura-text-secondary);
-  line-height: 1.5;
-  margin-bottom: 1.25rem;
+  max-width: 32ch;
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  line-height: var(--lh-snug);
 }
 
 .emptyStateCta {
-  border: 1.5px solid var(--sakura-accent);
+  margin-top: var(--space-3);
+  padding: 0 1.25rem;
+  height: 2.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
   background: transparent;
-  color: var(--sakura-accent);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  padding: 0.5rem 1.25rem;
-  border-radius: 9999px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.emptyStateCta:hover {
-  background: var(--sakura-accent);
-  color: #fff;
-}
+/* ── Skeletons ────────────────────────────────────────────────────────────── */
 
 .skeletonContainer {
-  padding: 0.25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
 }
 
 .skeletonRow {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  opacity: 0;
-  animation: fadeInSkeleton 0.3s ease forwards;
-}
-
-.skeletonRow:nth-child(1) { animation-delay: 0s; }
-.skeletonRow:nth-child(2) { animation-delay: 0.05s; }
-.skeletonRow:nth-child(3) { animation-delay: 0.1s; }
-.skeletonRow:nth-child(4) { animation-delay: 0.15s; }
-.skeletonRow:nth-child(5) { animation-delay: 0.2s; }
-.skeletonRow:nth-child(6) { animation-delay: 0.25s; }
-
-@keyframes fadeInSkeleton {
-  to { opacity: 1; }
+  gap: var(--space-3);
 }
 
 .skeletonThumb {
   width: 3rem;
   height: 3rem;
-  border-radius: 8px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
+  border-radius: var(--r-sm);
   flex-shrink: 0;
-}
-
-.skeletonThumb::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--sakura-skeleton-shimmer),
-    transparent
-  );
-  animation: shimmer 1.5s infinite;
 }
 
 .skeletonCol {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.4rem;
 }
 
 .skeletonLineW70 {
   width: 70%;
   height: 0.875rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-}
-
-.skeletonLineW70::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--sakura-skeleton-shimmer),
-    transparent
-  );
-  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-xs);
 }
 
 .skeletonLineW40 {
   width: 40%;
   height: 0.75rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-}
-
-.skeletonLineW40::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--sakura-skeleton-shimmer),
-    transparent
-  );
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  border-radius: var(--r-xs);
 }

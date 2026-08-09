@@ -86,8 +86,24 @@ export default function OnboardingPage() {
 
       // Kick mixes off now so the home page has something waiting.
       fetch("/api/home/mixes", { method: "POST" }).catch(() => {});
-      router.replace("/home");
-      router.refresh();
+
+      /*
+       * A hard navigation, not `router.replace`.
+       *
+       * The restart loop worked like this: visiting /home while un-onboarded
+       * server-redirects to /onboarding, and the App Router caches that RSC
+       * payload against the /home key. Finishing onboarding and calling
+       * `router.replace("/home")` replayed the *cached* payload — the redirect
+       * — putting the user straight back at step 1, forever. `router.refresh()`
+       * afterwards couldn't help: by then the URL was already /onboarding
+       * again, so it refreshed the onboarding page.
+       *
+       * Ordering refresh-then-replace doesn't reliably fix it either; the two
+       * race, and the cached entry can still win. A full document load is the
+       * only thing guaranteed to discard the client Router Cache, and it costs
+       * one navigation on a once-per-account flow.
+       */
+      window.location.assign("/home");
     } catch (e: any) {
       setError(e.message || "Something went wrong");
       setSubmitting(false);

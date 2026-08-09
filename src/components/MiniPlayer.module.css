@@ -2,48 +2,67 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: clamp(3.5rem, 9vh, 4.125rem);
-  background: var(--sakura-glass);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-top: 1px solid var(--sakura-glass-border);
-  border-radius: 14px 14px 0 0;
+  height: clamp(3.5rem, 9vh, 4.25rem);
+  background: var(--chrome);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  border-top: 1px solid var(--chrome-line);
+  border-radius: var(--r-md) var(--r-md) 0 0;
   cursor: pointer;
   flex-shrink: 0;
   z-index: 49;
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
-  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s ease, opacity 0.28s ease;
+  box-shadow: 0 -6px 26px rgba(0, 0, 0, 0.2);
+  transition: transform var(--d-base) var(--ease), opacity var(--d-base) var(--ease);
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* A hairline of the track's accent along the very top edge. One pixel of
+ * colour ties the bar to the artwork without tinting the whole surface. */
+.root::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--track-accent, var(--accent));
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .scrubRow {
   flex-shrink: 0;
   height: 14px;
   padding-top: 1px;
+  /* Sits above .content so the thin scrub strip is reliably grabbable. */
+  position: relative;
+  z-index: 2;
 }
 
 .lyricTicker {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
   height: 13px;
   line-height: 13px;
   padding: 0 clamp(0.75rem, 3vw, 1rem);
-  font-size: 0.625rem;
+  font-size: var(--t-2xs);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--track-accent, var(--sakura-accent));
+  letter-spacing: var(--track-snug);
+  color: var(--track-accent, var(--accent));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.85;
-  animation: fadeIn 0.25s ease;
+  opacity: 0.9;
+  animation: fadeIn var(--d-base) var(--ease);
 }
 
 .content {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
   padding: 0 clamp(0.5rem, 2.5vw, 0.75rem);
   flex: 1;
   min-height: 0;
@@ -54,7 +73,7 @@
   width: clamp(2.25rem, 7vw, 2.625rem);
   height: clamp(2.25rem, 7vw, 2.625rem);
   flex-shrink: 0;
-  transition: width 0.3s ease, height 0.3s ease;
+  transition: width var(--d-slow) var(--ease), height var(--d-slow) var(--ease);
 }
 
 .root.hasLyrics .artWrap {
@@ -62,87 +81,92 @@
   height: clamp(1.75rem, 5.5vw, 2rem);
 }
 
-.artGlow {
-  position: absolute;
-  inset: -3px;
-  border-radius: 11px;
-  background: var(--track-accent, var(--sakura-accent-gradient));
-  opacity: 0;
-  filter: blur(6px);
-  transition: opacity 0.3s ease, background 0.4s ease;
-}
-
-.artWrap.playing .artGlow {
-  opacity: 0.55;
-}
-
 .art {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   object-fit: cover;
-  background: var(--sakura-skeleton);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+  background: var(--skeleton);
+  box-shadow: var(--shadow-2);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--d-base) var(--ease);
 }
 
 .art.loaded {
   opacity: 1;
 }
 
+/* A ring rather than a blur-glow. Glows read as neon; a ring reads as focus. */
+.artWrap.playing .art {
+  box-shadow: var(--shadow-2), 0 0 0 1.5px var(--track-accent, var(--accent));
+}
+
 .artFallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sakura-text-secondary);
+  color: var(--text-3);
+  opacity: 1;
 }
 
 .info {
   flex: 1;
   min-width: 0;
+  /* The tap-to-expand affordance lives here, so it must not swallow the
+   * buttons' hit areas — it's a sibling, not an overlay. */
 }
 
 .title {
-  font-family: var(--sakura-font-display);
-  font-size: 0.8438rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--track-snug);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--sakura-text);
+  color: var(--text);
 }
 
 .artist {
-  font-size: 0.625rem;
-  color: var(--sakura-text-secondary);
+  font-size: var(--t-2xs);
+  color: var(--text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: 1px;
 }
 
-/*
- * The visible circle stays small so the bar doesn't get bulky, but the *hit
- * area* is padded out to the 44px minimum with a pseudo-element. At 30px, and
- * sitting directly beside the play button, this was a reliable mis-tap: people
- * aiming for "like" got "pause".
+/* ── Controls ──────────────────────────────────────────────────────────────
+ *
+ * Two things were wrong here and together they made the bar nearly unusable.
+ *
+ * 1. Both buttons used `all: unset`, which resets `position` to `static`.
+ *    `.likeBtn` re-declared `position: relative`; `.playBtn` did not. Its
+ *    44px-minimum `::before` hit area therefore anchored to `.root` — and
+ *    `max(100%, 44px)` resolved against the *bar*, not the button. The result
+ *    was an invisible full-width, full-height shield belonging to the play
+ *    button, painted above everything, over the entire mini player. Every tap
+ *    anywhere — the artwork, the title, the like button — hit play/pause. That
+ *    is the "I have to click twice" and "like triggers pause" report.
+ *
+ * 2. Even with that fixed, the two 44px hit areas overlapped: centres sat
+ *    43px apart while each pseudo-element reached 22px either side. The gap is
+ *    now explicit and the areas are sized so they cannot intersect.
+ *
+ * Both buttons are now `position: relative` on the same rule that defines the
+ * pseudo-element, so the anchor can't be lost again.
  */
-.likeBtn {
+.likeBtn,
+.playBtn {
   all: unset;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.875rem;
-  height: 1.875rem;
-  cursor: pointer;
   flex-shrink: 0;
-  color: var(--sakura-text-secondary);
-  transition: color 0.15s, transform 0.15s;
-  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .likeBtn::before,
@@ -151,19 +175,41 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: max(100%, var(--tap-min));
-  height: max(100%, var(--tap-min));
+  /* Fixed 40px, not `max(100%, 44px)`. A percentage here is what allowed the
+   * area to inflate to the container's width. 40px with a 6px gap between the
+   * two buttons keeps every tap unambiguous while still clearing a
+   * comfortable target. */
+  width: 40px;
+  height: 40px;
   transform: translate(-50%, -50%);
+  border-radius: var(--r-full);
+}
+
+.likeBtn {
+  width: 1.875rem;
+  height: 1.875rem;
+  color: var(--text-2);
+  border-radius: var(--r-full);
+  transition: color var(--d-fast) var(--ease), transform var(--d-base) var(--spring);
+  /* Explicit separation from the play button. */
+  margin-right: 0.375rem;
 }
 
 .likeBtn:active {
-  transform: scale(0.82);
+  transform: scale(0.84);
+  transition-duration: var(--d-instant);
 }
 
 .likedBtn {
-  color: var(--track-accent, var(--sakura-accent));
+  color: var(--track-accent, var(--accent));
 }
 
+.likeBtn svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* Petal burst on like. Built from the same blossom shape as the brand mark. */
 .petal {
   position: absolute;
   top: 50%;
@@ -171,54 +217,91 @@
   width: 7px;
   height: 10px;
   border-radius: 60% 60% 60% 0;
-  background: var(--track-accent, var(--sakura-accent));
+  background: var(--track-accent, var(--accent));
   opacity: 0;
   pointer-events: none;
-  animation: petalBurst 0.65s ease-out forwards;
+  animation: petalBurst 0.66s var(--ease-out) forwards;
 }
 
 .petal:nth-child(2n) {
-  background: var(--sakura-accent-2);
+  background: var(--accent);
+  opacity: 0.7;
 }
 
 @keyframes petalBurst {
   0% {
     opacity: 0.95;
-    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0) scale(0.6);
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0) scale(0.5);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-22px) scale(1);
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-24px) scale(1);
   }
 }
 
 .playBtn {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(1.875rem, 6vw, 2.25rem);
-  height: clamp(1.875rem, 6vw, 2.25rem);
-  cursor: pointer;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--sakura-accent-gradient);
-  color: #1A1620;
-  transition: transform 0.15s, box-shadow 0.15s;
-  box-shadow: 0 3px 12px rgba(242, 120, 159, 0.35);
+  width: clamp(2rem, 6.5vw, 2.375rem);
+  height: clamp(2rem, 6.5vw, 2.375rem);
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  transition: transform var(--d-base) var(--spring),
+    background-color var(--d-fast) var(--ease);
 }
 
-.playBtn:hover {
-  box-shadow: 0 4px 16px rgba(242, 120, 159, 0.5);
+.playBtn svg {
+  position: relative;
+  z-index: 1;
+  width: clamp(0.9375rem, 3vw, 1.0625rem);
+  height: clamp(0.9375rem, 3vw, 1.0625rem);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .playBtn:hover {
+    background: var(--accent-press);
+  }
+  .likeBtn:hover {
+    color: var(--text);
+  }
+  .likedBtn:hover {
+    color: var(--track-accent, var(--accent));
+  }
 }
 
 .playBtn:active {
   transform: scale(0.9);
+  transition-duration: var(--d-instant);
 }
 
-.playBtn svg {
-  width: clamp(0.9375rem, 3vw, 1.125rem);
-  height: clamp(0.9375rem, 3vw, 1.125rem);
+/* ── Swipe affordances ─────────────────────────────────────────────────────
+ * A hint of the action being committed to, revealed as the bar is dragged.
+ * Without it a horizontal swipe is a guess.
+ */
+.swipeHint {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--track-accent, var(--accent));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease);
 }
 
+.swipeHintPrev {
+  left: 0.75rem;
+}
 
+.swipeHintNext {
+  right: 0.75rem;
+}
+
+.swipeHintArmed {
+  opacity: 1;
+}

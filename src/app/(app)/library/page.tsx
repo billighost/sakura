@@ -6,7 +6,22 @@ import Link from "next/link";
 import { apiBatch } from "@/lib/apiBatch";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import { PlaylistModal } from "@/components/PlaylistModal";
+import { MicrophoneIcon, AlbumIcon, PlaylistIcon } from "@/components/Icons";
 import styles from "./page.module.css";
+
+/**
+ * Placeholder art for a library item with no cover.
+ *
+ * Drawn glyphs rather than emoji. Emoji render as a different picture on every
+ * platform (and as a blank box where the font is missing), can't inherit the
+ * theme's colour, and can't be sized to the optical grid the rest of the icons
+ * sit on — three reasons a placeholder should never be one.
+ */
+function ItemPlaceholder({ type }: { type: LibraryItem["type"] }) {
+  if (type === "artist") return <MicrophoneIcon size={22} />;
+  if (type === "album") return <AlbumIcon size={22} />;
+  return <PlaylistIcon size={22} />;
+}
 
 /**
  * NOTE ON ASSUMPTIONS
@@ -394,7 +409,7 @@ export default function LibraryPage() {
                       <img src={item.coverUrl} alt="" className={styles.listItemArtImg} />
                     ) : (
                       <div className={styles.listItemArtPlaceholder}>
-                        {item.type === "artist" ? "🎤" : item.type === "album" ? "💿" : "🎵"}
+                        <ItemPlaceholder type={item.type} />
                       </div>
                     )}
                   </div>
@@ -417,7 +432,7 @@ export default function LibraryPage() {
                       <img src={item.coverUrl} alt="" className={styles.gridItemArtImg} />
                     ) : (
                       <div className={styles.gridItemArtPlaceholder}>
-                        {item.type === "artist" ? "🎤" : item.type === "album" ? "💿" : "🎵"}
+                        <ItemPlaceholder type={item.type} />
                       </div>
                     )}
                   </div>

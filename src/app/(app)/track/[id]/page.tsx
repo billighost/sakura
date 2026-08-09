@@ -3,6 +3,7 @@ import { queryOne, query } from "@/lib/sql";
 import Link from "next/link";
 import { PlayButton } from "./PlayButton";
 import { BackButton } from "./BackButton";
+import { MusicNoteIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
 interface TrackDetail {
@@ -154,7 +155,9 @@ export default async function TrackDetailPage({ params }: { params: Promise<{ id
             {coverUrl ? (
               <img src={coverUrl} alt={track.title} className={styles.coverImg} />
             ) : (
-              <span className={styles.coverFallback}>♪</span>
+              <span className={styles.coverFallback} aria-hidden="true">
+                <MusicNoteIcon size={40} />
+              </span>
             )}
           </div>
 

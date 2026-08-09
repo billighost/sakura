@@ -5,18 +5,31 @@ import { usePlayer } from "./PlayerContext";
 import { useRouter } from "next/navigation";
 import { Scrubber } from "./Scrubber";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
+import {
+  PlayIcon,
+  PauseIcon,
+  HeartIcon,
+  MusicNoteIcon,
+  QueueIcon,
+  UserIcon,
+  AlbumIcon,
+  ShareIcon,
+  PrevIcon,
+  NextIcon,
+} from "./Icons";
 import styles from "./MiniPlayer.module.css";
 
 const PETAL_COUNT = 6;
 const SWIPE_COMMIT_PX = 46; // horizontal drag distance that commits to a track skip
 const SWIPE_COMMIT_VELOCITY = 0.5; // px/ms flick speed that commits regardless of distance
 const EXPAND_COMMIT_PX = -28; // vertical drag up that commits to expanding the full player
+const LONG_PRESS_MS = 450;
+const AXIS_LOCK_PX = 6; // movement before we decide this is a horizontal or vertical drag
 
 /**
- * Compact "now playing" bar. Deliberately minimal — art, title/artist, like, play/pause —
- * with swipe gestures carrying the rest: swipe up (or tap) to expand, swipe left/right to
- * skip tracks. Keeping it to two buttons is what keeps it feeling like a real app bar
- * instead of a second toolbar competing with the FullPlayer underneath it.
+ * Compact "now playing" bar. Deliberately minimal — art, title/artist, like,
+ * play/pause — with gestures carrying the rest: swipe up (or tap) to expand,
+ * swipe left/right to skip, long-press for the context menu.
  */
 export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const {
@@ -47,8 +60,8 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     setArtLoaded(false);
   }, [currentTrack?.coverUrl]);
 
-  // Keep the last-known art position fresh so the Full Player can grow out of it
-  // the instant it's asked to (avoids a stale rect from before a resize/scroll).
+  // Keep the last-known art position fresh so the Full Player can grow out of
+  // it the instant it's asked to (avoids a stale rect from before a resize).
   useEffect(() => {
     function updateRect() {
       if (artWrapRef.current) {
@@ -60,7 +73,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     return () => window.removeEventListener("resize", updateRect);
   }, [currentTrack?.id, setMiniArtRect]);
 
-  // --- Gestures: swipe up (or tap) to expand, swipe left/right to skip ------
+  // --- Gestures -------------------------------------------------------------
   const gesture = useRef({
     active: false,
     pointerId: -1,
@@ -72,15 +85,21 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     vx: 0,
     vy: 0,
     axis: null as "x" | "y" | null,
-    longPressTimer: null as any,
+    longPressTimer: null as ReturnType<typeof setTimeout> | null,
     longPressed: false,
   });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [gestureActive, setGestureActive] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
+  /**
+   * Controls and the scrub strip own their own taps. Anything else on the bar
+   * belongs to the gesture layer.
+   */
   function isInteractive(el: HTMLElement) {
-    return !!el.closest(`.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}`);
+    return !!el.closest(
+      `.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}, .${styles.lyricTicker}`
+    );
   }
 
   const handleExpand = useCallback(() => {
@@ -92,6 +111,9 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
 
   const handleGesturePointerDown = useCallback((e: React.PointerEvent) => {
     if (isInteractive(e.target as HTMLElement)) return;
+    // Ignore secondary buttons and multi-touch; both produce nonsense drags.
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+
     const g = gesture.current;
     g.active = true;
     g.pointerId = e.pointerId;
@@ -102,20 +124,21 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     g.axis = null;
     g.longPressed = false;
 
-    // Clear any previous timer
     if (g.longPressTimer) clearTimeout(g.longPressTimer);
-    
-    // Set 450ms long press threshold to distinct from tap-to-expand/swipes
     g.longPressTimer = setTimeout(() => {
-      if (g.active && !g.axis && Math.abs(g.lastX - g.startX) < 10 && Math.abs(g.lastY - g.startY) < 10) {
+      if (
+        g.active &&
+        !g.axis &&
+        Math.abs(g.lastX - g.startX) < 10 &&
+        Math.abs(g.lastY - g.startY) < 10
+      ) {
         g.longPressed = true;
         import("@/lib/haptics").then((h) => h.vibrate(15));
         setMenuPos({ x: g.lastX, y: g.lastY });
-        // Suppress gesture from firing swipe or expand
         setGestureActive(false);
         setDragOffset({ x: 0, y: 0 });
       }
-    }, 450);
+    }, LONG_PRESS_MS);
 
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   }, []);
@@ -123,41 +146,44 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const handleGesturePointerMove = useCallback((e: React.PointerEvent) => {
     const g = gesture.current;
     if (!g.active || g.pointerId !== e.pointerId) return;
-    
-    g.lastX = e.clientX;
-    g.lastY = e.clientY;
-
-    if (g.longPressed) return;
 
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
 
-    // Cancel long press if user drags away
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-      if (g.longPressTimer) {
-        clearTimeout(g.longPressTimer);
-        g.longPressTimer = null;
-      }
+    // Cancel the long press once the finger travels.
+    if ((Math.abs(dx) > 10 || Math.abs(dy) > 10) && g.longPressTimer) {
+      clearTimeout(g.longPressTimer);
+      g.longPressTimer = null;
     }
 
-    if (!g.axis) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      setGestureActive(true);
-    }
-
+    /*
+     * Velocity has to be measured against the *previous* sample. The old code
+     * assigned `g.lastX = e.clientX` at the top of this handler and then
+     * computed `(e.clientX - g.lastX) / dt` — always exactly zero. Flick-to-skip
+     * therefore never fired on velocity; only a slow 46px drag worked, which is
+     * why quick swipes felt like they did nothing.
+     */
     const now = performance.now();
     const dt = Math.max(1, now - g.lastT);
     g.vx = (e.clientX - g.lastX) / dt;
     g.vy = (e.clientY - g.lastY) / dt;
+    g.lastX = e.clientX;
+    g.lastY = e.clientY;
     g.lastT = now;
+
+    if (g.longPressed) return;
+
+    if (!g.axis) {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
+      g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      setGestureActive(true);
+    }
 
     if (g.axis === "x") {
       setDragOffset({ x: dx, y: 0 });
-    } else if (g.axis === "y") {
-      // Rubber-band: let it move up freely but resist dragging the bar downward.
-      const clamped = dy < 0 ? dy : dy * 0.15;
-      setDragOffset({ x: 0, y: clamped });
+    } else {
+      // Rubber-band: free upward, resistant downward.
+      setDragOffset({ x: 0, y: dy < 0 ? dy : dy * 0.15 });
     }
   }, []);
 
@@ -185,7 +211,8 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
       g.axis = null;
 
       if (axis === "x") {
-        const committed = Math.abs(dx) > SWIPE_COMMIT_PX || Math.abs(g.vx) > SWIPE_COMMIT_VELOCITY;
+        const committed =
+          Math.abs(dx) > SWIPE_COMMIT_PX || Math.abs(g.vx) > SWIPE_COMMIT_VELOCITY;
         if (committed) {
           import("@/lib/haptics").then((h) => h.vibrate(10));
           if (dx < 0) next();
@@ -197,7 +224,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
           handleExpand();
         }
       } else {
-        // No meaningful movement — treat as a tap-to-expand.
+        // No axis was ever locked — a tap.
         handleExpand();
       }
 
@@ -218,11 +245,23 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
 
   const transform =
     dragOffset.x !== 0
-      ? `translateX(${dragOffset.x}px)`
+      ? `translate3d(${dragOffset.x}px,0,0)`
       : dragOffset.y !== 0
-      ? `translateY(${dragOffset.y}px)`
-      : undefined;
-  const opacity = dragOffset.x !== 0 ? Math.max(0.35, 1 - Math.abs(dragOffset.x) / 160) : undefined;
+        ? `translate3d(0,${dragOffset.y}px,0)`
+        : undefined;
+  const opacity =
+    dragOffset.x !== 0 ? Math.max(0.35, 1 - Math.abs(dragOffset.x) / 160) : undefined;
+
+  // Show the user which way they're committing, once past the threshold.
+  const armedNext = dragOffset.x < -SWIPE_COMMIT_PX;
+  const armedPrev = dragOffset.x > SWIPE_COMMIT_PX;
+
+  const lyricSeek = () => {
+    if (lyrics?.lines && activeLyricIndex >= 0) {
+      const line = lyrics.lines[activeLyricIndex];
+      if (line) seekTo(line.time);
+    }
+  };
 
   return (
     <div
@@ -251,27 +290,30 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         />
       </div>
 
+      <span
+        className={`${styles.swipeHint} ${styles.swipeHintPrev} ${armedPrev ? styles.swipeHintArmed : ""}`}
+        aria-hidden="true"
+      >
+        <PrevIcon size={12} /> Prev
+      </span>
+      <span
+        className={`${styles.swipeHint} ${styles.swipeHintNext} ${armedNext ? styles.swipeHintArmed : ""}`}
+        aria-hidden="true"
+      >
+        Next <NextIcon size={12} />
+      </span>
+
       {activeLyricLine && (
         <div
           className={styles.lyricTicker}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (lyrics?.lines && activeLyricIndex >= 0) {
-              const line = lyrics.lines[activeLyricIndex];
-              if (line) seekTo(line.time);
-            }
-          }}
-          style={{ cursor: "pointer" }}
+          onClick={lyricSeek}
           tabIndex={0}
           role="button"
-          aria-label={`Current lyric line: ${activeLyricLine}. Press to jump playback here.`}
+          aria-label={`Current lyric: ${activeLyricLine}. Activate to jump playback here.`}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              if (lyrics?.lines && activeLyricIndex >= 0) {
-                const line = lyrics.lines[activeLyricIndex];
-                if (line) seekTo(line.time);
-              }
+              e.preventDefault();
+              lyricSeek();
             }
           }}
         >
@@ -280,11 +322,18 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
       )}
 
       <div className={styles.content}>
-        <div ref={artWrapRef} className={`${styles.artWrap} ${isPlaying ? styles.playing : ""}`}>
-          <div className={styles.artGlow} />
+        <div
+          ref={artWrapRef}
+          className={`${styles.artWrap} ${isPlaying ? styles.playing : ""}`}
+        >
           {currentTrack.coverUrl ? (
             <>
-              {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}
+              {!artLoaded && (
+                <div
+                  className={`${styles.art} skeleton`}
+                  style={{ position: "absolute", inset: 0, opacity: 1 }}
+                />
+              )}
               <img
                 className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
                 src={currentTrack.coverUrl}
@@ -294,9 +343,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
             </>
           ) : (
             <div className={`${styles.art} ${styles.artFallback} ${styles.loaded}`}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-              </svg>
+              <MusicNoteIcon size={16} />
             </div>
           )}
         </div>
@@ -309,28 +356,26 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         <button
           className={`${styles.likeBtn} ${isLiked ? styles.likedBtn : ""}`}
           onClick={handleLike}
-          aria-label={isLiked ? "Unlike" : "Like"}
+          aria-label={isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
+          aria-pressed={isLiked}
         >
-          <svg viewBox="0 0 24 24" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-          </svg>
-          {burstKey > 0 && Array.from({ length: PETAL_COUNT }).map((_, i) => (
-            <span
-              key={`${burstKey}-${i}`}
-              className={styles.petal}
-              style={{ "--rot": `${(360 / PETAL_COUNT) * i}deg` } as React.CSSProperties}
-            />
-          ))}
+          <HeartIcon size={17} filled={isLiked} />
+          {burstKey > 0 &&
+            Array.from({ length: PETAL_COUNT }).map((_, i) => (
+              <span
+                key={`${burstKey}-${i}`}
+                className={styles.petal}
+                style={{ "--rot": `${(360 / PETAL_COUNT) * i}deg` } as React.CSSProperties}
+              />
+            ))}
         </button>
 
-        <button className={styles.playBtn} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            {isPlaying ? (
-              <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
-            ) : (
-              <path d="M8 5v14l11-7z" />
-            )}
-          </svg>
+        <button
+          className={styles.playBtn}
+          onClick={togglePlay}
+          aria-label={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? <PauseIcon size={17} /> : <PlayIcon size={17} />}
         </button>
       </div>
 
@@ -341,9 +386,9 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
               setMenuPos(null);
               addToQueue(currentTrack);
             }}
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+            icon={<QueueIcon size={16} />}
           >
-            Add to Queue
+            Add to queue
           </ContextMenuItem>
           {currentTrack.artistId && (
             <ContextMenuItem
@@ -351,9 +396,9 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
                 setMenuPos(null);
                 router.push(`/artist/${currentTrack.artistId}`);
               }}
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
+              icon={<UserIcon size={16} />}
             >
-              Go to Artist
+              Go to artist
             </ContextMenuItem>
           )}
           {currentTrack.albumId && (
@@ -362,21 +407,19 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
                 setMenuPos(null);
                 router.push(`/album/${currentTrack.albumId}`);
               }}
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>}
+              icon={<AlbumIcon size={16} />}
             >
-              Go to Album
+              Go to album
             </ContextMenuItem>
           )}
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
-              if (navigator.share) {
-                navigator.share({ title: currentTrack.title, url: `${window.location.origin}/track/${currentTrack.id}` }).catch(() => {});
-              } else {
-                navigator.clipboard.writeText(`${window.location.origin}/track/${currentTrack.id}`);
-              }
+              window.dispatchEvent(
+                new CustomEvent("sakura:share", { detail: { track: currentTrack } })
+              );
             }}
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
+            icon={<ShareIcon size={16} />}
           >
             Share
           </ContextMenuItem>

@@ -1,8 +1,18 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
-import { MicrophoneIcon, RockIcon, HipHopIcon, ElectronicIcon, RnBIcon, JazzIcon, ClassicalIcon, PodcastIcon } from "@/components/Icons";
+import { GENRES } from "@/lib/genres";
+import {
+  SearchIcon,
+  CloseIcon,
+  ClockIcon,
+  ChevronRightIcon,
+  UserIcon,
+  PlaylistIcon,
+  MusicNoteIcon,
+} from "@/components/Icons";
 import { getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
 import styles from "./page.module.css";
 
@@ -22,6 +32,26 @@ interface SearchResult {
   deezerTrackId?: number;
 }
 
+interface ArtistResult {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  trackCount: number;
+  source: "library" | "deezer";
+  deezerId?: number;
+}
+
+interface PlaylistResult {
+  id: string;
+  name: string;
+  description: string | null;
+  coverUrl: string | null;
+  trackCount: number;
+  ownerName: string | null;
+  source: "library" | "deezer";
+  externalUrl?: string;
+}
+
 interface LibraryTrack {
   id: string;
   title: string;
@@ -35,23 +65,15 @@ interface LibraryTrack {
 const HISTORY_KEY = "sakura-search-history";
 const MAX_HISTORY = 10;
 
-const CATEGORIES = [
-  { label: "Pop", icon: <MicrophoneIcon size={24} />, query: "pop hits", colors: ["#FF6B9D", "#C44DFF"] },
-  { label: "Rock", icon: <RockIcon size={24} />, query: "rock classics", colors: ["#FF4D4D", "#FF8C42"] },
-  { label: "Hip-Hop", icon: <HipHopIcon size={24} />, query: "hip hop", colors: ["#6C5CE7", "#A29BFE"] },
-  { label: "Electronic", icon: <ElectronicIcon size={24} />, query: "electronic music", colors: ["#00B4D8", "#0077B6"] },
-  { label: "R&B", icon: <RnBIcon size={24} />, query: "R&B soul", colors: ["#E17055", "#FDCB6E"] },
-  { label: "Jazz", icon: <JazzIcon size={24} />, query: "jazz classics", colors: ["#00B894", "#55EFC4"] },
-  { label: "Classical", icon: <ClassicalIcon size={24} />, query: "classical music", colors: ["#636E72", "#B2BEC3"] },
-  { label: "Podcast", icon: <PodcastIcon size={24} />, query: "podcast", colors: ["#2D3436", "#636E72"] },
-];
-
-const QUICK_PICKS = ["Chill vibes", "Workout mix", "Throwback hits", "Feel good", "Focus flow", "Late night", "Acoustic", "Party starters"];
+const LOCAL_IDLE_MS = 180;
+const PROVIDER_IDLE_MS = 650;
+const MIN_PROVIDER_CHARS = 3;
 
 function getHistory(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : [];
   } catch {
     return [];
   }
@@ -72,13 +94,44 @@ function removeHistory(q: string) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
+type Tab = "all" | "songs" | "artists" | "playlists";
+
+/**
+ * Where a result opens.
+ *
+ * Search now merges our own catalogue with Deezer's, and the two need
+ * different destinations. A `library` row has a real row in our database and
+ * goes to the normal page. A `deezer` row doesn't exist locally, so it goes to
+ * /browse, which fetches the tracklist on demand.
+ *
+ * The ids arrive prefixed (`deezer-12345`) precisely so a mix-up can't route a
+ * foreign id into a local page and 404.
+ */
+function entityHref(
+  kind: "artist" | "playlist",
+  id: string,
+  source: "library" | "deezer",
+  deezerId?: number
+): string {
+  if (source === "library" && !id.startsWith("deezer-")) {
+    return `/${kind}/${id}`;
+  }
+  const externalId = deezerId ?? id.replace(/^deezer-/, "");
+  return `/browse/${kind}/${externalId}`;
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [artists, setArtists] = useState<ArtistResult[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
-  
+  const [tab, setTab] = useState<Tab>("all");
+  /** Set while browsing a genre, so the header can say what you're looking at. */
+  const [browsing, setBrowsing] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const providerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,42 +139,16 @@ export default function SearchPage() {
    * Guards against out-of-order responses. Each search takes the next id; a
    * response whose id is no longer current is discarded. Without this, a slow
    * lookup for "tay" can land after a fast one for "taylor swift" and replace
-   * correct results with stale ones — the faster you type, the likelier it is.
+   * correct results with stale ones.
    */
   const generationRef = useRef(0);
   const inFlightRef = useRef<AbortController | null>(null);
-
-  /**
-   * Two thresholds, because the two halves of a search cost wildly different
-   * things.
-   *
-   * The local half is a cached query against our own catalogue — cheap enough
-   * to run while someone is still typing, and it's what makes the page feel
-   * responsive.
-   *
-   * The provider half calls Deezer, which rate-limits. Every distinct prefix is
-   * a distinct cache key, so firing it mid-word means "taylor swift" costs
-   * several upstream calls for prefixes nobody wanted results for. Under load
-   * testing that pattern was what tripped the Deezer *and* iTunes circuit
-   * breakers and dropped search success to 62%; with novel terms removed the
-   * same load ran at 98%.
-   *
-   * 650ms is chosen to sit above normal inter-keystroke time (~150-300ms for
-   * most typists) so it fires when someone has genuinely stopped, not when they
-   * paused to think mid-word.
-   */
-  const LOCAL_IDLE_MS = 180;
-  const PROVIDER_IDLE_MS = 650;
-  /** Below this, a prefix matches too much to be worth asking a provider. */
-  const MIN_PROVIDER_CHARS = 3;
 
   useEffect(() => {
     setHistory(getHistory());
     inputRef.current?.focus();
   }, []);
 
-  // Navigating away mid-type would otherwise leave a timer to fire against an
-  // unmounted component, and an in-flight fetch nobody is waiting for.
   useEffect(() => {
     return () => {
       if (localTimerRef.current) clearTimeout(localTimerRef.current);
@@ -146,12 +173,12 @@ export default function SearchPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  /**
-   * `commit` distinguishes a search someone *meant* from one that merely
-   * happened because they stopped typing. Only committed searches are worth
-   * remembering — the old code saved history on every debounce tick, so typing
-   * one query left "tay", "taylo" and "taylor" in the recent-searches list.
-   */
+  function resetResults() {
+    setResults([]);
+    setArtists([]);
+    setPlaylists([]);
+  }
+
   const search = useCallback(
     async (q: string, opts: { provider?: boolean; commit?: boolean } = {}) => {
       const includeProvider = opts.provider ?? true;
@@ -159,12 +186,13 @@ export default function SearchPage() {
       if (!q.trim()) {
         generationRef.current += 1;
         inFlightRef.current?.abort();
-        setResults([]);
+        resetResults();
         setSearched(false);
         setLoading(false);
         return;
       }
 
+      setBrowsing(null);
       setLoading(true);
       setSearched(true);
 
@@ -173,30 +201,44 @@ export default function SearchPage() {
         setHistory(getHistory());
       }
 
-      const cacheKey = `search-${q.trim().toLowerCase()}`;
-      const cached = await getCachedLibraryData<SearchResult[]>(cacheKey);
-      if (cached) {
-        setResults(cached);
-        setLoading(false);
-        // Refresh behind the visible results, but only if this pass was meant
-        // to reach the provider at all.
-        if (includeProvider) fetchSearchResults(q, cacheKey, true);
-        return;
-      }
-
-      await fetchSearchResults(q, cacheKey, includeProvider);
+      await fetchSearchResults(q, `search-${q.trim().toLowerCase()}`, includeProvider);
     },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
+    []
   );
 
-  async function fetchSearchResults(q: string, cacheKey: string, includeProvider: boolean) {
+  async function fetchSearchResults(
+    q: string,
+    cacheKey: string,
+    includeProvider: boolean
+  ) {
     const generation = ++generationRef.current;
     inFlightRef.current?.abort();
     const controller = new AbortController();
     inFlightRef.current = controller;
 
+    /*
+     * The offline cache is consulted *inside* the guarded path, not before it.
+     * Previously an `await getCachedLibraryData(...)` ran before the generation
+     * was taken, so a cache hit for an old prefix could resolve after a newer
+     * live search had already painted and overwrite it — the exact staleness
+     * the generation counter exists to prevent.
+     */
     try {
-      const [libRes, deezerRes] = await Promise.allSettled([
+      const cached = await getCachedLibraryData<{
+        tracks: SearchResult[];
+        artists: ArtistResult[];
+        playlists: PlaylistResult[];
+      }>(cacheKey);
+
+      if (cached && generation === generationRef.current) {
+        setResults(cached.tracks ?? []);
+        setArtists(cached.artists ?? []);
+        setPlaylists(cached.playlists ?? []);
+        setLoading(false);
+        if (!includeProvider) return;
+      }
+
+      const [libRes, deezerRes, entityRes] = await Promise.allSettled([
         fetch(`/api/tracks?q=${encodeURIComponent(q.trim())}&limit=10`, {
           signal: controller.signal,
         }),
@@ -205,14 +247,15 @@ export default function SearchPage() {
               signal: controller.signal,
             })
           : Promise.reject(new Error("provider skipped")),
+        fetch(`/api/search?q=${encodeURIComponent(q.trim())}&limit=6`, {
+          signal: controller.signal,
+        }),
       ]);
 
-      // A newer keystroke has already started its own search; anything this one
-      // produces is stale by definition.
       if (generation !== generationRef.current) return;
 
       let libTracks: SearchResult[] = [];
-      if (libRes.status === "fulfilled") {
+      if (libRes.status === "fulfilled" && libRes.value.ok) {
         const data = await libRes.value.json();
         libTracks = (data.tracks || []).map((t: LibraryTrack) => ({
           id: t.id,
@@ -229,26 +272,83 @@ export default function SearchPage() {
       }
 
       let dzrTracks: SearchResult[] = [];
-      if (deezerRes.status === "fulfilled") {
+      if (deezerRes.status === "fulfilled" && deezerRes.value.ok) {
         const data = await deezerRes.value.json();
         dzrTracks = data.tracks || [];
       }
 
+      let nextArtists: ArtistResult[] = [];
+      let nextPlaylists: PlaylistResult[] = [];
+      if (entityRes.status === "fulfilled" && entityRes.value.ok) {
+        const data = await entityRes.value.json();
+        nextArtists = data.artists || [];
+        nextPlaylists = data.playlists || [];
+      }
+
       if (generation !== generationRef.current) return;
 
-      // Deduplicate tracks by deezerId or title+artist
+      // Library first — those play instantly — then provider results that
+      // aren't already represented.
       const allResults = [...libTracks];
       for (const dt of dzrTracks) {
-        if (!allResults.some(rt => rt.id === dt.id || (rt.title === dt.title && rt.artist === dt.artist))) {
-          allResults.push(dt);
-        }
+        const dup = allResults.some(
+          (rt) =>
+            rt.id === dt.id ||
+            (rt.title.toLowerCase() === dt.title.toLowerCase() &&
+              rt.artist.toLowerCase() === dt.artist.toLowerCase())
+        );
+        if (!dup) allResults.push(dt);
       }
 
       setResults(allResults);
-      // Only persist a result set that actually consulted the provider.
-      // Caching a library-only pass would make the eventual full search read it
-      // back as complete and never fill in the provider half.
-      if (includeProvider) setCachedLibraryData(cacheKey, allResults);
+      setArtists(nextArtists);
+      setPlaylists(nextPlaylists);
+
+      if (includeProvider) {
+        setCachedLibraryData(cacheKey, {
+          tracks: allResults,
+          artists: nextArtists,
+          playlists: nextPlaylists,
+        });
+      }
+    } catch (err) {
+      // An abort is the expected outcome of typing another character.
+      if ((err as Error)?.name === "AbortError") return;
+      if (generation === generationRef.current) resetResults();
+    } finally {
+      if (generation === generationRef.current) setLoading(false);
+    }
+  }
+
+  /**
+   * Browse a genre properly.
+   *
+   * This used to call /api/music/explore with the genre's label as free text,
+   * which searched song *titles* — asking for Jazz returned tracks with "jazz"
+   * in the name and none of the actual jazz. It now hits the genre endpoint,
+   * which filters on the genre field and Deezer's genre-scoped charts.
+   */
+  async function browseGenre(genreId: string, label: string) {
+    cancelPending();
+    generationRef.current += 1;
+    const generation = generationRef.current;
+    inFlightRef.current?.abort();
+
+    setLoading(true);
+    setSearched(true);
+    setBrowsing(label);
+    setQuery("");
+    setArtists([]);
+    setPlaylists([]);
+    setTab("all");
+
+    try {
+      const res = await fetch(
+        `/api/music/genre?genre=${encodeURIComponent(genreId)}&limit=30`
+      );
+      const data = await res.json();
+      if (generation !== generationRef.current) return;
+      setResults(data.tracks || []);
     } catch {
       if (generation === generationRef.current) setResults([]);
     } finally {
@@ -256,29 +356,6 @@ export default function SearchPage() {
     }
   }
 
-  async function exploreCategory(q: string) {
-    setLoading(true);
-    setSearched(true);
-    setQuery(q); 
-    try {
-      const res = await fetch(`/api/music/explore?q=${encodeURIComponent(q)}&limit=20`);
-      const data = await res.json();
-      setResults(data.tracks || []);
-    } catch {
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /**
-   * Both timers restart on every keystroke, so each fires only once the typing
-   * has actually stopped for its own interval — the local one almost
-   * immediately, the provider one only after a real pause.
-   *
-   * Typing "taylor swift" straight through now costs one provider call instead
-   * of one per prefix the old 400ms timer happened to land on.
-   */
   function handleChange(value: string) {
     setQuery(value);
 
@@ -286,7 +363,6 @@ export default function SearchPage() {
     if (providerTimerRef.current) clearTimeout(providerTimerRef.current);
 
     if (!value.trim()) {
-      // Clearing the box should empty the results now, not in 650ms.
       search("");
       return;
     }
@@ -309,40 +385,33 @@ export default function SearchPage() {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
-      // An explicit submit skips both waits and is what gets remembered.
       cancelPending();
       search(query, { provider: true, commit: true });
       inputRef.current?.blur();
     } else if (e.key === "Escape") {
-      if (query) {
-        handleClear();
-      } else {
-        inputRef.current?.blur();
-      }
+      if (query) handleClear();
+      else inputRef.current?.blur();
     }
   }
 
   function handleClear() {
     cancelPending();
+    generationRef.current += 1;
+    inFlightRef.current?.abort();
     setQuery("");
-    setResults([]);
+    resetResults();
     setSearched(false);
+    setBrowsing(null);
+    setLoading(false);
     inputRef.current?.focus();
   }
 
-  function handleHistoryClick(q: string) {
-    cancelPending();
-    setQuery(q);
-    search(q, { provider: true, commit: true });
-  }
-
-  function handleHistoryRemove(e: React.MouseEvent, q: string) {
-    e.stopPropagation();
-    removeHistory(q);
-    setHistory(getHistory());
-  }
-
   const showDefault = !searched && !query;
+  const hasAnything = results.length > 0 || artists.length > 0 || playlists.length > 0;
+
+  const showSongs = tab === "all" || tab === "songs";
+  const showArtists = tab === "all" || tab === "artists";
+  const showPlaylists = tab === "all" || tab === "playlists";
 
   return (
     <div className={styles.page}>
@@ -352,29 +421,31 @@ export default function SearchPage() {
             {loading ? (
               <span className={styles.spinnerSmall} aria-hidden="true" />
             ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
+              <SearchIcon size={18} />
             )}
           </span>
           <input
             ref={inputRef}
             className={styles.searchInput}
             type="text"
-            placeholder="What do you want to listen to?"
+            placeholder="Songs, artists or playlists"
             value={query}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
             aria-label="Search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
           />
-          {query && (
-            <button className={styles.clearBtn} onClick={handleClear} aria-label="Clear search">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+          {(query || browsing) && (
+            <button
+              className={styles.clearBtn}
+              onClick={handleClear}
+              aria-label="Clear search"
+            >
+              <CloseIcon size={16} />
             </button>
           )}
         </div>
@@ -382,14 +453,10 @@ export default function SearchPage() {
 
       {showDefault && (
         <>
-          <p className={styles.shortcutHint}>
-            Press <kbd>/</kbd> anytime to jump back into search
-          </p>
-
           {history.length > 0 && (
-            <div className={styles.historySection}>
+            <section className={styles.historySection}>
               <div className={styles.historyHeader}>
-                <span className={styles.sectionTitle}>Recent Searches</span>
+                <h2 className={styles.sectionTitle}>Recent</h2>
                 <button
                   className={styles.clearHistoryBtn}
                   onClick={() => {
@@ -397,63 +464,107 @@ export default function SearchPage() {
                     setHistory([]);
                   }}
                 >
-                  Clear all
+                  Clear
                 </button>
               </div>
               <div className={styles.historyChips}>
                 {history.map((q) => (
-                  <div key={q} className={styles.historyChip} onClick={() => handleHistoryClick(q)} role="button" tabIndex={0}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="13" height="13" className={styles.historyIcon}>
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+                  <div
+                    key={q}
+                    className={`${styles.historyChip} pressable`}
+                    onClick={() => {
+                      cancelPending();
+                      setQuery(q);
+                      search(q, { provider: true, commit: true });
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setQuery(q);
+                        search(q, { provider: true, commit: true });
+                      }
+                    }}
+                  >
+                    <ClockIcon size={13} className={styles.historyIcon} />
                     <span className={styles.historyChipText}>{q}</span>
-                    <span className={styles.historyChipRemove} onClick={(e) => handleHistoryRemove(e, q)} role="button" tabIndex={0} aria-label={`Remove ${q} from recent searches`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
+                    <span
+                      className={styles.historyChipRemove}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeHistory(q);
+                        setHistory(getHistory());
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Remove ${q}`}
+                    >
+                      <CloseIcon size={11} />
                     </span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          <div className={styles.quickPicksSection}>
-            <span className={styles.sectionTitle}>Quick Picks</span>
-            <div className={styles.quickPicksRow}>
-              {QUICK_PICKS.map((q) => (
-                <button key={q} className={styles.quickPickChip} onClick={() => exploreCategory(q)}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.categoriesSection}>
-            <span className={styles.sectionTitle}>Browse All</span>
+          <section className={styles.categoriesSection}>
+            <h2 className={styles.sectionTitle}>Browse by genre</h2>
             <div className={styles.categoriesGrid}>
-              {CATEGORIES.map((cat) => (
+              {GENRES.map((g) => (
                 <button
-                  key={cat.label}
-                  className={styles.categoryCard}
-                  onClick={() => exploreCategory(cat.query)}
-                  style={{ "--cat-color-1": cat.colors[0], "--cat-color-2": cat.colors[1] } as React.CSSProperties}
+                  key={g.id}
+                  className={`${styles.categoryCard} pressable-lg`}
+                  onClick={() => browseGenre(g.id, g.label)}
+                  style={{ "--tone": g.tone } as React.CSSProperties}
+                  data-anim
                 >
-                  <span className={styles.categoryIcon}>{cat.icon}</span>
-                  <span className={styles.categoryLabel}>{cat.label}</span>
+                  <span className={styles.categoryIcon}>
+                    <g.Icon size={34} tone={g.tone} />
+                  </span>
+                  <span className={styles.categoryLabel}>{g.label}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         </>
       )}
 
-      {searched && !loading && results.length > 0 && (
-        <p className={styles.resultsSummary}>
-          {results.length} result{results.length === 1 ? "" : "s"} for &ldquo;{query}&rdquo;
-        </p>
+      {searched && !showDefault && (
+        <>
+          {browsing ? (
+            <p className={styles.resultsSummary}>
+              <span className={styles.browsingLabel}>{browsing}</span>
+              <span>{results.length} songs</span>
+            </p>
+          ) : (
+            hasAnything &&
+            !loading && (
+              <div className={styles.tabs} role="tablist">
+                {(
+                  [
+                    ["all", "All"],
+                    ["songs", `Songs${results.length ? ` · ${results.length}` : ""}`],
+                    ["artists", `Artists${artists.length ? ` · ${artists.length}` : ""}`],
+                    [
+                      "playlists",
+                      `Playlists${playlists.length ? ` · ${playlists.length}` : ""}`,
+                    ],
+                  ] as [Tab, string][]
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={tab === id}
+                    className={`${styles.tab} ${tab === id ? styles.tabActive : ""}`}
+                    onClick={() => setTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+        </>
       )}
 
       <div className={styles.results}>
@@ -461,63 +572,132 @@ export default function SearchPage() {
           <div className={styles.skeletonContainer}>
             {[...Array(6)].map((_, i) => (
               <div key={i} className={styles.skeletonRow}>
-                <div className={styles.skeletonThumb} />
+                <div className={`${styles.skeletonThumb} skeleton`} />
                 <div className={styles.skeletonCol}>
-                  <div className={styles.skeletonLineW70} />
-                  <div className={styles.skeletonLineW40} />
+                  <div className={`${styles.skeletonLineW70} skeleton`} />
+                  <div className={`${styles.skeletonLineW40} skeleton`} />
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {!loading && searched && results.length === 0 && (
+        {!loading && searched && !hasAnything && (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <svg viewBox="0 0 120 120" width="120" height="120" fill="none">
-                <circle cx="60" cy="60" r="56" stroke="var(--sakura-border)" strokeWidth="2" />
-                <circle cx="60" cy="60" r="32" stroke="var(--sakura-accent)" strokeWidth="2" opacity="0.3" />
-                <circle cx="60" cy="60" r="10" fill="var(--sakura-accent)" opacity="0.15" />
-                <line x1="45" y1="45" x2="75" y2="75" stroke="var(--sakura-accent)" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
-                <line x1="75" y1="45" x2="45" y2="75" stroke="var(--sakura-accent)" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
-              </svg>
+            <div className={styles.emptyIcon} data-anim>
+              <MusicNoteIcon size={44} />
             </div>
-            <p className={styles.emptyText}>No results for &ldquo;{query}&rdquo;</p>
-            <p className={styles.emptySubtext}>Try checking your spelling or use different keywords.</p>
-            <button className={styles.emptyStateCta} onClick={handleClear}>Back to browse</button>
+            <p className={styles.emptyText}>
+              {browsing
+                ? `Nothing in ${browsing} yet`
+                : `No results for "${query}"`}
+            </p>
+            <p className={styles.emptySubtext}>
+              {browsing
+                ? "Try another genre — this one has nothing we can play right now."
+                : "Check the spelling, or try the artist's name instead."}
+            </p>
+            <button className={styles.emptyStateCta} onClick={handleClear}>
+              Back to browse
+            </button>
           </div>
         )}
 
-        {!loading && searched && results.length > 0 && (
-          <div className={styles.resultsList}>
-            {results.map((track, i) => (
-              <div key={track.id} style={{ animationDelay: `${Math.min(i, 10) * 0.03}s` }}>
-                <TrackRow
-                  track={{
-                    id: track.id,
-                    title: track.title,
-                    artist: { name: track.artist },
-                    album: { title: track.album, coverUrl: track.coverUrl },
-                    coverUrl: track.coverUrl,
-                    audioUrl: track.audioUrl || undefined,
-                    duration: track.duration,
-                    source: track.source
-                  }}
-                  queue={results.map((t) => ({
-                    id: t.id,
-                    title: t.title,
-                    artist: { name: t.artist },
-                    album: { title: t.album, coverUrl: t.coverUrl },
-                    coverUrl: t.coverUrl,
-                    audioUrl: t.audioUrl || undefined,
-                    duration: t.duration,
-                    source: t.source
-                  }))}
-                  index={i}
-                />
-              </div>
-            ))}
-          </div>
+        {!loading && showArtists && artists.length > 0 && (
+          <section className={styles.entitySection}>
+            {tab === "all" && <h2 className={styles.sectionTitle}>Artists</h2>}
+            <div className={styles.artistRow}>
+              {artists.map((a) => (
+                <Link
+                  key={a.id}
+                  href={entityHref("artist", a.id, a.source, a.deezerId)}
+                  className={`${styles.artistCard} pressable-lg`}
+                >
+                  <div className={styles.artistAvatarWrap}>
+                    {a.imageUrl ? (
+                      <img src={a.imageUrl} alt="" className={styles.artistAvatar} />
+                    ) : (
+                      <div className={styles.artistAvatarFallback}>
+                        <UserIcon size={22} />
+                      </div>
+                    )}
+                  </div>
+                  <span className={styles.artistName}>{a.name}</span>
+                  <span className={styles.artistMeta}>
+                    {a.trackCount > 0 ? `${a.trackCount} songs` : "Artist"}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && showPlaylists && playlists.length > 0 && (
+          <section className={styles.entitySection}>
+            {tab === "all" && <h2 className={styles.sectionTitle}>Playlists</h2>}
+            <div className={styles.playlistList}>
+              {playlists.map((p) => (
+                <Link
+                  key={p.id}
+                  href={entityHref("playlist", p.id, p.source)}
+                  className={`${styles.playlistRow} pressable`}
+                >
+                  <div className={styles.playlistCover}>
+                    {p.coverUrl ? (
+                      <img src={p.coverUrl} alt="" />
+                    ) : (
+                      <PlaylistIcon size={20} />
+                    )}
+                  </div>
+                  <div className={styles.playlistInfo}>
+                    <span className={styles.playlistName}>{p.name}</span>
+                    <span className={styles.playlistMeta}>
+                      {p.trackCount} songs
+                      {p.ownerName ? ` · ${p.ownerName}` : ""}
+                    </span>
+                  </div>
+                  <ChevronRightIcon size={16} className={styles.playlistChevron} />
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && showSongs && results.length > 0 && (
+          <section className={styles.entitySection}>
+            {tab === "all" && !browsing && artists.length + playlists.length > 0 && (
+              <h2 className={styles.sectionTitle}>Songs</h2>
+            )}
+            <div className={`${styles.resultsList} anim-stagger`}>
+              {results.map((track, i) => (
+                <div key={track.id} style={{ "--i": Math.min(i, 12) } as React.CSSProperties}>
+                  <TrackRow
+                    track={{
+                      id: track.id,
+                      title: track.title,
+                      artist: { name: track.artist },
+                      album: { title: track.album, coverUrl: track.coverUrl },
+                      coverUrl: track.coverUrl,
+                      audioUrl: track.audioUrl || undefined,
+                      duration: track.duration,
+                      source: track.source,
+                    }}
+                    queue={results.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      artist: { name: t.artist },
+                      album: { title: t.album, coverUrl: t.coverUrl },
+                      coverUrl: t.coverUrl,
+                      audioUrl: t.audioUrl || undefined,
+                      duration: t.duration,
+                      source: t.source,
+                    }))}
+                    index={i}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </div>

@@ -16,39 +16,44 @@ import { normaliseGenre } from "@/lib/taste";
  *
  * Artists come from the catalogue, ranked by real popularity, with a Deezer
  * top-up so a fresh install still presents recognisable names.
+ *
+ * Each genre carries an `icon` key, not an emoji. Emoji render differently on
+ * every platform, can't be themed, can't be animated, and are the single
+ * clearest sign an interface was assembled rather than designed. The key maps
+ * to a drawn scene in `GENRE_ICONS` on the client.
  */
 
 const CURATED_GENRES = [
-  { id: "afrobeats", label: "Afrobeats", emoji: "🌍" },
-  { id: "hip-hop", label: "Hip-Hop", emoji: "🎤" },
-  { id: "rnb", label: "R&B", emoji: "💜" },
-  { id: "pop", label: "Pop", emoji: "✨" },
-  { id: "amapiano", label: "Amapiano", emoji: "🪘" },
-  { id: "rock", label: "Rock", emoji: "🎸" },
-  { id: "alternative", label: "Alternative", emoji: "🌀" },
-  { id: "indie", label: "Indie", emoji: "🌾" },
-  { id: "electronic", label: "Electronic", emoji: "🔊" },
-  { id: "edm", label: "Dance / EDM", emoji: "🕺" },
-  { id: "house", label: "House", emoji: "🏠" },
-  { id: "drum & bass", label: "Drum & Bass", emoji: "⚡" },
-  { id: "jazz", label: "Jazz", emoji: "🎷" },
-  { id: "soul", label: "Soul", emoji: "🕊️" },
-  { id: "funk", label: "Funk", emoji: "🪩" },
-  { id: "reggae", label: "Reggae", emoji: "🌴" },
-  { id: "dancehall", label: "Dancehall", emoji: "🔥" },
-  { id: "country", label: "Country", emoji: "🤠" },
-  { id: "classical", label: "Classical", emoji: "🎻" },
-  { id: "metal", label: "Metal", emoji: "🤘" },
-  { id: "punk", label: "Punk", emoji: "💀" },
-  { id: "k-pop", label: "K-Pop", emoji: "🎏" },
-  { id: "latin", label: "Latin", emoji: "💃" },
-  { id: "gospel", label: "Gospel", emoji: "🙏" },
-  { id: "lo-fi", label: "Lo-Fi", emoji: "🌙" },
-  { id: "ambient", label: "Ambient", emoji: "☁️" },
-  { id: "blues", label: "Blues", emoji: "🎺" },
-  { id: "folk", label: "Folk", emoji: "🍂" },
-  { id: "highlife", label: "Highlife", emoji: "🎶" },
-  { id: "drill", label: "Drill", emoji: "🧊" },
+  { id: "afrobeats", label: "Afrobeats", icon: "afro" },
+  { id: "hip-hop", label: "Hip-Hop", icon: "hiphop" },
+  { id: "rnb", label: "R&B", icon: "rnb" },
+  { id: "pop", label: "Pop", icon: "pop" },
+  { id: "amapiano", label: "Amapiano", icon: "afro" },
+  { id: "rock", label: "Rock", icon: "rock" },
+  { id: "alternative", label: "Alternative", icon: "rock" },
+  { id: "indie", label: "Indie", icon: "folk" },
+  { id: "electronic", label: "Electronic", icon: "electronic" },
+  { id: "edm", label: "Dance / EDM", icon: "house" },
+  { id: "house", label: "House", icon: "house" },
+  { id: "drum & bass", label: "Drum & Bass", icon: "electronic" },
+  { id: "jazz", label: "Jazz", icon: "jazz" },
+  { id: "soul", label: "Soul", icon: "gospel" },
+  { id: "funk", label: "Funk", icon: "reggae" },
+  { id: "reggae", label: "Reggae", icon: "reggae" },
+  { id: "dancehall", label: "Dancehall", icon: "reggae" },
+  { id: "country", label: "Country", icon: "folk" },
+  { id: "classical", label: "Classical", icon: "classical" },
+  { id: "metal", label: "Metal", icon: "metal" },
+  { id: "punk", label: "Punk", icon: "metal" },
+  { id: "k-pop", label: "K-Pop", icon: "kpop" },
+  { id: "latin", label: "Latin", icon: "latin" },
+  { id: "gospel", label: "Gospel", icon: "gospel" },
+  { id: "lo-fi", label: "Lo-Fi", icon: "lofi" },
+  { id: "ambient", label: "Ambient", icon: "lofi" },
+  { id: "blues", label: "Blues", icon: "jazz" },
+  { id: "folk", label: "Folk", icon: "folk" },
+  { id: "highlife", label: "Highlife", icon: "afro" },
+  { id: "drill", label: "Drill", icon: "hiphop" },
 ];
 
 export async function GET() {

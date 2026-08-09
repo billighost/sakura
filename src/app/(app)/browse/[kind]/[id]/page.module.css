@@ -1,0 +1,226 @@
+.page {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-bottom: calc(var(--bottom-chrome) + var(--space-5));
+  background: var(--bg);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: calc(env(safe-area-inset-top) + 3.5rem) var(--gutter) var(--space-5);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.back {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  left: var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(8rem, 40vw, 11rem);
+  aspect-ratio: 1;
+  margin-bottom: var(--space-4);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface-3);
+  color: var(--text-3);
+  box-shadow: var(--shadow-3);
+}
+
+/* Artists are circular; playlists are square. The shape alone tells you which
+ * kind of thing you're looking at before you read a word. */
+.coverRound {
+  border-radius: var(--r-full);
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.eyebrow {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 6vw, 1.875rem);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  max-width: 22ch;
+}
+
+.meta {
+  margin-top: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--text-2);
+}
+
+.desc {
+  margin-top: var(--space-2);
+  max-width: 44ch;
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.playBtn,
+.shuffleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.playBtn {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.shuffleBtn {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .playBtn:hover {
+    background: var(--accent-press);
+  }
+  .shuffleBtn:hover {
+    background: var(--surface-4);
+  }
+  .back:hover {
+    background: var(--surface-4);
+  }
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+
+.body {
+  padding: var(--space-4) var(--gutter) 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyText {
+  padding: var(--space-6) 0;
+  text-align: center;
+  color: var(--text-2);
+  font-size: var(--t-sm);
+}
+
+/* ── Notice (private playlist, network failure) ───────────────────────────── */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  color: var(--text-3);
+}
+
+.noticeText {
+  max-width: 34ch;
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+}
+
+.noticeBtn {
+  padding: 0 1.25rem;
+  height: 2.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Skeletons ────────────────────────────────────────────────────────────── */
+
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.skeletonThumb {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+}
+
+.skeletonCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.skeletonLine {
+  width: 65%;
+  height: 0.875rem;
+  border-radius: var(--r-xs);
+}
+
+.skeletonLineShort {
+  width: 38%;
+  height: 0.75rem;
+  border-radius: var(--r-xs);
+}

@@ -142,11 +142,16 @@ model Playlist {
   description String?
   coverUrl    String?
   folderId    String?
+  // Opt-in discovery. Private by default: a playlist only becomes findable in
+  // search when its owner explicitly publishes it from the profile page.
+  isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
 
   user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   tracks PlaylistTrack[]
   folder PlaylistFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
 }
 
 model PlaylistFolder {
