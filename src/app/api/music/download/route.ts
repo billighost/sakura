@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
           for (let attempt = 1; attempt <= 2; attempt++) {
             try {
               console.log(`[Telegram AutoDownload] Trying bot "${botUsername}" for "${query}" (attempt ${attempt})`);
-              track = await botClient.searchAndSelect(query, duration ? Number(duration) : undefined, 25000, 45000);
+              track = await botClient.searchAndSelect(query, duration ? Number(duration) : undefined, isUrl ? 60000 : 25000, 45000);
               break;
             } catch (err: any) {
               const msg = String(err?.message || "");
