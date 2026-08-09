@@ -73,8 +73,8 @@ async function main() {
 
   const botEntity = await client.getEntity(botUsername);
   
-  const query = "Taylor Swift - Blank Space";
-  const targetDuration = 231; // 3:51
+  const query = "YOASOBI - アイドル";
+  const targetDuration = 232; // 3:52
   console.log(`\nSearching for "${query}" with target duration ${targetDuration}s...`);
 
   // Search
@@ -193,10 +193,9 @@ async function main() {
     buffer = Buffer.concat(chunks);
   }
 
-  const outputPath = path.join(__dirname, "../blank_space.mp3");
+  const outputPath = path.join(__dirname, "../public/YOASOBI_idol.mp3");
   fs.writeFileSync(outputPath, buffer);
   console.log(`\nSuccess! Saved downloaded track to ${outputPath} (${buffer.length} bytes)`);
-
   await client.disconnect();
 }
 

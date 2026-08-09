@@ -7,6 +7,10 @@ import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { Redis } from "@upstash/redis";
 
+// Telegram search + download can take up to ~2 minutes with retries.
+// Without this Vercel kills the function at 10s (default) with no status code.
+export const maxDuration = 300;
+
 /**
  * How long a "requested title → stored track id" alias lives.
  *

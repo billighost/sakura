@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "src/app/api/music/download/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/telegram/search/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/telegram/select/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/stream/telegram/[messageId]/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

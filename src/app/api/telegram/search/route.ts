@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Step 1: Send query and wait for bot's button response
-    const { buttonMessageId, buttons } = await client.searchMusic(q, 15000);
+    const { buttonMessageId, buttons } = await client.searchMusic(q, 25000);
 
     return NextResponse.json({
       buttonMessageId,

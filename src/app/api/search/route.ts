@@ -194,13 +194,13 @@ async function searchLocalPlaylists(q: string, limit: number): Promise<PlaylistH
   }>(
     `SELECT p.id, p.name, p.description, p."coverUrl",
             COUNT(pt."trackId")::int AS "trackCount",
-            u.name AS "ownerName"
+            u.username AS "ownerName"
        FROM "Playlist" p
        JOIN "User" u ON u.id = p."userId"
        LEFT JOIN "PlaylistTrack" pt ON pt."playlistId" = p.id
       WHERE p."isPublic" = TRUE
         AND (p.name % $1 OR p.name ILIKE $2)
-      GROUP BY p.id, p.name, p.description, p."coverUrl", u.name
+      GROUP BY p.id, p.name, p.description, p."coverUrl", u.username
       HAVING COUNT(pt."trackId") > 0
       ORDER BY
         (lower(p.name) = lower($1)) DESC,

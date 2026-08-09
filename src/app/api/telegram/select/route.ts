@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
 import { queryOne } from "@/lib/sql";
 
+export const maxDuration = 60;
+
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {

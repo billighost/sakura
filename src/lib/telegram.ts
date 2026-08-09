@@ -396,25 +396,33 @@ export class TelegramClient {
     buttonMessageId: number;
     buttons: Array<{ index: number; text: string }>;
   }> {
+    await this.ensureConnected();
     const botEntity = await this.client.getEntity(this.botUsername);
 
-    // Get last message ID before sending
+    // Get last message ID before sending so we only look at NEW messages
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
 
     // Send search query
+    await this.ensureConnected();
     await this.client.sendMessage(botEntity, { message: query });
 
     // Poll for the bot's response (message with inline buttons)
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 800));
 
+      await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
         limit: 10,
+        // Only look at messages newer than what we saw before sending —
+        // without this we keep re-examining old messages and never see the reply.
+        minId: lastKnownId,
       });
 
       for (const msg of newMessages) {
+        if (!msg || msg.id <= lastKnownId) continue;
+
         // Fast detection if bot sent a text response indicating no results found
         if (msg.message && !msg.replyMarkup && !msg.media) {
           if (/not found|no result|nothing found|sorry|no tracks|unsupported/i.test(msg.message)) {
@@ -562,10 +570,12 @@ export class TelegramClient {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 1500));
 
+      await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
         limit: 10,
+        minId: buttonMessageId,
       });
 
       for (const msg of newMessages) {
