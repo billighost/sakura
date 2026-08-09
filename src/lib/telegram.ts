@@ -251,7 +251,7 @@ export class TelegramClient {
   async searchAndSelect(
     query: string,
     targetDuration?: number,
-    searchTimeoutMs = 25000,
+    searchTimeoutMs = 10000,
     selectTimeoutMs = 45000
   ): Promise<MusicResult> {
     return this.withRetry(async () => {
@@ -259,11 +259,20 @@ export class TelegramClient {
       try {
         let buttonResult: { buttonMessageId: number; buttons: Array<{ index: number; text: string }> };
 
+        // Helper to strip honorifics (King, Dr, Sir, Chief, DJ, MC, Prof) and brackets/symbols
+        const cleanQueryString = (str: string) => {
+          return str
+            .replace(/\b(king|dr\.|dr|sir|chief|dj|mc|prof\.|prof)\b/gi, "")
+            .replace(/[\(\[\{].*?[\)\]\}]/g, "")
+            .replace(/[-_]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        };
+
         try {
           buttonResult = await this._searchMusic(query, searchTimeoutMs);
         } catch (err: any) {
-          // If query has brackets/parentheses or special delimiters, try a simplified search string
-          const cleaned = query.replace(/[\(\[\{].*?[\)\]\}]/g, "").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+          const cleaned = cleanQueryString(query);
           if (cleaned && cleaned.toLowerCase() !== query.toLowerCase()) {
             console.warn(`[Telegram AutoDownload] Initial search timed out or failed. Retrying with cleaned query: "${cleaned}"`);
             buttonResult = await this._searchMusic(cleaned, searchTimeoutMs);
@@ -361,7 +370,12 @@ export class TelegramClient {
       });
 
       for (const msg of newMessages) {
-        if (!msg || !msg.id || msg.id <= lastKnownId) continue;
+        // Fast detection if bot sent a text response indicating no results found
+        if (msg.message && !msg.replyMarkup && !msg.media) {
+          if (/not found|no result|nothing found|sorry|no tracks|unsupported/i.test(msg.message)) {
+            throw new Error(`Bot responded: ${msg.message.trim()}`);
+          }
+        }
 
         const replyMarkup = msg.replyMarkup;
         if (replyMarkup instanceof Api.ReplyInlineMarkup) {

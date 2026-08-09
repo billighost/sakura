@@ -72,6 +72,8 @@
   width: clamp(2.5rem, 8vw, 3rem);
   height: clamp(2.5rem, 8vw, 3rem);
   flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .art {
@@ -81,6 +83,19 @@
   border-radius: 4px;
   object-fit: cover;
   background: var(--sakura-skeleton);
+  display: block;
+}
+
+/* Active overlay on cover art */
+.artOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sakura-accent);
+  border-radius: 4px;
 }
 
 .info {
@@ -138,15 +153,15 @@
   font-size: 0.75rem;
   color: var(--sakura-text-secondary);
   flex-shrink: 0;
-  margin-left: 0.25rem;
   font-variant-numeric: tabular-nums;
-  opacity: 0.7;
+  opacity: 0.75;
+  margin-right: 2px;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -154,8 +169,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -177,8 +192,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -189,6 +204,7 @@
 }
 
 .iconBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: var(--sakura-text);
 }
 
@@ -214,4 +230,9 @@
 .removeBtn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ff4d4f;
+}
+
+.downloading {
+  opacity: 0.65;
+  transition: opacity 0.3s ease;
 }

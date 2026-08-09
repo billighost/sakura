@@ -94,6 +94,7 @@ export function QueueModal({
                 duration: currentTrack.duration || 0,
               }}
               index={currentIndex}
+              hidePlayButton
             />
           </div>
 
@@ -144,6 +145,7 @@ export function QueueModal({
                       dragHandle={dragGripNode}
                       onRemove={onRemoveFromUpNext}
                       index={i}
+                      hidePlayButton
                     />
                   </div>
                 );
@@ -199,6 +201,7 @@ export function QueueModal({
                       dragHandle={dragGripNode}
                       onRemove={onRemoveTrack}
                       index={absoluteIndex}
+                      hidePlayButton
                     />
                   </div>
                 );

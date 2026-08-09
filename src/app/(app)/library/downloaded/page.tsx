@@ -38,7 +38,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 export default function DownloadedPage() {
   const router = useRouter();
-  const { play } = usePlayer();
+  const { play, downloadQueue, downloadStates } = usePlayer();
   const [tracks, setTracks] = useState<OfflineTrack[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +58,26 @@ export default function DownloadedPage() {
     loadTracks();
   }, [loadTracks]);
 
+  // Combine completed downloaded tracks with any in-flight downloads
+  const inProgressDownloads = (downloadQueue || []).filter(
+    (item) => downloadStates[item.id] === "queued" || downloadStates[item.id] === "downloading"
+  );
+
+  const pendingTracks: OfflineTrack[] = inProgressDownloads
+    .filter((item) => !tracks.some((t) => t.id === item.id))
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      artist: item.artist,
+      album: item.album,
+      coverUrl: item.coverUrl,
+      audioUrl: item.audioUrl || "",
+      duration: item.duration || 0,
+      savedAt: Date.now(),
+    }));
+
+  const displayTracks = [...pendingTracks, ...tracks];
+
   function toQueue(t: OfflineTrack) {
     return {
       id: t.id,
@@ -71,19 +91,19 @@ export default function DownloadedPage() {
   }
 
   function handlePlayAll() {
-    if (tracks.length === 0) return;
-    const q = tracks.map(toQueue);
+    if (displayTracks.length === 0) return;
+    const q = displayTracks.map(toQueue);
     play(q[0], q);
   }
 
   function handleShufflePlay() {
-    if (tracks.length === 0) return;
-    const shuffled = shuffleArray(tracks);
+    if (displayTracks.length === 0) return;
+    const shuffled = shuffleArray(displayTracks);
     const q = shuffled.map(toQueue);
     play(q[0], q);
   }
 
-  const trackQueue = tracks.map((t) => ({
+  const trackQueue = displayTracks.map((t) => ({
     id: t.id,
     title: t.title,
     artist: { name: t.artist },
@@ -114,14 +134,14 @@ export default function DownloadedPage() {
               {loading ? (
                 <span className={styles.skeletonTextSmall} />
               ) : (
-                <span>{tracks.length > 0 ? formatTotalDuration(tracks) : "0 songs"}</span>
+                <span>{displayTracks.length > 0 ? formatTotalDuration(displayTracks) : "0 songs"}</span>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {!loading && tracks.length > 0 && (
+      {!loading && displayTracks.length > 0 && (
         <div className={styles.storageNote}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a5 5 0 0 0-5 5v3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3h-1V7a5 5 0 0 0-5-5z" />
@@ -130,7 +150,7 @@ export default function DownloadedPage() {
         </div>
       )}
 
-      {tracks.length > 0 && (
+      {displayTracks.length > 0 && (
         <div className={styles.controlsRow}>
           <div className={styles.playButtons}>
             <button className={styles.playAllBtn} onClick={handlePlayAll}>
@@ -165,7 +185,7 @@ export default function DownloadedPage() {
             </div>
           ))
         ) : (
-          tracks.map((track, i) => (
+          displayTracks.map((track, i) => (
             <TrackRow
               key={track.id}
               track={{
@@ -185,7 +205,7 @@ export default function DownloadedPage() {
         )}
       </div>
 
-      {!loading && tracks.length === 0 && (
+      {!loading && displayTracks.length === 0 && (
         <div className={styles.emptyState}>
           <div className={styles.emptyIllustration}>
             <svg viewBox="0 0 120 120" width="100" height="100" fill="none">

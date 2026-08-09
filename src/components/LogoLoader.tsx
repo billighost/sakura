@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LogoLoader.module.css";
 
 /**
@@ -26,15 +26,14 @@ interface LogoLoaderProps {
   onComplete?: () => void;
 }
 
-// dx/dy: scattered starting offset. mx/my: lateral drift added mid-flight,
-// so the petal arcs in on a curve rather than a straight line. os: the
-// small spring-back rotation (opposite sign to rot) used for overshoot.
+// dx/dy: scattered starting offset (where the petal flies in from).
+// rot: how rotated it is when scattered. os is unused but kept for compat.
 const PETALS = [
-  { dx: -130, dy: -150, rot: -150, os: 10, mx: 35, my: -25, delay: 0 },
-  { dx: 150, dy: -120, rot: 170, os: -10, mx: -30, my: 35, delay: 70 },
-  { dx: 170, dy: 70, rot: -120, os: 8, mx: -35, my: -20, delay: 130 },
-  { dx: -50, dy: 175, rot: 210, os: -12, mx: 30, my: -30, delay: 220 },
-  { dx: -175, dy: 30, rot: -200, os: 10, mx: 25, my: 30, delay: 300 },
+  { dx: -130, dy: -150, rot: -150, delay: 0 },
+  { dx: 150, dy: -120, rot: 170, delay: 60 },
+  { dx: 170, dy: 70, rot: -120, delay: 120 },
+  { dx: -50, dy: 175, rot: 210, delay: 190 },
+  { dx: -175, dy: 30, rot: -200, delay: 260 },
 ] as const;
 
 const STAMEN_ANGLES = [0, 60, 120, 180, 240, 300];
@@ -49,23 +48,49 @@ const SPARKLES = [
   [320, 50, 90],
 ] as const;
 
+const SPLASH_SHOWN_KEY = "sakura-splash-shown";
+
 export function LogoLoader({
-  minDurationMs = 2800,
+  minDurationMs = 1800,
   skippable = true,
   onComplete,
 }: LogoLoaderProps) {
+  // mounted starts true on both server and client to avoid hydration mismatch.
+  // useLayoutEffect (synchronous, client-only) immediately hides it before
+  // paint if the session flag is already set — so there's no flash of the
+  // loader on subsequent navigations.
   const [exiting, setExiting] = useState(false);
   const [mounted, setMounted] = useState(true);
   const finishedRef = useRef(false);
   const finishRef = useRef<() => void>(() => {});
 
+  // Synchronously hide before first paint if we've shown the splash before.
+  // useLayoutEffect is client-only and runs before the browser paints,
+  // so mounted flips to false before anything is drawn — zero flicker.
+  useLayoutEffect(() => {
+    if (sessionStorage.getItem(SPLASH_SHOWN_KEY) === "1") {
+      setMounted(false);
+      onComplete?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
+    // Bail instantly on the client if we've already shown the splash in this
+    // session. Set mounted=false before any visual frame so nothing flickers.
+    if (sessionStorage.getItem(SPLASH_SHOWN_KEY) === "1") {
+      setMounted(false);
+      onComplete?.();
+      return;
+    }
+
     const finish = () => {
       if (finishedRef.current) return;
       finishedRef.current = true;
       setExiting(true);
       window.setTimeout(() => {
         setMounted(false);
+        sessionStorage.setItem(SPLASH_SHOWN_KEY, "1");
         onComplete?.();
       }, 500); // must match --overlay-fade in CSS
     };
@@ -128,14 +153,11 @@ export function LogoLoader({
                     className={styles.petal}
                     style={
                       {
-                        "--dx": `${p.dx}px`,
-                        "--dy": `${p.dy}px`,
-                        "--mx": `${p.mx}px`,
-                        "--my": `${p.my}px`,
-                        "--rot": `${p.rot}deg`,
-                        "--os": `${p.os}deg`,
-                        "--delay": `${p.delay}ms`,
-                      } as React.CSSProperties
+                    "--dx": `${p.dx}px`,
+                    "--dy": `${p.dy}px`,
+                    "--rot": `${p.rot}deg`,
+                    "--delay": `${p.delay}ms`,
+                  } as React.CSSProperties
                     }
                   >
                     <path

@@ -191,8 +191,13 @@ async function buildArtist(id: string) {
         if (dTop.data) {
           const mergedTracks = [...finalTracks];
           for (const dt of dTop.data) {
-            // Deduplicate by deezerId OR title (case insensitive)
-            if (!mergedTracks.find(t => t.deezerId === dt.id.toString() || t.title.toLowerCase() === dt.title.toLowerCase())) {
+            // Deduplicate by deezerId OR (title + artist name + duration)
+            if (!mergedTracks.find(t => 
+              (t.deezerId && t.deezerId === dt.id.toString()) ||
+              (t.title.toLowerCase() === dt.title.toLowerCase() && 
+               (t.artist?.name || "").toLowerCase() === (dt.artist?.name || "").toLowerCase() &&
+               t.duration === dt.duration)
+            )) {
               mergedTracks.push({
                 id: `deezer-${dt.id}`,
                 deezerId: dt.id.toString(),

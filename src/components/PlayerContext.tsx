@@ -199,6 +199,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // next track would wrongly re-seek to an old saved position instead of playing.
   const hasRestoredProgressRef = useRef(false);
   const lastProgressSaveRef = useRef(0);
+  // When a remote-sync restore sets a seek target for the current track, we
+  // can't go through loadAudio (the track ID hasn't changed, so that effect
+  // won't re-run). This ref lets the seek happen directly on the audio element,
+  // either immediately or on the next loadedmetadata event.
+  const pendingSeekMsRef = useRef<number | null>(null);
   const loadedTrackIdRef = useRef<string | null>(null);
   const [queue, setQueueState] = useState<Track[]>([]);
   const [upNextQueue, setUpNextQueue] = useState<Track[]>([]);
@@ -1126,6 +1131,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.addEventListener("loadedmetadata", () => {
         const d = audioRef.current?.duration;
         if (d && isFinite(d)) signalTracker.setDuration(d * 1000);
+
+        // Apply a cross-device seek that arrived before the audio was ready.
+        if (pendingSeekMsRef.current !== null && audioRef.current) {
+          const targetSec = pendingSeekMsRef.current / 1000;
+          const dur = audioRef.current.duration;
+          const clamped = isFinite(dur) && dur > 0 ? Math.min(targetSec, dur) : targetSec;
+          audioRef.current.currentTime = clamped;
+          setProgress(clamped);
+          pendingSeekMsRef.current = null;
+        }
       });
 
       audio.addEventListener("ended", () => {
@@ -1409,14 +1424,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setShuffle(!!remote.shuffle);
         setRepeat((remote.repeat as "off" | "one" | "all") ?? "off");
 
-        // Hand the position to the same mechanism a reload uses, so there's one
-        // code path that applies a resume seek and it's already been proven to
-        // wait for loadedmetadata.
-        const seconds = Math.floor((remote.positionMs ?? 0) / 1000);
-        localStorage.setItem("sakura-player-progress", String(seconds));
-        localStorage.setItem("sakura-player-track-id", remote.trackId!);
-        setProgress(seconds);
-        hasRestoredProgressRef.current = false;
+        // If the remote track is the same one already loaded, seek directly —
+        // loadAudio won't re-run because the track ID hasn't changed, and the
+        // "already loaded" guard inside loadAudio would early-return anyway.
+        const targetSec = (remote.positionMs ?? 0) / 1000;
+
+        const applySeek = () => {
+          if (!audioRef.current) return;
+          const dur = audioRef.current.duration;
+          const clamped = isFinite(dur) && dur > 0 ? Math.min(targetSec, dur) : targetSec;
+          audioRef.current.currentTime = clamped;
+          setProgress(clamped);
+          pendingSeekMsRef.current = null;
+        };
+
+        if (remote.trackId === snapshotRef.current.trackId) {
+          // Same track — seek now if audio is ready, else queue it.
+          if (audioRef.current && audioRef.current.readyState >= 1) {
+            applySeek();
+          } else {
+            pendingSeekMsRef.current = remote.positionMs ?? 0;
+          }
+          // Also update localStorage so a future reload resumes at this position.
+          localStorage.setItem("sakura-player-progress", String(targetSec));
+          localStorage.setItem("sakura-player-track-id", remote.trackId!);
+          setProgress(targetSec);
+        } else {
+          // Different track — loadAudio will run when currentIndex/currentTrack
+          // changes. Funnel the position through localStorage + the flag so the
+          // existing loadedmetadata path in loadAudio applies it.
+          localStorage.setItem("sakura-player-progress", String(targetSec));
+          localStorage.setItem("sakura-player-track-id", remote.trackId!);
+          setProgress(targetSec);
+          hasRestoredProgressRef.current = false;
+        }
 
         showToast("Picked up where you left off", "accent");
       } finally {
@@ -1591,7 +1632,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // freshly-picked track to a meaningless timestamp.
         const savedProgress = localStorage.getItem("sakura-player-progress");
         const savedTrackId = localStorage.getItem("sakura-player-track-id");
-        if (savedProgress && savedTrackId === currentTrack.id) {
+        const trackMatches =
+          savedTrackId === currentTrack.id ||
+          (currentTrack.resolvedId && savedTrackId === currentTrack.resolvedId);
+        if (savedProgress && trackMatches) {
           const time = Number(savedProgress);
           const applySavedSeek = () => {
             if (!audioRef.current) return;

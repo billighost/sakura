@@ -24,6 +24,7 @@ interface TrackRowProps {
   showNumber?: boolean;
   dragHandle?: React.ReactNode;
   onRemove?: (trackId: string) => void;
+  hidePlayButton?: boolean;
 }
 
 function CircularProgress({ progress, speed }: { progress: number; speed?: string }) {
@@ -60,7 +61,7 @@ function CircularProgress({ progress, speed }: { progress: number; speed?: strin
   );
 }
 
-export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove }: TrackRowProps) {
+export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove, hidePlayButton }: TrackRowProps) {
   const { 
     currentTrack, 
     isPlaying, 
@@ -227,9 +228,11 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  const isDownloading = stateInQueue === "queued" || stateInQueue === "downloading";
+
   return (
     <div
-      className={`${styles.root} ${isActive ? styles.active : ""}`}
+      className={`${styles.root} ${isActive ? styles.active : ""} ${isDownloading ? styles.downloading : ""}`}
       onClick={handlePlay}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -252,9 +255,21 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
             index + 1
           )}
         </span>
-      ) : cover ? (
+      ) : null}
+      {cover ? (
         <div className={styles.artWrap}>
           <img src={cover} alt="" className={styles.art} referrerPolicy="no-referrer" />
+          {isActive && !showNumber && (
+            <div className={styles.artOverlay}>
+              {isPlaying ? (
+                <span className={styles.eq} aria-hidden="true"><span /><span /><span /></span>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -296,29 +311,40 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
         </div>
       </div>
 
-      <span className={styles.duration}>{formatDuration(track.duration)}</span>
-
       <div className={styles.actions}>
-        <button
-          className={styles.playBtn}
-          onClick={handlePlay}
-          title="Play"
-          aria-label="Play"
-        >
-          {effectiveDownloadState === "telegram" ? (
-            <CircularProgress progress={downloadProgress[track.id] ?? 30} speed={downloadSpeed[track.id]} />
-          ) : effectiveDownloadState === "device" ? (
-            <CircularProgress progress={downloadProgress[track.id] ?? 70} speed={downloadSpeed[track.id]} />
-          ) : isActive && isPlaying ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-            </svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
-        </button>
+        {track.duration > 0 && (
+          <span className={styles.duration}>{formatDuration(track.duration)}</span>
+        )}
+
+        {!hidePlayButton && (
+          <button
+            className={styles.playBtn}
+            onClick={handlePlay}
+            title="Play"
+            aria-label="Play"
+          >
+            {effectiveDownloadState === "telegram" ? (
+              <CircularProgress progress={downloadProgress[track.id] ?? 30} speed={downloadSpeed[track.id]} />
+            ) : effectiveDownloadState === "device" ? (
+              <CircularProgress progress={downloadProgress[track.id] ?? 70} speed={downloadSpeed[track.id]} />
+            ) : isActive && isPlaying ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {hidePlayButton && (effectiveDownloadState === "telegram" || effectiveDownloadState === "device") && (
+          <CircularProgress 
+            progress={downloadProgress[track.id] ?? (effectiveDownloadState === "telegram" ? 30 : 70)} 
+            speed={downloadSpeed[track.id]} 
+          />
+        )}
 
         {onRemove && (
           <button
@@ -346,7 +372,7 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
         )}
 
         <button className={styles.iconBtn} onClick={openMenuFromButton} title="More options" aria-label="More options">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2" />
             <circle cx="12" cy="12" r="2" />
             <circle cx="12" cy="19" r="2" />
