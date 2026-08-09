@@ -69,7 +69,9 @@ export async function extractDominantColor(url: string | undefined | null): Prom
     };
 
     img.onerror = () => resolve(null);
-    img.src = url;
+    img.src = url.startsWith("/") || url.startsWith("data:") 
+      ? url 
+      : `/api/image-proxy?url=${encodeURIComponent(url)}`;
   });
 
   inflight.set(url, promise);

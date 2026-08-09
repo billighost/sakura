@@ -71,7 +71,7 @@ export function LyricsModal({
     <div
       className={`${styles.overlay} ${open ? styles.open : ""}`}
       style={{ "--track-accent": accentColor || undefined } as React.CSSProperties}
-      aria-hidden={!open}
+      {...(!open ? { inert: "" } : {})}
       data-block-drag
     >
       <div className={styles.header}>

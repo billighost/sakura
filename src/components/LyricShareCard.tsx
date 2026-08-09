@@ -94,7 +94,9 @@ export function LyricShareCard({
       img.onerror = () => {
         drawTextOverlay(ctx, 600);
       };
-      img.src = track.coverUrl;
+      img.src = track.coverUrl.startsWith("/") || track.coverUrl.startsWith("data:")
+        ? track.coverUrl
+        : `/api/image-proxy?url=${encodeURIComponent(track.coverUrl)}`;
     } else {
       drawTextOverlay(ctx, 600);
     }

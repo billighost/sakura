@@ -229,7 +229,9 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = url;
+    img.src = url.startsWith("/") || url.startsWith("data:") 
+      ? url 
+      : `/api/image-proxy?url=${encodeURIComponent(url)}`;
 
     // A CDN that never responds shouldn't hang the share sheet forever.
     setTimeout(() => resolve(null), 8000);
