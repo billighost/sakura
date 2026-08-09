@@ -337,14 +337,21 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     if (e.button !== undefined && e.button !== 0) return;
 
-    const rowEl = e.currentTarget as HTMLElement;
-    const timer = setTimeout(() => {
-      const ps = pressState.current;
-      if (!ps) return;
-      ps.active = true;
-      rowEl.setPointerCapture?.(ps.pointerId);
-      setDragQueueItem({ list, index, deltaY: 0, rowHeight: rowEl.getBoundingClientRect().height || ROW_HEIGHT });
-    }, LONG_PRESS_MS);
+    e.stopPropagation();
+
+    const gripEl = e.currentTarget as HTMLElement;
+    const rowEl = (gripEl.closest("[data-queue-row]") as HTMLElement) || gripEl;
+
+    try {
+      gripEl.setPointerCapture?.(e.pointerId);
+    } catch {}
+
+    setDragQueueItem({
+      list,
+      index,
+      deltaY: 0,
+      rowHeight: rowEl.getBoundingClientRect().height || ROW_HEIGHT,
+    });
 
     pressState.current = {
       pointerId: e.pointerId,
@@ -353,8 +360,8 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
       startY: e.clientY,
       startX: e.clientX,
       rowEl,
-      longPressTimer: timer,
-      active: false,
+      longPressTimer: null,
+      active: true,
     };
   }
 

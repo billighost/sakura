@@ -1,12 +1,18 @@
 "use client";
 
+import { TrackRow } from "./TrackRow";
 import styles from "./QueueModal.module.css";
 
 interface QueueTrack {
   id: string;
   title: string;
   artist: string;
+  artistId?: string;
+  album?: string;
+  albumId?: string;
   coverUrl?: string;
+  audioUrl?: string;
+  duration?: number;
 }
 
 interface DragQueueItem {
@@ -37,12 +43,6 @@ interface QueueModalProps {
   radioActive?: boolean;
 }
 
-/**
- * Queue, as a bottom sheet over the player — not a swap-out of the album art.
- * All the drag-to-reorder gesture state/logic still lives in FullPlayer (it's
- * entangled with that component's long-press + pointer capture machinery);
- * this component is presentation only.
- */
 export function QueueModal({
   open,
   onClose,
@@ -83,18 +83,18 @@ export function QueueModal({
         <div className={styles.list}>
           <div className={styles.listHeader}>Now Playing</div>
           <div className={styles.rowActive}>
-            <img src={currentTrack.coverUrl || ""} alt="" className={styles.art} />
-            <div className={styles.info}>
-              <div className={styles.titleActive}>{currentTrack.title}</div>
-              <div className={styles.artist}>{currentTrack.artist}</div>
-            </div>
-            {isPlaying && (
-              <div className={styles.nowPlayingBadge} aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            )}
+            <TrackRow
+              track={{
+                id: currentTrack.id,
+                title: currentTrack.title,
+                artist: { name: currentTrack.artist, id: currentTrack.artistId },
+                album: currentTrack.album ? { title: currentTrack.album, id: currentTrack.albumId, coverUrl: currentTrack.coverUrl } : null,
+                coverUrl: currentTrack.coverUrl,
+                audioUrl: currentTrack.audioUrl,
+                duration: currentTrack.duration || 0,
+              }}
+              index={currentIndex}
+            />
           </div>
 
           {upNextQueue.length > 0 && (
@@ -102,48 +102,49 @@ export function QueueModal({
               <div className={styles.listHeader}>Up Next</div>
               {upNextQueue.map((t, i) => {
                 const isDragging = dragQueueItem?.list === "upnext" && dragQueueItem.index === i;
-                return (
-                  <div
-                    key={t.id}
-                    className={`${styles.row} ${isDragging ? styles.rowDragging : ""}`}
-                    style={isDragging ? { transform: `translateY(${dragQueueItem!.deltaY}px)`, transition: "none" } : undefined}
+                const rowTrack = {
+                  id: t.id,
+                  title: t.title,
+                  artist: { name: t.artist, id: t.artistId },
+                  album: t.album ? { title: t.album, id: t.albumId, coverUrl: t.coverUrl } : null,
+                  coverUrl: t.coverUrl,
+                  audioUrl: t.audioUrl,
+                  duration: t.duration || 0,
+                };
+
+                const dragGripNode = (
+                  <span
+                    className={styles.dragGrip}
+                    aria-hidden="true"
                     onPointerDown={(e) => onRowPointerDown("upnext", i, e)}
                     onPointerMove={onRowPointerMove}
                     onPointerUp={onRowPointerUp}
                     onPointerCancel={onRowPointerCancel}
-                    onClick={() => {
-                      if (!dragQueueItem) onGoToQueueItem(currentIndex + 1);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Play ${t.title} by ${t.artist}`}
                   >
-                    <span className={styles.dragGrip} aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <circle cx="9" cy="6" r="1.4" />
-                        <circle cx="15" cy="6" r="1.4" />
-                        <circle cx="9" cy="12" r="1.4" />
-                        <circle cx="15" cy="12" r="1.4" />
-                        <circle cx="9" cy="18" r="1.4" />
-                        <circle cx="15" cy="18" r="1.4" />
-                      </svg>
-                    </span>
-                    <img src={t.coverUrl || ""} alt="" className={styles.art} />
-                    <div className={styles.info}>
-                      <div className={styles.title2}>{t.title}</div>
-                      <div className={styles.artist}>{t.artist}</div>
-                    </div>
-                    <button
-                      data-no-drag
-                      className={styles.removeBtn}
-                      onClick={() => onRemoveFromUpNext(t.id)}
-                      aria-label={`Remove ${t.title} from queue`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <circle cx="9" cy="6" r="1.4" />
+                      <circle cx="15" cy="6" r="1.4" />
+                      <circle cx="9" cy="12" r="1.4" />
+                      <circle cx="15" cy="12" r="1.4" />
+                      <circle cx="9" cy="18" r="1.4" />
+                      <circle cx="15" cy="18" r="1.4" />
+                    </svg>
+                  </span>
+                );
+
+                return (
+                  <div
+                    key={t.id}
+                    data-queue-row
+                    className={`${styles.row} ${isDragging ? styles.rowDragging : ""}`}
+                    style={isDragging ? { transform: `translateY(${dragQueueItem!.deltaY}px)`, transition: "none" } : undefined}
+                  >
+                    <TrackRow
+                      track={rowTrack}
+                      dragHandle={dragGripNode}
+                      onRemove={onRemoveFromUpNext}
+                      index={i}
+                    />
                   </div>
                 );
               })}
@@ -156,48 +157,49 @@ export function QueueModal({
               {tailQueue.map((t, i) => {
                 const isDragging = dragQueueItem?.list === "tail" && dragQueueItem.index === i;
                 const absoluteIndex = currentIndex + 1 + i;
-                return (
-                  <div
-                    key={t.id}
-                    className={`${styles.row} ${isDragging ? styles.rowDragging : ""}`}
-                    style={isDragging ? { transform: `translateY(${dragQueueItem!.deltaY}px)`, transition: "none" } : undefined}
+                const rowTrack = {
+                  id: t.id,
+                  title: t.title,
+                  artist: { name: t.artist, id: t.artistId },
+                  album: t.album ? { title: t.album, id: t.albumId, coverUrl: t.coverUrl } : null,
+                  coverUrl: t.coverUrl,
+                  audioUrl: t.audioUrl,
+                  duration: t.duration || 0,
+                };
+
+                const dragGripNode = (
+                  <span
+                    className={styles.dragGrip}
+                    aria-hidden="true"
                     onPointerDown={(e) => onRowPointerDown("tail", i, e)}
                     onPointerMove={onRowPointerMove}
                     onPointerUp={onRowPointerUp}
                     onPointerCancel={onRowPointerCancel}
-                    onClick={() => {
-                      if (!dragQueueItem) onGoToQueueItem(absoluteIndex);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Play ${t.title} by ${t.artist}`}
                   >
-                    <span className={styles.dragGrip} aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <circle cx="9" cy="6" r="1.4" />
-                        <circle cx="15" cy="6" r="1.4" />
-                        <circle cx="9" cy="12" r="1.4" />
-                        <circle cx="15" cy="12" r="1.4" />
-                        <circle cx="9" cy="18" r="1.4" />
-                        <circle cx="15" cy="18" r="1.4" />
-                      </svg>
-                    </span>
-                    <img src={t.coverUrl || ""} alt="" className={styles.art} />
-                    <div className={styles.info}>
-                      <div className={styles.title2}>{t.title}</div>
-                      <div className={styles.artist}>{t.artist}</div>
-                    </div>
-                    <button
-                      data-no-drag
-                      className={styles.removeBtn}
-                      onClick={() => onRemoveTrack(t.id)}
-                      aria-label={`Remove ${t.title} from queue`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <circle cx="9" cy="6" r="1.4" />
+                      <circle cx="15" cy="6" r="1.4" />
+                      <circle cx="9" cy="12" r="1.4" />
+                      <circle cx="15" cy="12" r="1.4" />
+                      <circle cx="9" cy="18" r="1.4" />
+                      <circle cx="15" cy="18" r="1.4" />
+                    </svg>
+                  </span>
+                );
+
+                return (
+                  <div
+                    key={t.id}
+                    data-queue-row
+                    className={`${styles.row} ${isDragging ? styles.rowDragging : ""}`}
+                    style={isDragging ? { transform: `translateY(${dragQueueItem!.deltaY}px)`, transition: "none" } : undefined}
+                  >
+                    <TrackRow
+                      track={rowTrack}
+                      dragHandle={dragGripNode}
+                      onRemove={onRemoveTrack}
+                      index={absoluteIndex}
+                    />
                   </div>
                 );
               })}
@@ -212,8 +214,6 @@ export function QueueModal({
             </div>
           )}
 
-          {/* When the radio is filling the queue, say so. Otherwise tracks
-              appear out of nowhere and it reads as a bug rather than a feature. */}
           {radioActive && (upNextQueue.length > 0 || tailQueue.length > 0) && (
             <div className={styles.radioNote}>
               <span className={styles.radioDot} aria-hidden="true" />

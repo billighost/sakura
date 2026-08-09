@@ -207,16 +207,18 @@ export class TelegramClient {
         return await fn();
       } catch (err: any) {
         lastErr = err;
-        const isConnectionError =
+        const isRetriableError =
           err?.code === 406 ||
           err?.errorMessage === "AUTH_KEY_DUPLICATED" ||
           String(err).includes("AUTH_KEY_DUPLICATED") ||
           err?.message?.includes("ECONNRESET") ||
           err?.message?.includes("ETIMEDOUT") ||
           err?.message?.includes("socket") ||
-          err?.message?.includes("network");
+          err?.message?.includes("network") ||
+          err?.message?.includes("Bot did not respond") ||
+          err?.message?.includes("TIMEOUT");
 
-        if (isConnectionError) {
+        if (isRetriableError) {
           this.connected = false;
           this.connectPromise = null;
           try { await this.client.disconnect(); } catch { /* ignore */ }
@@ -230,7 +232,7 @@ export class TelegramClient {
 
           if (attempt < 3) {
             const jitterMs = 1500 + Math.floor(Math.random() * 2000);
-            console.warn(`[Telegram] Connection error (${err.message || err.errorMessage || "AUTH_KEY_DUPLICATED"}), attempt ${attempt}/3. Recreated client and retrying in ${jitterMs}ms...`);
+            console.warn(`[Telegram] Retriable error (${err.message || err.errorMessage || "AUTH_KEY_DUPLICATED"}), attempt ${attempt}/3. Recreated client and retrying in ${jitterMs}ms...`);
             await new Promise((r) => setTimeout(r, jitterMs));
             continue;
           }
@@ -249,13 +251,27 @@ export class TelegramClient {
   async searchAndSelect(
     query: string,
     targetDuration?: number,
-    searchTimeoutMs = 20000,
+    searchTimeoutMs = 25000,
     selectTimeoutMs = 45000
   ): Promise<MusicResult> {
     return this.withRetry(async () => {
       const release = await TelegramClient.botMutex.acquire();
       try {
-      const { buttonMessageId, buttons } = await this._searchMusic(query, searchTimeoutMs);
+        let buttonResult: { buttonMessageId: number; buttons: Array<{ index: number; text: string }> };
+
+        try {
+          buttonResult = await this._searchMusic(query, searchTimeoutMs);
+        } catch (err: any) {
+          // If query has brackets/parentheses or special delimiters, try a simplified search string
+          const cleaned = query.replace(/[\(\[\{].*?[\)\]\}]/g, "").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+          if (cleaned && cleaned.toLowerCase() !== query.toLowerCase()) {
+            console.warn(`[Telegram AutoDownload] Initial search timed out or failed. Retrying with cleaned query: "${cleaned}"`);
+            buttonResult = await this._searchMusic(cleaned, searchTimeoutMs);
+          } else {
+            throw err;
+          }
+        }
+        const { buttonMessageId, buttons } = buttonResult;
       if (buttons.length === 0) {
         throw new Error("No results found on Telegram");
       }

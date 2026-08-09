@@ -22,6 +22,8 @@ interface TrackRowProps {
   queue?: TrackRowProps["track"][];
   index?: number;
   showNumber?: boolean;
+  dragHandle?: React.ReactNode;
+  onRemove?: (trackId: string) => void;
 }
 
 function CircularProgress({ progress, speed }: { progress: number; speed?: string }) {
@@ -58,7 +60,7 @@ function CircularProgress({ progress, speed }: { progress: number; speed?: strin
   );
 }
 
-export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
+export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove }: TrackRowProps) {
   const { 
     currentTrack, 
     isPlaying, 
@@ -237,6 +239,7 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handlePlay(e as any); }}
     >
+      {dragHandle}
       {showNumber && index !== undefined ? (
         <span className={`${styles.numberCell} ${isActive ? styles.numberActive : ""}`}>
           {isActive && isPlaying ? (
@@ -316,6 +319,31 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
             </svg>
           )}
         </button>
+
+        {onRemove && (
+          <button
+            data-no-drag
+            className={styles.removeBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onRemove(track.id);
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+            }}
+            title="Remove from queue"
+            aria-label={`Remove ${track.title}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
 
         <button className={styles.iconBtn} onClick={openMenuFromButton} title="More options" aria-label="More options">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

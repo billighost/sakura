@@ -195,3 +195,23 @@
 .circularLoader {
   color: var(--sakura-text);
 }
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--sakura-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.removeBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff4d4f;
+}

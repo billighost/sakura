@@ -24,12 +24,6 @@
   opacity: 1;
 }
 
-/*
- * Always-dark media surface, same as the full player it opens from — the
- * tokens are declared here so the rgba literals below have one source of
- * truth, and the background is opaque enough that the app theme never shows
- * through and invalidates the white text.
- */
 .sheet {
   --on-media: #fff;
   --on-media-secondary: rgba(255, 255, 255, 0.75);
@@ -39,9 +33,6 @@
   position: relative;
   width: 100%;
   max-width: 560px;
-  /* `dvh`, not `vh`: on iOS `vh` is the *largest* viewport, so 82vh with the
-   * URL bar showing pushed the bottom of the sheet under the browser chrome.
-   * The safe-area subtraction keeps the last row clear of the home indicator. */
   max-height: calc(82dvh - env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
@@ -147,14 +138,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
   border-radius: 12px;
   position: relative;
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s;
+  width: 100%;
 }
 
 .row {
-  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -166,7 +156,6 @@
 .rowActive {
   background: var(--accent);
   border-left: 2px solid var(--track-accent, var(--sakura-accent));
-  padding-left: 10px;
 }
 
 .rowDragging {
@@ -175,140 +164,24 @@
   background: rgba(20, 16, 23, 0.95);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
   border-radius: 12px;
-  cursor: grabbing;
 }
 
 .dragGrip {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
+  width: 1.75rem;
   height: 2.5rem;
   flex-shrink: 0;
   color: var(--on-media-tertiary);
-  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  pointer-events: auto;
 }
 
-.rowDragging .dragGrip {
-  color: var(--on-media-secondary);
-}
-
-/*
- * The visible circle stays 28px so the row stays compact, but the *hit* area
- * is expanded to a full tap target via a pseudo-element — a 28px button
- * sitting next to a drag grip on a phone was a coin-flip between removing the
- * track and starting a reorder. Done this way rather than by growing the box,
- * so the row layout is unchanged.
- */
-.removeBtn {
-  all: unset;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  color: var(--on-media-tertiary);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.removeBtn::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--tap-min);
-  height: var(--tap-min);
-  transform: translate(-50%, -50%);
-}
-
-.removeBtn:hover {
-  background: var(--on-media-fill);
-  color: var(--on-media);
-}
-
-.removeBtn:active {
-  transform: scale(0.85);
-}
-
-.art {
-  width: 46px;
-  height: 46px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: var(--on-media-fill);
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-.info {
-  flex: 1;
-  min-width: 0;
-}
-
-.titleActive {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--track-accent, var(--sakura-accent));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.title2 {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--on-media-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.artist {
-  font-size: 0.8125rem;
-  color: var(--on-media-tertiary);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nowPlayingBadge {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding-right: 4px;
-}
-
-.nowPlayingBadge span {
-  width: 3px;
-  border-radius: 2px;
-  background: var(--track-accent, var(--sakura-accent));
-  animation: eq 0.9s ease-in-out infinite;
-}
-
-.nowPlayingBadge span:nth-child(1) {
-  height: 8px;
-  animation-delay: -0.6s;
-}
-
-.nowPlayingBadge span:nth-child(2) {
-  height: 14px;
-  animation-delay: -0.3s;
-}
-
-.nowPlayingBadge span:nth-child(3) {
-  height: 10px;
-  animation-delay: 0s;
-}
-
-@keyframes eq {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
+.dragGrip:active {
+  cursor: grabbing;
 }
 
 .emptyState {
@@ -319,7 +192,6 @@
   line-height: 1.5;
 }
 
-/* Footer note telling the listener the radio is what's filling the queue. */
 .radioNote {
   display: flex;
   align-items: center;
@@ -350,11 +222,6 @@
   .radioDot { animation: none; }
 }
 
-/*
- * Short viewports: the sheet's percentage height leaves almost nothing for the
- * list once the drag handle, header and radio footer are subtracted. Give it a
- * larger share of a small screen and tighten the chrome around it.
- */
 @media (max-height: 640px) {
   .sheet {
     max-height: calc(92dvh - env(safe-area-inset-bottom, 0px));
@@ -386,7 +253,6 @@
     transition: none;
   }
 
-  .nowPlayingBadge span,
   .radioDot {
     animation: none;
   }
