@@ -224,13 +224,12 @@ export async function POST(req: NextRequest) {
   try {
     console.log(`[Telegram AutoDownload] Searching: "${searchQuery}"`);
 
-    // Pre-fetch Deezer track ID so we have a URL-based fallback ready when the
-    // bot's daily text-search limit is hit. Deezer links bypass the limit.
-    // This runs concurrently with the rest of the setup, not blocking the bot call.
-    const deezerLookupPromise = searchDeezerTrack(title, artist).catch(() => null);
+    // Await Deezer track lookup first. We prefer Deezer URLs because they bypass
+    // the bot's daily text-search rate limits and are usually more accurate.
+    const deezerTrack = await searchDeezerTrack(title, artist).catch(() => null);
+    const deezerUrl = deezerTrack?.id ? `https://www.deezer.com/track/${deezerTrack.id}` : null;
 
-    // Try each bot in the fallback chain. If a bot is rate-limited on text search,
-    // retry it with a direct Deezer URL before moving to the next bot.
+    // Try each bot in the fallback chain.
     let track: any = null;
     let lastError: any = null;
     const botChain = getBotFallbackChain();
@@ -239,41 +238,53 @@ export async function POST(req: NextRequest) {
       const botClient = getTelegramClientForBot(botUsername);
       await botClient.acquire();
       try {
-        // First attempt: text query
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            console.log(`[Telegram AutoDownload] Trying bot "${botUsername}" for "${searchQuery}" (attempt ${attempt})`);
-            track = await botClient.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 20000, 35000);
-            break;
-          } catch (err: any) {
-            const msg = String(err?.message || "");
-            const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
-            console.warn(`[Telegram AutoDownload] Bot "${botUsername}" attempt ${attempt} failed:`, msg);
-            lastError = err;
-            if (isRateLimited) {
-              // Text search is rate-limited. Try the same bot with a Deezer URL —
-              // the bot accepts streaming service links even when the search quota is exhausted.
-              const deezerTrack = await deezerLookupPromise;
-              if (deezerTrack?.id) {
-                const deezerUrl = `https://www.deezer.com/track/${deezerTrack.id}`;
-                console.log(`[Telegram AutoDownload] Bot "${botUsername}" is rate-limited. Retrying with Deezer URL: ${deezerUrl}`);
-                try {
-                  track = await botClient.searchAndSelect(deezerUrl, duration ? Number(duration) : undefined, 25000, 45000);
-                  break; // Deezer URL worked!
-                } catch (deezerErr: any) {
-                  console.warn(`[Telegram AutoDownload] Bot "${botUsername}" Deezer URL attempt failed:`, String(deezerErr?.message || deezerErr));
-                  lastError = deezerErr;
-                }
+        const queriesToTry = deezerUrl ? [deezerUrl, searchQuery] : [searchQuery];
+        
+        for (const query of queriesToTry) {
+          const isUrl = query.startsWith("http");
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              console.log(`[Telegram AutoDownload] Trying bot "${botUsername}" for "${query}" (attempt ${attempt})`);
+              track = await botClient.searchAndSelect(query, duration ? Number(duration) : undefined, 25000, 45000);
+              break;
+            } catch (err: any) {
+              const msg = String(err?.message || "");
+              const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
+              const isNotFound = msg.includes("not found") || msg.includes("Bot responded:");
+              
+              console.warn(`[Telegram AutoDownload] Bot "${botUsername}" attempt ${attempt} failed for "${query}":`, msg);
+              lastError = err;
+              
+              if (isRateLimited) {
+                // If text search is rate-limited and we have a Deezer URL we didn't try (shouldn't happen with the new order, but just in case),
+                // we break the current query loop.
+                break;
               }
-              // Deezer URL also failed or no Deezer ID — skip to next bot
-              throw err;
-            }
-            if (attempt < 2) {
-              await new Promise((r) => setTimeout(r, 1500));
+              
+              if (isNotFound && isUrl) {
+                // If Deezer URL wasn't found by the bot, break attempt loop to fallback to text search immediately
+                break;
+              }
+
+              if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 1500));
+              }
             }
           }
+          if (track) break; // success, break query loop
+          
+          // If we got rate-limited on the current query, and it was a text search, skip to next bot.
+          // Or if it was a URL and got rate limited (unlikely), also skip to next bot.
+          const msg = String(lastError?.message || "");
+          if (msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily")) {
+            break; // breaks query loop, proceeds to throw below and catch skips to next bot
+          }
         }
-        if (track) break; // success
+        if (track) break; // success, break bot loop
+        
+        // If we exhausted all queries for this bot and still no track, throw the last error
+        // to either propagate it or trigger the next bot in the chain.
+        throw lastError;
       } catch (err: any) {
         const msg = String(err?.message || "");
         const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
