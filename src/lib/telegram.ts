@@ -297,12 +297,44 @@ export class TelegramClient {
     query: string,
     targetDuration?: number,
     searchTimeoutMs = 10000,
-    selectTimeoutMs = 45000
+    selectTimeoutMs = 45000,
+    expectedTitle?: string,
+    expectedArtist?: string
   ): Promise<MusicResult> {
     return this.withRetry(async () => {
       const release = await TelegramClient.botMutex.acquire();
       try {
         let buttonResult: { buttonMessageId: number; buttons: Array<{ index: number; text: string }> };
+
+        const botEntity = await this.client.getEntity(this.botUsername);
+
+        // FAST PATH: check if the bot already sent the audio we want recently (e.g. from a timed out previous attempt)
+        if (expectedTitle) {
+          const recent = await this.client.getMessages(botEntity, { limit: 15 });
+          for (const msg of recent) {
+            if (msg.media && "document" in msg.media) {
+              const doc = (msg.media as Api.MessageMediaDocument).document;
+              if (doc instanceof Api.Document) {
+                const audioAttr = doc.attributes.find((a) => a instanceof Api.DocumentAttributeAudio) as Api.DocumentAttributeAudio | undefined;
+                if (audioAttr && audioAttr.title) {
+                  const cleanExpected = expectedTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const cleanActual = audioAttr.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  if (cleanActual.includes(cleanExpected) || cleanExpected.includes(cleanActual) || (expectedArtist && audioAttr.performer?.toLowerCase().includes(expectedArtist.toLowerCase()))) {
+                    console.log(`[Telegram AutoDownload] FAST PATH: Found matching audio "${audioAttr.title}" in recent history for query "${query}"!`);
+                    return {
+                      messageId: msg.id,
+                      title: audioAttr.title,
+                      artist: audioAttr.performer || "Unknown",
+                      duration: audioAttr.duration || 0,
+                      fileId: doc.id.toString(),
+                      buttonIndex: 0
+                    };
+                  }
+                }
+              }
+            }
+          }
+        }
 
         // Helper to strip honorifics (King, Dr, Sir, Chief, DJ, MC, Prof) and brackets/symbols
         const cleanQueryString = (str: string) => {
