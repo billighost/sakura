@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
        * In all these cases fall through to Telegram to get a real file.
        */
       const au = existingTrack.audioUrl || "";
-      const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
+      const isAudioUsable = au.length > 0 && !au.includes("dzcdn.net") && !au.endsWith("/0");
 
       if (isAudioUsable) {
         console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}". Returning DB track.`);
