@@ -1,241 +1,328 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  SettingsIcon,
+  ImageIcon,
+  CalendarIcon,
+  ShareIcon,
+  ClockIcon,
+  DiscIcon,
+  HeadphonesIcon,
+  PlaylistIcon,
+  FireIcon,
+  DownloadIcon,
+  MusicNoteIcon,
+  ChevronRightIcon,
+  CheckIcon,
+  GlobeIcon,
+  LockIcon,
+  AlertIcon,
+} from "@/components/Icons";
 import styles from "./page.module.css";
 
-/* ────────────────────────────────────────────────────────────
-   Types — swap for your real API/DB shapes.
-──────────────────────────────────────────────────────────── */
 type ProfileData = {
+  id: string;
   name: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
   bio: string;
   email: string;
   plan: string;
-  memberSince: string; // display string, e.g. "March 2023"
+  memberSince: string;
   stats: { label: string; value: string }[];
-  topArtists: { id: string; name: string; trackCount: number; avatarUrl?: string }[];
-  topTracks: { id: string; title: string; artist: string; coverUrl?: string }[];
+  topArtists: { id: string; name: string; trackCount: number; avatarUrl?: string | null }[];
+  topTracks: { id: string; title: string; artist: string; coverUrl?: string | null }[];
 };
 
-/* ────────────────────────────────────────────────────────────
-   Icons
-──────────────────────────────────────────────────────────── */
-function CameraIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  );
-}
-function CalendarIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  );
-}
-function ShareIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
-    </svg>
-  );
-}
-function ClockIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" strokeLinecap="round" />
-    </svg>
-  );
-}
-function HeadphonesIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-      <rect x="1" y="15" width="6" height="7" rx="2" />
-      <rect x="17" y="15" width="6" height="7" rx="2" />
-    </svg>
-  );
-}
-function DiscIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="2.5" />
-    </svg>
-  );
-}
-function ListIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-    </svg>
-  );
-}
-function StreakIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 2s5 5.5 5 10a5 5 0 0 1-10 0c0-1.5 1-3 1-3s1.5 1.5 1.5 3A2.5 2.5 0 0 0 12 17" />
-    </svg>
-  );
-}
-function DownloadIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-    </svg>
-  );
-}
-function LogOutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-    </svg>
-  );
-}
-function MusicNoteIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" opacity={0.6}>
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
-    </svg>
-  );
-}
+type PlaylistRow = {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  trackCount: number;
+  isPublic: boolean;
+};
+
+const BIO_MAX = 160;
+
+/** Stat icons in the same order the API returns stats. */
+const STAT_ICONS = [ClockIcon, MusicNoteIcon, HeadphonesIcon, PlaylistIcon, FireIcon];
 
 function initials(name: string) {
-  return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
-
-// Removed MOCK data
-
-const STAT_ICONS = [ClockIcon, DiscIcon, HeadphonesIcon, ListIcon, StreakIcon];
 
 export default function ProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [playlists, setPlaylists] = useState<PlaylistRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const [savingBio, setSavingBio] = useState(false);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
+
   const [uploading, setUploading] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [exporting, setExporting] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cropImgRef = useRef<HTMLImageElement>(null);
 
-  const bioMax = 160;
+  const load = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const [pRes, plRes] = await Promise.all([
+        fetch("/api/profile"),
+        fetch("/api/playlists"),
+      ]);
 
-  useEffect(() => {
-    fetch("/api/profile")
-      .then((res) => res.json())
-      .then((data) => {
-        setProfile(data);
-        setBioDraft(data.bio || "");
-      });
+      if (!pRes.ok) throw new Error("profile");
+      const data = await pRes.json();
+      setProfile(data);
+      setBioDraft(data.bio || "");
+
+      if (plRes.ok) {
+        const pl = await plRes.json();
+        setPlaylists(Array.isArray(pl.playlists) ? pl.playlists : []);
+      }
+    } catch {
+      // Previously this had no catch at all, so a failed request left the page
+      // stuck on the word "Loading..." with no way forward.
+      setLoadError("We couldn't load your profile. Check your connection.");
+    }
   }, []);
 
-  function handleAvatarPick() {
-    fileInputRef.current?.click();
-  }
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  /* ── Avatar ────────────────────────────────────────────────────────────── */
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("That file isn't an image.");
+      return;
+    }
+    // 8MB in, before any cropping. The crop below shrinks it a lot.
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError("That image is too large. Pick one under 8MB.");
+      return;
+    }
+
+    setUploadError(null);
     const reader = new FileReader();
     reader.onload = () => setCropSrc(reader.result as string);
+    reader.onerror = () => setUploadError("We couldn't read that file.");
     reader.readAsDataURL(file);
-    e.target.value = "";
   }
 
+  /**
+   * Actually crop, rather than pretending to.
+   *
+   * The old flow showed a "crop" dialog and then uploaded the untouched
+   * original — so a 4000×3000 photo became the avatar, was squashed by
+   * `object-fit` in CSS, and cost several megabytes on every page that showed
+   * it. This centre-crops to a square and downscales to 512px before upload.
+   */
   async function confirmCrop() {
     if (!cropSrc) return;
     setUploading(true);
+    setUploadError(null);
+
     try {
-      const res = await fetch(cropSrc);
-      const blob = await res.blob();
+      const img = cropImgRef.current;
+      if (!img || !img.naturalWidth) throw new Error("not-loaded");
+
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - side) / 2;
+      const sy = (img.naturalHeight - side) / 2;
+      const out = Math.min(512, side);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = out;
+      canvas.height = out;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no-canvas");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, out, out);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.9)
+      );
+      if (!blob) throw new Error("no-blob");
+
       const response = await fetch("/api/profile/avatar", {
         method: "POST",
-        headers: {
-          "Content-Type": blob.type,
-        },
+        headers: { "Content-Type": blob.type },
         body: blob,
       });
-      if (response.ok) {
-        const data = await response.json();
-        setProfile((p) => p ? { ...p, avatarUrl: data.avatarUrl } : null);
-      }
+
+      if (!response.ok) throw new Error("upload");
+
+      const data = await response.json();
+      setProfile((p) => (p ? { ...p, avatarUrl: data.avatarUrl } : null));
+      setCropSrc(null);
+    } catch {
+      setUploadError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
-      setCropSrc(null);
     }
   }
+
+  /* ── Bio ───────────────────────────────────────────────────────────────── */
 
   async function saveBio() {
     setSavingBio(true);
-    await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bio: bioDraft }),
-    });
-    setProfile((p) => p ? { ...p, bio: bioDraft } : null);
-    setSavingBio(false);
-    setEditingBio(false);
+    setBioError(null);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: bioDraft }),
+      });
+      if (!res.ok) throw new Error();
+      setProfile((p) => (p ? { ...p, bio: bioDraft } : null));
+      setEditingBio(false);
+    } catch {
+      // The old code updated local state unconditionally, so a rejected save
+      // looked successful until the next reload silently reverted it.
+      setBioError("Couldn't save. Try again.");
+    } finally {
+      setSavingBio(false);
+    }
   }
+
+  /* ── Share ─────────────────────────────────────────────────────────────── */
 
   async function handleShare() {
     if (!profile) return;
+
+    // The old version copied `https://sakura.app/u/<name>` — a domain we don't
+    // own and a route that doesn't exist. Use this deployment's real origin.
+    const url = `${window.location.origin}/u/${profile.id}`;
+
     try {
-      await navigator.clipboard.writeText(`https://sakura.app/u/${profile.name.toLowerCase().replace(/\s+/g, "-")}`);
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 1800);
-    } catch {
-      // clipboard unavailable — silently ignore
+      if (navigator.share) {
+        await navigator.share({ title: `${profile.name} on Sakura`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareState("copied");
+      setTimeout(() => setShareState("idle"), 1800);
+    } catch (err) {
+      // A cancelled share sheet rejects with AbortError; that isn't a failure.
+      if ((err as Error)?.name === "AbortError") return;
+      setShareState("failed");
+      setTimeout(() => setShareState("idle"), 2400);
     }
   }
+
+  /* ── Playlist visibility ───────────────────────────────────────────────── */
+
+  async function togglePlaylistVisibility(id: string, next: boolean) {
+    // Optimistic, with rollback — the toggle should feel instant.
+    setPlaylists((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, isPublic: next } : p))
+    );
+
+    try {
+      const res = await fetch(`/api/playlists/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isPublic: !next } : p))
+      );
+    }
+  }
+
+  /* ── Export ────────────────────────────────────────────────────────────── */
 
   async function handleExport() {
     setExporting(true);
     try {
+      const res = await fetch("/api/export");
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = "/api/export";
+      a.href = url;
       a.download = "sakura-export.json";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
+      // Without this the blob is pinned in memory for the life of the tab.
+      URL.revokeObjectURL(url);
+    } catch {
+      setUploadError("Export failed. Please try again.");
     } finally {
       setExporting(false);
     }
   }
 
-  async function handleLogout() {
-    setLoggingOut(true);
-    await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/login");
+  /* ── Render ────────────────────────────────────────────────────────────── */
+
+  if (loadError) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.errorState}>
+          <AlertIcon size={30} />
+          <p className={styles.errorText}>{loadError}</p>
+          <button className={styles.retryBtn} onClick={load}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!profile) {
-    return <div className={styles.page}>Loading...</div>;
+    return (
+      <div className={styles.page}>
+        <div className={styles.hero}>
+          <div className={`${styles.avatar} skeleton`} />
+          <div className={`${styles.skelName} skeleton`} />
+          <div className={`${styles.skelBio} skeleton`} />
+        </div>
+        <div className={styles.statsGrid}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`${styles.statCard} skeleton`} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={styles.page}>
-      {/* ── Hero ── */}
-      <div className={styles.heroSection}>
-        <div className={styles.heroGradient} />
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <header className={styles.hero}>
+        {/* The settings entry point the profile was missing entirely. */}
+        <Link href="/settings" className={styles.settingsBtn} aria-label="Settings" data-anim>
+          <SettingsIcon size={20} />
+        </Link>
 
-        <div className={styles.avatarWrapper}>
+        <div className={styles.avatarWrap}>
           {profile.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={profile.avatarUrl} alt="" className={styles.avatar} />
           ) : (
             <div className={styles.avatarPlaceholder}>{initials(profile.name)}</div>
@@ -243,178 +330,279 @@ export default function ProfilePage() {
           <button
             type="button"
             className={styles.editAvatarBtn}
-            onClick={handleAvatarPick}
+            onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             aria-label="Change profile photo"
           >
-            {uploading ? <span className={styles.spinner} /> : <CameraIcon />}
+            {uploading ? <span className={styles.spinner} /> : <ImageIcon size={14} />}
           </button>
-          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleFileChange}
+          />
         </div>
 
-        <h1 className={styles.username} style={{ zIndex: 1 }}>{profile.name}</h1>
+        <h1 className={styles.username}>{profile.name}</h1>
 
         {editingBio ? (
           <div className={styles.bioEdit}>
             <textarea
               className={styles.bioInput}
               rows={2}
-              maxLength={bioMax}
+              maxLength={BIO_MAX}
               value={bioDraft}
               onChange={(e) => setBioDraft(e.target.value)}
               autoFocus
+              aria-label="Your bio"
             />
-            <div className={styles.bioCharCount}>{bioDraft.length}/{bioMax}</div>
+            <div className={styles.bioMeta}>
+              <span className={styles.bioCount}>
+                {bioDraft.length}/{BIO_MAX}
+              </span>
+              {bioError && <span className={styles.bioError}>{bioError}</span>}
+            </div>
             <div className={styles.bioActions}>
               <button
                 type="button"
-                className={styles.bioCancel}
+                className={styles.btnGhost}
                 onClick={() => {
                   setBioDraft(profile.bio);
+                  setBioError(null);
                   setEditingBio(false);
                 }}
               >
                 Cancel
               </button>
-              <button type="button" className={styles.bioSave} onClick={saveBio} disabled={savingBio}>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={saveBio}
+                disabled={savingBio}
+              >
                 {savingBio ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
         ) : (
-          <button type="button" className={styles.bio} onClick={() => setEditingBio(true)} style={{ zIndex: 1 }}>
-            {profile.bio || "Add a bio"}
+          <button
+            type="button"
+            className={styles.bio}
+            onClick={() => setEditingBio(true)}
+          >
+            {profile.bio || "Add a short bio"}
           </button>
         )}
 
-        <div className={styles.memberSince}>
-          <CalendarIcon />
-          <span>Member since {profile.memberSince}</span>
-        </div>
+        <p className={styles.memberSince}>
+          <CalendarIcon size={13} />
+          <span>Listening since {profile.memberSince}</span>
+        </p>
 
-        <div style={{ position: "relative" }}>
-          <button type="button" className={styles.shareBtn} onClick={handleShare}>
-            <ShareIcon />
-            Share profile
-          </button>
-          {shareCopied && <div className={styles.tooltip}>Link copied</div>}
-        </div>
-      </div>
+        <button type="button" className={`${styles.shareBtn} pressable`} onClick={handleShare}>
+          {shareState === "copied" ? <CheckIcon size={15} /> : <ShareIcon size={15} />}
+          {shareState === "copied"
+            ? "Link copied"
+            : shareState === "failed"
+              ? "Couldn't copy"
+              : "Share profile"}
+        </button>
 
-      {/* ── Stats ── */}
+        {uploadError && <p className={styles.inlineError}>{uploadError}</p>}
+      </header>
+
+      {/* ── Stats ────────────────────────────────────────────────────────── */}
       <div className={styles.statsGrid}>
         {profile.stats.map((stat, i) => {
           const Icon = STAT_ICONS[i % STAT_ICONS.length];
           return (
-            <div key={stat.label} className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <Icon />
-              </div>
-              <div className={styles.statValue}>{stat.value}</div>
-              <div className={styles.statLabel}>{stat.label}</div>
+            <div key={stat.label} className={styles.statCard} data-anim>
+              <span className={styles.statIcon}>
+                <Icon size={16} />
+              </span>
+              <span className={styles.statValue}>{stat.value}</span>
+              <span className={styles.statLabel}>{stat.label}</span>
             </div>
           );
         })}
       </div>
 
-      {/* ── Top artists ── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Top artists this year</h2>
-          <span className={styles.sectionCount}>{profile.topArtists.length}</span>
-        </div>
-        <div className={styles.artistList}>
-          {profile.topArtists.map((artist, i) => (
-            <div key={artist.id} className={styles.artistItem}>
-              <span className={styles.artistRank}>{i + 1}</span>
-              <div className={styles.artistAvatar}>
-                {artist.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={artist.avatarUrl} alt="" />
-                ) : (
-                  <div className={styles.artistPlaceholder}>{initials(artist.name)}</div>
-                )}
-              </div>
-              <div className={styles.artistInfo}>
-                <div className={styles.artistName}>{artist.name}</div>
-                <div className={styles.artistTracks}>{artist.trackCount} tracks played</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ── Top artists ──────────────────────────────────────────────────── */}
+      {profile.topArtists.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Your top artists this year</h2>
+          <div className={styles.rankList}>
+            {profile.topArtists.map((artist, i) => (
+              // These were plain divs before — the whole "top artists" list
+              // looked tappable and did nothing.
+              <Link
+                key={artist.id}
+                href={`/artist/${artist.id}`}
+                className={`${styles.rankRow} pressable`}
+              >
+                <span className={styles.rank}>{i + 1}</span>
+                <div className={`${styles.rankArt} ${styles.rankArtRound}`}>
+                  {artist.avatarUrl ? (
+                    <img src={artist.avatarUrl} alt="" />
+                  ) : (
+                    <span className={styles.rankArtFallback}>
+                      {initials(artist.name)}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.rankInfo}>
+                  <span className={styles.rankTitle}>{artist.name}</span>
+                  <span className={styles.rankMeta}>
+                    {artist.trackCount} {artist.trackCount === 1 ? "song" : "songs"} played
+                  </span>
+                </div>
+                <ChevronRightIcon size={16} className={styles.rankChevron} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* ── Top tracks ── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Top tracks this year</h2>
-          <span className={styles.sectionCount}>{profile.topTracks.length}</span>
-        </div>
-        <div className={styles.trackList}>
-          {profile.topTracks.map((track, i) => (
-            <div key={track.id} className={styles.trackItem}>
-              <span className={styles.trackNumber}>{i + 1}</span>
-              <div className={styles.trackCover}>
-                {track.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={track.coverUrl} alt="" />
-                ) : (
-                  <div className={styles.trackPlaceholder}>
-                    <MusicNoteIcon />
+      {/* ── Top tracks ───────────────────────────────────────────────────── */}
+      {profile.topTracks.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Your top songs this year</h2>
+          <div className={styles.rankList}>
+            {profile.topTracks.map((track, i) => (
+              <Link
+                key={track.id}
+                href={`/track/${track.id}`}
+                className={`${styles.rankRow} pressable`}
+              >
+                <span className={styles.rank}>{i + 1}</span>
+                <div className={styles.rankArt}>
+                  {track.coverUrl ? (
+                    <img src={track.coverUrl} alt="" />
+                  ) : (
+                    <span className={styles.rankArtFallback}>
+                      <MusicNoteIcon size={16} />
+                    </span>
+                  )}
+                </div>
+                <div className={styles.rankInfo}>
+                  <span className={styles.rankTitle}>{track.title}</span>
+                  <span className={styles.rankMeta}>{track.artist}</span>
+                </div>
+                <ChevronRightIcon size={16} className={styles.rankChevron} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Playlist visibility ──────────────────────────────────────────── */}
+      {playlists.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Your playlists</h2>
+          <p className={styles.sectionHint}>
+            Public playlists can be found by anyone using search. Everything
+            else stays private to you.
+          </p>
+          <div className={styles.playlistList}>
+            {playlists.map((p) => (
+              <div key={p.id} className={styles.playlistRow}>
+                <Link href={`/playlist/${p.id}`} className={styles.playlistLink}>
+                  <div className={styles.rankArt}>
+                    {p.coverUrl ? (
+                      <img src={p.coverUrl} alt="" />
+                    ) : (
+                      <span className={styles.rankArtFallback}>
+                        <PlaylistIcon size={16} />
+                      </span>
+                    )}
                   </div>
-                )}
+                  <div className={styles.rankInfo}>
+                    <span className={styles.rankTitle}>{p.name}</span>
+                    <span className={styles.rankMeta}>
+                      {p.trackCount} {p.trackCount === 1 ? "song" : "songs"}
+                    </span>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={p.isPublic}
+                  aria-label={`Make ${p.name} ${p.isPublic ? "private" : "public"}`}
+                  className={`${styles.visToggle} ${p.isPublic ? styles.visToggleOn : ""}`}
+                  onClick={() => togglePlaylistVisibility(p.id, !p.isPublic)}
+                >
+                  {p.isPublic ? <GlobeIcon size={14} /> : <LockIcon size={14} />}
+                  <span>{p.isPublic ? "Public" : "Private"}</span>
+                </button>
               </div>
-              <div className={styles.trackInfo}>
-                <div className={styles.trackTitle}>{track.title}</div>
-                <div className={styles.trackArtist}>{track.artist}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* ── Account ── */}
+      {/* ── Account ──────────────────────────────────────────────────────── */}
       <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Account</h2>
-        </div>
-        <div className={styles.accountCard}>
-          <div className={styles.accountRow}>
-            <span className={styles.accountLabel}>Email</span>
-            <span className={styles.accountValue}>{profile.email}</span>
+        <h2 className={styles.sectionTitle}>Account</h2>
+        <div className={styles.card}>
+          <div className={styles.cardRow}>
+            <span className={styles.cardLabel}>Email</span>
+            <span className={styles.cardValue}>{profile.email}</span>
           </div>
-          <div className={styles.accountRow}>
-            <span className={styles.accountLabel}>Plan</span>
-            <span className={styles.accountValue}>{profile.plan}</span>
+          <div className={styles.cardRow}>
+            <span className={styles.cardLabel}>Plan</span>
+            <span className={styles.cardValue}>{profile.plan}</span>
           </div>
+          <Link href="/settings" className={`${styles.cardRow} ${styles.cardLink}`}>
+            <span className={styles.cardLabel}>Settings</span>
+            <ChevronRightIcon size={16} className={styles.rankChevron} />
+          </Link>
         </div>
       </section>
 
-      <button type="button" className={styles.exportBtn} onClick={handleExport} disabled={exporting}>
-        {exporting ? <span className={styles.spinner} /> : <DownloadIcon />}
-        {exporting ? "Preparing your export…" : "Export my data"}
+      <button
+        type="button"
+        className={`${styles.wideBtn} pressable`}
+        onClick={handleExport}
+        disabled={exporting}
+      >
+        {exporting ? <span className={styles.spinner} /> : <DownloadIcon size={16} />}
+        {exporting ? "Preparing your download…" : "Download my data"}
       </button>
 
-      <div style={{ height: "0.75rem" }} />
-
-      <button type="button" className={styles.exportBtn} onClick={handleLogout} disabled={loggingOut}>
-        {loggingOut ? <span className={styles.spinner} /> : <LogOutIcon />}
-        {loggingOut ? "Signing out…" : "Sign out"}
-      </button>
-
-      {/* ── Crop modal ── */}
+      {/* ── Crop dialog ──────────────────────────────────────────────────── */}
       {cropSrc && (
-        <div className={styles.cropOverlay} role="dialog" aria-modal="true">
-          <div className={styles.cropModal}>
+        <div
+          className={styles.cropOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Crop your photo"
+          onClick={() => !uploading && setCropSrc(null)}
+        >
+          <div className={styles.cropModal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.cropTitle}>Your new photo</h3>
+            <p className={styles.cropHint}>
+              We&apos;ll take the middle square of this image.
+            </p>
             <div className={styles.cropPreview}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={cropSrc} alt="" className={styles.cropImage} />
+              <img ref={cropImgRef} src={cropSrc} alt="" className={styles.cropImage} />
             </div>
             <div className={styles.cropActions}>
-              <button type="button" className={styles.cropCancel} onClick={() => setCropSrc(null)} disabled={uploading}>
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={() => setCropSrc(null)}
+                disabled={uploading}
+              >
                 Cancel
               </button>
-              <button type="button" className={styles.cropConfirm} onClick={confirmCrop} disabled={uploading}>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={confirmCrop}
+                disabled={uploading}
+              >
                 {uploading ? "Uploading…" : "Use photo"}
               </button>
             </div>

@@ -77,7 +77,7 @@ interface PlayerContextType {
   volume: number;
   shuffle: boolean;
   repeat: "off" | "one" | "all";
-  play: (track: Track, queue?: Track[]) => void;
+  play: (track: Track, queue?: Track[], targetIndex?: number) => void;
   playNext: (track: Track) => void;
   addToQueue: (track: Track) => void;
   togglePlay: () => void;
@@ -1530,7 +1530,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             // mutating `id` here restarted playback and could duplicate keys.
             setQueueState((prev) =>
               prev.map((t) =>
-                t.id === currentTrack.id
+                t.id === currentTrack.id ||
+                (currentTrack.resolvedId && (t.id === currentTrack.resolvedId || t.resolvedId === currentTrack.resolvedId))
                   ? {
                       ...t,
                       resolvedId: data.id || t.resolvedId,
@@ -1627,7 +1628,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentTrack?.id]);
 
-  const play = useCallback((track: Track, newQueue?: Track[]) => {
+  const play = useCallback((track: Track, newQueue?: Track[], targetIndex?: number) => {
     if (!remoteSyncDone) return;
     setProgress(0);
     if (audioRef.current) {
@@ -1637,30 +1638,89 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     setIsPlaying(true);
 
-    if (currentTrack && currentTrack.id === track.id) {
+    if (currentTrack && (currentTrack.id === track.id || (track.resolvedId && currentTrack.id === track.resolvedId))) {
       if (audioRef.current && audioRef.current.paused) {
         audioRef.current.play().catch(() => {});
       }
     }
 
-    if (newQueue) {
-      setQueueState(newQueue);
-      const idx = newQueue.findIndex((t) => t.id === track.id);
-      setCurrentIndex(idx >= 0 ? idx : 0);
+    if (newQueue && newQueue.length > 0) {
+      let idx = -1;
+
+      // 1. Try exact targetIndex if provided and valid
+      if (targetIndex !== undefined && targetIndex >= 0 && targetIndex < newQueue.length) {
+        const candidate = newQueue[targetIndex];
+        if (
+          candidate.id === track.id ||
+          candidate.id === track.resolvedId ||
+          (track.resolvedId && candidate.id === track.resolvedId) ||
+          (candidate.title.toLowerCase() === track.title.toLowerCase() &&
+            candidate.artist.toLowerCase() === track.artist.toLowerCase())
+        ) {
+          idx = targetIndex;
+        }
+      }
+
+      // 2. Search newQueue by id, resolvedId, or title+artist
+      if (idx === -1) {
+        idx = newQueue.findIndex(
+          (t) =>
+            t.id === track.id ||
+            t.id === track.resolvedId ||
+            (track.resolvedId && t.id === track.resolvedId) ||
+            (t.resolvedId && (t.resolvedId === track.id || t.resolvedId === track.resolvedId)) ||
+            (t.title.toLowerCase() === track.title.toLowerCase() &&
+              t.artist.toLowerCase() === track.artist.toLowerCase())
+        );
+      }
+
+      // 3. Fallback to targetIndex if provided and valid, otherwise 0
+      if (idx === -1) {
+        if (targetIndex !== undefined && targetIndex >= 0 && targetIndex < newQueue.length) {
+          idx = targetIndex;
+        } else {
+          idx = 0;
+        }
+      }
+
+      // Update the queue entry at idx with resolved audioUrl & resolvedId if track has them
+      const updatedQueue = [...newQueue];
+      updatedQueue[idx] = {
+        ...updatedQueue[idx],
+        audioUrl: track.audioUrl || updatedQueue[idx].audioUrl,
+        resolvedId: track.resolvedId || updatedQueue[idx].resolvedId || updatedQueue[idx].id,
+        coverUrl: track.coverUrl || updatedQueue[idx].coverUrl,
+      };
+
+      setQueueState(updatedQueue);
+      setCurrentIndex(idx);
       return;
     }
 
-    // Both the queue and the index are derived here *before* either setter
-    // runs. The previous version called setCurrentIndex from inside the
-    // setQueueState updater — updaters must be pure and React may invoke them
-    // more than once (StrictMode does so deliberately), so the index could be
-    // computed against a different `prev` than the one that was committed.
-    // That is exactly the "details show one song, a different one plays"
-    // symptom: the queue array and currentIndex came from different passes.
     const prevQueue = queueRef.current;
-    const existingIdx = prevQueue.findIndex((t) => t.id === track.id);
+    const existingIdx = prevQueue.findIndex(
+      (t) =>
+        t.id === track.id ||
+        t.id === track.resolvedId ||
+        (track.resolvedId && t.id === track.resolvedId) ||
+        (t.resolvedId && (t.resolvedId === track.id || t.resolvedId === track.resolvedId)) ||
+        (t.title.toLowerCase() === track.title.toLowerCase() &&
+          t.artist.toLowerCase() === track.artist.toLowerCase())
+    );
 
     if (existingIdx >= 0) {
+      setQueueState((prev) =>
+        prev.map((t, i) =>
+          i === existingIdx
+            ? {
+                ...t,
+                audioUrl: track.audioUrl || t.audioUrl,
+                resolvedId: track.resolvedId || t.resolvedId,
+                coverUrl: track.coverUrl || t.coverUrl,
+              }
+            : t
+        )
+      );
       setCurrentIndex(existingIdx);
       return;
     }

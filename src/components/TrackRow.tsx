@@ -75,8 +75,13 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     removeFromDownloadQueue,
   } = usePlayer();
   const liked = favoriteTrackIds?.has(track.id) || false;
-  const isActive = currentTrack?.id === track.id;
-  
+  const isActive =
+    currentTrack?.id === track.id ||
+    (currentTrack?.resolvedId && currentTrack.resolvedId === track.id) ||
+    (currentTrack &&
+      currentTrack.title.toLowerCase() === track.title.toLowerCase() &&
+      currentTrack.artist.toLowerCase() === track.artist.name.toLowerCase());
+
   const [offline, setOffline] = useState(false);
   const [localDownloadState, setLocalDownloadState] = useState<"idle" | "telegram" | "device">("idle");
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -182,7 +187,8 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
     }));
     play(
       {
-        id: actualId,
+        id: track.id,
+        resolvedId: actualId !== track.id ? actualId : undefined,
         title: track.title,
         artist: track.artist.name,
         artistId: track.artist.id,
@@ -192,7 +198,8 @@ export function TrackRow({ track, queue, index, showNumber }: TrackRowProps) {
         audioUrl: actualAudioUrl,
         duration: track.duration,
       },
-      q
+      q,
+      index
     );
   }
 

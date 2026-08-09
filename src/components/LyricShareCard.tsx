@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
+import { drawWordmark } from "@/lib/brandMark";
 
 interface LyricShareCardProps {
   track: {
@@ -152,10 +153,21 @@ export function LyricShareCard({
         lyricY += 80;
       }
 
-      // 5. Draw Watermark/Branding at the bottom
-      ctx.font = "600 36px Inter, system-ui, sans-serif";
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-      ctx.fillText("🌸 SAKURA", canvasEl.width / 2, canvasEl.height - 180);
+      // 5. Draw Watermark/Branding at the bottom.
+      //
+      // Drawn, not typed. This was `ctx.fillText("🌸 SAKURA", ...)`, and an
+      // emoji in an exported image is a real problem rather than a cosmetic
+      // one: it rasterises to a different picture per platform, so the same
+      // card looked like a different product depending on the phone that made
+      // it — and rendered a literal empty box anywhere the emoji font was
+      // missing, in an image people post publicly.
+      drawWordmark(ctx, {
+        x: canvasEl.width / 2,
+        y: canvasEl.height - 162,
+        fontSize: 36,
+        color: "rgba(255, 255, 255, 0.42)",
+        markColor: accentColor || "#ef6d97",
+      });
     }
   }, [track, lyric, accentColor]);
 

@@ -682,16 +682,6 @@ export default function SearchPage() {
                       duration: track.duration,
                       source: track.source,
                     }}
-                    queue={results.map((t) => ({
-                      id: t.id,
-                      title: t.title,
-                      artist: { name: t.artist },
-                      album: { title: t.album, coverUrl: t.coverUrl },
-                      coverUrl: t.coverUrl,
-                      audioUrl: t.audioUrl || undefined,
-                      duration: t.duration,
-                      source: t.source,
-                    }))}
                     index={i}
                   />
                 </div>
