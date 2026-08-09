@@ -410,7 +410,7 @@ export class TelegramClient {
     // Poll for the bot's response (message with inline buttons)
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 3000));
 
       await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
@@ -581,7 +581,7 @@ export class TelegramClient {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 3000));
 
       await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
