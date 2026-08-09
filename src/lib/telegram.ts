@@ -107,6 +107,14 @@ export class TelegramClient {
   private readonly apiId: number;
   private readonly apiHash: string;
   private readonly sessionString: string;
+  private readonly proxyConfig?: {
+    ip: string;
+    port: number;
+    socksType: 5 | 4;
+    username?: string;
+    password?: string;
+  };
+  private activeCount = 0;
   // Shared mutex — bot interactions from ALL concurrent downloads are serialized
   private static botMutex = new RedisMutex();
 
@@ -115,11 +123,13 @@ export class TelegramClient {
     apiHash: string,
     sessionString: string,
     botUsername?: string,
+    proxyConfig?: TelegramClient["proxyConfig"]
   ) {
     this.apiId = apiId;
     this.apiHash = apiHash;
     this.sessionString = sessionString;
     this.botUsername = botUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
+    this.proxyConfig = proxyConfig;
     this.client = new GramClient(
       new StringSession(sessionString),
       apiId,
@@ -127,6 +137,7 @@ export class TelegramClient {
       {
         connectionRetries: 5,
         autoReconnect: true,
+        ...(proxyConfig ? { proxy: proxyConfig } : {}),
       },
     );
   }
@@ -163,7 +174,11 @@ export class TelegramClient {
               new StringSession(this.sessionString),
               this.apiId,
               this.apiHash,
-              { connectionRetries: 5, autoReconnect: true },
+              {
+                connectionRetries: 5,
+                autoReconnect: true,
+                ...(this.proxyConfig ? { proxy: this.proxyConfig } : {}),
+              },
             );
             await new Promise((r) => setTimeout(r, jitterMs));
           } else {
@@ -179,6 +194,32 @@ export class TelegramClient {
     })();
 
     return this.connectPromise;
+  }
+
+  async acquire(): Promise<void> {
+    this.activeCount++;
+    await this.ensureConnected();
+  }
+
+  async release(): Promise<void> {
+    this.activeCount--;
+    if (this.activeCount <= 0) {
+      this.activeCount = 0;
+      await this.disconnect();
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    this.connected = false;
+    this.connectPromise = null;
+    if (this.client) {
+      try {
+        await this.client.disconnect();
+        console.log("[Telegram] Disconnected cleanly");
+      } catch (err) {
+        console.warn("[Telegram] Error during disconnect:", err);
+      }
+    }
   }
 
   /**
@@ -227,7 +268,11 @@ export class TelegramClient {
             new StringSession(this.sessionString),
             this.apiId,
             this.apiHash,
-            { connectionRetries: 5, autoReconnect: true }
+            {
+              connectionRetries: 5,
+              autoReconnect: true,
+              ...(this.proxyConfig ? { proxy: this.proxyConfig } : {}),
+            }
           );
 
           if (attempt < 3) {
@@ -731,7 +776,28 @@ export function getTelegramClient(): TelegramClient {
       throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
     }
 
-    globalForTelegram.telegramClient = new TelegramClient(apiId, apiHash, sessionString, process.env.TELEGRAM_BOT_USERNAME);
+    const proxyHost = process.env.TELEGRAM_PROXY_HOST || "";
+    const proxyPort = process.env.TELEGRAM_PROXY_PORT ? parseInt(process.env.TELEGRAM_PROXY_PORT, 10) : undefined;
+    const proxyUsername = process.env.TELEGRAM_PROXY_USERNAME || undefined;
+    const proxyPassword = process.env.TELEGRAM_PROXY_PASSWORD || undefined;
+    const proxySocksTypeInput = process.env.TELEGRAM_PROXY_SOCKS_TYPE ? parseInt(process.env.TELEGRAM_PROXY_SOCKS_TYPE, 10) : 5;
+    const proxySocksType: 5 | 4 = (proxySocksTypeInput === 4) ? 4 : 5;
+
+    const proxyConfig = proxyHost && proxyPort ? {
+      ip: proxyHost,
+      port: proxyPort,
+      socksType: proxySocksType,
+      username: proxyUsername,
+      password: proxyPassword,
+    } : undefined;
+
+    globalForTelegram.telegramClient = new TelegramClient(
+      apiId,
+      apiHash,
+      sessionString,
+      process.env.TELEGRAM_BOT_USERNAME,
+      proxyConfig,
+    );
   }
   return globalForTelegram.telegramClient;
 }

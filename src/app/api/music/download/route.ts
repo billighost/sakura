@@ -240,10 +240,10 @@ export async function POST(req: NextRequest) {
   downloadPromise.catch(() => {});
   pendingDownloads.set(cacheKey, downloadPromise);
 
-  try {
-    const client = getTelegramClient();
-    await client.init();
+  const client = getTelegramClient();
+  await client.acquire();
 
+  try {
     console.log(`[Telegram AutoDownload] Searching: "${searchQuery}"`);
 
     // searchAndSelect acquires the bot mutex, searches, clicks the first result,
@@ -586,5 +586,7 @@ export async function POST(req: NextRequest) {
       { error: "Failed to download track from Telegram" },
       { status: 500 }
     );
+  } finally {
+    await client.release();
   }
 }

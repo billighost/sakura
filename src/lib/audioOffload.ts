@@ -82,31 +82,35 @@ export async function promoteToCdn(messageId: number): Promise<void> {
     if (isCdnUrl(fresh?.audioUrl)) return;
 
     const client = getTelegramClient();
-    await client.init();
-    const { stream, size } = await client.getAudioStream(messageId);
+    await client.acquire();
+    try {
+      const { stream, size } = await client.getAudioStream(messageId);
 
-    if (size > MAX_UPLOAD_BYTES) {
-      console.warn(
-        `[cdn] Track ${track.id} is ${Math.round(size / 1048576)}MB — above the ` +
-          `${MAX_UPLOAD_BYTES / 1048576}MB upload limit; leaving it on the proxy path`,
+      if (size > MAX_UPLOAD_BYTES) {
+        console.warn(
+          `[cdn] Track ${track.id} is ${Math.round(size / 1048576)}MB — above the ` +
+            `${MAX_UPLOAD_BYTES / 1048576}MB upload limit; leaving it on the proxy path`,
+        );
+        stream.destroy?.();
+        return;
+      }
+
+      const { url, bytes } = await uploadAudioStream(stream, `tg-${messageId}`);
+
+      // Only now is the CDN copy real. Writing the URL earlier would point
+      // listeners at an object that might never finish uploading.
+      await execute(`UPDATE "Track" SET "audioUrl" = $1 WHERE id = $2`, [url, track.id]);
+
+      // The old proxy URL is embedded in cached track payloads all over the app.
+      await cacheDel(cacheKey("track", track.id));
+
+      console.log(
+        `[cdn] Promoted track ${track.id} (msg ${messageId}, ${Math.round(bytes / 1024)}KB) — ` +
+          `future plays bypass this server`,
       );
-      stream.destroy?.();
-      return;
+    } finally {
+      await client.release();
     }
-
-    const { url, bytes } = await uploadAudioStream(stream, `tg-${messageId}`);
-
-    // Only now is the CDN copy real. Writing the URL earlier would point
-    // listeners at an object that might never finish uploading.
-    await execute(`UPDATE "Track" SET "audioUrl" = $1 WHERE id = $2`, [url, track.id]);
-
-    // The old proxy URL is embedded in cached track payloads all over the app.
-    await cacheDel(cacheKey("track", track.id));
-
-    console.log(
-      `[cdn] Promoted track ${track.id} (msg ${messageId}, ${Math.round(bytes / 1024)}KB) — ` +
-        `future plays bypass this server`,
-    );
   } catch (err) {
     console.error(
       `[cdn] Promotion failed for message ${messageId}:`,

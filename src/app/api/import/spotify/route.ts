@@ -29,10 +29,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
-    const client = getTelegramClient();
-    await client.init();
+  const client = getTelegramClient();
+  await client.acquire();
 
+  let clientReleased = false;
+  const releaseClient = async () => {
+    if (!clientReleased) {
+      clientReleased = true;
+      await client.release();
+    }
+  };
+
+  try {
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -51,8 +59,13 @@ export async function POST(req: NextRequest) {
         } catch (err: any) {
           console.error("[Import Playlist Stream Error]", err);
           controller.error(err);
+        } finally {
+          await releaseClient();
         }
       },
+      async cancel() {
+        await releaseClient();
+      }
     });
 
     return new Response(stream, {
@@ -63,6 +76,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    await releaseClient();
     console.error("[Import Playlist]", error);
     return new Response(
       JSON.stringify({ error: "Failed to import playlist." }),

@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Query is required" }, { status: 400 });
   }
 
-  try {
-    const client = getTelegramClient();
-    await client.init();
+  const client = getTelegramClient();
+  await client.acquire();
 
+  try {
     // Step 1: Send query and wait for bot's button response
     const { buttonMessageId, buttons } = await client.searchMusic(q, 15000);
 
@@ -33,5 +33,7 @@ export async function GET(req: NextRequest) {
       { error: "Failed to search music via Telegram. Make sure TELEGRAM_SESSION_STRING is configured." },
       { status: 500 }
     );
+  } finally {
+    await client.release();
   }
 }

@@ -154,7 +154,6 @@
 }
 
 .rowActive {
-  background: var(--accent);
   border-left: 2px solid var(--track-accent, var(--sakura-accent));
 }
 

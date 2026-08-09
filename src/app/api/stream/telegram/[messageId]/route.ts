@@ -33,6 +33,16 @@ export async function GET(
     return new Response("Invalid messageId", { status: 400 });
   }
 
+  const client = getTelegramClient();
+  let clientAcquired = false;
+  let clientReleased = false;
+  const releaseClient = async () => {
+    if (clientAcquired && !clientReleased) {
+      clientReleased = true;
+      await client.release();
+    }
+  };
+
   try {
     /**
      * Parse the Range header.
@@ -67,23 +77,11 @@ export async function GET(
       requestedEnd = undefined;
     }
 
-    const client = getTelegramClient();
-    await client.init();
+    await client.acquire();
+    clientAcquired = true;
 
     /**
      * Probe the size before streaming when a Range was asked for.
-     *
-     * The previous version computed `size - offsetBytes` unconditionally, so an
-     * offset past the end of the file produced a *negative* Content-Length and a
-     * Content-Range whose start exceeded its end — a response strict HTTP
-     * clients reject outright at the parser ("Invalid character in
-     * Content-Length"), killing the connection rather than failing the request.
-     *
-     * That is not a hypothetical: the offline download queue resumes by sending
-     * `Range: bytes=<savedBytes>-`, so any partial download whose saved length
-     * had caught up with the real file hit exactly this. The client is written
-     * to handle a 416 by discarding its partial data and restarting — it never
-     * got the chance, because the server sent a corrupt 206 instead.
      */
     const { stream: nodeStream, size } = await client.getAudioStream(
       msgId,
@@ -96,6 +94,7 @@ export async function GET(
     if (offsetBytes !== undefined && size > 0 && offsetBytes >= size) {
       // Unsatisfiable: tell the client the real size so it can restart correctly.
       nodeStream.destroy?.();
+      await releaseClient();
       return new Response(null, {
         status: 416,
         headers: {
@@ -104,6 +103,17 @@ export async function GET(
         },
       });
     }
+
+    nodeStream.on("close", () => {
+      releaseClient().catch(err => console.error("[Telegram Stream] Release error on close:", err));
+    });
+    nodeStream.on("end", () => {
+      releaseClient().catch(err => console.error("[Telegram Stream] Release error on end:", err));
+    });
+    nodeStream.on("error", (err) => {
+      console.error("[Telegram Stream] Node stream error:", err);
+      releaseClient().catch(e => console.error("[Telegram Stream] Release error on error:", e));
+    });
 
     const webStream = Readable.toWeb(nodeStream);
 
@@ -140,16 +150,15 @@ export async function GET(
       headers.set("Content-Length", String(size));
     }
 
-    // Only whole-file requests schedule promotion. A Range request is a seek or
-    // a browser probe, and firing on those would attempt the upload repeatedly
-    // during a single listen — the lock would absorb it, but at the cost of a
-    // Redis round trip per seek for no benefit.
+    // Only whole-file requests schedule promotion.
     scheduleCdnPromotion(msgId);
 
     return new Response(webStream as ReadableStream, {
       status: 200,
       headers,
-    });  } catch (error) {
+    });
+  } catch (error) {
+    await releaseClient();
     console.error("[Telegram Stream]", error);
     return new Response("Failed to stream audio from Telegram", { status: 500 });
   }

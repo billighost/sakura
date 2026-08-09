@@ -19,10 +19,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
-    const client = getTelegramClient();
-    await client.init();
+  const client = getTelegramClient();
+  await client.acquire();
 
+  try {
     // Step 2: Click the button to trigger the audio download
     const track = await client.selectResult(
       Number(buttonMessageId),
@@ -78,5 +78,7 @@ export async function POST(req: NextRequest) {
       { error: "Failed to download selected track" },
       { status: 500 }
     );
+  } finally {
+    await client.release();
   }
 }
