@@ -338,6 +338,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
                 className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
                 src={currentTrack.coverUrl}
                 alt=""
+                referrerPolicy="no-referrer"
                 onLoad={() => setArtLoaded(true)}
               />
             </>

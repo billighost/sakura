@@ -254,7 +254,7 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
         </span>
       ) : cover ? (
         <div className={styles.artWrap}>
-          <img src={cover} alt="" className={styles.art} />
+          <img src={cover} alt="" className={styles.art} referrerPolicy="no-referrer" />
         </div>
       ) : null}
 

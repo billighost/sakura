@@ -39,6 +39,7 @@ export const metadata: Metadata = {
   title: "Sakura",
   description: "Your personal music library",
   manifest: "/manifest.json",
+  referrer: "no-referrer",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <head>
+        <meta name="referrer" content="no-referrer" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://res.cloudinary.com" />
         <link rel="dns-prefetch" href="https://e-cdns-images.dzcdn.net" />

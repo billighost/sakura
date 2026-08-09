@@ -31,6 +31,29 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
           aData = await artistRes.json();
         }
 
+        // If artist image or data is missing, perform fallback search by artistName
+        if ((!aData || !aData.imageUrl) && artistName) {
+          try {
+            const searchRes = await fetch(`/api/search?q=${encodeURIComponent(artistName)}&limit=5`);
+            if (searchRes.ok) {
+              const searchJson = await searchRes.json();
+              const match = (searchJson.artists || []).find(
+                (a: any) => a.name.toLowerCase() === artistName.toLowerCase()
+              ) || searchJson.artists?.[0];
+
+              if (match) {
+                aData = {
+                  ...aData,
+                  imageUrl: match.imageUrl || aData?.imageUrl,
+                  bio: aData?.bio || match.description,
+                };
+              }
+            }
+          } catch (e) {
+            console.warn("[CreditsSection] Fallback search for artist failed:", e);
+          }
+        }
+
         if (active) {
           setCreditsData(cData);
           setArtistData(aData);
@@ -47,7 +70,7 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
     return () => {
       active = false;
     };
-  }, [trackId, artistId]);
+  }, [trackId, artistId, artistName]);
 
   return (
     <div className={styles.container} data-block-drag>
@@ -62,7 +85,7 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
           {/* Main Artist Card */}
           <div className={styles.artistCard}>
             {artistData?.imageUrl ? (
-              <img src={artistData.imageUrl} alt={artistName} className={styles.artistImage} />
+              <img src={artistData.imageUrl} alt={artistName} className={styles.artistImage} referrerPolicy="no-referrer" />
             ) : (
               <div className={`${styles.artistImage} ${styles.artistFallback}`}>
                 <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
@@ -147,7 +170,7 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
             </div>
             <div className={styles.modalBody}>
                {artistData.imageUrl && (
-                  <img src={artistData.imageUrl} alt={artistName} className={styles.modalImage} />
+                  <img src={artistData.imageUrl} alt={artistName} className={styles.modalImage} referrerPolicy="no-referrer" />
                )}
               <p className={styles.fullBio}>{artistData.bio}</p>
             </div>

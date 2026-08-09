@@ -457,6 +457,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                     className={`${styles.art} ${artLoaded ? styles.loaded : ""}`}
                     src={currentTrack.coverUrl}
                     alt={currentTrack.title}
+                    referrerPolicy="no-referrer"
                     onLoad={() => setArtLoaded(true)}
                   />
                 </>
