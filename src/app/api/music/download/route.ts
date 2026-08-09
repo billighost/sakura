@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getTelegramClient } from "@/lib/telegram";
+import { getTelegramClientForBot, getBotFallbackChain } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
-import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
+import { enrichTrackMetadata, enrichMusicBrainzAndSave, searchDeezerTrack } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { Redis } from "@upstash/redis";
@@ -104,11 +104,6 @@ export async function POST(req: NextRequest) {
 
     /**
      * Second chance: the same song under a different canonical title.
-     *
-     * The lookup above matches the requested title exactly, which misses every
-     * track Telegram stored under a fuller name — remasters, "(feat. …)"
-     * suffixes, deluxe editions. Those are not rare, and each miss costs a
-     * 30-60s bot download for a file we already have.
      */
     const aliasId = await cacheGet<string>(aliasKey);
     if (aliasId) {
@@ -149,7 +144,6 @@ export async function POST(req: NextRequest) {
 
   // This endpoint drives a Telegram bot with a 3-attempt retry and 60s
   // timeouts, so it is by far the most expensive thing a client can trigger.
-  // Without a cap, one looping client can saturate the bot for everyone.
   const limited = await rateLimit(
     `download:${session.user.id}`,
     LIMITS.download.limit,
@@ -174,28 +168,11 @@ export async function POST(req: NextRequest) {
   if (pendingDownloads.has(cacheKey)) {
     console.log(`[Telegram AutoDownload] Coalescing request for "${searchQuery}". Waiting for active download...`);
     try {
-      /**
-       * Take the winner's answer directly.
-       *
-       * This used to await the promise for its side effect and then re-query by
-       * `lower(title) = lower($1)` using the *requested* title — which silently
-       * failed whenever Telegram's canonical title differed from what was asked
-       * for. Asking for "Dreams" stores "Dreams (2004 Remaster)", the lookup
-       * missed, and the waiter fell through to start its own download. Measured:
-       * five concurrent requests for one new song produced five separate
-       * Telegram downloads with five different messageIds, each overwriting the
-       * last — precisely what this block exists to prevent.
-       *
-       * The resolved payload is the response the winner is about to send, so
-       * there's nothing to look up and nothing to mismatch.
-       */
       const shared = await pendingDownloads.get(cacheKey);
       if (shared) {
         return NextResponse.json(shared);
       }
 
-      // Older in-flight entries (or a winner that resolved without a payload)
-      // still fall back to the lookup rather than starting a second download.
       const newTrack = await queryOne<{
         id: string;
         title: string;
@@ -244,32 +221,75 @@ export async function POST(req: NextRequest) {
   downloadPromise.catch(() => {});
   pendingDownloads.set(cacheKey, downloadPromise);
 
-  const client = getTelegramClient();
-  await client.acquire();
-
   try {
     console.log(`[Telegram AutoDownload] Searching: "${searchQuery}"`);
 
-    // searchAndSelect acquires the bot mutex, searches, clicks the first result,
-    // waits for audio, then releases — all serialized for reliability
+    // Pre-fetch Deezer track ID so we have a URL-based fallback ready when the
+    // bot's daily text-search limit is hit. Deezer links bypass the limit.
+    // This runs concurrently with the rest of the setup, not blocking the bot call.
+    const deezerLookupPromise = searchDeezerTrack(title, artist).catch(() => null);
+
+    // Try each bot in the fallback chain. If a bot is rate-limited on text search,
+    // retry it with a direct Deezer URL before moving to the next bot.
     let track: any = null;
     let lastError: any = null;
+    const botChain = getBotFallbackChain();
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (const botUsername of botChain) {
+      const botClient = getTelegramClientForBot(botUsername);
+      await botClient.acquire();
       try {
-        track = await client.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 20000, 35000);
-        break;
-      } catch (err) {
-        console.warn(`[Telegram AutoDownload] Attempt ${attempt} failed for "${searchQuery}":`, err instanceof Error ? err.message : err);
-        lastError = err;
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 1500));
+        // First attempt: text query
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            console.log(`[Telegram AutoDownload] Trying bot "${botUsername}" for "${searchQuery}" (attempt ${attempt})`);
+            track = await botClient.searchAndSelect(searchQuery, duration ? Number(duration) : undefined, 20000, 35000);
+            break;
+          } catch (err: any) {
+            const msg = String(err?.message || "");
+            const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
+            console.warn(`[Telegram AutoDownload] Bot "${botUsername}" attempt ${attempt} failed:`, msg);
+            lastError = err;
+            if (isRateLimited) {
+              // Text search is rate-limited. Try the same bot with a Deezer URL —
+              // the bot accepts streaming service links even when the search quota is exhausted.
+              const deezerTrack = await deezerLookupPromise;
+              if (deezerTrack?.id) {
+                const deezerUrl = `https://www.deezer.com/track/${deezerTrack.id}`;
+                console.log(`[Telegram AutoDownload] Bot "${botUsername}" is rate-limited. Retrying with Deezer URL: ${deezerUrl}`);
+                try {
+                  track = await botClient.searchAndSelect(deezerUrl, duration ? Number(duration) : undefined, 25000, 45000);
+                  break; // Deezer URL worked!
+                } catch (deezerErr: any) {
+                  console.warn(`[Telegram AutoDownload] Bot "${botUsername}" Deezer URL attempt failed:`, String(deezerErr?.message || deezerErr));
+                  lastError = deezerErr;
+                }
+              }
+              // Deezer URL also failed or no Deezer ID — skip to next bot
+              throw err;
+            }
+            if (attempt < 2) {
+              await new Promise((r) => setTimeout(r, 1500));
+            }
+          }
         }
+        if (track) break; // success
+      } catch (err: any) {
+        const msg = String(err?.message || "");
+        const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
+        if (isRateLimited) {
+          console.warn(`[Telegram AutoDownload] Bot "${botUsername}" exhausted. Trying next fallback bot...`);
+          lastError = err;
+          continue; // try next bot
+        }
+        throw err; // non-rate-limit error: propagate immediately
+      } finally {
+        await botClient.release();
       }
     }
 
     if (!track) {
-      throw lastError || new Error("Failed to download track after 3 attempts");
+      throw lastError || new Error("All bots failed or are rate-limited");
     }
 
     const userId = session.user.id as string;
@@ -296,8 +316,6 @@ export async function POST(req: NextRequest) {
     let albumId: string | null = providedAlbumId || null;
 
     if (metadata.album) {
-      // The frontend might send a Deezer ID ("deezer-...") for the album if it hasn't
-      // been downloaded yet. We must ensure the Album exists in our DB and use its internal UUID.
       const existingAlbum = await queryOne<{ id: string }>(
         `SELECT id FROM "Album" WHERE "deezerId" = $1 OR id = $2`,
         [metadata.album.deezerId, albumId]
@@ -336,8 +354,6 @@ export async function POST(req: NextRequest) {
         albumId = newAlbum!.id;
       }
     } else if (albumId && albumId.startsWith("deezer-")) {
-      // If we got a deezer- albumId but metadata.album is null, we can't create it reliably.
-      // Leave albumId null to avoid foreign key crashes.
       albumId = null;
     }
 
@@ -358,8 +374,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (dbTrack) {
-      // The track exists (e.g., as a Deezer stub from the Favorites route).
-      // We just downloaded it from Telegram, so we must upgrade the stub to a real track.
       const newAudioUrl = `/api/stream/telegram/${track.messageId}`;
       await execute(
         `UPDATE "Track" 
@@ -369,9 +383,6 @@ export async function POST(req: NextRequest) {
       );
       (dbTrack as any).audioUrl = newAudioUrl;
     } else {
-      // Two concurrent serverless instances may both pass the earlier lookups
-      // and try to insert the same track simultaneously. Wrap in try/catch so
-      // the loser of the race falls back to selecting the winner's row.
       try {
         dbTrack = await queryOne<{ id: string; audioUrl: string }>(
           `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "deezerId", isrc, "previewUrl", "coverUrl", "createdAt")
@@ -391,9 +402,8 @@ export async function POST(req: NextRequest) {
           ]
         );
       } catch (insertErr: any) {
-        // If the insert failed due to a concurrent duplicate, find the existing row.
         const isDuplicate =
-          insertErr?.code === "23505" || // PostgreSQL unique_violation
+          insertErr?.code === "23505" ||
           String(insertErr?.message).includes("duplicate key");
 
         if (isDuplicate) {
@@ -410,19 +420,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-
     // ── Contributors ────────────────────────────────────────────────────────
-    // Previously this looped one artist at a time with a SELECT then maybe an
-    // INSERT per contributor — up to 2N round trips for a track with N credited
-    // artists. Now: one upsert for all of them, one read back, one join insert.
     const contributors = metadata.track?.contributors?.filter((c) => c.name) ?? [];
 
     if (contributors.length > 0) {
       const names = contributors.map((c) => c.name);
       const images = contributors.map((c) => c.imageUrl || null);
 
-      // `ON CONFLICT DO UPDATE` rather than DO NOTHING: DO NOTHING wouldn't
-      // return the existing rows, and we need every id back in one trip.
       const artistRows = await query<{ id: string; name: string }>(
         `INSERT INTO "Artist" (id, name, "imageUrl", "createdAt")
          SELECT gen_random_uuid()::text, n, i, NOW()
@@ -468,9 +472,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Credits ─────────────────────────────────────────────────────────────
-    // One multi-row insert instead of one per credit. Also de-duplicated: the
-    // previous version inserted unconditionally, so re-downloading a track
-    // appended a second copy of every producer/writer credit.
     if (metadata.credits?.length) {
       await execute(
         `INSERT INTO "TrackCredit" (id, "trackId", name, role, "createdAt")
@@ -489,11 +490,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Samples ─────────────────────────────────────────────────────────────
-    // The per-sample `SELECT ... WHERE title ILIKE '%x%'` lookup is gone: it
-    // ran a full scan per sample, and when it missed it fell back to pointing
-    // the sample at the track itself — writing a row claiming the song sampled
-    // itself. Resolution now happens in one pass, and unresolvable samples are
-    // skipped rather than recorded wrongly.
     if (metadata.samples?.length) {
       const sampleTitles = metadata.samples.map((s) => s.trackTitle);
 
@@ -526,12 +522,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Trigger MusicBrainz enrichment in the background so it does not block the response
+    // Trigger MusicBrainz enrichment in the background
     enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
 
-    // If the user had already liked the virtual deezer- version of this track
-    // (e.g. liked before ever playing it), migrate that Favorite row to the
-    // new real track id so the heart icon stays filled after the download.
+    // Migrate favorite from deezer- virtual track to real track
     if (metadata.track?.deezerId) {
       const deezerId = metadata.track.deezerId.toString();
       const deezerTrackId = `deezer-${deezerId}`;
@@ -556,41 +550,43 @@ export async function POST(req: NextRequest) {
       coverUrl: metadata.album?.coverUrl || null,
     };
 
-    /**
-     * Remember which request produced this track.
-     *
-     * Telegram's canonical title routinely differs from what was asked for
-     * ("Dreams" → "Dreams (2004 Remaster)"), and the cache check at the top of
-     * this route matches on exact title. Without an alias, every future request
-     * phrased the original way misses the row that already exists and pays for
-     * a fresh 30-60s bot download — permanently, not just once.
-     *
-     * Written through `cacheSet` so the in-process L1 absorbs the reads; on
-     * Upstash's per-command billing an uncached lookup per play would be far
-     * more expensive than the row it saves.
-     */
     await cacheSet(aliasKey, dbTrack!.id, ALIAS_TTL_SECONDS).catch(() => {});
 
     resolveDownload(payload);
     pendingDownloads.delete(cacheKey);
 
     return NextResponse.json(payload);
-  } catch (error) {
+  } catch (error: any) {
     rejectDownload(error);
     pendingDownloads.delete(cacheKey);
     console.error("[Telegram AutoDownload]", error);
-    
-    if (redis) {
-      // Cache the failure for 30 seconds to prevent slamming the bot instantly,
-      // but allow the user to retry relatively quickly.
+
+    const msg = String(error?.message || "");
+    const isRateLimited = msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily");
+    const isNoResults = msg.includes("Bot responded:") || msg.includes("No results found");
+
+    // Don't negative-cache rate limits — the bot will work again tomorrow.
+    if (redis && !isRateLimited) {
       await redis.set(negativeCacheKey, "1", { ex: 30 }).catch(console.error);
     }
-    
+
+    if (isRateLimited) {
+      return NextResponse.json(
+        { error: "The music bot has reached its daily search limit. Please try again tomorrow." },
+        { status: 429 }
+      );
+    }
+
+    if (isNoResults) {
+      return NextResponse.json(
+        { error: "Track not found on Telegram bot" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to download track from Telegram" },
       { status: 500 }
     );
-  } finally {
-    await client.release();
   }
 }

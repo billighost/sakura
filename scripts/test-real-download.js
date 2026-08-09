@@ -60,7 +60,11 @@ async function main() {
   const sessionString = process.env.TELEGRAM_SESSION_STRING || "";
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
 
-  console.log("Connecting with Bot:", botUsername);
+  // Force no proxy for this local test — the SOCKS proxy has expired
+  // Production (Vercel) still uses the proxy via env vars in the actual server code
+  const proxyConfig = undefined;
+
+  console.log("Connecting with Bot:", botUsername, "(no proxy - direct connection)");
   const client = new TelegramClient(
     new StringSession(sessionString),
     apiId,
@@ -71,11 +75,14 @@ async function main() {
   await client.connect();
   console.log("Connected successfully!");
 
+
   const botEntity = await client.getEntity(botUsername);
   
-  const query = "YOASOBI - アイドル";
+  // Since the bot is rate-limited for text searches today,
+  // use a direct Deezer URL which bypasses the limit
+  const query = "https://www.deezer.com/en/track/2210493097"; // YOASOBI - アイドル
   const targetDuration = 232; // 3:52
-  console.log(`\nSearching for "${query}" with target duration ${targetDuration}s...`);
+  console.log(`\nSearching via Deezer URL (bot rate-limit workaround): ${query}`);
 
   // Search
   // Last message ID before sending
@@ -87,7 +94,7 @@ async function main() {
   // Poll for the bot's response
   let buttonMessageId = null;
   let buttons = [];
-  const deadline = Date.now() + 20000;
+  const deadline = Date.now() + 55000; // 55s — URL downloads can take longer
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1200));

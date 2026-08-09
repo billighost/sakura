@@ -422,11 +422,22 @@ export class TelegramClient {
 
       for (const msg of newMessages) {
         if (!msg || msg.id <= lastKnownId) continue;
+        // Skip messages we sent (outgoing)
+        if (msg.out) continue;
 
-        // Fast detection if bot sent a text response indicating no results found
+        // Fast detection if bot sent a text response indicating no results found or rate limit
         if (msg.message && !msg.replyMarkup && !msg.media) {
-          if (/not found|no result|nothing found|sorry|no tracks|unsupported/i.test(msg.message)) {
-            throw new Error(`Bot responded: ${msg.message.trim()}`);
+          const txt = msg.message.trim();
+          if (/daily.*(limit|search limit)/i.test(txt) || /limit reached/i.test(txt)) {
+            throw new Error(`Bot rate-limited: ${txt.split('\n')[0]}`);
+          }
+          // Don't throw on progress/status messages (e.g. "Downloading...", "Processing...")
+          // These appear when the bot is given a Deezer/Spotify URL and is fetching the file.
+          if (/download|process|fetch|wait|please/i.test(txt)) {
+            continue; // keep polling — the audio will follow
+          }
+          if (/not found|no result|nothing found|sorry|no tracks|unsupported|error/i.test(txt)) {
+            throw new Error(`Bot responded: ${txt}`);
           }
         }
 
@@ -810,4 +821,63 @@ export function getTelegramClient(): TelegramClient {
     );
   }
   return globalForTelegram.telegramClient;
+}
+
+/**
+ * Returns an ordered list of bot usernames to try. The first is the primary
+ * configured bot; the rest are fallbacks tried when the primary is rate-limited.
+ *
+ * Overridable via TELEGRAM_FALLBACK_BOTS="deezload2bot,vkmusic_bot" in .env.
+ */
+export function getBotFallbackChain(): string[] {
+  const primary = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
+  const fallbackEnv = process.env.TELEGRAM_FALLBACK_BOTS || "";
+  const fallbacks = fallbackEnv
+    .split(",")
+    .map((b) => b.trim())
+    .filter((b) => b && b !== primary);
+  return [primary, ...fallbacks];
+}
+
+const globalForFallbackClients = globalThis as unknown as {
+  telegramFallbackClients?: Map<string, TelegramClient>;
+};
+if (!globalForFallbackClients.telegramFallbackClients) {
+  globalForFallbackClients.telegramFallbackClients = new Map();
+}
+
+/**
+ * Get (or create) a TelegramClient pointed at a specific bot username.
+ * Caches one client per bot in a global map so we don't recreate connections.
+ */
+export function getTelegramClientForBot(botUsername: string): TelegramClient {
+  const cache = globalForFallbackClients.telegramFallbackClients!;
+  if (cache.has(botUsername)) return cache.get(botUsername)!;
+
+  const apiId = parseInt(process.env.TELEGRAM_API_ID || "0", 10);
+  const apiHash = process.env.TELEGRAM_API_HASH || "";
+  const sessionString = process.env.TELEGRAM_SESSION_STRING || "";
+
+  if (!apiId || !apiHash) {
+    throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
+  }
+
+  const proxyHost = process.env.TELEGRAM_PROXY_HOST || "";
+  const proxyPort = process.env.TELEGRAM_PROXY_PORT ? parseInt(process.env.TELEGRAM_PROXY_PORT, 10) : undefined;
+  const proxyUsername = process.env.TELEGRAM_PROXY_USERNAME || undefined;
+  const proxyPassword = process.env.TELEGRAM_PROXY_PASSWORD || undefined;
+  const proxySocksTypeInput = process.env.TELEGRAM_PROXY_SOCKS_TYPE ? parseInt(process.env.TELEGRAM_PROXY_SOCKS_TYPE, 10) : 5;
+  const proxySocksType: 5 | 4 = (proxySocksTypeInput === 4) ? 4 : 5;
+
+  const proxyConfig = proxyHost && proxyPort ? {
+    ip: proxyHost,
+    port: proxyPort,
+    socksType: proxySocksType,
+    username: proxyUsername,
+    password: proxyPassword,
+  } : undefined;
+
+  const client = new TelegramClient(apiId, apiHash, sessionString, botUsername, proxyConfig);
+  cache.set(botUsername, client);
+  return client;
 }
