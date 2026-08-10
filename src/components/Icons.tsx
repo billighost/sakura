@@ -376,6 +376,23 @@ export function ArrowRightIcon(p: IconProps) {
   );
 }
 
+/**
+ * Downward arrow. Its own geometry rather than a rotated `ArrowLeftIcon`:
+ * a rotation would inherit that glyph's `chev-l` animation part and slide
+ * sideways when triggered, which is wrong for a control that means "come back
+ * down to the current line".
+ */
+export function ArrowDownIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <g data-part="chev-d">
+        <path d="M12 4.6v14.8" />
+        <path d="M5.8 13.4 12 19.6l6.2-6.2" />
+      </g>
+    </Svg>
+  );
+}
+
 export function MoreIcon(p: IconProps) {
   return (
     <Svg {...p} fill="currentColor">
@@ -561,6 +578,41 @@ export function PhoneIcon(p: IconProps) {
       <rect x="6.3" y="2.3" width="11.4" height="19.4" rx="2.8" />
       <path d="M10.3 5.3h3.4" />
       <circle cx="12" cy="18.4" r="0.9" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+/**
+ * Script conversion — a CJK-style glyph beside a Latin "A", which is literally
+ * what the control does. Deliberately not GlobeIcon: a globe means "region" or
+ * "language", not "rewrite this in another alphabet".
+ */
+export function LanguageIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <g data-part="glyph-src">
+        <path d="M3.4 6.1h7.2" />
+        <path d="M7 4.2v1.9" />
+        <path d="M9.1 6.1c0 3.3-2 5.9-5.7 7.1" />
+        <path d="M5.2 9.6c1 1.9 2.6 3.1 5.1 3.8" />
+      </g>
+      <g data-part="glyph-dst">
+        <path d="M13.2 19.8l3.5-8.4 3.5 8.4" />
+        <path d="M14.5 16.7h4.4" />
+      </g>
+    </Svg>
+  );
+}
+
+/**
+ * Indeterminate progress. An open arc rather than a ring of dots — the gap is
+ * what makes the rotation legible, and this is the one place in the set where
+ * a spin is the honest depiction of what's happening rather than filler.
+ */
+export function SpinnerIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path data-part="spin" d="M12 3.4a8.6 8.6 0 1 1-8.6 8.6" />
     </Svg>
   );
 }

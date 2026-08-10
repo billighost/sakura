@@ -1801,21 +1801,60 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /*
+   * `seekingRef` freezes progress updates so a drag isn't fought by incoming
+   * `timeupdate` events. The hazard is that it's set by one call site and
+   * cleared by another: a caller that begins a seek and never ends it leaves
+   * the flag latched, `timeupdate` blocked, and `progress` frozen at the
+   * moment of the press — which then reads as playback jumping slightly
+   * backwards the next time that stale value is written to `currentTime`.
+   *
+   * That is exactly what tapping the mini player did: its Scrubber passes
+   * `onScrubStart` but no `onScrubEnd`, and a tap that doesn't land on the
+   * track element never reaches the handler that would have released it.
+   *
+   * A watchdog makes the flag self-releasing, so no call site can strand it.
+   * The pairing is still the normal path — this only catches the leaks.
+   */
+  const seekWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSeeking = useCallback(() => {
+    if (seekWatchdogRef.current) {
+      clearTimeout(seekWatchdogRef.current);
+      seekWatchdogRef.current = null;
+    }
+    seekingRef.current = false;
+    setIsSeeking(false);
+  }, []);
+
   const beginSeek = useCallback(() => {
     seekingRef.current = true;
     setIsSeeking(true);
-  }, []);
 
-  const endSeek = useCallback((time?: number) => {
-    if (audioRef.current && time !== undefined) {
-      audioRef.current.currentTime = time;
-      setProgress(time);
-    }
-    // Small delay to ensure the audio has processed the seek before allowing timeupdate to update
-    setTimeout(() => {
-      seekingRef.current = false;
-      setIsSeeking(false);
-    }, 50);
+    if (seekWatchdogRef.current) clearTimeout(seekWatchdogRef.current);
+    // Comfortably longer than any real drag between pointer samples, short
+    // enough that a leaked flag can't survive into the next interaction.
+    seekWatchdogRef.current = setTimeout(clearSeeking, 2000);
+  }, [clearSeeking]);
+
+  const endSeek = useCallback(
+    (time?: number) => {
+      if (audioRef.current && time !== undefined) {
+        audioRef.current.currentTime = time;
+        setProgress(time);
+      }
+      // A beat for the audio element to process the seek, so the next
+      // `timeupdate` reports the new position rather than the old one.
+      setTimeout(clearSeeking, 50);
+    },
+    [clearSeeking]
+  );
+
+  // Nothing may outlive the provider.
+  useEffect(() => {
+    return () => {
+      if (seekWatchdogRef.current) clearTimeout(seekWatchdogRef.current);
+    };
   }, []);
 
   // One-shot seek helper for anything that isn't a drag gesture (tapping a lyric line,
@@ -1829,12 +1868,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audioRef.current.currentTime = time;
         setProgress(time);
       }
-      setTimeout(() => {
-        seekingRef.current = false;
-        setIsSeeking(false);
-      }, 50);
+      setTimeout(clearSeeking, 50);
     },
-    []
+    [clearSeeking]
   );
 
   const setVolume = useCallback((vol: number) => {

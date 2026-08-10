@@ -1,0 +1,83 @@
+/* Transliteration control — sits directly above the lyrics, so it has to be
+ * quiet enough not to compete with them. See TransliterateControl.tsx. */
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--gutter) var(--space-2);
+  flex-shrink: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--on-media-secondary, rgba(255, 255, 255, 0.7));
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Active state carries the accent, since this is a real on/off. */
+.toggleOn {
+  border-color: transparent;
+  background: var(--track-accent, var(--accent));
+  color: var(--on-accent);
+}
+
+.toggle:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toggleOn:active {
+  background: var(--track-accent, var(--accent));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toggle:hover:not(:disabled):not(.toggleOn) {
+    border-color: rgba(255, 255, 255, 0.26);
+    color: var(--on-media, rgba(255, 255, 255, 0.96));
+  }
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--track-accent, var(--accent));
+  outline-offset: 2px;
+}
+
+/*
+ * Said plainly rather than hidden: a script we can't romanise is worth stating
+ * once, so the reader knows the feature exists and simply doesn't cover this
+ * song — rather than wondering why the control is missing.
+ */
+.unsupported,
+.error {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  text-align: center;
+  margin: 0;
+  max-width: 34ch;
+}
+
+.unsupported {
+  color: var(--on-media-tertiary, rgba(255, 255, 255, 0.42));
+}
+
+.error {
+  color: var(--danger);
+}

@@ -35,6 +35,14 @@ interface LyricsResult {
   syncedLyrics: string | null;
   plainLyrics: string | null;
   timedLyrics: any;
+  /**
+   * Per-word timings, when a provider has them — Musixmatch richsync via
+   * synclyrics is the usual source. Kept separate from `syncedLyrics` because
+   * it's a structured array rather than an LRC string, and the client prefers
+   * it: line-level sync can only light a whole line at once, which tells the
+   * reader nothing about where in the line the voice actually is.
+   */
+  wordSynced: any;
   source: string;
 }
 
@@ -68,7 +76,7 @@ export async function GET(req: NextRequest) {
     { label: "lyrics" },
   );
 
-  if (result && (result.syncedLyrics || result.plainLyrics)) {
+  if (result && (result.syncedLyrics || result.plainLyrics || result.wordSynced)) {
     return NextResponse.json(result, {
       headers: { "Cache-Control": "private, max-age=3600" },
     });
@@ -122,7 +130,17 @@ async function resolveLyrics(
       { provider: "lrclib", op: "search", timeoutMs: 5000, attempts: 2 },
     ),
     callProvider<any>(
-      async () => getLyricsManager().getLyrics({ track: title, artist, album, length: durMs }),
+      async () =>
+        getLyricsManager().getLyrics({
+          track: title,
+          artist,
+          album,
+          length: durMs,
+          // Asked for explicitly: the default set doesn't include wordSynced,
+          // and without it Musixmatch's richsync is never fetched — which is
+          // the only source of per-word timings we have.
+          lyricsType: ["wordSynced", "lineSynced", "plain"],
+        }),
       { provider: "synclyrics", op: "get", timeoutMs: 8000, attempts: 1 },
     )
   ]);
@@ -130,6 +148,7 @@ async function resolveLyrics(
   let syncedLyrics = "";
   let plainLyrics = "";
   let timedLyrics: any = null;
+  let wordSynced: any = null;
   let source = "";
 
   // Process in order of priority
@@ -175,24 +194,36 @@ async function resolveLyrics(
     }
   }
 
-  // 3. Musixmatch / NetEase via synclyrics
-  if (!syncedLyrics && synclyricsRes.status === "fulfilled" && synclyricsRes.value?.lyrics) {
+  // 3. Musixmatch / NetEase via synclyrics.
+  //
+  // Unlike the fallbacks above, this block runs even when an earlier provider
+  // already supplied lyrics — word timings are strictly better data than a
+  // line-level LRC string, so they're worth taking whenever they exist rather
+  // than only when nothing else answered.
+  if (synclyricsRes.status === "fulfilled" && synclyricsRes.value?.lyrics) {
     const result = synclyricsRes.value;
+    const words = result.lyrics.wordSynced?.lyrics;
+    if (Array.isArray(words) && words.length > 0) {
+      wordSynced = words;
+      source = source || result.lyrics.wordSynced?.source || "synclyrics";
+    }
+
     const lineSynced = result.lyrics.lineSynced?.lyrics || "";
     const plain = result.lyrics.plain?.lyrics || "";
-    if (lineSynced) {
+    if (lineSynced && !syncedLyrics) {
       syncedLyrics = lineSynced;
-      source = result.lyrics.lineSynced?.source || "synclyrics";
+      source = source || result.lyrics.lineSynced?.source || "synclyrics";
     }
     if (plain && !plainLyrics) plainLyrics = plain;
   }
 
-  if (!syncedLyrics && !plainLyrics) return null;
+  if (!syncedLyrics && !plainLyrics && !wordSynced) return null;
 
   return {
     syncedLyrics: syncedLyrics || null,
     plainLyrics: plainLyrics || null,
     timedLyrics: timedLyrics || null,
+    wordSynced,
     source: source || "unknown",
   };
 }

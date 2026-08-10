@@ -149,4 +149,6 @@ export const LIMITS = {
   search: { limit: 60, window: 60 },
   /** Regenerates every mix for a user. */
   mixes: { limit: 6, window: 300 },
+  /** Pure string transformation, no upstream — this only stops runaway loops. */
+  transliterate: { limit: 30, window: 60 },
 } as const;

@@ -1,14 +1,21 @@
 /*
- * Like the full player, this is an always-dark media surface in both themes —
- * the base below is opaque enough that the theme underneath never shows
- * through, so white text is correct here regardless of light/dark mode.
- * Tokens are declared once rather than repeating rgba(255,255,255,.x) inline.
+ * Lyrics view.
+ *
+ * Like the full player, an always-dark media surface in both themes — the base
+ * is opaque enough that the theme underneath never shows through, so white
+ * text is correct here regardless of light/dark mode. The on-media tokens are
+ * declared once rather than repeating rgba(255,255,255,.x) inline.
+ *
+ * The governing rule: the active line is marked by TYPE, never by a filled
+ * background. A background plate behind the current line reads as a selected
+ * table row rather than as singing. Everything below — weight, colour, scale,
+ * and the graded recession of neighbours — exists to carry "now" without one.
  */
 .overlay {
-  --on-media: rgba(255, 255, 255, 0.95);
-  --on-media-secondary: rgba(255, 255, 255, 0.72);
-  --on-media-tertiary: rgba(255, 255, 255, 0.45);
-  --on-media-fill: rgba(255, 255, 255, 0.1);
+  --on-media: rgba(255, 255, 255, 0.96);
+  --on-media-secondary: rgba(255, 255, 255, 0.7);
+  --on-media-tertiary: rgba(255, 255, 255, 0.42);
+  --on-media-fill: rgba(255, 255, 255, 0.09);
 
   position: fixed;
   inset: 0;
@@ -16,10 +23,11 @@
   display: flex;
   flex-direction: column;
   background: rgba(14, 11, 15, 0.97);
+  /* Sanctioned blur: the player genuinely sits underneath this. */
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
   transform: translateY(100%);
-  transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform var(--d-slow) var(--ease);
   pointer-events: none;
   padding-top: env(safe-area-inset-top);
 }
@@ -29,34 +37,39 @@
   pointer-events: auto;
 }
 
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem clamp(0.75rem, 3vw, 1.25rem) 0.5rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--gutter) var(--space-2);
   flex-shrink: 0;
 }
 
 .headerBtn {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: var(--tap-min);
   height: var(--tap-min);
-  cursor: pointer;
-  border-radius: 50%;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-full);
   color: var(--on-media);
-  transition: background 0.15s;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.headerBtn:hover {
+.headerBtn:active {
   background: var(--on-media-fill);
 }
 
-.headerBtn:active {
-  transform: scale(0.9);
+@media (hover: hover) and (pointer: fine) {
+  .headerBtn:hover {
+    background: var(--on-media-fill);
+  }
 }
 
 .headerCenter {
@@ -66,267 +79,415 @@
 }
 
 .headerLabel {
-  font-size: 0.625rem;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
   color: var(--on-media-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: var(--track-caps);
   font-weight: 600;
 }
 
+/* A track title is the name of a thing — display face. */
 .headerTitle {
-  font-family: var(--sakura-font-display);
-  font-size: 0.875rem;
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
   font-weight: 600;
   color: var(--on-media);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 0.0625rem;
+  margin-top: 1px;
 }
 
 .body {
   flex: 1;
   min-height: 0;
-  padding: 0 clamp(1rem, 4vw, 2rem);
+  padding: 0 var(--gutter);
   display: flex;
   flex-direction: column;
+  /* Anchors the jump-to-current button, which floats over the list. */
+  position: relative;
 }
 
-.status {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--on-media-tertiary);
-  font-size: 0.95rem;
-  text-align: center;
-}
+/* ── The list ─────────────────────────────────────────────────────────────── */
 
 .list {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem 0 2rem;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-}
-
-.list::-webkit-scrollbar {
-  display: none;
+  /*
+   * Generous top and bottom padding so the first and last lines can still
+   * reach the focus point (42% down the viewport). Without it the final line
+   * can never centre — the scroller runs out of travel — and the song appears
+   * to stop following you a few lines before the end.
+   */
+  padding: 38vh 0 52vh;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /*
+   * Deliberately NOT `scroll-behavior: smooth`. The hook chooses per call
+   * whether a movement animates — a seek must land instantly while a line
+   * change should glide — and a blanket CSS rule would override the
+   * `behavior: "auto"` it passes to scrollTo.
+   */
 }
 
 .row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-radius: 8px;
-  padding: 4px 8px;
-  margin: 1.1rem 0;
-  transition: background 0.2s ease;
-}
-
-.row:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.row:hover .shareLineBtn {
-  opacity: 1;
-}
-
-.rowActive {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.lineGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
-  transform-origin: left center;
-  transition: transform 0.3s ease;
-}
-
-.lineGroupActive {
-  transform: scale(1.04);
-}
-
-.line {
-  font-size: clamp(1.15rem, 3.6vw, 1.6rem);
-  font-weight: 700;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.4);
-  transition: color 0.3s ease;
-}
-
-.lineGroup:hover .line {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.lineActive {
-  color: #fff;
-  text-shadow: 0 0 15px rgba(255, 255, 255, 0.35);
-}
-
-.lineTranslit {
-  font-size: clamp(0.85rem, 2.4vw, 1.05rem);
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.28);
-  transition: color 0.3s ease;
-}
-
-.lineGroup:hover .lineTranslit {
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.lineTranslitActive {
-  color: rgba(255, 255, 255, 0.75);
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  /* No background, no radius, no padding plate. See the note at the top. */
 }
 
 /*
- * Revealed on hover on pointer devices, but permanently visible on touch —
- * it used to be `opacity: 0` with a hover-only reveal, which on a phone made
- * "share this line" completely unreachable. The 32px box was also below the
- * 44px minimum tap target.
+ * The whole line is the tap target; it needs a real ≥44px box without looking
+ * like a button. Padding gives it height, and the text keeps its own metrics.
+ */
+.lineBtn {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: var(--space-1) 0;
+  min-height: var(--tap-min);
+  cursor: pointer;
+  color: inherit;
+  transform-origin: left center;
+  transition: transform var(--d-slow) var(--spring-soft);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.line {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 4.4vw, 1.75rem);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-tight);
+  /*
+   * Recession by depth rather than a flat two-state on/off. Lines adjacent to
+   * the current one stay readable so you can see where the song is going;
+   * distant ones fall back far enough to stop competing. Capped at 3 in the
+   * component so the ends of a long song never become invisible.
+   */
+  color: rgba(255, 255, 255, calc(0.46 - var(--depth, 0) * 0.1));
+  transition: color var(--d-slow) var(--ease), opacity var(--d-slow) var(--ease);
+  margin: 0;
+}
+
+/* Sung lines settle back rather than staying as bright as what's coming. */
+.row[data-state="past"] .line {
+  color: rgba(255, 255, 255, calc(0.34 - var(--depth, 0) * 0.07));
+}
+
+/*
+ * The active line. Colour and weight do the work; the scale is small on
+ * purpose — enough to lift the line off the page, not so much that the text
+ * reflows and the lines below visibly jump each time.
+ */
+.row[data-state="active"] .line {
+  color: var(--on-media);
+  font-weight: 700;
+}
+
+.row[data-state="active"] .lineBtn {
+  transform: scale(1.035);
+}
+
+.translit {
+  font-family: var(--font-body);
+  font-size: clamp(0.8rem, 2.6vw, 0.98rem);
+  font-weight: 500;
+  line-height: var(--lh-normal);
+  color: rgba(255, 255, 255, calc(0.26 - var(--depth, 0) * 0.05));
+  transition: color var(--d-slow) var(--ease);
+  margin: 3px 0 0;
+}
+
+.row[data-state="active"] .translit {
+  color: var(--on-media-secondary);
+}
+
+/*
+ * Word-level highlight.
+ *
+ * Only reachable when the provider gave us per-word timings. Each chunk is its
+ * own span so the lit/unlit boundary always falls on a real character edge —
+ * a percentage-positioned gradient mask cuts through the middle of a glyph,
+ * which is wrong in Japanese and Chinese where a "word" is often one character.
+ *
+ * When there are no word timings the component renders plain text instead and
+ * the whole line lights at once via the rule above. That's the honest reading
+ * of line-level data: interpolating a sweep across a line we have no word
+ * timings for drifts out of step with the voice within a couple of words.
+ */
+.word {
+  color: rgba(255, 255, 255, 0.32);
+  transition: color var(--d-fast) var(--ease-in-out);
+}
+
+.row[data-state="active"] .word[data-lit] {
+  color: var(--on-media);
+}
+
+/* Already-sung lines show every word lit, without a per-word transition. */
+.row[data-state="past"] .word {
+  color: inherit;
+  transition: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lineBtn:hover .line {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  /* The only hint that lines are seekable, shown where a pointer can see it. */
+  .lineBtn:hover .line {
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.22);
+    text-underline-offset: 5px;
+    text-decoration-thickness: 1px;
+  }
+}
+
+.lineBtn:focus-visible {
+  outline: 2px solid var(--track-accent, var(--accent));
+  outline-offset: 4px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Per-line share ───────────────────────────────────────────────────────────
+ *
+ * Previously visible on every line at all times, which put sixty share buttons
+ * on a screen whose entire job is reading. It now belongs to the line you're
+ * pointing at, plus the active line — which is the one you'd want to share on
+ * touch, where there is no hover to reveal it with.
  */
 .shareLineBtn {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: var(--tap-min);
   height: var(--tap-min);
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--on-media-tertiary);
-  opacity: 0;
   flex-shrink: 0;
-  transition: opacity 0.2s ease, color 0.15s, background 0.15s;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-full);
+  color: var(--on-media-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  /* Not `visibility` — it must stay out of the tab order until revealed, which
+   * the component handles with tabIndex, and stay non-interactive here. */
+  pointer-events: none;
+  transition: opacity var(--d-base) var(--ease), color var(--d-fast) var(--ease);
 }
 
-@media (hover: none) {
-  .shareLineBtn {
-    opacity: 0.55;
-  }
-}
-
-.shareLineBtn:hover {
-  color: var(--on-media);
-  background: var(--on-media-fill);
+.shareLineVisible {
+  opacity: 0.6;
+  pointer-events: auto;
 }
 
 .shareLineBtn:active {
-  transform: scale(0.9);
+  background: var(--on-media-fill);
+  color: var(--on-media);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .shareLineBtn:hover {
+    opacity: 1;
+    color: var(--on-media);
+    background: var(--on-media-fill);
+  }
+}
+
+.shareLineBtn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--track-accent, var(--accent));
+  outline-offset: -2px;
+}
+
+/* ── Jump to current ──────────────────────────────────────────────────────── */
+
+.jumpBtn {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  height: var(--tap-min);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-full);
+  background: rgba(28, 22, 30, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--on-media);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-3);
+  white-space: nowrap;
+
+  /* Hidden state. Transform-only so it stays on the compositor. */
+  transform: translate(-50%, 12px) scale(0.94);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-base) var(--ease), transform var(--d-base) var(--spring);
+}
+
+.jumpVisible {
+  transform: translate(-50%, 0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── States ───────────────────────────────────────────────────────────────── */
+
+.status {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.statusTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--on-media-secondary);
+  margin: 0;
+}
+
+.statusHint {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--on-media-tertiary);
+  max-width: 30ch;
+  margin: 0;
+}
+
+/* Shaped like lyrics rather than a spinner, so the wait previews the content. */
+.skeletonList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 18vh 0 0;
+}
+
+.skeletonLine {
+  height: 1.6rem;
+  border-radius: var(--r-sm);
 }
 
 .plainText {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem 0;
-  font-size: 1.05rem;
-  line-height: 1.65;
+  padding: var(--space-5) 0;
+  font-family: var(--font-body);
+  font-size: var(--t-md);
+  line-height: var(--lh-loose);
   color: var(--on-media-secondary);
   white-space: pre-line;
-  scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 
-.plainText::-webkit-scrollbar {
-  display: none;
-}
+/* ── Footer transport ─────────────────────────────────────────────────────── */
 
 .footer {
   flex-shrink: 0;
-  padding: 0.5rem clamp(1rem, 4vw, 2rem) calc(1.25rem + env(safe-area-inset-bottom));
+  padding: var(--space-2) var(--gutter) calc(var(--space-5) + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .timeRow {
   display: flex;
   justify-content: space-between;
-  font-size: 0.6875rem;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
   font-variant-numeric: tabular-nums;
   color: var(--on-media-tertiary);
-  margin-top: 0.35rem;
+  margin-top: var(--space-1);
 }
 
 .transport {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.75rem;
-  margin-top: 0.75rem;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
 }
 
 .transportBtn {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: max(var(--tap-min), 2.75rem);
   height: max(var(--tap-min), 2.75rem);
-  cursor: pointer;
-  border-radius: 50%;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-full);
   color: var(--on-media-secondary);
-  transition: all 0.15s;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.transportBtn:hover {
-  color: var(--on-media);
-}
-
-.transportBtn:active {
-  transform: scale(0.85);
+@media (hover: hover) and (pointer: fine) {
+  .transportBtn:hover {
+    color: var(--on-media);
+  }
 }
 
 .playPauseBtn {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 3.5rem;
   height: 3.5rem;
+  border: none;
+  border-radius: var(--r-full);
+  /* Flat accent — the artwork's colour when we have it, sakura pink otherwise. */
+  background: var(--track-accent, var(--accent));
+  color: var(--on-accent);
   cursor: pointer;
-  border-radius: 50%;
-  background: var(--track-accent, var(--sakura-accent-gradient));
-  color: #1a1620;
-  transition: transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 6px 20px rgba(242, 120, 159, 0.4);
+  box-shadow: var(--shadow-2);
 }
 
-.playPauseBtn:hover {
-  transform: scale(1.04);
-}
-
-.playPauseBtn:active {
-  transform: scale(0.92);
-}
-
-/*
- * Short viewports: 1.1rem line margins plus the footer transport consumed the
- * entire screen in landscape, leaving roughly one lyric visible. Tighten the
- * spacing instead of letting the list collapse to nothing.
+/* ── Short viewports ──────────────────────────────────────────────────────────
+ *
+ * In landscape the line margins plus the footer transport consumed the screen,
+ * leaving roughly one lyric visible. Tighten rather than letting the list
+ * collapse to nothing.
  */
 @media (max-height: 640px) {
   .list {
-    padding: 0.75rem 0 1rem;
+    padding: 30vh 0 40vh;
   }
 
   .row {
-    margin: 0.6rem 0;
+    margin: var(--space-3) 0;
   }
 
   .line {
-    font-size: clamp(1rem, 3.2vw, 1.3rem);
+    font-size: clamp(1.05rem, 3.4vw, 1.35rem);
   }
 
   .footer {
-    padding: 0.375rem clamp(0.75rem, 4vw, 2rem)
-      calc(0.625rem + env(safe-area-inset-bottom));
+    padding: var(--space-1) var(--gutter) calc(var(--space-3) + env(safe-area-inset-bottom));
   }
 
   .transport {
-    gap: 1.25rem;
-    margin-top: 0.5rem;
+    gap: var(--space-5);
+    margin-top: var(--space-2);
   }
 
   .playPauseBtn {
@@ -335,16 +496,32 @@
   }
 }
 
+/* ── Reduced motion ───────────────────────────────────────────────────────────
+ *
+ * The overlay slide, the active line's scale and the word-by-word colour
+ * transition all go. Colour changes themselves stay: they're what identifies
+ * the current line, so removing them would leave the view unusable rather than
+ * calmer. Scroll behaviour is handled in JS, which reads the same setting.
+ */
 @media (prefers-reduced-motion: reduce) {
   .overlay {
     transition: none;
   }
 
-  .list {
-    scroll-behavior: auto;
+  .row[data-state="active"] .lineBtn {
+    transform: none;
   }
 
-  .lineGroupActive {
-    transform: none;
+  .word {
+    transition: none;
+  }
+
+  .jumpBtn {
+    transform: translate(-50%, 0);
+    transition: opacity var(--d-fast) var(--ease);
+  }
+
+  .jumpVisible {
+    transform: translate(-50%, 0);
   }
 }

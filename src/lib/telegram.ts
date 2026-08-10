@@ -486,27 +486,16 @@ export class TelegramClient {
             const attrNames = doc.attributes.map(a => a.className).join(', ');
             console.log(`[Telegram _searchMusic]   doc mimeType: ${mime}, size: ${size}, attributes: ${attrNames}`);
 
-            // Expanded audio detection
-            const isAudio =
-              mime.startsWith("audio/") ||
-              doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
-              doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
+            // Check if any attribute is DocumentAttributeAudio (covers music and voice)
+            const audioAttr = doc.attributes.find((a) => a instanceof Api.DocumentAttributeAudio) as Api.DocumentAttributeAudio | undefined;
 
             // Also accept if it's not an image/video and size > 500 KB (likely audio)
             const isNonMedia = !mime.startsWith("image/") && !mime.startsWith("video/");
 
-            if (isAudio || (isNonMedia && size > 500 * 1024)) {
-              const audioAttr = doc.attributes.find(
-                (a) => a instanceof Api.DocumentAttributeAudio,
-              ) as Api.DocumentAttributeAudio | undefined;
-              const voiceAttr = doc.attributes.find(
-                (a) => a instanceof Api.DocumentAttributeVoice,
-              ) as Api.DocumentAttributeVoice | undefined;
-
-              // Prefer title from audioAttr, else fallback to voice's duration
-              const title = audioAttr?.title || voiceAttr?.className || "Audio";
+            if (audioAttr || (isNonMedia && size > 500 * 1024)) {
+              const title = audioAttr?.title || (audioAttr?.voice ? "Voice" : "Audio");
               const performer = audioAttr?.performer || "Unknown";
-              const duration = audioAttr?.duration || voiceAttr?.duration || 0;
+              const duration = audioAttr?.duration || 0;
 
               console.log(`[Telegram _searchMusic] Recognised as audio: "${title}" by ${performer}, duration ${duration}s`);
               return {
@@ -531,11 +520,8 @@ export class TelegramClient {
         if (doc instanceof Api.Document) {
           const mime = doc.mimeType || '';
           const size = Number(doc.size) || 0;
-          const isAudio =
-            mime.startsWith("audio/") ||
-            doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
-            doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
-          if (isAudio || (size > 500 * 1024 && !mime.startsWith("image/") && !mime.startsWith("video/"))) {
+          const audioAttr = doc.attributes.find((a) => a instanceof Api.DocumentAttributeAudio);
+          if (audioAttr || (size > 500 * 1024 && !mime.startsWith("image/") && !mime.startsWith("video/"))) {
             console.log(`[Telegram _searchMusic] FALLBACK: found audio in msg ${msg.id}`);
             return {
               buttonMessageId: msg.id,
@@ -582,7 +568,7 @@ export class TelegramClient {
           ) as Api.DocumentAttributeAudio | undefined;
           return {
             messageId: audioMsg.id,
-            title: audioAttr?.title || "Unknown",
+            title: audioAttr?.title || (audioAttr?.voice ? "Voice" : "Unknown"),
             artist: audioAttr?.performer || "Unknown",
             duration: audioAttr?.duration || 0,
             fileId: doc.id.toString(),
@@ -651,24 +637,17 @@ export class TelegramClient {
         const doc = (msg.media as Api.MessageMediaDocument).document;
         if (!(doc instanceof Api.Document)) continue;
 
-        const isAudio = doc.mimeType?.startsWith("audio/") ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
-
-        if (!isAudio) continue;
-
         const audioAttr = doc.attributes.find(
           (a) => a instanceof Api.DocumentAttributeAudio,
         ) as Api.DocumentAttributeAudio | undefined;
-        const voiceAttr = doc.attributes.find(
-          (a) => a instanceof Api.DocumentAttributeVoice,
-        ) as Api.DocumentAttributeVoice | undefined;
+
+        if (!audioAttr) continue;
 
         return {
           messageId: msg.id,
-          title: audioAttr?.title || "Voice",
-          artist: audioAttr?.performer || "Unknown",
-          duration: audioAttr?.duration || voiceAttr?.duration || 0,
+          title: audioAttr.title || (audioAttr.voice ? "Voice" : "Unknown"),
+          artist: audioAttr.performer || "Unknown",
+          duration: audioAttr.duration || 0,
           fileId: doc.id.toString(),
           buttonIndex,
         };
@@ -708,27 +687,20 @@ export class TelegramClient {
         const doc = (msg.media as Api.MessageMediaDocument).document;
         if (!(doc instanceof Api.Document)) continue;
 
-        const isAudio = doc.mimeType?.startsWith("audio/") ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
+        const audioAttr = doc.attributes.find(
+          (a) => a instanceof Api.DocumentAttributeAudio,
+        ) as Api.DocumentAttributeAudio | undefined;
 
-        if (!isAudio) continue;
+        if (!audioAttr) continue;
 
         const msgId = msg.id || 0;
         if (results.some((r) => r.messageId === msgId)) continue;
 
-        const audioAttr = doc.attributes.find(
-          (a) => a instanceof Api.DocumentAttributeAudio,
-        ) as Api.DocumentAttributeAudio | undefined;
-        const voiceAttr = doc.attributes.find(
-          (a) => a instanceof Api.DocumentAttributeVoice,
-        ) as Api.DocumentAttributeVoice | undefined;
-
         const track: MusicResult = {
           messageId: msgId,
-          title: audioAttr?.title || "Voice",
-          artist: audioAttr?.performer || "Unknown",
-          duration: audioAttr?.duration || voiceAttr?.duration || 0,
+          title: audioAttr.title || (audioAttr.voice ? "Voice" : "Unknown"),
+          artist: audioAttr.performer || "Unknown",
+          duration: audioAttr.duration || 0,
           fileId: doc.id.toString(),
           buttonIndex: 0,
         };

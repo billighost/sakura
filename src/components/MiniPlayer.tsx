@@ -47,6 +47,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     duration,
     seekTo,
     beginSeek,
+    endSeek,
     togglePlay,
     next,
     prev,
@@ -168,6 +169,12 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
           variant="mini"
           onScrubStart={beginSeek}
           onSeek={(t) => seekTo(t)}
+          // Pairs with onScrubStart. Without it, a press that ends without a
+          // completed drag — a tap on the bar, or a pointer whose capture is
+          // stolen by the expand gesture — left the seek flag latched, which
+          // froze `progress` and made playback resume slightly behind where it
+          // actually was.
+          onScrubEnd={endSeek}
         />
       </div>
 
