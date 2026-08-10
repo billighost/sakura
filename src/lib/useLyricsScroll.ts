@@ -101,7 +101,19 @@ export function useLyricsScroll({
     /** Guards the very first layout pass, which must not animate. */
     hasPositioned: false,
     lastActiveIndex: -1,
+    /**
+     * The live active index, for handlers bound once. It lives in this bag
+     * rather than its own ref so the listener effect has one mutable object to
+     * read instead of two, and so the ref never appears in a dependency array.
+     */
+    activeIndex: -1,
   });
+
+  // Kept current from an effect: render must stay pure, and the handlers that
+  // read it only ever run after commit.
+  useEffect(() => {
+    s.current.activeIndex = activeIndex;
+  }, [activeIndex]);
 
   const registerLine = useCallback((index: number, el: HTMLElement | null) => {
     if (el) lineRefs.current.set(index, el);
@@ -212,10 +224,10 @@ export function useLyricsScroll({
         setDetached(true);
       }
 
-      const top = targetOffsetFor(activeIndexRef.current);
+      const top = targetOffsetFor(s.current.activeIndex);
       if (top !== null) s.current.driftAtRelease = Math.abs(container.scrollTop - top);
 
-      setActiveVisible(isActiveVisible(activeIndexRef.current));
+      setActiveVisible(isActiveVisible(s.current.activeIndex));
     };
 
     // Passive: none of these are ever prevented, and saying so up front lets
@@ -233,13 +245,6 @@ export function useLyricsScroll({
       container.removeEventListener("scroll", onScroll);
     };
   }, [enabled, isActiveVisible, targetOffsetFor]);
-
-  // The scroll handler is bound once but needs the live index; a ref keeps it
-  // current without rebinding listeners on every line change.
-  const activeIndexRef = useRef(activeIndex);
-  useEffect(() => {
-    activeIndexRef.current = activeIndex;
-  }, [activeIndex]);
 
   /* ── Following the song ─────────────────────────────────────────────────── */
 
@@ -279,7 +284,7 @@ export function useLyricsScroll({
       if (!container) return;
 
       const idle = performance.now() - s.current.lastInteraction;
-      const visible = isActiveVisible(activeIndexRef.current);
+      const visible = isActiveVisible(s.current.activeIndex);
       setActiveVisible(visible);
 
       const near = s.current.driftAtRelease < container.clientHeight * NEAR_FACTOR;
@@ -295,7 +300,7 @@ export function useLyricsScroll({
       if (!visible && !near) return;
 
       attach();
-      scrollToIndex(activeIndexRef.current, prefersReducedMotion() ? "auto" : "smooth");
+      scrollToIndex(s.current.activeIndex, prefersReducedMotion() ? "auto" : "smooth");
     };
 
     const id = setInterval(tick, 250);
@@ -310,33 +315,39 @@ export function useLyricsScroll({
     // An explicit "put me here" outranks whatever the user was reading, so it
     // reattaches as well as scrolling. Instant, not smooth: after a seek the
     // lyrics should already be there, not on their way.
-    attach();
     s.current.lastInteraction = 0;
 
-    if (activeIndexRef.current >= 0) {
-      // A frame's delay lets the new track's lines mount and measure; without
-      // it there is nothing to scroll to and the view stays at the top.
-      const raf = requestAnimationFrame(() => scrollToIndex(activeIndexRef.current, "auto"));
-      return () => cancelAnimationFrame(raf);
-    }
+    // A frame's delay lets the new track's lines mount and measure; without it
+    // there is nothing to scroll to and the view stays at the top. `attach()`
+    // rides along inside the frame so the detach flag clears in the same tick
+    // as the scroll it belongs to, instead of a render earlier.
+    const raf = requestAnimationFrame(() => {
+      attach();
+      if (s.current.activeIndex >= 0) {
+        scrollToIndex(s.current.activeIndex, "auto");
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [snapToken, enabled, attach, scrollToIndex]);
 
-  /* Reset when the view closes, so reopening starts centred rather than
-   * wherever the reader left it during the previous song. */
+  /*
+   * Reset when the view closes, so reopening starts centred rather than
+   * wherever the reader left it during the previous song. Ref-only — the
+   * returned values are gated on `enabled` so a closed view reports "attached",
+   * which is what the caller wants to render, without pushing to state.
+   */
   useEffect(() => {
     if (enabled) return;
     s.current.hasPositioned = false;
     s.current.detached = false;
     s.current.driftAtRelease = 0;
-    setDetached(false);
-    setActiveVisible(true);
   }, [enabled]);
 
   return {
     scrollRef,
     registerLine,
-    detached,
-    showJumpToCurrent: detached && !activeVisible && activeIndex >= 0,
+    detached: enabled && detached,
+    showJumpToCurrent: enabled && detached && !activeVisible && activeIndex >= 0,
     jumpToCurrent,
   };
 }

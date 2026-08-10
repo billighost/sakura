@@ -176,6 +176,11 @@ export function LyricsModal({
             <div
               ref={scrollRef}
               className={`${styles.list} no-scrollbar`}
+              // Opted out of the app's smooth-scroll layer: this list runs its
+              // own scroll choreography (yield to the reader, resume on idle,
+              // snap on seek) and an outside animator would fight it for
+              // `scrollTop`.
+              data-lenis-prevent
               // Not a listbox: these are lines of text that happen to be
               // seekable, and announcing "option 4 of 60" while reading is
               // noise. A labelled group of buttons describes it honestly.
@@ -342,7 +347,9 @@ function LyricRow({
           )}
         </p>
 
-        {line.transliterated && <p className={styles.translit}>{line.transliterated}</p>}
+        {showTranslit && line.transliterated && (
+          <p className={styles.translit}>{line.transliterated}</p>
+        )}
       </button>
 
       <button

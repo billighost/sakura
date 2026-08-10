@@ -362,9 +362,17 @@
   border-radius: var(--r-md);
   background: var(--surface-2);
   /* Handles are dragged along this rail, so the browser must not claim the
-   * gesture for horizontal scrolling. */
+   * gesture for horizontal scrolling — and, since Lenis is bound to the page
+   * scroller, must not let a drag here animate the page either. */
   touch-action: none;
-  overflow: hidden;
+  overscroll-behavior: contain;
+  /*
+   * NOT `overflow: hidden`. The handles' 44px touch targets extend past the
+   * rail's edges by design, and clipping them would trim exactly the part of
+   * the target that makes the first and last second of a track reachable with
+   * a thumb. The bars are inset instead, so nothing visually overflows.
+   */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .waveBars {
@@ -374,6 +382,9 @@
   align-items: center;
   gap: 1px;
   padding: 0 2px;
+  /* Rounds the bar field, since the parent can no longer clip it. */
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 .waveBar {

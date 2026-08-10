@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Sheet } from "../Sheet";
 import { ImageStep } from "./ImageStep";
 import { VideoStep } from "./VideoStep";
-import { useShare } from "./ShareContext";
+import { useShare, type ShareSubject } from "./ShareContext";
 import {
   copyLink,
   createShareLink,
@@ -55,15 +55,19 @@ export function ShareStudio() {
 
   const open = subject !== null;
 
-  // Reset when a new share begins. Keyed on the track so opening the studio
-  // for a different song doesn't show the previous song's finished card.
-  useEffect(() => {
-    if (open) {
-      setStep("choose");
-      setResult(null);
-      setBusy(false);
-    }
-  }, [open, subject?.track.id]);
+  /*
+   * Reset when a new share begins. A new share is always a fresh `subject`
+   * object identity (every caller constructs one), so the "adjust state when a
+   * prop changes" pattern keyed on that identity is enough — no effect, and no
+   * stale card from the previous song left on screen.
+   */
+  const [prevSubject, setPrevSubject] = useState<ShareSubject | null>(null);
+  if (subject !== prevSubject) {
+    setPrevSubject(subject);
+    setStep("choose");
+    setResult(null);
+    setBusy(false);
+  }
 
   const lines = useMemo(
     () => (subject?.lines ?? []).map((l) => l.text).filter(Boolean),

@@ -4,13 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TrimEditor } from "./TrimEditor";
 import {
   COVER_STYLES,
-  extensionFor,
   isVideoShareSupported,
-  pickMimeType,
   renderShareVideo,
   type CoverStyle,
   type VideoTrack,
 } from "@/lib/shareVideo";
+import { detectFastEncode } from "@/lib/fastEncode";
 import { toSameOriginUrl } from "@/lib/shareAudio";
 import type { LyricLine } from "@/lib/lyrics";
 import { haptic } from "@/lib/haptics";
@@ -48,9 +47,16 @@ export function VideoStep({
 }: VideoStepProps) {
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("bloom");
   const [showLyrics, setShowLyrics] = useState(canUseLyrics);
-  const [trim, setTrim] = useState({
-    start: Math.max(0, atTime - 7),
-    duration: 15,
+  const [trim, setTrim] = useState(() => {
+    // A default window around where playback was when the share started. The
+    // 15s default only makes sense while there's a track long enough to hold
+    // it; a 10-second loop gets the whole thing.
+    const duration = track.duration ?? 0;
+    const length = Math.min(15, Math.max(1, duration || 15));
+    return {
+      start: Math.max(0, Math.min(atTime - 7, Math.max(0, duration - length))),
+      duration: length,
+    };
   });
 
   const [progress, setProgress] = useState<number | null>(null);
@@ -99,6 +105,23 @@ export function VideoStep({
 
   const exporting = progress !== null;
 
+  /*
+   * Which encoder will run, so the progress copy can be honest about the wait.
+   * WebCodecs encodes offline in a few seconds; MediaRecorder captures in real
+   * time, so a 60-second clip genuinely takes a minute and the user needs to be
+   * told that up front rather than concluding it has hung.
+   */
+  const [isFast, setIsFast] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    detectFastEncode().then((support) => {
+      if (!cancelled) setIsFast(support !== null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleExport = useCallback(async () => {
     if (!localAudio) return;
 
@@ -109,7 +132,7 @@ export function VideoStep({
     abortRef.current = controller;
 
     try {
-      const blob = await renderShareVideo({
+      const result = await renderShareVideo({
         track,
         audioUrl: localAudio,
         startTime: trim.start,
@@ -123,7 +146,7 @@ export function VideoStep({
       });
 
       haptic("success");
-      onExport(blob, extensionFor(pickMimeType() ?? "video/webm"));
+      onExport(result.blob, result.extension);
     } catch (err) {
       // A cancel is the user's decision, not a failure to report back at them.
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -245,8 +268,12 @@ export function VideoStep({
             />
           </div>
           <p className={styles.progressNote}>
-            Recording in real time — about {Math.max(1, Math.ceil(trim.duration * (1 - (progress ?? 0))))}s
-            left. Keep this screen open.
+            {isFast === false
+              ? `Recording in real time — about ${Math.max(
+                  1,
+                  Math.ceil(trim.duration * (1 - (progress ?? 0)))
+                )}s left. Keep this screen open.`
+              : "Putting your video together. Keep this screen open."}
           </p>
           <button
             type="button"

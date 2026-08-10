@@ -215,7 +215,7 @@ export function Sheet({
           </header>
         )}
 
-        <div className={styles.body} data-sheet-body>
+        <div className={styles.body} data-sheet-body data-lenis-prevent>
           {children}
         </div>
 

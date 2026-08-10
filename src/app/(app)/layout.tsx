@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { TabBar } from "@/components/TabBar";
 import { MiniPlayer } from "@/components/MiniPlayer";
 import { FullPlayer } from "@/components/FullPlayer";
@@ -9,6 +10,7 @@ import { MediaSessionProvider } from "@/components/MediaSessionProvider";
 import { AppNavProvider, useAppNav } from "@/components/AppNavContext";
 import { ShareProvider } from "@/components/share/ShareContext";
 import { ShareStudio } from "@/components/share/ShareStudio";
+import { SmoothScroll } from "@/components/SmoothScroll";
 import { useSwipeBack } from "@/lib/useSwipeBack";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import styles from "./layout.module.css";
@@ -17,6 +19,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const { currentTrack } = usePlayer();
   const { registerScroller } = useAppNav();
+  const pathname = usePathname();
 
   // Single registration. This used to be an inline copy of the same listener
   // that `useSwipeBack` installs, so on pages calling the hook a swipe fired
@@ -56,6 +59,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div ref={registerScroller} className={styles.content} data-app-scroll>
         {children}
       </div>
+
+      {/* Smooth wheel scrolling for the resolved page scroller. Touch stays
+          native — see the note in SmoothScroll.tsx. */}
+      <SmoothScroll routeKey={pathname} />
 
       <div className={styles.bottom}>
         {currentTrack && <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />}

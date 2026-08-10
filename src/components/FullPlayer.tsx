@@ -89,10 +89,20 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
    * smooth scroll to somewhere the song is already playing.
    */
   const [snapToken, setSnapToken] = useState(0);
-  useEffect(() => {
+
+  /*
+   * Reset on track change, adjusted during render rather than in an effect.
+   * An effect would run a frame late, so the first paint of a new song would
+   * briefly show the previous song's transliteration and let the lyrics view
+   * animate a scroll it should have snapped. This is React's documented
+   * "adjust state when a prop changes" pattern — the same one Sheet.tsx uses.
+   */
+  const [lastTrackId, setLastTrackId] = useState(currentTrack?.id);
+  if (currentTrack?.id !== lastTrackId) {
+    setLastTrackId(currentTrack?.id);
     setLyricsOverride(null);
     setSnapToken((n) => n + 1);
-  }, [currentTrack?.id]);
+  }
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);

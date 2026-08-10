@@ -7,28 +7,38 @@ import { lineIndexAt, type LyricLine } from "./lyrics";
 /**
  * Video share rendering.
  *
- * A canvas is animated, `canvas.captureStream()` gives a video track, a Web
- * Audio `MediaStreamAudioDestinationNode` gives a matching audio track, and
- * `MediaRecorder` muxes the two.
+ * ── Two encoders ────────────────────────────────────────────────────────────
  *
- * ── The three things that make this hard ────────────────────────────────────
+ * **WebCodecs (`fastEncode.ts`), preferred.** Frames are handed to a hardware
+ * encoder as fast as the CPU manages, so a 30-second clip typically exports in
+ * 2–6 seconds rather than 30. Used wherever the browser supports it.
  *
- * **Taint.** A canvas that has drawn a cross-origin image without CORS
- * produces a stream MediaRecorder refuses to encode, and a cross-origin
- * `<audio>` can't be routed through Web Audio at all. Both media are fetched
- * to same-origin blobs first (see `toSameOriginUrl`).
+ * **MediaRecorder, fallback.** Captures a canvas stream in real time — a
+ * 30-second clip takes 30 seconds. Kept because it works essentially
+ * everywhere, and an export that is slow is better than one that is impossible.
  *
- * **Drift.** The obvious frame loop advances a counter per rAF and assumes
- * 30fps. It isn't 30fps — rAF is throttled when the tab blurs, and a busy main
- * thread drops frames — so by the end of a 30-second clip the burned-in lyrics
- * can be a second or more out from the audio. Every frame here is therefore
- * timed from `audio.currentTime`, the only clock that agrees with what's being
- * recorded. That is the single most important line in this file.
+ * Note what is *not* done: playing the audio at 10× and recording, then slowing
+ * the result down. MediaRecorder timestamps frames from the wall clock, so that
+ * yields a genuinely 10×-fast file — chipmunk audio and all — and undoing it
+ * means re-encoding with ffmpeg.wasm plus a phase vocoder to fix the pitch.
+ * More work than it saves. WebCodecs is the real answer, because it decouples
+ * encoding from playback entirely.
  *
- * **Codecs.** Support varies enormously and Safari is the one that bites.
- * `pickMimeType` probes rather than assuming, and export fails with an
- * explanation rather than producing a file that won't play.
+ * ── Shared constraints ──────────────────────────────────────────────────────
+ *
+ * **Taint.** A canvas that has drawn a cross-origin image without CORS produces
+ * a stream MediaRecorder refuses to encode, and a cross-origin `<audio>` can't
+ * be routed through Web Audio at all. Both media are fetched to same-origin
+ * blobs first (see `toSameOriginUrl`).
+ *
+ * **Drift.** In the MediaRecorder path every frame is timed from
+ * `audio.currentTime` rather than a frame counter, because rAF is throttled on
+ * blur and a busy main thread drops frames — by the end of a long clip a
+ * counter-based loop can be a second out. The WebCodecs path has no drift by
+ * construction: it assigns its own timestamps.
  */
+
+import { detectFastEncode, decodeRegion, encodeFast } from "./fastEncode";
 
 export type CoverStyle = "bloom" | "vinyl" | "field" | "pulse" | "type" | "frame";
 
@@ -96,9 +106,10 @@ export function pickMimeType(): string | null {
 
 export function isVideoShareSupported(): boolean {
   return (
-    typeof MediaRecorder !== "undefined" &&
-    typeof HTMLCanvasElement.prototype.captureStream === "function" &&
-    pickMimeType() !== null
+    (typeof VideoEncoder !== "undefined" && typeof AudioEncoder !== "undefined") ||
+    (typeof MediaRecorder !== "undefined" &&
+      typeof HTMLCanvasElement.prototype.captureStream === "function" &&
+      pickMimeType() !== null)
   );
 }
 
@@ -109,7 +120,140 @@ export function extensionFor(mimeType: string): string {
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
 
-export async function renderShareVideo(options: VideoShareOptions): Promise<Blob> {
+export interface VideoResult {
+  blob: Blob;
+  extension: string;
+}
+
+/**
+ * Export a clip, using the fastest encoder this browser supports.
+ *
+ * Returns the extension alongside the blob because the two encoders can pick
+ * different containers, and the filename has to match what's actually inside.
+ */
+export async function renderShareVideo(options: VideoShareOptions): Promise<VideoResult> {
+  const fast = await detectFastEncode();
+  if (fast) {
+    try {
+      return await renderFast(options);
+    } catch (err) {
+      // A cancel is the user's choice; anything else falls back rather than
+      // failing outright, since MediaRecorder may still manage it.
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      console.warn("Fast export failed, falling back to recording:", err);
+    }
+  }
+
+  const blob = await renderViaRecorder(options);
+  return { blob, extension: extensionFor(pickMimeType() ?? "video/webm") };
+}
+
+/**
+ * WebCodecs path — encodes offline, as fast as the machine allows.
+ *
+ * The `pulse` style is the one complication: it reads a live `AnalyserNode`,
+ * which only exists during playback. Here the spectrum is computed from the
+ * decoded samples for each frame's window instead, which is the same
+ * information arrived at without playing anything.
+ */
+async function renderFast(options: VideoShareOptions): Promise<VideoResult> {
+  const {
+    track,
+    audioUrl,
+    startTime,
+    durationSeconds,
+    coverStyle,
+    accentColor,
+    lyricLines = [],
+    showLyrics = false,
+    onProgress,
+    signal,
+  } = options;
+
+  await ensureFonts();
+
+  const [cover, audio] = await Promise.all([
+    track.coverUrl ? loadImage(track.coverUrl) : Promise.resolve(null),
+    decodeRegion(audioUrl, startTime, durationSeconds, signal),
+  ]);
+
+  const actualDuration = Math.max(1, audio.length / audio.sampleRate);
+  const freqData = new Uint8Array(64);
+
+  const scene: VideoScene = {
+    // Assigned per frame by the encoder; the placeholder is never drawn to.
+    ctx: null as unknown as CanvasRenderingContext2D,
+    W: WIDTH,
+    H: HEIGHT,
+    track,
+    cover,
+    accent: parseColor(accentColor || "#F2789F"),
+    freqData,
+    lyricLines,
+    showLyrics: showLyrics && lyricLines.length > 0,
+  };
+
+  const samples = audio.getChannelData(0);
+
+  const { blob, extension } = await encodeFast({
+    width: WIDTH,
+    height: HEIGHT,
+    fps: FPS,
+    duration: actualDuration,
+    audio,
+    onProgress,
+    signal,
+    drawFrame: (ctx, t) => {
+      scene.ctx = ctx;
+      if (coverStyle === "pulse") {
+        fillSpectrum(freqData, samples, audio.sampleRate, t);
+      }
+      drawVideoFrame(scene, coverStyle, startTime + t, t, Math.min(1, t / actualDuration));
+    },
+  });
+
+  return { blob, extension };
+}
+
+/**
+ * Approximate a spectrum for one frame, for the offline path.
+ *
+ * A real FFT would be more accurate and is not worth it here: this drives a
+ * decorative bar ring, and band energy from a windowed sample average is
+ * visually indistinguishable at 30fps while costing a fraction as much.
+ */
+function fillSpectrum(
+  out: Uint8Array,
+  samples: Float32Array,
+  sampleRate: number,
+  t: number
+): void {
+  const windowSize = Math.floor(sampleRate / 30);
+  const start = Math.min(samples.length - 1, Math.max(0, Math.floor(t * sampleRate)));
+  const end = Math.min(samples.length, start + windowSize);
+
+  const bands = out.length;
+  const perBand = Math.max(1, Math.floor((end - start) / bands));
+
+  for (let b = 0; b < bands; b++) {
+    const from = start + b * perBand;
+    const to = Math.min(end, from + perBand);
+
+    let peak = 0;
+    for (let i = from; i < to; i += 4) {
+      const v = samples[i] < 0 ? -samples[i] : samples[i];
+      if (v > peak) peak = v;
+    }
+
+    // Lower bands carry more energy in real music; weighting the curve keeps
+    // the ring from looking uniformly flat.
+    const weighted = peak * (1.4 - (b / bands) * 0.7);
+    out[b] = Math.min(255, Math.round(weighted * 320));
+  }
+}
+
+/** MediaRecorder path — real-time capture, used where WebCodecs is absent. */
+async function renderViaRecorder(options: VideoShareOptions): Promise<Blob> {
   const {
     track,
     audioUrl,

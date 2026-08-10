@@ -1,4 +1,9 @@
-import { HAN_CHARS, HAN_JAPANESE, HAN_MANDARIN } from "./data/hanReadings";
+import {
+  HAN_CHARS,
+  HAN_JAPANESE_KUN,
+  HAN_JAPANESE_ON,
+  HAN_MANDARIN,
+} from "./data/hanReadings";
 
 /**
  * Romanisation for lyric text.
@@ -90,16 +95,43 @@ export const SCRIPT_QUALITY: Record<TransliterationScript, TransliterationQualit
 
 /* ── Han ──────────────────────────────────────────────────────────────────── */
 
+/**
+ * Strip pinyin tone marks: nǐ hǎo → ni hao.
+ *
+ * Unihan gives readings with diacritics. They're dropped because this is a
+ * *reading aid for singing along* — someone following a lyric wants to know
+ * which syllable to make, and tone marks on unfamiliar letters slow that down
+ * more than they help. Anyone who reads tones can read the original line, which
+ * is displayed directly above.
+ *
+ * NFD splits a marked vowel into base + combining mark, so removing the
+ * combining range leaves the bare letter. ü is preserved as "v"'s more
+ * recognisable form rather than being flattened to "u", which would merge
+ * distinct syllables (lü/lu).
+ */
+function stripToneMarks(reading: string): string {
+  return (
+    reading
+      .normalize("NFD")
+      // Combining grave, acute, macron, caron and diaeresis — the five marks
+      // pinyin uses. Matched by codepoint rather than pasted literally so the
+      // class survives an editor that normalises the file.
+      .replace(/[̀́̄̌̈]/g, "")
+      .normalize("NFC")
+  );
+}
+
 let hanMandarin: Map<string, string> | null = null;
-let hanJapanese: Map<string, string> | null = null;
+let hanJapaneseOn: Map<string, string> | null = null;
+let hanJapaneseKun: Map<string, string> | null = null;
 
 /**
  * Build the lookup on first use, not at import.
  *
- * The generated module is three strings; turning them into 20k-entry Maps
- * costs real time, and most requests to this server never transliterate
- * anything. Paying it lazily means a deploy's first Chinese lyric is slightly
- * slower and every other request is unaffected.
+ * The generated module is four strings; turning them into 20k-entry Maps costs
+ * real time, and most requests to this server never transliterate anything.
+ * Paying it lazily means a deploy's first Chinese lyric is slightly slower and
+ * every other request is unaffected.
  */
 function buildHanMap(readings: string): Map<string, string> {
   const map = new Map<string, string>();
@@ -110,18 +142,43 @@ function buildHanMap(readings: string): Map<string, string> {
   return map;
 }
 
-function hanReading(ch: string, mode: "chinese" | "japanese"): string | undefined {
+/**
+ * Reading for one Han character.
+ *
+ * Japanese has two readings per character and which is right depends on the
+ * word. The one signal available without a morphological analyser is
+ * okurigana: kana directly after the kanji mean it stands as its own word and
+ * takes the kun'yomi (駆ける → "kakeru"), while kana before it are particles
+ * and a compound reading (on'yomi) applies (夜に → "yoru"). Anything else
+ * defaults to on'yomi, which is correct more often than not.
+ */
+function hanReading(
+  ch: string,
+  mode: "chinese" | "japanese",
+  nextIsKana: boolean
+): string | undefined {
   if (mode === "chinese") {
     hanMandarin ??= buildHanMap(HAN_MANDARIN);
-    return hanMandarin.get(ch);
+    const reading = hanMandarin.get(ch);
+    return reading ? stripToneMarks(reading) : undefined;
   }
-  hanJapanese ??= buildHanMap(HAN_JAPANESE);
-  // Japanese text contains characters Unihan only gives a Mandarin reading
-  // for; a Mandarin reading is still closer than dropping the character.
-  hanJapanese ??= buildHanMap(HAN_JAPANESE);
-  if (hanJapanese.has(ch)) return hanJapanese.get(ch);
+
+  if (nextIsKana) {
+    hanJapaneseKun ??= buildHanMap(HAN_JAPANESE_KUN);
+    const kun = hanJapaneseKun.get(ch);
+    if (kun) return kun;
+  }
+
+  hanJapaneseOn ??= buildHanMap(HAN_JAPANESE_ON);
+  const on = hanJapaneseOn.get(ch);
+  if (on) return on;
+
+  // Unihan has no Japanese reading for some characters that still occur in
+  // Japanese text. A Mandarin reading is a poor substitute but closer than
+  // dropping the character and leaving a hole in the line.
   hanMandarin ??= buildHanMap(HAN_MANDARIN);
-  return hanMandarin.get(ch);
+  const fallback = hanMandarin.get(ch);
+  return fallback ? stripToneMarks(fallback) : undefined;
 }
 
 /* ── Cyrillic ─────────────────────────────────────────────────────────────── */
@@ -178,21 +235,93 @@ const HANGUL_MEDIAL = [
   "a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe",
   "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i",
 ];
+/*
+ * Jongseong (final consonant), indexed 0–27 where 0 is "no final".
+ *
+ * The order is fixed by Unicode and must be exactly 28 entries: one short and
+ * every value from that point on is attributed to the wrong consonant. An
+ * earlier version of this table had 27, which shifted ㅇ onto ㅆ's slot and
+ * romanised 사랑 as "sarat" — the single most common final in the language,
+ * silently wrong in every song.
+ *
+ * ㄱㄲㄳ ㄴㄵㄶ ㄷ ㄹㄺㄻㄼㄽㄾㄿㅀ ㅁ ㅂㅄ ㅅㅆ ㅇ ㅈㅊ ㅋㅌㅍㅎ
+ */
 const HANGUL_FINAL = [
-  "", "k", "k", "k", "n", "n", "n", "t", "l", "k", "m", "l", "l", "l", "l",
-  "l", "m", "p", "t", "t", "ng", "t", "t", "k", "t", "p", "t",
+  "",   "k",  "k",  "k",  "n",  "n",  "n",
+  "t",  "l",  "k",  "m",  "l",  "l",  "l",
+  "p",  "l",  "m",  "p",  "p",  "t",  "t",
+  "ng", "t",  "t",  "k",  "t",  "p",  "t",
 ];
 
-function romanizeHangulSyllable(ch: string): string | null {
+/**
+ * Finals that revoice when the next syllable starts with ㅇ (a null onset).
+ *
+ * Revised Romanization resyllabifies across the boundary: 한국어 is *hangugeo*,
+ * not *hangukeo*, because the ㄱ slides into the empty onset and voices there.
+ * Without this the output is understandable but visibly not how the word is
+ * written anywhere a reader would have seen it before.
+ */
+const FINAL_LIAISON: Record<string, string> = {
+  k: "g",
+  t: "d",
+  p: "b",
+  l: "r",
+};
+
+interface HangulParts {
+  initial: number;
+  medial: number;
+  final: number;
+}
+
+/** Decompose a precomposed syllable, or null if it isn't one. */
+function decomposeHangul(ch: string): HangulParts | null {
   const code = ch.codePointAt(0)!;
   if (code < HANGUL_BASE || code > HANGUL_LAST) return null;
 
   const index = code - HANGUL_BASE;
-  const initial = Math.floor(index / (JAMO_MEDIAL_COUNT * JAMO_FINAL_COUNT));
-  const medial = Math.floor((index % (JAMO_MEDIAL_COUNT * JAMO_FINAL_COUNT)) / JAMO_FINAL_COUNT);
-  const final = index % JAMO_FINAL_COUNT;
+  return {
+    initial: Math.floor(index / (JAMO_MEDIAL_COUNT * JAMO_FINAL_COUNT)),
+    medial: Math.floor((index % (JAMO_MEDIAL_COUNT * JAMO_FINAL_COUNT)) / JAMO_FINAL_COUNT),
+    final: index % JAMO_FINAL_COUNT,
+  };
+}
 
-  return HANGUL_INITIAL[initial] + HANGUL_MEDIAL[medial] + HANGUL_FINAL[final];
+/** Index of ㅇ as an initial — the null onset that triggers liaison. */
+const INITIAL_IEUNG = 11;
+
+/**
+ * Romanise a run of Hangul, applying liaison across syllable boundaries.
+ *
+ * Done over the whole string rather than per character because Revised
+ * Romanization is not context-free: a final consonant changes when the next
+ * syllable begins with ㅇ, so a per-syllable map cannot get 한국어 right.
+ */
+function romanizeHangul(text: string): string {
+  const chars = [...text];
+  let out = "";
+
+  for (let i = 0; i < chars.length; i++) {
+    const parts = decomposeHangul(chars[i]);
+    if (!parts) {
+      out += chars[i];
+      continue;
+    }
+
+    let final = HANGUL_FINAL[parts.final];
+
+    // Liaison: the final slides into a following null onset and voices there.
+    if (final && FINAL_LIAISON[final]) {
+      const next = decomposeHangul(chars[i + 1] ?? "");
+      if (next && next.initial === INITIAL_IEUNG) {
+        final = FINAL_LIAISON[final];
+      }
+    }
+
+    out += HANGUL_INITIAL[parts.initial] + HANGUL_MEDIAL[parts.medial] + final;
+  }
+
+  return out;
 }
 
 /* ── Kana ─────────────────────────────────────────────────────────────────── */
@@ -393,7 +522,8 @@ function romanizeHan(text: string, mode: "chinese" | "japanese"): string {
   // Iterating by code point rather than by index: some Han characters are
   // outside the BMP and a per-index loop splits them into broken surrogates.
   for (const ch of text) {
-    const reading = hanReading(ch, mode);
+    // Chinese has one reading per character, so the okurigana signal is moot.
+    const reading = hanReading(ch, mode, false);
     if (reading) {
       // A space between readings — pinyin syllables are otherwise unreadable
       // run together, and this is the convention every pinyin renderer uses.
@@ -403,6 +533,20 @@ function romanizeHan(text: string, mode: "chinese" | "japanese"): string {
     }
   }
   return out;
+}
+
+/** True for hiragana, katakana and the chōonpu. */
+function isKanaChar(ch: string | undefined): boolean {
+  if (!ch) return false;
+  const code = ch.codePointAt(0)!;
+  return (code >= 0x3040 && code <= 0x30ff) || ch === "ー";
+}
+
+/** Hiragana only — okurigana is never katakana. */
+function isHiragana(ch: string | undefined): boolean {
+  if (!ch) return false;
+  const code = ch.codePointAt(0)!;
+  return code >= 0x3040 && code <= 0x309f;
 }
 
 function romanizeJapanese(text: string): string {
@@ -416,12 +560,15 @@ function romanizeJapanese(text: string): string {
     }
   };
 
-  for (const ch of text) {
+  // Indexed so each kanji can look ahead for okurigana.
+  const chars = [...text];
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
     const code = ch.codePointAt(0)!;
-    const isKana = (code >= 0x3040 && code <= 0x30ff) || ch === "ー";
     const isHan = code >= 0x4e00 && code <= 0x9fff;
 
-    if (isKana) {
+    if (isKanaChar(ch)) {
       buffer += ch;
       continue;
     }
@@ -429,11 +576,46 @@ function romanizeJapanese(text: string): string {
     flushKana();
 
     if (isHan) {
-      const reading = hanReading(ch, "japanese");
+      /*
+       * Hiragana immediately after a kanji is okurigana — the inflecting tail
+       * of a native word — which means the kun'yomi applies. Katakana doesn't
+       * count: it marks a separate loanword rather than inflecting what
+       * precedes it.
+       */
+      const next = chars[i + 1];
+      const nextCode = next?.codePointAt(0) ?? 0;
+      const nextIsOkurigana = nextCode >= 0x3040 && nextCode <= 0x309f;
+
+      const reading = hanReading(ch, "japanese", nextIsOkurigana);
+
+      /*
+       * Unihan's kun'yomi are dictionary forms with the okurigana included and
+       * no stem marker: 駆 is "KAKERU", of which only "ka" is the kanji and
+       * "keru" is the kana that follow it in the text. Those kana are about to
+       * be romanised from the text itself, so emitting the whole reading gives
+       * "kakerukeru".
+       *
+       * The fix is to romanise the okurigana first and drop that suffix from
+       * the reading when it matches. Where it doesn't match — a different
+       * inflection from the one Unihan lists — the full reading is kept, since
+       * a slightly long romanisation is better than a truncated guess.
+       */
+      let text = reading;
+      if (reading && nextIsOkurigana) {
+        let tail = "";
+        for (let j = i + 1; j < chars.length && isHiragana(chars[j]); j++) {
+          tail += chars[j];
+        }
+        const romanTail = romanizeKana(tail);
+        if (romanTail && reading.endsWith(romanTail)) {
+          text = reading.slice(0, -romanTail.length);
+        }
+      }
+
       // Space-separate readings so kanji compounds don't run into the kana
       // around them as one unreadable string.
-      out += (out && !/\s$/.test(out) ? " " : "") + (reading ?? ch);
-      if (reading) out += " ";
+      out += (out && !/\s$/.test(out) ? " " : "") + (text ?? ch);
+      if (text && !nextIsOkurigana) out += " ";
     } else {
       out += ch;
     }
@@ -509,9 +691,7 @@ export function transliterateLine(text: string, script: TransliterationScript): 
       return replaceWithTable(withDigraphs, GREEK);
     }
     case "korean":
-      return [...text]
-        .map((ch) => romanizeHangulSyllable(ch) ?? ch)
-        .join("");
+      return romanizeHangul(text);
     case "japanese":
       return romanizeJapanese(text);
     case "chinese":

@@ -30,16 +30,17 @@ import { prefersReducedMotion } from "./motion";
 const MAX_DRIFT = 0.5;
 
 export function useSmoothTime(progress: number, isPlaying: boolean): number {
+  /*
+   * The interpolated value is state because the caller renders from it; the
+   * anchor is a ref because it's written from an effect and read from a frame
+   * loop, neither of which should force a render on its own.
+   */
+  const anchor = useRef({ time: progress, at: 0 });
   const [smooth, setSmooth] = useState(progress);
 
-  const anchor = useRef({ time: progress, at: 0 });
-
-  // Re-anchor whenever the real clock reports in. Written in an effect rather
-  // than during render so the anchor timestamp is taken at commit, alongside
-  // the frame the value will first be used in.
+  // Re-anchor on every real update.
   useEffect(() => {
     anchor.current = { time: progress, at: performance.now() };
-    setSmooth(progress);
   }, [progress]);
 
   useEffect(() => {
@@ -52,7 +53,18 @@ export function useSmoothTime(progress: number, isPlaying: boolean): number {
     const tick = () => {
       const { time, at } = anchor.current;
       const elapsed = (performance.now() - at) / 1000;
-      setSmooth(time + Math.min(elapsed, MAX_DRIFT));
+      const next = time + Math.min(elapsed, MAX_DRIFT);
+      /*
+       * Monotonic within a track. Anchoring happens in an effect, so for one
+       * frame after each `timeupdate` this loop can still be reading the
+       * previous anchor — and a raw assignment there would step the clock
+       * backward four times a second, which is the stutter this hook exists to
+       * remove. Taking the max absorbs that gap. A real seek moves the value
+       * backward legitimately, so `progress` is compared too: when the audio
+       * jumps back, the clamp yields rather than pinning the highlight to the
+       * pre-seek position.
+       */
+      setSmooth((prev) => (next < prev && prev - next < MAX_DRIFT ? prev : next));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -60,5 +72,10 @@ export function useSmoothTime(progress: number, isPlaying: boolean): number {
     return () => cancelAnimationFrame(raf);
   }, [isPlaying]);
 
+  /*
+   * While paused the anchor is exact, so the raw value is used directly — the
+   * interpolated one would be whatever the last frame happened to compute
+   * before the loop stopped, which can sit a fraction ahead of the audio.
+   */
   return isPlaying ? smooth : progress;
 }

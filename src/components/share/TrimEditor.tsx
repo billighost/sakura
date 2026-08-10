@@ -19,11 +19,26 @@ import styles from "./ShareStudio.module.css";
  * from that position — which is the feature, not a nicety.
  */
 
-/** Selection bounds, in seconds. Social clips past ~30s get truncated anyway. */
-const MIN_LENGTH = 5;
-const MAX_LENGTH = 30;
+/**
+ * Selection bounds, in seconds.
+ *
+ * There is no upper cap: the ceiling is the track's own length. Capping at 30s
+ * was a MediaRecorder-era constraint — when export ran in real time, a
+ * four-minute clip meant a four-minute wait. WebCodecs encodes offline, so the
+ * limit no longer buys anything, and a user who wants to share a whole song
+ * should be able to.
+ *
+ * The floor stays: under about three seconds there is no clip worth watching,
+ * and the handles become fiddly to separate on a phone.
+ */
+const MIN_LENGTH = 3;
 
-const PRESETS = [10, 15, 20, 30];
+/**
+ * Length presets. The window keeps its length when one is chosen and stays
+ * where it is, so picking "30s" adjusts the selection rather than jumping the
+ * user back to the start of the song.
+ */
+const PRESETS = [10, 15, 30, 60];
 
 export interface TrimEditorProps {
   audioUrl: string;
@@ -60,8 +75,11 @@ export function TrimEditor({
 
   useEffect(() => {
     const controller = new AbortController();
-    setStatus("loading");
 
+    // No `setStatus("loading")` here: the initial state is already "loading",
+    // and VideoStep only mounts this once the audio URL is resolved, so the URL
+    // cannot change underneath a mounted editor. Setting it synchronously would
+    // be a cascading render for a value that is already correct.
     extractWaveform(audioUrl, controller.signal)
       .then((data) => {
         setWaveform(data);
@@ -101,8 +119,11 @@ export function TrimEditor({
 
   const commit = useCallback(
     (start: number, length: number, previewAt?: number) => {
-      const clampedLength = Math.min(MAX_LENGTH, Math.max(MIN_LENGTH, length));
-      const clampedStart = Math.max(0, Math.min(start, Math.max(0, duration - clampedLength)));
+      if (duration <= 0) return;
+
+      // Bounded by the track, not by an arbitrary maximum.
+      const clampedLength = Math.min(duration, Math.max(MIN_LENGTH, length));
+      const clampedStart = Math.max(0, Math.min(start, duration - clampedLength));
       onChange({ start: clampedStart, duration: clampedLength });
 
       if (previewAt !== undefined) {
@@ -133,6 +154,41 @@ export function TrimEditor({
     [disabled, duration, timeFromClientX, value.start, value.duration]
   );
 
+  /**
+   * Tapping the rail outside the selection moves the window there, centred on
+   * the tap, and starts dragging it.
+   *
+   * Without this, a tap on the waveform did nothing at all — the only way to
+   * move a selection was to find and drag the region itself, which on a phone
+   * means hitting a target that may be a few millimetres wide when the clip is
+   * short relative to the song. Jumping to the tap is what people expect from
+   * every scrubber they've used.
+   */
+  const onRailPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (disabled || duration <= 0 || status !== "ready") return;
+      // Only unclaimed taps: the handles and the region have their own
+      // handlers and must not be overridden by the rail underneath them.
+      if (e.target !== e.currentTarget && (e.target as HTMLElement).closest("button")) return;
+      if (dragRef.current) return;
+
+      const t = timeFromClientX(e.clientX);
+      const inSelection = t >= value.start && t <= value.start + value.duration;
+      if (inSelection) return;
+
+      e.preventDefault();
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+
+      const start = Math.max(0, Math.min(t - value.duration / 2, duration - value.duration));
+      dragRef.current = "region";
+      grabOffsetRef.current = t - start;
+
+      haptic("impact");
+      commit(start, value.duration, start);
+    },
+    [disabled, duration, status, timeFromClientX, value.start, value.duration, commit]
+  );
+
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       const handle = dragRef.current;
@@ -147,10 +203,21 @@ export function TrimEditor({
       } else if (handle === "end") {
         commit(value.start, t - value.start);
       } else {
-        commit(t - grabOffsetRef.current, value.duration);
+        /*
+         * Region drag: the window keeps its length and slides as a unit, so a
+         * 30-second selection stays 30 seconds wherever it's moved to. Clamping
+         * the *start* against `duration - length` rather than letting `commit`
+         * trim the length is what prevents the window shrinking when it's
+         * pushed against either end of the track.
+         */
+        const start = Math.max(
+          0,
+          Math.min(t - grabOffsetRef.current, duration - value.duration)
+        );
+        commit(start, value.duration);
       }
     },
-    [timeFromClientX, value.start, value.duration, commit]
+    [timeFromClientX, value.start, value.duration, duration, commit]
   );
 
   const endDrag = useCallback(
@@ -234,6 +301,7 @@ export function TrimEditor({
         ref={railRef}
         className={styles.wave}
         style={{ "--accent": accentColor || "var(--accent)" } as React.CSSProperties}
+        onPointerDown={onRailPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
@@ -318,14 +386,35 @@ export function TrimEditor({
             } pressable`}
             onClick={() => {
               haptic("selection");
-              commit(value.start, seconds, value.start);
+              /*
+               * Grow and shrink around the middle of the current selection, so
+               * changing the length keeps you roughly where you were listening.
+               * Anchoring to the start instead would drag the window backwards
+               * every time the user tried a longer clip.
+               */
+              const centre = value.start + value.duration / 2;
+              commit(centre - seconds / 2, seconds, centre - seconds / 2);
             }}
             disabled={disabled || seconds > duration}
             aria-pressed={Math.round(value.duration) === seconds}
           >
-            {seconds}s
+            {seconds < 60 ? `${seconds}s` : `${seconds / 60}m`}
           </button>
         ))}
+
+        <button
+          type="button"
+          className={`${styles.preset} ${
+            Math.round(value.duration) >= Math.floor(duration) ? styles.presetActive : ""
+          } pressable`}
+          onClick={() => {
+            haptic("selection");
+            commit(0, duration, 0);
+          }}
+          disabled={disabled || duration <= 0}
+        >
+          Whole song
+        </button>
 
         <button
           type="button"
