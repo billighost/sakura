@@ -1,58 +1,23 @@
+/*
+ * The page owns its scroller so the sticky header can pin to it. Note there is
+ * no horizontal padding here and no top padding: <PageHeader> has to run
+ * edge-to-edge for its blur to reach the screen edges, and it supplies its own
+ * safe-area top inset. Sections below pad themselves via `.section`.
+ */
 .page {
   height: 100%;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: var(--space-5) var(--gutter) calc(var(--bottom-chrome) + var(--space-6));
+  padding: 0 0 calc(var(--bottom-chrome) + var(--space-6));
   background: var(--bg);
 }
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-5);
-}
-
-.backBtn {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-left: -0.5rem;
-  flex-shrink: 0;
-  border-radius: var(--r-full);
-  color: var(--text);
-  cursor: pointer;
-  box-sizing: border-box;
-  transition: background-color var(--d-fast) var(--ease);
-}
-
-.backBtn:active {
-  background: var(--surface-2);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .backBtn:hover {
-    background: var(--surface-2);
-  }
-}
-
-.headerStatus {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.title {
-  font-family: var(--font-display);
-  font-size: var(--t-2xl);
-  font-weight: 600;
-  letter-spacing: var(--track-tight);
-  color: var(--text);
-}
+/* ── Header ───────────────────────────────────────────────────────────────
+ *
+ * The hand-rolled header that lived here — `.header`, `.backBtn`,
+ * `.headerStatus`, `.title` — is gone; it's <PageHeader> now. Only the save
+ * status strings it renders as `actions` remain.
+ */
 
 .saveHint {
   font-size: var(--t-xs);
@@ -71,7 +36,8 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-5);
+  /* The gutter is on the content now, not the scroll container. */
+  margin: 0 var(--gutter) var(--space-5);
   border: 1px solid var(--danger);
   border-radius: var(--r-md);
   background: var(--danger-soft);
@@ -99,6 +65,7 @@
 
 .section {
   margin-bottom: var(--space-6);
+  padding-inline: var(--gutter);
 }
 
 .sectionHeader {
@@ -444,6 +411,7 @@
 
 .version {
   margin-top: var(--space-4);
+  padding-inline: var(--gutter);
   text-align: center;
   font-size: var(--t-xs);
   color: var(--text-3);

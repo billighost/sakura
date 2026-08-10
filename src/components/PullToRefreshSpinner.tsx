@@ -1,93 +1,86 @@
 "use client";
 
-import React from "react";
+import styles from "./PullToRefreshSpinner.module.css";
 
 interface PullToRefreshSpinnerProps {
   pullDistance: number;
   refreshing: boolean;
+  /** Past the threshold — releasing now refreshes. */
+  armed?: boolean;
   threshold?: number;
 }
 
+/**
+ * The pull-to-refresh indicator.
+ *
+ * Rewritten from a block of inline styles that shipped a `<style jsx global>`
+ * keyframe on every render. Two behavioural changes beyond the move to CSS
+ * modules: the arc now traces the pull as an SVG dash offset, so progress is
+ * legible before release rather than only as a rotation nobody reads; and the
+ * armed state is shown explicitly, because the old version gave no signal that
+ * letting go would actually do anything.
+ */
 export function PullToRefreshSpinner({
   pullDistance,
   refreshing,
+  armed = false,
   threshold = 70,
 }: PullToRefreshSpinnerProps) {
   if (pullDistance <= 0 && !refreshing) return null;
 
   const progress = Math.min(1, pullDistance / threshold);
-  const rotation = progress * 360;
+  const RADIUS = 8;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: "60px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 50,
-        pointerEvents: "none",
-        transform: `translateY(${Math.min(pullDistance - 50, 10)}px)`,
-        opacity: refreshing ? 1 : progress,
-        transition: refreshing ? "transform 0.2s, opacity 0.2s" : "none",
-      }}
-    >
+    <>
+      {/*
+        The live region is a sibling, not a child: `aria-hidden` on the visual
+        wrapper would hide anything inside it from assistive tech, silently
+        including the announcement.
+      */}
+      <span role="status" aria-live="polite" className="srOnly">
+        {refreshing ? "Refreshing" : armed ? "Release to refresh" : ""}
+      </span>
+
       <div
+        className={styles.root}
         style={{
-          width: "36px",
-          height: "36px",
-          borderRadius: "50%",
-          background: "var(--sakura-glass-strong)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid var(--sakura-glass-border)",
-          boxShadow: "0 4px 16px var(--sakura-shadow)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          // Travels at a fraction of the pull so the badge trails the finger
+          // instead of racing it off the top of the list.
+          transform: `translate3d(0, ${Math.min(pullDistance * 0.55, 46)}px, 0)`,
+          opacity: refreshing ? 1 : progress,
         }}
+        aria-hidden="true"
       >
+      <div className={`${styles.badge} ${armed ? styles.armed : ""}`}>
         {refreshing ? (
-          <div
-            style={{
-              width: "18px",
-              height: "18px",
-              borderRadius: "50%",
-              border: "2px solid var(--sakura-border)",
-              borderTopColor: "var(--sakura-accent)",
-              animation: "ptr-spin 0.8s linear infinite",
-            }}
-          />
+          <span className={styles.spinner} />
         ) : (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--sakura-accent)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              width: "18px",
-              height: "18px",
-              transform: `rotate(${rotation}deg)`,
-              transition: "transform 0.1s linear",
-            }}
-          >
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+          <svg className={styles.arc} viewBox="0 0 20 20" width="20" height="20">
+            <circle
+              className={styles.arcTrack}
+              cx="10"
+              cy="10"
+              r={RADIUS}
+              fill="none"
+              strokeWidth="2"
+            />
+            <circle
+              className={styles.arcFill}
+              cx="10"
+              cy="10"
+              r={RADIUS}
+              fill="none"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={CIRCUMFERENCE * (1 - progress)}
+            />
           </svg>
         )}
+        </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes ptr-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </div>
+    </>
   );
 }

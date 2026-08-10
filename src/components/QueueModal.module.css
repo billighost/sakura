@@ -1,147 +1,43 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.overlay.open {
-  pointer-events: auto;
-}
-
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.overlay.open .backdrop {
-  opacity: 1;
-}
-
-.sheet {
-  --on-media: #fff;
-  --on-media-secondary: rgba(255, 255, 255, 0.75);
-  --on-media-tertiary: rgba(255, 255, 255, 0.45);
-  --on-media-fill: rgba(255, 255, 255, 0.1);
-
-  position: relative;
-  width: 100%;
-  max-width: 560px;
-  max-height: calc(82dvh - env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  background: var(--sakura-glass-strong, rgba(20, 16, 23, 0.96));
-  backdrop-filter: blur(28px) saturate(1.3);
-  -webkit-backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: none;
-  border-radius: 24px 24px 0 0;
-  box-shadow: 0 -12px 50px rgba(0, 0, 0, 0.5);
-  transform: translateY(100%);
-  transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .sheet {
-    background: rgba(18, 14, 21, 0.97);
-  }
-}
-
-.overlay.open .sheet {
-  transform: translateY(0);
-}
-
-.dragHandleRow {
-  display: flex;
-  justify-content: center;
-  padding: 0.75rem 0 0.25rem;
-  flex-shrink: 0;
-}
-
-.dragHandle {
-  width: 2.5rem;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1.25rem 0.75rem;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.title {
-  font-family: var(--sakura-font-display);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--on-media);
-  margin: 0;
-}
-
-.closeBtn {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  color: var(--on-media-secondary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.closeBtn:hover {
-  background: var(--on-media-fill);
-  color: var(--on-media);
-}
+/* Queue list. The sheet shell — backdrop, panel, grabber, header, close button,
+ * enter/exit, drag-to-dismiss — now comes from <Sheet>, so what's left here is
+ * only the list itself.
+ *
+ * The `--on-media` white-on-dark variables this file used to define are gone
+ * with it. They existed because the queue floated over the full player's
+ * artwork backdrop and had to stay legible against an unknown image; on a real
+ * surface they were just a second, unthemed palette that ignored light mode.
+ */
 
 .list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem 1.25rem 1.5rem;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.list::-webkit-scrollbar {
-  display: none;
+  /* Scrolling and padding belong to the sheet body now. */
+  display: flex;
+  flex-direction: column;
 }
 
 .listHeader {
-  font-size: 0.6875rem;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--on-media-tertiary);
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+  letter-spacing: var(--track-caps);
+  color: var(--text-3);
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-2);
 }
 
 .list .listHeader:first-child {
-  margin-top: 0.5rem;
+  margin-top: var(--space-1);
 }
 
 .rowActive,
 .row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 12px;
+  gap: var(--space-2);
+  border-radius: var(--r-md);
   position: relative;
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s;
   width: 100%;
+  transition: transform var(--d-base) var(--ease), background-color var(--d-fast) var(--ease);
 }
 
 .row {
@@ -149,20 +45,24 @@
   -webkit-user-select: none;
 }
 
-.row:hover {
-  background: rgba(255, 255, 255, 0.05);
+@media (hover: hover) and (pointer: fine) {
+  .row:hover {
+    background: var(--surface-2);
+  }
 }
 
+/* The playing row is the one accent in the list. */
 .rowActive {
-  border-left: 2px solid var(--track-accent, var(--sakura-accent));
+  border-left: 2px solid var(--track-accent, var(--accent));
 }
 
+/* Lifted off the list while dragging, so it reads as picked up rather than
+ * sliding between its neighbours. */
 .rowDragging {
-  position: relative;
   z-index: 5;
-  background: rgba(20, 16, 23, 0.95);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
+  background: var(--surface-3);
+  box-shadow: var(--shadow-3);
+  border-radius: var(--r-md);
 }
 
 .dragGrip {
@@ -170,88 +70,67 @@
   align-items: center;
   justify-content: center;
   width: 1.75rem;
-  height: 2.5rem;
+  height: var(--tap-min);
   flex-shrink: 0;
-  color: var(--on-media-tertiary);
+  color: var(--text-3);
   cursor: grab;
+  /* Also set inline in QueueGrip — the scroller would otherwise claim the
+   * vertical drag before the reorder ever starts. */
   touch-action: none;
   user-select: none;
-  pointer-events: auto;
 }
 
 .dragGrip:active {
   cursor: grabbing;
+  color: var(--text-2);
 }
 
 .emptyState {
-  padding: 2rem 0.5rem;
+  padding: var(--space-6) var(--space-2);
   text-align: center;
-  color: var(--on-media-tertiary);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  color: var(--text-3);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
 }
 
 .radioNote {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem 0.5rem 1.5rem;
-  color: var(--on-media-tertiary);
-  font-size: 0.75rem;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-2) var(--space-2);
+  color: var(--text-3);
+  font-size: var(--t-xs);
 }
 
 .radioDot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-  box-shadow: 0 0 0 0 var(--sakura-accent);
-  animation: radioPulse 2.4s ease-out infinite;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  animation: radioPulse 2.4s var(--ease-out) infinite;
   flex-shrink: 0;
 }
 
 @keyframes radioPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(242, 120, 159, 0.55); }
-  70%  { box-shadow: 0 0 0 7px rgba(242, 120, 159, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(242, 120, 159, 0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .radioDot { animation: none; }
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @media (max-height: 640px) {
-  .sheet {
-    max-height: calc(92dvh - env(safe-area-inset-bottom, 0px));
-  }
-
-  .dragHandleRow {
-    padding: 0.5rem 0 0.125rem;
-  }
-
-  .header {
-    padding: 0.375rem 1rem 0.5rem;
-  }
-
-  .list {
-    padding: 0.375rem 1rem 1rem;
-  }
-
   .listHeader {
-    margin-top: 1rem;
-  }
-
-  .radioNote {
-    padding: 0.625rem 0.5rem 1rem;
+    margin-top: var(--space-4);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet {
-    transition: none;
-  }
-
   .radioDot {
     animation: none;
   }

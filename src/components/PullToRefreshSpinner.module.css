@@ -1,0 +1,88 @@
+/* Pull-to-refresh indicator. See PullToRefreshSpinner.tsx. */
+
+.root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3rem;
+  z-index: 30;
+  /* Never intercepts the pull it's reporting on. */
+  pointer-events: none;
+  /* No transition while the finger is down — the transform is the finger. On
+   * release the inline transform is dropped and this eases it home. */
+  transition: transform var(--d-base) var(--ease), opacity var(--d-fast) var(--ease);
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-full);
+  /* Chrome token: this genuinely floats over scrolling content. */
+  background: var(--chrome);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--chrome-line);
+  box-shadow: var(--shadow-2);
+  color: var(--text-2);
+  transition: transform var(--d-base) var(--spring), color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease);
+}
+
+/* Past the threshold. A small pop plus the accent is enough to read as
+ * "released now, this fires" without another element appearing. */
+.badge.armed {
+  transform: scale(1.1);
+  color: var(--accent);
+  border-color: var(--accent-soft);
+}
+
+.arc {
+  /* Start the dash at 12 o'clock rather than 3, so the arc fills the way the
+   * pull is travelling. */
+  transform: rotate(-90deg);
+}
+
+.arcTrack {
+  stroke: var(--line-strong);
+}
+
+.arcFill {
+  stroke: currentColor;
+}
+
+.spinner {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: var(--r-full);
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  animation: ptrSpin 0.8s linear infinite;
+}
+
+@keyframes ptrSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion: globals.css already neutralises every animation with
+ * `!important`, so the spin is gone whatever this block says — which means a
+ * partial ring with one accent edge would just look like a rendering fault.
+ * Make it a complete accent ring instead: static, but unambiguous. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    border-color: var(--accent);
+    opacity: 0.9;
+  }
+
+  .badge.armed {
+    transform: none;
+  }
+}

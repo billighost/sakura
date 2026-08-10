@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderShareCard, canvasToBlob, type CardTrack, DIMENSIONS } from "@/lib/shareCard";
+import { Sheet } from "./Sheet";
 import styles from "./ShareModal.module.css";
 
 interface Props {
@@ -157,66 +158,57 @@ export function ShareModal({ open, onClose, track, lyricText, lyricTime, accentC
   const canvasH = DIMENSIONS.story.h;
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="dialog" aria-label="Share">
-      <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>Share</h3>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className={styles.preview}>
-          {rendering && (
-            <div className={styles.spinner}>
-              <div className={styles.spinnerArc} />
-              <span className={styles.spinnerLabel}>Rendering…</span>
-            </div>
-          )}
-          {error && (
-            <div className={styles.error}>{error}</div>
-          )}
-          <canvas
-            ref={canvasRef}
-            width={canvasW}
-            height={canvasH}
-            style={{
-              width: "100%",
-              maxHeight: "min(56vh, 22rem)",
-              aspectRatio: `${canvasW} / ${canvasH}`,
-              borderRadius: "12px",
-              boxShadow: "0 8px 26px rgba(0,0,0,0.3)",
-              background: "var(--sakura-surface)",
-              opacity: rendering ? 0.3 : 1,
-              transition: "opacity 0.3s",
-              objectFit: "contain",
-            }}
-          />
-        </div>
-
-        <div className={styles.formats}>
-          {FORMATS.map((f) => (
-            <button
-              key={f.key}
-              className={`${styles.fmtBtn} ${format === f.key ? styles.fmtActive : ""}`}
-              onClick={() => setFormat(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.actions}>
-          <button className={styles.secondary} onClick={onClose}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Share"
+      footer={
+        <>
+          <button className={`${styles.secondary} pressable`} onClick={onClose}>
             Cancel
           </button>
-          <button className={styles.primary} onClick={handleShare} disabled={rendering}>
+          <button
+            className={`${styles.primary} pressable`}
+            onClick={handleShare}
+            disabled={rendering}
+          >
             {lines.length > 0 ? "Share lyric" : "Share"}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className={styles.preview}>
+        {rendering && (
+          <div className={styles.spinner}>
+            <div className={styles.spinnerArc} />
+            <span className={styles.spinnerLabel}>Rendering…</span>
+          </div>
+        )}
+        {error && <div className={styles.error}>{error}</div>}
+        <canvas
+          ref={canvasRef}
+          width={canvasW}
+          height={canvasH}
+          className={styles.canvas}
+          style={{
+            aspectRatio: `${canvasW} / ${canvasH}`,
+            opacity: rendering ? 0.3 : 1,
+          }}
+        />
       </div>
-    </div>
+
+      <div className={styles.formats} role="group" aria-label="Image size">
+        {FORMATS.map((f) => (
+          <button
+            key={f.key}
+            className={`${styles.fmtBtn} ${format === f.key ? styles.fmtActive : ""} pressable`}
+            onClick={() => setFormat(f.key)}
+            aria-pressed={format === f.key}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+    </Sheet>
   );
 }

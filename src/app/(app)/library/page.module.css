@@ -7,28 +7,12 @@
 
 /* ---------- Header ---------- */
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 1.5rem) 0;
-  max-width: 72rem;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.title {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.5rem, 4vw, 1.875rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
+/*
+ * Title, layout and back behaviour now come from the shared PageHeader; what
+ * used to be `.header`/`.title`/`.headerActions` here is gone. The action
+ * buttons below are still local because they are library-specific controls
+ * (new playlist, search toggle, list/grid switch) passed in as `actions`.
+ */
 
 .iconBtn {
   all: unset;
@@ -63,15 +47,13 @@
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  max-width: 72rem;
-  margin: 0 auto;
-  width: calc(100% - clamp(2rem, 6vw, 3rem));
-  margin-top: clamp(0.625rem, 2vw, 0.875rem);
-  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  /* Rendered inside PageHeader's `extras` slot now, which already supplies the
+   * gutter and the top margin — hence no width/margin juggling here. */
+  width: 100%;
   padding: 0.7rem 0.9rem;
-  background: var(--sakura-surface);
-  border-radius: 12px;
-  border: 1px solid var(--sakura-border);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
   animation: searchSlideIn 0.2s ease-out;
 }
 

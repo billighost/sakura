@@ -5,6 +5,8 @@ import { usePlayer } from "./PlayerContext";
 import { useRouter } from "next/navigation";
 import { Scrubber } from "./Scrubber";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
+import { useDrag } from "@/lib/useDrag";
+import { haptic } from "@/lib/haptics";
 import {
   PlayIcon,
   PauseIcon,
@@ -22,7 +24,9 @@ import styles from "./MiniPlayer.module.css";
 const PETAL_COUNT = 6;
 const SWIPE_COMMIT_PX = 46; // horizontal drag distance that commits to a track skip
 const SWIPE_COMMIT_VELOCITY = 0.5; // px/ms flick speed that commits regardless of distance
-const EXPAND_COMMIT_PX = -28; // vertical drag up that commits to expanding the full player
+// Expanding used to commit at its own 28px, but one threshold per gesture is
+// the point of the shared recogniser and upward travel is already the cheapest
+// way in — a flick clears it on velocity, and a plain tap still expands.
 const LONG_PRESS_MS = 450;
 const AXIS_LOCK_PX = 6; // movement before we decide this is a horizontal or vertical drag
 
@@ -30,6 +34,10 @@ const AXIS_LOCK_PX = 6; // movement before we decide this is a horizontal or ver
  * Compact "now playing" bar. Deliberately minimal — art, title/artist, like,
  * play/pause — with gestures carrying the rest: swipe up (or tap) to expand,
  * swipe left/right to skip, long-press for the context menu.
+ *
+ * The gesture physics that used to live here are now `useDrag` (see the
+ * vocabulary doc in src/lib/motion.ts); this file keeps only the thresholds
+ * and what the commits mean.
  */
 export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const {
@@ -74,33 +82,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   }, [currentTrack?.id, setMiniArtRect]);
 
   // --- Gestures -------------------------------------------------------------
-  const gesture = useRef({
-    active: false,
-    pointerId: -1,
-    startX: 0,
-    startY: 0,
-    lastX: 0,
-    lastY: 0,
-    lastT: 0,
-    vx: 0,
-    vy: 0,
-    axis: null as "x" | "y" | null,
-    longPressTimer: null as ReturnType<typeof setTimeout> | null,
-    longPressed: false,
-  });
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [gestureActive, setGestureActive] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
-
-  /**
-   * Controls and the scrub strip own their own taps. Anything else on the bar
-   * belongs to the gesture layer.
-   */
-  function isInteractive(el: HTMLElement) {
-    return !!el.closest(
-      `.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}, .${styles.lyricTicker}`
-    );
-  }
 
   const handleExpand = useCallback(() => {
     if (artWrapRef.current) {
@@ -109,152 +91,51 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     onExpand();
   }, [onExpand, setMiniArtRect]);
 
-  const handleGesturePointerDown = useCallback((e: React.PointerEvent) => {
-    if (isInteractive(e.target as HTMLElement)) return;
-    // Ignore secondary buttons and multi-touch; both produce nonsense drags.
-    if (e.button !== 0 && e.pointerType === "mouse") return;
-
-    const g = gesture.current;
-    g.active = true;
-    g.pointerId = e.pointerId;
-    g.startX = g.lastX = e.clientX;
-    g.startY = g.lastY = e.clientY;
-    g.lastT = performance.now();
-    g.vx = g.vy = 0;
-    g.axis = null;
-    g.longPressed = false;
-
-    if (g.longPressTimer) clearTimeout(g.longPressTimer);
-    g.longPressTimer = setTimeout(() => {
-      if (
-        g.active &&
-        !g.axis &&
-        Math.abs(g.lastX - g.startX) < 10 &&
-        Math.abs(g.lastY - g.startY) < 10
-      ) {
-        g.longPressed = true;
-        import("@/lib/haptics").then((h) => h.vibrate(15));
-        setMenuPos({ x: g.lastX, y: g.lastY });
-        setGestureActive(false);
-        setDragOffset({ x: 0, y: 0 });
-      }
-    }, LONG_PRESS_MS);
-
-    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-  }, []);
-
-  const handleGesturePointerMove = useCallback((e: React.PointerEvent) => {
-    const g = gesture.current;
-    if (!g.active || g.pointerId !== e.pointerId) return;
-
-    const dx = e.clientX - g.startX;
-    const dy = e.clientY - g.startY;
-
-    // Cancel the long press once the finger travels.
-    if ((Math.abs(dx) > 10 || Math.abs(dy) > 10) && g.longPressTimer) {
-      clearTimeout(g.longPressTimer);
-      g.longPressTimer = null;
-    }
-
-    /*
-     * Velocity has to be measured against the *previous* sample. The old code
-     * assigned `g.lastX = e.clientX` at the top of this handler and then
-     * computed `(e.clientX - g.lastX) / dt` — always exactly zero. Flick-to-skip
-     * therefore never fired on velocity; only a slow 46px drag worked, which is
-     * why quick swipes felt like they did nothing.
-     */
-    const now = performance.now();
-    const dt = Math.max(1, now - g.lastT);
-    g.vx = (e.clientX - g.lastX) / dt;
-    g.vy = (e.clientY - g.lastY) / dt;
-    g.lastX = e.clientX;
-    g.lastY = e.clientY;
-    g.lastT = now;
-
-    if (g.longPressed) return;
-
-    if (!g.axis) {
-      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
-      g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      setGestureActive(true);
-    }
-
-    if (g.axis === "x") {
-      setDragOffset({ x: dx, y: 0 });
-    } else {
-      // Rubber-band: free upward, resistant downward.
-      setDragOffset({ x: 0, y: dy < 0 ? dy : dy * 0.15 });
-    }
-  }, []);
-
-  const endGesture = useCallback(
-    (e: React.PointerEvent) => {
-      const g = gesture.current;
-      if (g.longPressTimer) {
-        clearTimeout(g.longPressTimer);
-        g.longPressTimer = null;
-      }
-
-      if (!g.active || g.pointerId !== e.pointerId) return;
-      g.active = false;
-      setGestureActive(false);
-
-      if (g.longPressed) {
-        g.longPressed = false;
-        setDragOffset({ x: 0, y: 0 });
-        return;
-      }
-
-      const dx = e.clientX - g.startX;
-      const dy = e.clientY - g.startY;
-      const axis = g.axis;
-      g.axis = null;
-
-      if (axis === "x") {
-        const committed =
-          Math.abs(dx) > SWIPE_COMMIT_PX || Math.abs(g.vx) > SWIPE_COMMIT_VELOCITY;
-        if (committed) {
-          import("@/lib/haptics").then((h) => h.vibrate(10));
-          if (dx < 0) next();
-          else prev();
-        }
-      } else if (axis === "y") {
-        if (dy < EXPAND_COMMIT_PX || g.vy < -0.5) {
-          import("@/lib/haptics").then((h) => h.vibrate(8));
-          handleExpand();
-        }
-      } else {
-        // No axis was ever locked — a tap.
-        handleExpand();
-      }
-
-      setDragOffset({ x: 0, y: 0 });
+  const drag = useDrag({
+    axis: "both",
+    threshold: SWIPE_COMMIT_PX,
+    velocity: SWIPE_COMMIT_VELOCITY,
+    lockAfter: AXIS_LOCK_PX,
+    // Free upward toward the full player, resistant downward — there's nothing
+    // below the bar to reveal, so downward travel only acknowledges the finger.
+    resistance: { up: 1, down: 0.15 },
+    // Downward never commits, so the bar can't be flicked into nothing.
+    commitDirections: ["left", "right", "up"],
+    blockSelector: `.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}, .${styles.lyricTicker}`,
+    longPressDelay: LONG_PRESS_MS,
+    onLongPress: (point) => setMenuPos(point),
+    onTap: () => handleExpand(),
+    onCommit: (direction) => {
+      if (direction === "left") next();
+      else if (direction === "right") prev();
+      else if (direction === "up") handleExpand();
     },
-    [next, prev, handleExpand]
-  );
+  });
 
   if (!currentTrack) return null;
 
   function handleLike() {
     if (!isLiked) {
       setBurstKey((k) => k + 1);
-      import("@/lib/haptics").then((h) => h.vibrate(12));
+      haptic("success");
     }
     toggleLiked();
   }
 
+  const gestureActive = drag.active && drag.axis !== null;
   const transform =
-    dragOffset.x !== 0
-      ? `translate3d(${dragOffset.x}px,0,0)`
-      : dragOffset.y !== 0
-        ? `translate3d(0,${dragOffset.y}px,0)`
+    drag.dx !== 0
+      ? `translate3d(${drag.dx}px,0,0)`
+      : drag.dy !== 0
+        ? `translate3d(0,${drag.dy}px,0)`
         : undefined;
-  const opacity =
-    dragOffset.x !== 0 ? Math.max(0.35, 1 - Math.abs(dragOffset.x) / 160) : undefined;
+  const opacity = drag.dx !== 0 ? Math.max(0.35, 1 - Math.abs(drag.dx) / 160) : undefined;
 
   // Show the user which way they're committing, once past the threshold.
-  const armedNext = dragOffset.x < -SWIPE_COMMIT_PX;
-  const armedPrev = dragOffset.x > SWIPE_COMMIT_PX;
+  // `armed` already folds in velocity, so a fast flick lights the affordance up
+  // too — the old distance-only check left quick swipes with no feedback at all.
+  const armedNext = drag.axis === "x" && drag.direction === "left" && drag.armed;
+  const armedPrev = drag.axis === "x" && drag.direction === "right" && drag.armed;
 
   const lyricSeek = () => {
     if (lyrics?.lines && activeLyricIndex >= 0) {
@@ -271,13 +152,13 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
           "--track-accent": accentColor || undefined,
           transform,
           opacity,
+          // The transform *is* the finger while dragging; easing it would add
+          // lag between the touch and the bar.
           transition: gestureActive ? "none" : undefined,
+          touchAction: drag.touchAction,
         } as React.CSSProperties
       }
-      onPointerDown={handleGesturePointerDown}
-      onPointerMove={handleGesturePointerMove}
-      onPointerUp={endGesture}
-      onPointerCancel={endGesture}
+      {...drag.bind}
     >
       <div className={styles.scrubRow}>
         <Scrubber

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiBatch } from "@/lib/apiBatch";
 import { getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
 import { PlaylistModal } from "@/components/PlaylistModal";
+import { PageHeader } from "@/components/PageHeader";
 import { MicrophoneIcon, AlbumIcon, PlaylistIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
@@ -198,9 +199,11 @@ export default function LibraryPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Your Library</h1>
-        <div className={styles.headerActions}>
+      <PageHeader
+        title="Your Library"
+        showBack={false}
+        actions={
+          <>
           <button
             className={styles.iconBtn}
             onClick={() => setPlaylistModalOpen(true)}
@@ -243,33 +246,34 @@ export default function LibraryPage() {
               </svg>
             )}
           </button>
-        </div>
-      </div>
-
-      {searchOpen && (
-        <div className={styles.searchBar}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search in your library"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={styles.searchInput}
-            autoFocus
-          />
-          {searchQuery && (
-            <button className={styles.searchClear} onClick={() => setSearchQuery("")} aria-label="Clear search">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
-        </div>
-      )}
+          </>
+        }
+      >
+        {searchOpen && (
+          <div className={styles.searchBar}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search in your library"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={styles.searchInput}
+              autoFocus
+            />
+            {searchQuery && (
+              <button className={styles.searchClear} onClick={() => setSearchQuery("")} aria-label="Clear search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+      </PageHeader>
 
       <div className={styles.filterRow}>
         {filters.map((f) => (
@@ -283,7 +287,7 @@ export default function LibraryPage() {
         ))}
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} data-page-scroll>
         <div className={styles.contentInner}>
           {refreshing && (
             <div className={styles.refreshIndicator}>

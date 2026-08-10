@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlayer } from "@/components/PlayerContext";
+import { PageHeader } from "@/components/PageHeader";
 import {
   PaletteIcon,
   SoundIcon,
@@ -11,7 +12,6 @@ import {
   DatabaseIcon,
   InfoIcon,
   ChevronRightIcon,
-  ChevronLeftIcon,
   LogOutIcon,
   SunIcon,
   MoonIcon,
@@ -19,6 +19,7 @@ import {
   CheckIcon,
 } from "@/components/Icons";
 import { getStorageEstimate, clearAudioCache } from "@/lib/offline-db";
+import { haptic } from "@/lib/haptics";
 import styles from "./page.module.css";
 
 /* ── Controls ──────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ function Toggle({
       disabled={busy}
       className={`${styles.toggle} ${on ? styles.toggleOn : ""}`}
       onClick={() => {
-        import("@/lib/haptics").then((h) => h.vibrate(8));
+        haptic("selection");
         onChange(!on);
       }}
     >
@@ -359,27 +360,22 @@ export default function SettingsPage() {
       : 0;
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        {/* Settings is a push destination from the profile, not a tab. Without
-            a back control the only way out is the browser gesture, which
-            doesn't exist in a standalone PWA window. */}
-        <button
-          type="button"
-          className={styles.backBtn}
-          onClick={() => router.back()}
-          aria-label="Back"
-        >
-          <ChevronLeftIcon size={20} />
-        </button>
-        <h1 className={styles.title}>Settings</h1>
-        <span className={styles.headerStatus}>
-          {saveState === "saving" && <span className={styles.saveHint}>Saving…</span>}
-          {saveState === "error" && (
+    <div className={styles.page} data-page-scroll>
+      {/* Settings is a push destination from the profile, not a tab, so it
+          needs a back control — `backFallback` covers the deep-link case where
+          there's no history to pop and a standalone PWA has no browser chrome
+          to fall back on. */}
+      <PageHeader
+        title="Settings"
+        backFallback="/profile"
+        actions={
+          saveState === "saving" ? (
+            <span className={styles.saveHint}>Saving…</span>
+          ) : saveState === "error" ? (
             <span className={styles.saveError}>Couldn&apos;t save</span>
-          )}
-        </span>
-      </header>
+          ) : null
+        }
+      />
 
       {loadFailed && (
         <div className={styles.banner}>

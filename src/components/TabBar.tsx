@@ -3,92 +3,101 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback } from "react";
+import { useAppNav } from "./AppNavContext";
+import { haptic } from "@/lib/haptics";
+import { HomeIcon, SearchIcon, LibraryIcon, UserIcon, type IconProps } from "./Icons";
 import styles from "./TabBar.module.css";
 
-const tabs = [
-  {
-    href: "/home",
-    label: "Home",
-    inactiveIcon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4",
-    activeIcon:
-      "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4",
-  },
-  {
-    href: "/search",
-    label: "Search",
-    inactiveIcon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
-    activeIcon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
-  },
-  {
-    href: "/library",
-    label: "Library",
-    inactiveIcon:
-      "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-    activeIcon:
-      "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-  },
-  {
-    href: "/profile",
-    label: "Profile",
-    inactiveIcon:
-      "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
-    activeIcon:
-      "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
-  },
+/**
+ * The tab bar.
+ *
+ * It used to hand-roll four inline SVGs, two of which were byte-identical
+ * between their active and inactive states, so "selected" was carried by colour
+ * alone. They now come from the icon system, which has real filled variants and
+ * per-icon animation via `[data-anim]`.
+ *
+ * Two behavioural fixes worth naming:
+ *
+ *  - Tapping the active tab scrolled nothing. It called `window.scrollTo`, but
+ *    the app shell scrolls an inner element — the window has never scrolled at
+ *    all — so the gesture was inert on every tab. It now goes through the one
+ *    registered scroller.
+ *  - Switching tabs pushed a history entry each time, so Back walked the user
+ *    through every tab they'd visited instead of leaving the section. Tabs are
+ *    siblings, not a stack, so they replace.
+ */
+
+interface Tab {
+  href: string;
+  label: string;
+  Icon: (p: IconProps) => React.JSX.Element;
+}
+
+const TABS: Tab[] = [
+  { href: "/home", label: "Home", Icon: HomeIcon },
+  { href: "/search", label: "Search", Icon: SearchIcon },
+  { href: "/library", label: "Library", Icon: LibraryIcon },
+  { href: "/profile", label: "Profile", Icon: UserIcon },
 ];
 
 export function TabBar() {
   const pathname = usePathname();
+  const { navigate, scrollToTop } = useAppNav();
 
-  const handleTap = useCallback(() => {
-    if (navigator.vibrate) {
-      navigator.vibrate(10);
-    }
-  }, []);
+  const activeIndex = TABS.findIndex((t) => pathname.startsWith(t.href));
 
-  const handleActiveTabClick = useCallback(
-    (href: string, e: React.MouseEvent) => {
-      if (pathname.startsWith(href)) {
-        e.preventDefault();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleClick = useCallback(
+    (e: React.MouseEvent, href: string, isActive: boolean) => {
+      // Always ours to handle: <Link> is kept for the real href (middle-click,
+      // "open in new tab", and a crawlable/keyboard-reachable anchor) but the
+      // navigation itself goes through the shell so it gets a transition.
+      e.preventDefault();
+      haptic("selection");
+
+      if (isActive) {
+        scrollToTop();
+        return;
       }
+      navigate(href, "tab");
     },
-    [pathname]
+    [navigate, scrollToTop]
   );
 
   return (
-    <nav className={styles.bar} role="tablist">
-      {tabs.map((tab) => {
-        const active = pathname.startsWith(tab.href);
+    <nav className={styles.bar} aria-label="Main">
+      {/*
+        One indicator that slides between tabs, rather than a dot mounted per
+        tab. A remounted dot can only fade; a single element can travel, which
+        is what makes the selection read as one thing moving.
+      */}
+      {activeIndex >= 0 && (
+        <span
+          className={styles.indicator}
+          style={{
+            width: `${100 / TABS.length}%`,
+            // Translating by its own width per tab keeps it aligned whatever
+            // the viewport, with no measurement and no resize listener.
+            transform: `translateX(${activeIndex * 100}%)`,
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {TABS.map(({ href, label, Icon }) => {
+        const active = pathname.startsWith(href);
         return (
           <Link
-            key={tab.href}
-            href={tab.href}
+            key={href}
+            href={href}
             className={`${styles.item} ${active ? styles.active : ""}`}
-            role="tab"
-            aria-selected={active}
-            onClick={(e) => {
-              handleTap();
-              handleActiveTabClick(tab.href, e);
-            }}
+            aria-current={active ? "page" : undefined}
+            data-anim={active ? "on" : undefined}
+            onClick={(e) => handleClick(e, href, active)}
           >
             <span className={styles.iconWrap}>
-              <svg
-                className={styles.icon}
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill={active ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth={active ? 0 : 2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d={active ? tab.activeIcon : tab.inactiveIcon} />
-              </svg>
-              {active && <span className={styles.indicator} />}
+              <Icon size={24} filled={active} />
             </span>
-            <span className={styles.label}>{tab.label}</span>
+            <span className={styles.label}>{label}</span>
           </Link>
         );
       })}

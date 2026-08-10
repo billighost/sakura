@@ -4,8 +4,11 @@
   height: 100%;
   height: 100dvh;
   overflow: hidden;
-  background: var(--sakura-bg);
-  color: var(--sakura-text);
+  background: var(--bg);
+  color: var(--text);
+  /* Anchors the page-transition snapshot to the app frame rather than the
+   * viewport, so a transition can't paint over the tab bar. */
+  isolation: isolate;
 }
 
 .content {
@@ -13,8 +16,26 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* iOS rubber-band would otherwise scroll the whole shell out of view. */
   overscroll-behavior-y: contain;
   min-height: 0;
+  /*
+   * Left/right insets matter in landscape on a notched phone, where the safe
+   * area is horizontal. Bottom padding is `--bottom-chrome`, which already
+   * folds in the home-indicator inset, so pages never guess at it.
+   */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  /*
+   * Bottom clearance is deliberately NOT set here. Pages already pad
+   * themselves by `--bottom-chrome` (home, search, profile, settings, browse,
+   * error), and that token folds in the home-indicator inset — so adding it
+   * again at the shell level would double the gap under every one of them.
+   */
+  /* Restored explicitly on navigation — see AppNavContext. Letting the browser
+   * also try produces a fight where it wins the first frame and we win the
+   * second, which reads as a jump. */
+  overflow-anchor: none;
 }
 
 .bottom {

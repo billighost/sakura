@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import styles from "./PlaylistModal.module.css";
 import { usePlayer } from "./PlayerContext";
 import { PlaylistModal } from "./PlaylistModal";
+import { Sheet } from "./Sheet";
+import { PlusIcon } from "./Icons";
 
 interface AddToPlaylistModalProps {
   isOpen: boolean;
@@ -21,27 +23,52 @@ export function AddToPlaylistModal({ isOpen, onClose, trackId }: AddToPlaylistMo
   const { showToast } = usePlayer();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showNewPlaylist, setShowNewPlaylist] = useState(false);
+  /** Bumped by the retry button to re-run the fetch effect. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (isOpen && !showNewPlaylist) {
-      fetchPlaylists();
-    }
-  }, [isOpen, showNewPlaylist]);
+    if (!isOpen || showNewPlaylist) return;
 
-  async function fetchPlaylists() {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/playlists");
-      if (!res.ok) throw new Error("Failed to fetch playlists");
-      const data = await res.json();
-      setPlaylists(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
+    /*
+     * Aborted on cleanup so a slow response from a sheet the user already
+     * closed — or from a previous open — can't land on top of a newer one.
+     * The fetch is inlined rather than called from a `fetchPlaylists()` helper
+     * because that helper's first statement was `setLoading(true)`, a
+     * synchronous setState in an effect body and a cascading render.
+     */
+    let cancelled = false;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch("/api/playlists", { signal: controller.signal });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (cancelled) return;
+        // The endpoint returns a bare array, not { items: [...] }.
+        setPlaylists(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (err) {
+        if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
+        setError("We couldn't load your playlists.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [isOpen, showNewPlaylist, reloadKey]);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  }, []);
 
   async function handleAddToPlaylist(playlistId: string) {
     try {
@@ -50,26 +77,24 @@ export function AddToPlaylistModal({ isOpen, onClose, trackId }: AddToPlaylistMo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackId }),
       });
-      
+
       if (!res.ok) {
-        if (res.status === 409) throw new Error("Track already in playlist");
-        throw new Error("Failed to add track");
+        if (res.status === 409) throw new Error("That song is already in this playlist.");
+        throw new Error("We couldn't add that song. Try again.");
       }
-      
+
       showToast("Added to playlist!", "success");
       onClose();
-    } catch (err: any) {
-      showToast(err.message || "Something went wrong", "error");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Something went wrong", "error");
     }
   }
 
-  if (!isOpen) return null;
-
   if (showNewPlaylist) {
     return (
-      <PlaylistModal 
-        isOpen={true} 
-        onClose={() => setShowNewPlaylist(false)} 
+      <PlaylistModal
+        isOpen={true}
+        onClose={() => setShowNewPlaylist(false)}
         onSuccess={(playlistId) => {
           handleAddToPlaylist(playlistId);
           setShowNewPlaylist(false);
@@ -79,66 +104,49 @@ export function AddToPlaylistModal({ isOpen, onClose, trackId }: AddToPlaylistMo
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>Add to Playlist</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className={styles.inputGroup} style={{ maxHeight: "300px", overflowY: "auto", margin: "8px 0" }}>
-          {loading ? (
-            <div className={styles.progressContainer}>
-              <div className={styles.spinner} style={{ width: 20, height: 20 }} />
-            </div>
-          ) : playlists.length === 0 ? (
-            <div className={styles.progressText} style={{ padding: "16px 0" }}>No playlists yet.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {playlists.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => handleAddToPlaylist(p.id)}
-                  style={{
-                    background: "var(--sakura-hover)",
-                    border: "none",
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    color: "var(--sakura-text)",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = "var(--sakura-border)"}
-                  onMouseOut={(e) => e.currentTarget.style.background = "var(--sakura-hover)"}
-                >
-                  <span style={{ fontWeight: 500 }}>{p.name}</span>
-                  <span style={{ fontSize: "12px", color: "var(--sakura-text-secondary)" }}>{p.trackCount} tracks</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button 
-          className={`${styles.btn} ${styles.btnSubmit}`} 
-          onClick={() => setShowNewPlaylist(true)}
-          style={{ width: "100%", marginTop: "8px" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New Playlist
-        </button>
+    <Sheet open={isOpen} onClose={onClose} title="Add to Playlist" maxHeight="70dvh">
+      <div className={styles.pickList}>
+        {loading ? (
+          <div className={styles.progressContainer}>
+            <div className={styles.spinner} />
+          </div>
+        ) : error ? (
+          /* A failed fetch used to log to the console and render an empty list,
+             which reads as "you have no playlists" — the one message guaranteed
+             to be wrong. */
+          <div className={styles.pickEmpty}>
+            <p>{error}</p>
+            <button type="button" className={styles.retryBtn} onClick={retry}>
+              Try again
+            </button>
+          </div>
+        ) : playlists.length === 0 ? (
+          <div className={styles.pickEmpty}>
+            <p>No playlists yet. Create one below.</p>
+          </div>
+        ) : (
+          playlists.map((p) => (
+            <button
+              key={p.id}
+              className={`${styles.pickRow} pressable`}
+              onClick={() => handleAddToPlaylist(p.id)}
+            >
+              <span className={styles.pickName}>{p.name}</span>
+              <span className={styles.pickCount}>
+                {p.trackCount} {p.trackCount === 1 ? "track" : "tracks"}
+              </span>
+            </button>
+          ))
+        )}
       </div>
-    </div>
+
+      <button
+        className={`${styles.btn} ${styles.btnSubmit} ${styles.newPlaylistBtn} pressable`}
+        onClick={() => setShowNewPlaylist(true)}
+      >
+        <PlusIcon size={18} />
+        New Playlist
+      </button>
+    </Sheet>
   );
 }

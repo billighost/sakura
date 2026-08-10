@@ -1,0 +1,232 @@
+/* Sheet — the app's one overlay primitive. See src/components/Sheet.tsx.
+ *
+ * Movement is transform/opacity only so the whole presentation stays on the
+ * compositor: a sheet animating `height` or `top` janks on exactly the phones
+ * this app is built for.
+ */
+
+.root {
+  position: fixed;
+  inset: 0;
+  /*
+   * Layering, highest last: app chrome 50 → FullPlayer 200 → Sheet 250 →
+   * ContextMenu 280 → Toast 300 → OfflineBanner 400.
+   *
+   * 250 rather than 200 is deliberate. Sheets are opened *from* the full
+   * player (queue, share), so an equal value left them relying on portal
+   * order — they happened to win because the portal appends after the app
+   * root, which is true until someone reorders the tree.
+   */
+  z-index: 250;
+  display: flex;
+  /* Sits above the app's own chrome but must not trap taps once it's gone. */
+  pointer-events: none;
+}
+
+.root.visible {
+  pointer-events: auto;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  opacity: 0;
+  transition: opacity var(--d-base) var(--ease);
+  /* Blur here is sanctioned: content genuinely sits underneath. */
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.visible .backdrop {
+  opacity: 1;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--shadow-4);
+  /* Bounded so a long list scrolls inside the sheet rather than the sheet
+   * growing past the viewport and stranding its footer off-screen. */
+  max-height: 88dvh;
+  min-height: 0;
+  outline: none;
+  will-change: transform;
+}
+
+/* ── Bottom sheet ─────────────────────────────────────────────────────────── */
+
+.sheet {
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sheet .panel {
+  width: 100%;
+  max-width: 34rem;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  /* Off-screen by its own height, so the start position is right whatever the
+   * content measures — a fixed px offset leaves a gap on a short sheet. */
+  transform: translate3d(0, 100%, 0);
+  transition: transform var(--d-slow) var(--spring-soft);
+  /* The home indicator would otherwise sit on top of the last row. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.sheet.visible .panel {
+  transform: translate3d(0, 0, 0);
+}
+
+/* ── Centred dialog ───────────────────────────────────────────────────────── */
+
+.dialog {
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+}
+
+.dialog .panel {
+  width: 100%;
+  max-width: 27rem;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  transform: scale(0.94);
+  opacity: 0;
+  transition: transform var(--d-base) var(--spring), opacity var(--d-fast) var(--ease);
+}
+
+.dialog.visible .panel {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ── Chrome ───────────────────────────────────────────────────────────────── */
+
+.grabber {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0 var(--space-1);
+  flex-shrink: 0;
+  /* The grab area is the whole strip, not just the visible bar. */
+  min-height: 1.5rem;
+}
+
+.grabberBar {
+  width: 2.25rem;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  flex-shrink: 0;
+}
+
+.sheet .header {
+  padding-top: var(--space-1);
+}
+
+.dialog .header {
+  padding-top: var(--space-5);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  /* Pull the icon button's 44px box back to the visual edge, so the target is
+   * full size but the glyph still aligns with the content gutter. */
+  margin-right: calc(var(--space-2) * -1);
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.closeBtn:active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .closeBtn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line);
+  background: var(--surface-1);
+}
+
+.footer > * {
+  flex: 1;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────────
+ *
+ * The slide and the scale go; the fade stays. A sheet that appears with no
+ * transition at all is more disorienting than one that fades, and opacity
+ * isn't what triggers vestibular discomfort.
+ *
+ * Drag-to-dismiss is untouched — direct manipulation is the user moving the
+ * sheet, not the app animating at them.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sheet .panel,
+  .dialog .panel {
+    transform: none;
+    opacity: 0;
+    transition: opacity var(--d-fast) var(--ease);
+  }
+
+  .sheet.visible .panel,
+  .dialog.visible .panel {
+    transform: none;
+    opacity: 1;
+  }
+}

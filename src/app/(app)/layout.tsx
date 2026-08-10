@@ -6,6 +6,7 @@ import { MiniPlayer } from "@/components/MiniPlayer";
 import { FullPlayer } from "@/components/FullPlayer";
 import { PlayerProvider, usePlayer } from "@/components/PlayerContext";
 import { MediaSessionProvider } from "@/components/MediaSessionProvider";
+import { AppNavProvider, useAppNav } from "@/components/AppNavContext";
 import { useSwipeBack } from "@/lib/useSwipeBack";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import styles from "./layout.module.css";
@@ -13,6 +14,7 @@ import styles from "./layout.module.css";
 function AppShell({ children }: { children: React.ReactNode }) {
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const { currentTrack } = usePlayer();
+  const { registerScroller } = useAppNav();
 
   // Single registration. This used to be an inline copy of the same listener
   // that `useSwipeBack` installs, so on pages calling the hook a swipe fired
@@ -43,11 +45,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.root}>
-      <div className={styles.content}>{children}</div>
+      {/*
+        The app's one scroll container. Everything that needs to read or drive
+        page scroll — scroll restoration, the collapsing header, tap-active-tab
+        -to-top, the scroll lock behind a sheet — finds it by this ref or the
+        `data-app-scroll` attribute, rather than each guessing at `window`.
+      */}
+      <div ref={registerScroller} className={styles.content} data-app-scroll>
+        {children}
+      </div>
+
       <div className={styles.bottom}>
         {currentTrack && <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />}
         <TabBar />
       </div>
+
       <FullPlayer open={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
     </div>
   );
@@ -57,7 +69,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PlayerProvider>
       <MediaSessionProvider />
-      <AppShell>{children}</AppShell>
+      <AppNavProvider>
+        <AppShell>{children}</AppShell>
+      </AppNavProvider>
     </PlayerProvider>
   );
 }

@@ -1,21 +1,30 @@
+/* Context menu. See ContextMenu.tsx — it renders into a portal at a fixed
+ * point, so the glass treatment here is legitimate (content genuinely scrolls
+ * underneath). Migrated to the short token names. */
+
 .menu {
   position: fixed;
   display: flex;
   flex-direction: column;
-  min-width: 180px;
-  padding: 6px;
-  border-radius: 16px;
-  background: var(--sakura-glass-strong);
+  min-width: 11rem;
+  padding: var(--space-1);
+  border-radius: var(--r-lg);
+  background: var(--chrome);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid var(--sakura-glass-border);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  z-index: 9999;
-  font-size: 0.875rem;
-  color: var(--sakura-text);
+  border: 1px solid var(--chrome-line);
+  box-shadow: var(--shadow-3), var(--shadow-1);
+  /* Above sheets (250), below toasts (300) — a toast confirming the action a
+   * menu just triggered has to be readable over it. Ladder in Sheet.module.css. */
+  z-index: 280;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  color: var(--text);
+  /* Invisible at the raw touch point until the position measurement lands. */
   opacity: 0;
   transform: scale(0.94);
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transform-origin: top left;
+  transition: opacity var(--d-fast) var(--ease), transform var(--d-fast) var(--spring);
 }
 
 .menuOpen {
@@ -24,36 +33,49 @@
 }
 
 .item {
-  all: unset;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  color: inherit;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
-.item:hover {
-  background: var(--sakura-hover);
+@media (hover: hover) and (pointer: fine) {
+  .item:hover {
+    background: var(--surface-2);
+  }
 }
 
 .item:active {
-  background: var(--sakura-active);
+  background: var(--accent-softer);
+}
+
+.itemDanger {
+  color: var(--danger);
 }
 
 .itemIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
+  width: 1.25rem;
   flex-shrink: 0;
-  color: var(--sakura-text-secondary);
+  color: var(--text-2);
 }
 
 .item:hover .itemIcon {
-  color: var(--sakura-accent);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    transform: none;
+  }
 }

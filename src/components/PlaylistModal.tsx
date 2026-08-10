@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./PlaylistModal.module.css";
 import { usePlayer } from "./PlayerContext";
+import { Sheet } from "./Sheet";
 
 interface PlaylistModalProps {
   isOpen: boolean;
@@ -21,7 +22,10 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
   const [isLoading, setIsLoading] = useState(false);
   const [importStatus, setImportStatus] = useState("");
 
-  if (!isOpen) return null;
+  // No early `if (!isOpen) return null` — <Sheet> stays mounted through its
+  // exit animation and unmounts itself afterwards. Returning null here would
+  // rip the sheet out of the tree the instant it closed, which is exactly the
+  // hard cut this migration removes.
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -131,78 +135,83 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>New Playlist</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      title="New Playlist"
+      variant="dialog"
+      // A form mid-submit shouldn't be dismissable by a stray backdrop tap —
+      // the import streams tracks in and losing the sheet loses the progress.
+      dismissible={!isLoading}
+    >
+      <form onSubmit={handleSubmit}>
+        <div className={styles.inputGroup}>
+          <label htmlFor="playlist-name" className={styles.label}>Name</label>
+          <input
+            id="playlist-name"
+            className={styles.input}
+            placeholder="My Awesome Playlist"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={isLoading}
+          />
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className={styles.inputGroup}>
-            <label htmlFor="playlist-name" className={styles.label}>Name</label>
-            <input
-              id="playlist-name"
-              className={styles.input}
-              placeholder="My Awesome Playlist"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
+        <div className={styles.inputGroup} style={{ marginTop: 12 }}>
+          <label htmlFor="playlist-desc" className={styles.label}>Description (optional)</label>
+          <textarea
+            id="playlist-desc"
+            className={`${styles.input} ${styles.textarea}`}
+            placeholder="A brief description..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
 
-          <div className={styles.inputGroup} style={{ marginTop: 12 }}>
-            <label htmlFor="playlist-desc" className={styles.label}>Description (optional)</label>
-            <textarea
-              id="playlist-desc"
-              className={`${styles.input} ${styles.textarea}`}
-              placeholder="A brief description..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
+        <div className={styles.divider} style={{ margin: "20px 0" }}>OR</div>
 
-          <div className={styles.divider} style={{ margin: "20px 0" }}>OR</div>
+        <div className={styles.inputGroup}>
+          <label htmlFor="playlist-import" className={styles.label}>Import Public Spotify Playlist</label>
+          <input
+            id="playlist-import"
+            className={styles.input}
+            placeholder="https://open.spotify.com/playlist/..."
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
 
-          <div className={styles.inputGroup}>
-            <label htmlFor="playlist-import" className={styles.label}>Import Public Spotify Playlist</label>
-            <input
-              id="playlist-import"
-              className={styles.input}
-              placeholder="https://open.spotify.com/playlist/..."
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-
-          {isLoading && importStatus && (
-            <div className={styles.progressContainer}>
-              <div className={styles.spinner} />
-              <div className={styles.progressText}>{importStatus}</div>
+        {isLoading && importStatus && (
+          <div className={styles.progressContainer}>
+            <div className={styles.spinner} />
+            {/* Announced, because the status is the only sign anything is
+                happening during a long import. */}
+            <div className={styles.progressText} role="status" aria-live="polite">
+              {importStatus}
             </div>
-          )}
-
-          <div className={styles.actions}>
-            <button type="button" className={`${styles.btn} ${styles.btnCancel}`} onClick={onClose} disabled={isLoading}>
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              className={`${styles.btn} ${styles.btnSubmit}`} 
-              disabled={isLoading || (!name.trim() && !importUrl.trim())}
-            >
-              {isLoading ? "Saving..." : importUrl.trim() ? "Import" : "Create"}
-            </button>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnCancel} pressable`}
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={`${styles.btn} ${styles.btnSubmit} pressable`}
+            disabled={isLoading || (!name.trim() && !importUrl.trim())}
+          >
+            {isLoading ? "Saving..." : importUrl.trim() ? "Import" : "Create"}
+          </button>
+        </div>
+      </form>
+    </Sheet>
   );
 }

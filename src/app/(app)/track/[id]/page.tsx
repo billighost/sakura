@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { queryOne, query } from "@/lib/sql";
 import Link from "next/link";
 import { PlayButton } from "./PlayButton";
-import { BackButton } from "./BackButton";
+import { BackButton } from "@/components/BackButton";
 import { MusicNoteIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
@@ -142,7 +142,9 @@ export default async function TrackDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className={styles.page}>
-      <BackButton />
+      {/* Deep-linkable from a share, so back needs somewhere to go when there
+          is no history to pop. */}
+      <BackButton className={styles.backBtn} fallback="/home" />
 
       <div className={styles.heroSection}>
         {coverUrl ? (

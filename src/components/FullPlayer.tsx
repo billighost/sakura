@@ -9,6 +9,8 @@ import { CreditsSection } from "./CreditsSection";
 import { LyricsPreviewCard } from "./LyricsPreviewCard";
 import { QueueModal } from "./QueueModal";
 import { LyricsModal } from "./LyricsModal";
+import { useDrag } from "@/lib/useDrag";
+import { haptic } from "@/lib/haptics";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -33,18 +35,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef({
-    dragging: false,
-    startX: 0,
-    startY: 0,
-    lastX: 0,
-    lastY: 0,
-    lastTime: 0,
-    velocityX: 0,
-    velocityY: 0,
-    axis: null as "x" | "y" | null,
-    allowX: false,
-  });
 
   const {
     queue,
@@ -157,111 +147,47 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   }, [open, miniArtRect]);
 
   // --- Real drag-to-dismiss / swipe-to-skip physics --------------------------
-  // A single gesture recognizer covers the whole player: drag down anywhere to
-  // dismiss (like the app's real bottom sheet), or swipe the album art left/right
-  // to skip tracks. Interactive chrome (buttons, links, the scrubber, queue rows,
-  // scrollable lyrics/credits, and now the Queue/Lyrics modals) opts out via the
-  // elementIsGestureBlocked check so this never steals a tap, a seek, or a queue
-  // reorder.
-  function elementIsGestureBlocked(el: HTMLElement) {
-    return !!el.closest('button, a, input, [role="slider"], [data-block-drag]');
-  }
+  // A single gesture recogniser covers the whole player: drag down anywhere to
+  // dismiss, or swipe the album art left/right to skip. Interactive chrome
+  // (buttons, links, the scrubber, queue rows, scrollable lyrics/credits, and
+  // the Queue/Lyrics modals) opts out via `blockSelector` so this never steals
+  // a tap, a seek or a reorder.
+  //
+  // The axis is decided at pointer-down rather than by the recogniser: the art
+  // is the only region where a horizontal swipe means anything, and letting the
+  // rest of the player lock to "x" would swallow drags that should dismiss.
+  const [artAxisAllowed, setArtAxisAllowed] = useState(false);
 
-  const handlePointerDown = useCallback(
+  const playerDrag = useDrag({
+    axis: artAxisAllowed ? "both" : "y",
+    threshold: 70,
+    velocity: 0.55,
+    // Down dismisses; up has nothing above it, so it barely gives. Sideways is
+    // damped so the art never fully leaves the frame before release.
+    resistance: { down: 1, up: 0.25, left: 0.6, right: 0.6 },
+    commitDirections: artAxisAllowed ? ["down", "left", "right"] : ["down"],
+    enabled: open && !showQueue && !lyricsExpanded,
+    blockSelector: 'button, a, input, [role="slider"], [data-block-drag]',
+    onCommit: (direction) => {
+      if (direction === "down") onClose();
+      else if (direction === "left") next();
+      else if (direction === "right") prev();
+    },
+  });
+
+  /**
+   * Dismiss is only available from the top of the scroller — otherwise a flick
+   * to scroll the credits back up would close the player instead.
+   */
+  const handlePlayerPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (showQueue || lyricsExpanded) return; // modals have their own dismiss affordances
       if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
-      if (elementIsGestureBlocked(e.target as HTMLElement)) return;
-
-      const allowX = !!artShellRef.current && artShellRef.current.contains(e.target as Node);
-
-      dragState.current = {
-        dragging: true,
-        startX: e.clientX,
-        startY: e.clientY,
-        lastX: e.clientX,
-        lastY: e.clientY,
-        lastTime: performance.now(),
-        velocityX: 0,
-        velocityY: 0,
-        axis: null,
-        allowX,
-      };
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-      if (rootRef.current) rootRef.current.style.transition = "none";
+      setArtAxisAllowed(
+        !!artShellRef.current && artShellRef.current.contains(e.target as Node)
+      );
+      playerDrag.bind.onPointerDown(e);
     },
-    [showQueue, lyricsExpanded]
-  );
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    const ds = dragState.current;
-    if (!ds.dragging) return;
-
-    const dx = e.clientX - ds.startX;
-    const dy = e.clientY - ds.startY;
-
-    if (!ds.axis) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      ds.axis = ds.allowX && Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-    }
-
-    const now = performance.now();
-    const dt = Math.max(1, now - ds.lastTime);
-    ds.velocityX = (e.clientX - ds.lastX) / dt;
-    ds.velocityY = (e.clientY - ds.lastY) / dt;
-    ds.lastX = e.clientX;
-    ds.lastY = e.clientY;
-    ds.lastTime = now;
-
-    if (!rootRef.current) return;
-
-    if (ds.axis === "y") {
-      let delta = dy;
-      if (delta < 0) delta *= 0.25; // rubber-band past the resting position
-      rootRef.current.style.transform = `translateY(${Math.max(0, delta)}px)`;
-    } else {
-      // Rubber-band the swipe so it never fully leaves the frame before release.
-      const damped = dx * 0.6;
-      rootRef.current.style.transform = `translateX(${damped}px)`;
-      if (artShellRef.current) {
-        artShellRef.current.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 260));
-      }
-    }
-  }, []);
-
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      const ds = dragState.current;
-      if (!ds.dragging) return;
-      ds.dragging = false;
-
-      if (rootRef.current) {
-        rootRef.current.style.transition = "";
-        rootRef.current.style.transform = "";
-      }
-      if (artShellRef.current) artShellRef.current.style.opacity = "";
-
-      if (ds.axis === "y") {
-        const delta = Math.max(0, e.clientY - ds.startY);
-        const isFastFlick = ds.velocityY > 0.55;
-        const isFarEnough = delta > window.innerHeight * 0.4;
-        if (isFastFlick || isFarEnough) {
-          import("@/lib/haptics").then((h) => h.vibrate(8));
-          onClose();
-        }
-      } else if (ds.axis === "x") {
-        const dx = e.clientX - ds.startX;
-        const isFastFlick = Math.abs(ds.velocityX) > 0.5;
-        const isFarEnough = Math.abs(dx) > 70;
-        if (isFastFlick || isFarEnough) {
-          import("@/lib/haptics").then((h) => h.vibrate(10));
-          if (dx < 0) next();
-          else prev();
-        }
-      }
-      ds.axis = null;
-    },
-    [onClose, next, prev]
+    [playerDrag.bind]
   );
 
   // --- Queue drag-to-reorder -------------------------------------------------
@@ -300,7 +226,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             const listLength = current.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
             const to = Math.min(Math.max(current.index + rowsMoved, 0), Math.max(0, listLength - 1));
             if (to !== current.index) {
-              import("@/lib/haptics").then((h) => h.vibrate(10));
+              haptic("impact");
               if (current.list === "upnext") reorderUpNext(current.index, to);
               else reorderQueueTail(current.index, to);
             }
@@ -381,7 +307,14 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
     e.preventDefault();
     const deltaY = e.clientY - ps.startY;
-    setDragQueueItem((prev) => (prev ? { ...prev, deltaY } : prev));
+    setDragQueueItem((prev) => {
+      if (!prev) return prev;
+      // Tick once per slot crossed. Without this the row slides silently and the
+      // only confirmation arrives on release, well after the decision is made.
+      const slot = Math.round(deltaY / prev.rowHeight);
+      if (slot !== Math.round(prev.deltaY / prev.rowHeight)) haptic("selection");
+      return { ...prev, deltaY };
+    });
   }
 
   function handleRowPointerUp(e: React.PointerEvent) {
@@ -406,6 +339,18 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const displayProgress = seekDrag !== null ? seekDrag : progress;
   const tailQueue = queue.slice(currentIndex + 1);
 
+  const dragTransform =
+    playerDrag.axis === "y"
+      ? `translate3d(0, ${Math.max(0, playerDrag.dy)}px, 0)`
+      : playerDrag.axis === "x"
+        ? `translate3d(${playerDrag.dx}px, 0, 0)`
+        : undefined;
+
+  // The art fades as it's swiped away, so the skip reads as the current track
+  // leaving rather than the whole screen sliding for no reason.
+  const artDragOpacity =
+    playerDrag.axis === "x" ? Math.max(0.4, 1 - Math.abs(playerDrag.dx) / 260) : undefined;
+
   return (
     <div
       ref={rootRef}
@@ -414,12 +359,15 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         {
           backgroundImage: currentTrack.coverUrl ? `url(${currentTrack.coverUrl})` : undefined,
           "--track-accent": accentColor || undefined,
+          transform: dragTransform,
+          // While the finger is down the transform must track it exactly; the
+          // class transition takes back over the moment it lifts and snaps home.
+          transition: playerDrag.active && playerDrag.axis ? "none" : undefined,
+          touchAction: playerDrag.touchAction,
         } as React.CSSProperties
       }
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      {...playerDrag.bind}
+      onPointerDown={handlePlayerPointerDown}
     >
       <div className={styles.overlay} />
 
@@ -449,7 +397,15 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
       <div ref={scrollContainerRef} className={styles.scrollContainer}>
         <div className={styles.mainContent}>
           <div className={styles.artContainer}>
-            <div ref={artShellRef} className={styles.artShell} style={artFlipStyle}>
+            <div
+              ref={artShellRef}
+              className={styles.artShell}
+              style={
+                artDragOpacity !== undefined
+                  ? { ...artFlipStyle, opacity: artDragOpacity, transition: "none" }
+                  : artFlipStyle
+              }
+            >
               {currentTrack.coverUrl ? (
                 <>
                   {!artLoaded && <div className={`${styles.art} skeleton`} style={{ position: "absolute", inset: 0 }} />}

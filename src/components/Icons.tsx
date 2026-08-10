@@ -743,6 +743,14 @@ export function SortIcon(p: IconProps) {
   );
 }
 
+export function DragHandleIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M8 8.5h8M8 12h8M8 15.5h8" />
+    </Svg>
+  );
+}
+
 export function FilterIcon(p: IconProps) {
   return (
     <Svg {...p}>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { haptic } from "./haptics";
 
 /**
  * Edge-swipe to go back.
@@ -54,7 +55,7 @@ export function useSwipeBack(enabled = true) {
 
       // Horizontal intent: travelled far enough, and mostly sideways.
       if (dx > 70 && Math.abs(dy) < Math.abs(dx) * 0.6) {
-        import("@/lib/haptics").then((h) => h.vibrate(8));
+        haptic("impact");
         router.back();
       }
     };

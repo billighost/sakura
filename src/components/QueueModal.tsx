@@ -1,6 +1,8 @@
 "use client";
 
 import { TrackRow } from "./TrackRow";
+import { Sheet } from "./Sheet";
+import { DragHandleIcon } from "./Icons";
 import styles from "./QueueModal.module.css";
 
 interface QueueTrack {
@@ -43,6 +45,40 @@ interface QueueModalProps {
   radioActive?: boolean;
 }
 
+/**
+ * Reorder grip. `touch-action: none` is load-bearing — without it the sheet's
+ * scroller claims the vertical drag and the row never moves.
+ */
+function QueueGrip({
+  list,
+  index,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+}: {
+  list: "upnext" | "tail";
+  index: number;
+  onPointerDown: (list: "upnext" | "tail", index: number, e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
+  onPointerCancel: () => void;
+}) {
+  return (
+    <span
+      className={styles.dragGrip}
+      aria-hidden="true"
+      style={{ touchAction: "none" }}
+      onPointerDown={(e) => onPointerDown(list, index, e)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
+      <DragHandleIcon size={16} />
+    </span>
+  );
+}
+
 export function QueueModal({
   open,
   onClose,
@@ -63,24 +99,8 @@ export function QueueModal({
   radioActive = false,
 }: QueueModalProps) {
   return (
-    <div className={`${styles.overlay} ${open ? styles.open : ""}`} aria-hidden={!open}>
-      <div className={styles.backdrop} onClick={onClose} />
-      <div className={styles.sheet} data-block-drag role="dialog" aria-label="Queue" aria-modal="true">
-        <div className={styles.dragHandleRow}>
-          <div className={styles.dragHandle} />
-        </div>
-
-        <div className={styles.header}>
-          <h2 className={styles.title}>Queue</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close queue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className={styles.list}>
+    <Sheet open={open} onClose={onClose} title="Queue" maxHeight="82dvh">
+      <div className={styles.list}>
           <div className={styles.listHeader}>Now Playing</div>
           <div className={styles.rowActive}>
             <TrackRow
@@ -114,23 +134,14 @@ export function QueueModal({
                 };
 
                 const dragGripNode = (
-                  <span
-                    className={styles.dragGrip}
-                    aria-hidden="true"
-                    onPointerDown={(e) => onRowPointerDown("upnext", i, e)}
+                  <QueueGrip
+                    list="upnext"
+                    index={i}
+                    onPointerDown={onRowPointerDown}
                     onPointerMove={onRowPointerMove}
                     onPointerUp={onRowPointerUp}
                     onPointerCancel={onRowPointerCancel}
-                  >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                      <circle cx="9" cy="6" r="1.4" />
-                      <circle cx="15" cy="6" r="1.4" />
-                      <circle cx="9" cy="12" r="1.4" />
-                      <circle cx="15" cy="12" r="1.4" />
-                      <circle cx="9" cy="18" r="1.4" />
-                      <circle cx="15" cy="18" r="1.4" />
-                    </svg>
-                  </span>
+                  />
                 );
 
                 return (
@@ -170,23 +181,14 @@ export function QueueModal({
                 };
 
                 const dragGripNode = (
-                  <span
-                    className={styles.dragGrip}
-                    aria-hidden="true"
-                    onPointerDown={(e) => onRowPointerDown("tail", i, e)}
+                  <QueueGrip
+                    list="tail"
+                    index={i}
+                    onPointerDown={onRowPointerDown}
                     onPointerMove={onRowPointerMove}
                     onPointerUp={onRowPointerUp}
                     onPointerCancel={onRowPointerCancel}
-                  >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                      <circle cx="9" cy="6" r="1.4" />
-                      <circle cx="15" cy="6" r="1.4" />
-                      <circle cx="9" cy="12" r="1.4" />
-                      <circle cx="15" cy="12" r="1.4" />
-                      <circle cx="9" cy="18" r="1.4" />
-                      <circle cx="15" cy="18" r="1.4" />
-                    </svg>
-                  </span>
+                  />
                 );
 
                 return (
@@ -223,8 +225,7 @@ export function QueueModal({
               Autoplay is on — more like this will keep coming.
             </div>
           )}
-        </div>
       </div>
-    </div>
+    </Sheet>
   );
 }

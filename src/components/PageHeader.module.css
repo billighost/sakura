@@ -1,0 +1,137 @@
+/* Collapsing page header. The bar is sticky and permanent; only the title
+ * cross-fades between its large and compact forms. See PageHeader.tsx. */
+
+.root {
+  position: relative;
+  z-index: 2;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 3.25rem;
+  /* Clears the notch / status bar when installed as a standalone PWA. */
+  padding: max(var(--space-2), env(safe-area-inset-top)) var(--space-4) var(--space-2);
+  /* Transparent while expanded so the large title area reads as open page. */
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background-color var(--d-base) var(--ease), border-color var(--d-base) var(--ease),
+    backdrop-filter var(--d-base) var(--ease);
+}
+
+.collapsed .bar {
+  background: var(--chrome);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border-bottom-color: var(--chrome-line);
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  /* Optical alignment: the chevron's mass sits right of its box centre, so the
+   * button is nudged left to line up with the title text below it. */
+  margin-left: calc(var(--space-2) * -1);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.compactTitle {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Invisible until the large title has scrolled away. */
+  opacity: 0;
+  transform: translateY(0.35rem);
+  transition: opacity var(--d-base) var(--ease), transform var(--d-base) var(--ease);
+}
+
+.collapsed .compactTitle {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  margin-right: calc(var(--space-2) * -1);
+}
+
+/* ── Large title ──────────────────────────────────────────────────────────── */
+
+.large {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+/* Only the title fades as it scrolls under the bar, so the two titles never
+ * both read as present. The extras row below stays fully opaque and usable —
+ * it can't be a child of the fading element, because a parent's opacity
+ * creates a compositing group its children cannot opt out of. */
+.titleBlock {
+  opacity: 1;
+  transition: opacity var(--d-base) var(--ease);
+}
+
+.collapsed .titleBlock {
+  opacity: 0;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+  color: var(--text-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  /* Long playlist names wrap rather than clipping, but never past two lines. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.extras {
+  margin-top: var(--space-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compactTitle,
+  .titleBlock {
+    transition: none;
+  }
+
+  .compactTitle {
+    transform: none;
+  }
+}

@@ -707,6 +707,109 @@ input[type="radio"] {
   animation-delay: calc(var(--i, 0) * 26ms);
 }
 
+/* ── Page transitions ──────────────────────────────────────────────────────
+ *
+ * Driven by `document.startViewTransition` in AppNavContext, which stamps
+ * `data-nav` on <html> for the duration so the right animation applies:
+ *
+ *   push — going deeper. Content slides in from the right, out to the left.
+ *   back — returning. The exact mirror, so the pair reads as one axis.
+ *   tab  — switching between siblings. A crossfade, not a slide: tabs aren't
+ *          a stack, and sliding between them implies a hierarchy that
+ *          doesn't exist.
+ *
+ * Where the API is unsupported (Firefox, older Safari) nothing here applies
+ * and navigation is an instant swap, which is the current behaviour anyway.
+ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  /* Both snapshots animate together; without this the browser's default
+   * crossfade runs underneath and muddies the slide. */
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/*
+ * The overlay swallows pointer events for the transition's whole duration, so
+ * a tap landing mid-animation is lost. Letting them through means a fast user
+ * never feels the app stall.
+ */
+::view-transition {
+  pointer-events: none;
+}
+
+[data-nav="push"]::view-transition-old(root) {
+  animation: navExitLeft var(--d-slow) var(--ease) both;
+}
+
+[data-nav="push"]::view-transition-new(root) {
+  animation: navEnterRight var(--d-slow) var(--ease) both;
+}
+
+[data-nav="back"]::view-transition-old(root) {
+  animation: navExitRight var(--d-slow) var(--ease) both;
+}
+
+[data-nav="back"]::view-transition-new(root) {
+  animation: navEnterLeft var(--d-slow) var(--ease) both;
+}
+
+[data-nav="tab"]::view-transition-old(root) {
+  animation: fadeIn var(--d-fast) var(--ease-out) both reverse;
+}
+
+[data-nav="tab"]::view-transition-new(root) {
+  animation: fadeIn var(--d-base) var(--ease) both;
+}
+
+/* 24px, not the 60px the Next guide suggests: this is a full-bleed phone app
+ * where the whole viewport is the moving element, and a long travel makes
+ * every navigation feel slower than it is. */
+@keyframes navEnterRight {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes navExitLeft {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0);
+  }
+}
+
+@keyframes navEnterLeft {
+  from {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes navExitRight {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+}
+
 /* ── Skeletons ─────────────────────────────────────────────────────────────
  * The sweep is a functional gradient (it encodes "loading"), and it's the one
  * animated gradient the design language keeps.
@@ -857,5 +960,18 @@ input[type="radio"] {
   .pressable:active,
   .pressable-lg:active {
     transform: none;
+  }
+
+  /*
+   * Page transitions are the classic vestibular trigger — the whole viewport
+   * moving at once. AppNavContext already declines to start one when reduced
+   * motion is set, so this is a belt-and-braces stop for a transition already
+   * in flight when the OS setting flips mid-session.
+   */
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

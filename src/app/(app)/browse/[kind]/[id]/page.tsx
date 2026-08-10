@@ -126,7 +126,9 @@ export default function ExternalPage({
   return (
     <div className={styles.page}>
       <header className={styles.hero}>
-        <BackButton className={styles.back} />
+        {/* Reachable from search and from external links, so back needs a
+            destination when there's no history to pop. */}
+        <BackButton className={styles.back} fallback="/search" />
 
         <div className={`${styles.cover} ${kind === "artist" ? styles.coverRound : ""}`}>
           {cover ? (
