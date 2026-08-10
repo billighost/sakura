@@ -1,53 +1,95 @@
 "use client";
 
-import { renderShareCard, type CardTrack } from "./shareCard";
+import { drawBlossom, drawWordmark } from "./brandMark";
+import { parseColor, rgb, shift, ensureFonts, DISPLAY, BODY } from "./shareCard";
+import { lineIndexAt, type LyricLine } from "./lyrics";
 
 /**
- * Animated video shares: a short clip of the artwork reacting to the actual
- * audio, with the current lyric line burned in.
+ * Video share rendering.
  *
- * How it works: a canvas is animated at 30fps, `canvas.captureStream()` gives a
- * video track, a Web Audio `MediaStreamAudioDestinationNode` gives a matching
- * audio track, and `MediaRecorder` muxes the two.
+ * A canvas is animated, `canvas.captureStream()` gives a video track, a Web
+ * Audio `MediaStreamAudioDestinationNode` gives a matching audio track, and
+ * `MediaRecorder` muxes the two.
  *
- * The important constraint is **taint**. A canvas that has drawn a cross-origin
- * image without CORS produces a stream that `MediaRecorder` refuses to encode,
- * and an `<audio>` element sourced cross-origin can't be routed through Web
- * Audio at all. Both media are therefore fetched to same-origin blobs first —
- * slower to start, but it's the difference between working and throwing.
+ * ── The three things that make this hard ────────────────────────────────────
+ *
+ * **Taint.** A canvas that has drawn a cross-origin image without CORS
+ * produces a stream MediaRecorder refuses to encode, and a cross-origin
+ * `<audio>` can't be routed through Web Audio at all. Both media are fetched
+ * to same-origin blobs first (see `toSameOriginUrl`).
+ *
+ * **Drift.** The obvious frame loop advances a counter per rAF and assumes
+ * 30fps. It isn't 30fps — rAF is throttled when the tab blurs, and a busy main
+ * thread drops frames — so by the end of a 30-second clip the burned-in lyrics
+ * can be a second or more out from the audio. Every frame here is therefore
+ * timed from `audio.currentTime`, the only clock that agrees with what's being
+ * recorded. That is the single most important line in this file.
+ *
+ * **Codecs.** Support varies enormously and Safari is the one that bites.
+ * `pickMimeType` probes rather than assuming, and export fails with an
+ * explanation rather than producing a file that won't play.
  */
 
+export type CoverStyle = "bloom" | "vinyl" | "field" | "pulse" | "type" | "frame";
+
+export const COVER_STYLES: { key: CoverStyle; label: string; hint: string }[] = [
+  { key: "bloom", label: "Bloom", hint: "Artwork behind a floating card" },
+  { key: "vinyl", label: "Vinyl", hint: "The record, turning" },
+  { key: "field", label: "Field", hint: "Colour drifting from the artwork" },
+  { key: "pulse", label: "Pulse", hint: "Moves with the music" },
+  { key: "type", label: "Type", hint: "Words only, no artwork" },
+  { key: "frame", label: "Frame", hint: "Artwork, full bleed" },
+];
+
+export interface VideoTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  coverUrl?: string;
+}
+
 export interface VideoShareOptions {
-  track: CardTrack;
-  /** Same-origin blob URL or CORS-enabled audio URL. */
+  track: VideoTrack;
+  /** Same-origin blob URL. Use `toSameOriginUrl` before calling. */
   audioUrl: string;
-  /** Where in the track to start the clip, in seconds. */
   startTime: number;
-  /** Clip length. Kept short — this is for social, and encoding is real work. */
-  durationSeconds?: number;
+  durationSeconds: number;
+  coverStyle: CoverStyle;
   accentColor?: string | null;
-  /** Lyric lines with timings, for the burned-in caption. */
-  lyricLines?: { time: number; text: string }[];
-  seed?: string;
+  /** Present and non-empty enables lyric mode. */
+  lyricLines?: LyricLine[];
+  showLyrics?: boolean;
   onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
 }
 
 const FPS = 30;
 const WIDTH = 720;
 const HEIGHT = 1280;
 
-/** Picks the best container the browser will actually encode. */
-function pickMimeType(): string | null {
+/* ── Codec selection ─────────────────────────────────────────────────────── */
+
+/**
+ * Best container this browser will actually encode.
+ *
+ * MP4/H.264 first because it's the only format every social target accepts
+ * without re-encoding, and it's what Safari produces. WebM variants follow for
+ * Chrome and Firefox, which handle it natively but where the file may be
+ * rejected by some upload flows — a tradeoff worth taking over failing.
+ */
+export function pickMimeType(): string | null {
   const candidates = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2", // Safari, and best for sharing
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4",
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
   ];
+
+  if (typeof MediaRecorder === "undefined") return null;
   for (const type of candidates) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
+    if (MediaRecorder.isTypeSupported(type)) return type;
   }
   return null;
 }
@@ -60,67 +102,81 @@ export function isVideoShareSupported(): boolean {
   );
 }
 
-/** Fetch to a blob URL so the resulting element is same-origin and untainted. */
-async function toSameOriginUrl(url: string): Promise<string> {
-  if (url.startsWith("blob:") || url.startsWith("data:")) return url;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not load audio (${res.status})`);
-  return URL.createObjectURL(await res.blob());
+/** File extension matching the chosen container. */
+export function extensionFor(mimeType: string): string {
+  return mimeType.startsWith("video/mp4") ? "mp4" : "webm";
 }
 
-export async function renderShareVideo(
-  options: VideoShareOptions
-): Promise<Blob> {
+/* ── Render ──────────────────────────────────────────────────────────────── */
+
+export async function renderShareVideo(options: VideoShareOptions): Promise<Blob> {
   const {
     track,
     audioUrl,
     startTime,
-    durationSeconds = 15,
+    durationSeconds,
+    coverStyle,
     accentColor,
     lyricLines = [],
-    seed = track.id,
+    showLyrics = false,
     onProgress,
+    signal,
   } = options;
 
   const mimeType = pickMimeType();
-  if (!mimeType) throw new Error("Video export isn't supported on this browser.");
+  if (!mimeType) {
+    throw new Error("This browser can't record video. Try Chrome, or save an image instead.");
+  }
+
+  await ensureFonts();
 
   const cleanup: Array<() => void> = [];
+  const runCleanup = () => {
+    for (const fn of cleanup.reverse()) {
+      try {
+        fn();
+      } catch {
+        /* best effort */
+      }
+    }
+  };
 
   try {
     /* ── Audio graph ──────────────────────────────────────────────────── */
 
-    const localAudioUrl = await toSameOriginUrl(audioUrl);
-    if (localAudioUrl !== audioUrl) {
-      cleanup.push(() => URL.revokeObjectURL(localAudioUrl));
-    }
-
     const audio = new Audio();
-    audio.src = localAudioUrl;
+    audio.src = audioUrl;
     audio.crossOrigin = "anonymous";
     audio.preload = "auto";
 
     await new Promise<void>((resolve, reject) => {
-      audio.onloadedmetadata = () => resolve();
-      audio.onerror = () => reject(new Error("Could not decode audio for export."));
-      setTimeout(() => reject(new Error("Timed out loading audio.")), 15000);
+      const timer = setTimeout(() => reject(new Error("Timed out loading the audio.")), 20000);
+      audio.onloadedmetadata = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      audio.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error("Couldn't decode the audio for this track."));
+      };
     });
 
-    const AudioCtx =
-      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const audioCtx = new AudioCtx();
+    const AudioCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioCtx = new AudioCtor();
     cleanup.push(() => void audioCtx.close().catch(() => {}));
 
     const source = audioCtx.createMediaElementSource(audio);
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 128;
-    analyser.smoothingTimeConstant = 0.75;
+    analyser.smoothingTimeConstant = 0.72;
 
     const destination = audioCtx.createMediaStreamDestination();
     source.connect(analyser);
     analyser.connect(destination);
-    // Deliberately NOT connected to audioCtx.destination — exporting shouldn't
-    // blast the clip out of the speakers while it renders.
+    // Deliberately NOT connected to audioCtx.destination — exporting should
+    // not blast the clip out of the speakers while it renders.
 
     const freqData = new Uint8Array(analyser.frequencyBinCount);
 
@@ -129,27 +185,29 @@ export async function renderShareVideo(
     const canvas = document.createElement("canvas");
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Canvas unavailable.");
 
-    // The static card is rendered once into an offscreen canvas and blitted
-    // each frame — re-rendering gradients and petals 30 times a second would
-    // drop frames on a phone.
-    const backdrop = document.createElement("canvas");
-    await renderShareCard(backdrop, {
-      track,
-      accentColor,
-      format: "story",
-      seed,
-      scale: WIDTH / 1080,
-      lines: [],
-    });
+    const cover = track.coverUrl ? await loadImage(track.coverUrl) : null;
+    const accent = parseColor(accentColor || "#F2789F");
 
     const clipEnd = Math.min(
       startTime + durationSeconds,
-      isFinite(audio.duration) ? audio.duration : startTime + durationSeconds
+      Number.isFinite(audio.duration) ? audio.duration : startTime + durationSeconds
     );
     const actualDuration = Math.max(1, clipEnd - startTime);
+
+    const scene: VideoScene = {
+      ctx,
+      W: WIDTH,
+      H: HEIGHT,
+      track,
+      cover,
+      accent,
+      freqData,
+      lyricLines,
+      showLyrics: showLyrics && lyricLines.length > 0,
+    };
 
     /* ── Recording ────────────────────────────────────────────────────── */
 
@@ -158,10 +216,11 @@ export async function renderShareVideo(
       ...videoStream.getVideoTracks(),
       ...destination.stream.getAudioTracks(),
     ]);
+    cleanup.push(() => combined.getTracks().forEach((t) => t.stop()));
 
     const recorder = new MediaRecorder(combined, {
       mimeType,
-      videoBitsPerSecond: 3_500_000,
+      videoBitsPerSecond: 4_500_000,
       audioBitsPerSecond: 128_000,
     });
 
@@ -170,173 +229,674 @@ export async function renderShareVideo(
       if (e.data.size > 0) chunks.push(e.data);
     };
 
+    let stopped = false;
+    const stopAll = () => {
+      if (stopped) return;
+      stopped = true;
+      audio.pause();
+      if (recorder.state !== "inactive") recorder.stop();
+    };
+
     const finished = new Promise<Blob>((resolve, reject) => {
       recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-      recorder.onerror = () => reject(new Error("Recording failed."));
+      recorder.onerror = () => reject(new Error("Recording failed partway through."));
     });
+
+    // Cancellation has to reach the recorder, not just the caller's await —
+    // otherwise the encode keeps running in the background after the user
+    // pressed cancel.
+    if (signal) {
+      if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+      const onAbort = () => stopAll();
+      signal.addEventListener("abort", onAbort);
+      cleanup.push(() => signal.removeEventListener("abort", onAbort));
+    }
 
     audio.currentTime = startTime;
     await audioCtx.resume();
     await audio.play();
-    recorder.start(200);
+    // Timeslice so chunks arrive during the recording rather than as one blob
+    // at the end — a long clip otherwise spikes memory at stop.
+    recorder.start(250);
 
     let rafId = 0;
-    const startedAt = performance.now();
+    cleanup.push(() => cancelAnimationFrame(rafId));
 
     const drawFrame = () => {
-      const elapsed = (performance.now() - startedAt) / 1000;
-      const progress = Math.min(1, elapsed / actualDuration);
+      /*
+       * Timed from the audio element, NOT from a frame counter or
+       * `performance.now()`. Those two both drift against the recorded audio
+       * the moment a frame is dropped or rAF is throttled, and drift is the
+       * failure mode people notice — the lyrics slide out of sync and the clip
+       * looks broken. `audio.currentTime` is the same clock the recorder is
+       * capturing, so a dropped frame costs one frame rather than
+       * accumulating.
+       */
+      const elapsed = audio.currentTime - startTime;
+      const progress = Math.min(1, Math.max(0, elapsed / actualDuration));
 
-      ctx.drawImage(backdrop, 0, 0, WIDTH, HEIGHT);
       analyser.getByteFrequencyData(freqData);
-
-      drawReactiveBars(ctx, freqData, accentColor);
-      drawCaption(ctx, lyricLines, startTime + elapsed);
-      drawProgressBar(ctx, progress, accentColor);
+      drawVideoFrame(scene, coverStyle, audio.currentTime, elapsed, progress);
 
       onProgress?.(progress);
 
-      if (progress < 1) {
-        rafId = requestAnimationFrame(drawFrame);
-      } else {
-        audio.pause();
-        if (recorder.state !== "inactive") recorder.stop();
+      if (progress >= 1 || audio.ended) {
+        stopAll();
+        return;
       }
+      rafId = requestAnimationFrame(drawFrame);
     };
 
     rafId = requestAnimationFrame(drawFrame);
-    cleanup.push(() => cancelAnimationFrame(rafId));
 
-    // Belt-and-braces stop: if rAF is throttled (backgrounded tab) the loop
-    // above may never reach progress >= 1.
-    const guard = setTimeout(() => {
-      audio.pause();
-      if (recorder.state !== "inactive") recorder.stop();
-    }, (actualDuration + 3) * 1000);
+    // Belt and braces: if rAF is throttled to nothing (backgrounded tab) the
+    // loop above may never reach progress >= 1, and the recorder would run
+    // until the tab closed.
+    const guard = setTimeout(() => stopAll(), (actualDuration + 5) * 1000);
     cleanup.push(() => clearTimeout(guard));
 
     const blob = await finished;
-    if (blob.size === 0) throw new Error("Export produced an empty file.");
+
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    if (blob.size === 0) throw new Error("The export came out empty. Try a shorter clip.");
+
     return blob;
   } finally {
-    for (const fn of cleanup) {
-      try {
-        fn();
-      } catch {
-        /* best effort */
-      }
-    }
+    runCleanup();
   }
 }
 
-/* ── Frame elements ─────────────────────────────────────────────────────── */
+/* ── Frame composition ───────────────────────────────────────────────────── */
 
-function drawReactiveBars(
-  ctx: CanvasRenderingContext2D,
-  data: Uint8Array,
-  accentColor?: string | null
-) {
-  const barCount = 48;
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
-  const centerY = h * 0.63;
-  const maxBar = h * 0.1;
-  const gap = (w * 0.8) / barCount;
-  const barW = gap * 0.45;
-  const startX = w * 0.1;
+interface VideoScene {
+  ctx: CanvasRenderingContext2D;
+  W: number;
+  H: number;
+  track: VideoTrack;
+  cover: HTMLImageElement | null;
+  accent: [number, number, number];
+  freqData: Uint8Array;
+  lyricLines: LyricLine[];
+  showLyrics: boolean;
+}
+
+function drawVideoFrame(
+  s: VideoScene,
+  style: CoverStyle,
+  absoluteTime: number,
+  elapsed: number,
+  progress: number
+): void {
+  const { ctx, W, H } = s;
+
+  ctx.fillStyle = "#0E0B10";
+  ctx.fillRect(0, 0, W, H);
+
+  switch (style) {
+    case "vinyl":
+      drawVinyl(s, elapsed);
+      break;
+    case "field":
+      drawField(s, elapsed);
+      break;
+    case "pulse":
+      drawPulse(s);
+      break;
+    case "type":
+      drawTypeOnly(s);
+      break;
+    case "frame":
+      drawFrameStyle(s);
+      break;
+    default:
+      drawBloom(s, elapsed);
+  }
+
+  if (s.showLyrics) drawLyricOverlay(s, absoluteTime);
+  else drawCredit(s);
+
+  drawProgressRail(s, progress);
+}
+
+/* ── Cover styles ────────────────────────────────────────────────────────── */
+
+/** Artwork blurred behind a floating card of the artwork itself. */
+function drawBloom(s: VideoScene, elapsed: number): void {
+  const { ctx, W, H, cover, accent } = s;
+
+  if (cover) {
+    // Blurred backdrop. `filter` is expensive per frame, so the drift is slow
+    // and the scale generous enough that the blur edges never enter frame.
+    ctx.save();
+    ctx.filter = "blur(56px) saturate(1.5)";
+    const drift = Math.sin(elapsed * 0.12) * 24;
+    const size = Math.max(W, H) * 1.5;
+    ctx.drawImage(cover, (W - size) / 2 + drift, (H - size) / 2, size, size);
+    ctx.restore();
+    ctx.filter = "none";
+
+    ctx.fillStyle = "rgba(12,9,14,0.52)";
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.fillStyle = rgb(shift(accent, -0.6));
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // The card, breathing very slightly so the frame is never fully static.
+  const cardSize = W * 0.62;
+  const bob = Math.sin(elapsed * 0.9) * 5;
+  const x = (W - cardSize) / 2;
+  const y = H * 0.24 + bob;
 
   ctx.save();
-  for (let i = 0; i < barCount; i++) {
-    // Log-ish sampling: low bins carry most of the energy, so a linear map
-    // leaves the right-hand half of the display permanently flat.
-    const bin = Math.floor(Math.pow(i / barCount, 1.6) * data.length);
-    const amplitude = (data[bin] ?? 0) / 255;
-    const envelope = Math.sin((i / barCount) * Math.PI);
-    const bh = Math.max(4, amplitude * maxBar * envelope * 2.2);
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 48;
+  ctx.shadowOffsetY = 20;
+  roundRect(ctx, x, y, cardSize, cardSize, 18);
+  ctx.fillStyle = "#1C1620";
+  ctx.fill();
+  ctx.restore();
 
-    ctx.fillStyle = accentColor || "#F2789F";
-    ctx.globalAlpha = 0.35 + amplitude * 0.6;
-    const x = startX + i * gap;
+  ctx.save();
+  roundRect(ctx, x, y, cardSize, cardSize, 18);
+  ctx.clip();
+  drawCover(s, x, y, cardSize, cardSize);
+  ctx.restore();
+}
+
+/** The record itself, turning at 33⅓ rpm. */
+function drawVinyl(s: VideoScene, elapsed: number): void {
+  const { ctx, W, H, cover, accent } = s;
+
+  ctx.fillStyle = rgb(shift(accent, -0.72));
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W / 2;
+  const cy = H * 0.36;
+  const radius = W * 0.36;
+
+  // 33⅓ rpm is 0.5556 rev/s — the real speed, because a record turning at an
+  // arbitrary rate is the kind of detail that reads as wrong without being
+  // identifiable.
+  const angle = elapsed * 0.5556 * Math.PI * 2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "#0B0910";
+  ctx.fill();
+
+  // Grooves. Flat strokes at stepped alpha rather than a radial gradient.
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let r = radius * 0.42; r < radius * 0.97; r += 6) {
     ctx.beginPath();
-    ctx.roundRect(x, centerY - bh / 2, barW, bh, barW / 2);
-    ctx.fill();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // The label, rotating with the disc.
+  ctx.rotate(angle);
+  const labelRadius = radius * 0.38;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, labelRadius, 0, Math.PI * 2);
+  ctx.clip();
+  if (cover) {
+    ctx.drawImage(cover, -labelRadius, -labelRadius, labelRadius * 2, labelRadius * 2);
+  } else {
+    ctx.fillStyle = rgb(accent);
+    ctx.fillRect(-labelRadius, -labelRadius, labelRadius * 2, labelRadius * 2);
+  }
+  ctx.restore();
+
+  // Spindle hole.
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.035, 0, Math.PI * 2);
+  ctx.fillStyle = "#0E0B10";
+  ctx.fill();
+
+  ctx.restore();
+
+  // A highlight sweep across the disc, fixed while the record turns under it.
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, -0.7, 0.5);
+  ctx.lineTo(cx, cy);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Slow colour field derived from the artwork's own palette. */
+function drawField(s: VideoScene, elapsed: number): void {
+  const { ctx, W, H, accent } = s;
+
+  const bands = 7;
+  const bandH = H / bands;
+
+  for (let i = 0; i < bands; i++) {
+    // Each band breathes on its own phase, so the field never pulses as one
+    // block — which would read as a flash rather than as drift.
+    const phase = Math.sin(elapsed * 0.35 + i * 0.9) * 0.5 + 0.5;
+    const amount = -0.58 + (i / (bands - 1)) * 0.42 + phase * 0.12;
+    ctx.fillStyle = rgb(shift(accent, amount));
+    ctx.fillRect(0, i * bandH, W, bandH + 1);
+  }
+}
+
+/** Bars driven by the live analyser — genuinely audio-reactive. */
+function drawPulse(s: VideoScene): void {
+  const { ctx, W, H, accent, freqData, cover } = s;
+
+  ctx.fillStyle = rgb(shift(accent, -0.78));
+  ctx.fillRect(0, 0, W, H);
+
+  if (cover) {
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.filter = "blur(40px)";
+    const size = Math.max(W, H) * 1.3;
+    ctx.drawImage(cover, (W - size) / 2, (H - size) / 2, size, size);
+    ctx.restore();
+    ctx.filter = "none";
+  }
+
+  const cx = W / 2;
+  const cy = H * 0.38;
+  const baseRadius = W * 0.2;
+  const bars = 64;
+
+  // Overall energy drives the artwork disc's scale.
+  let energy = 0;
+  for (let i = 0; i < freqData.length; i++) energy += freqData[i];
+  energy = energy / freqData.length / 255;
+
+  const discRadius = baseRadius * (1 + energy * 0.08);
+
+  ctx.save();
+  for (let i = 0; i < bars; i++) {
+    // Log-ish sampling: low bins carry most of the energy, so a linear map
+    // leaves the outer half of the ring permanently flat.
+    const bin = Math.floor(Math.pow(i / bars, 1.7) * freqData.length);
+    const amplitude = (freqData[bin] ?? 0) / 255;
+    const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
+    const inner = discRadius + 10;
+    const outer = inner + amplitude * W * 0.16;
+
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+    ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+    ctx.strokeStyle = rgb(accent, 0.35 + amplitude * 0.65);
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, discRadius, 0, Math.PI * 2);
+  ctx.clip();
+  if (cover) {
+    drawCover(s, cx - discRadius, cy - discRadius, discRadius * 2, discRadius * 2);
+  } else {
+    ctx.fillStyle = rgb(accent);
+    ctx.fillRect(cx - discRadius, cy - discRadius, discRadius * 2, discRadius * 2);
+    drawBlossom(ctx, { x: cx, y: cy, size: discRadius * 0.4, color: "#FFFFFF", opacity: 0.9 });
   }
   ctx.restore();
 }
 
-function drawCaption(
-  ctx: CanvasRenderingContext2D,
-  lines: { time: number; text: string }[],
-  atTime: number
-) {
-  if (lines.length === 0) return;
+/** No artwork at all — flat ground and type. For lyric-led clips. */
+function drawTypeOnly(s: VideoScene): void {
+  const { ctx, W, H, accent } = s;
+  ctx.fillStyle = rgb(shift(accent, -0.82));
+  ctx.fillRect(0, 0, W, H);
 
-  let active = "";
-  for (const line of lines) {
-    if (line.time <= atTime) active = line.text;
-    else break;
+  // A single accent rule high in the frame, so the composition has an anchor
+  // when no lyric is currently showing.
+  ctx.fillStyle = rgb(accent);
+  ctx.fillRect(W * 0.1, H * 0.16, W * 0.14, 4);
+}
+
+/** Artwork full-bleed with a readability scrim. */
+function drawFrameStyle(s: VideoScene): void {
+  const { ctx, W, H, cover, accent } = s;
+
+  if (cover) {
+    drawCover(s, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = rgb(shift(accent, -0.5));
+    ctx.fillRect(0, 0, W, H);
   }
-  if (!active) return;
 
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
-  const maxWidth = w * 0.82;
+  // One colour, ramping opacity — the sanctioned scrim, needed because burned
+  // -in type sits over arbitrary artwork.
+  const scrim = ctx.createLinearGradient(0, H * 0.35, 0, H);
+  scrim.addColorStop(0, "rgba(10,7,12,0)");
+  scrim.addColorStop(1, "rgba(10,7,12,0.9)");
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* ── Lyric overlay ───────────────────────────────────────────────────────── */
+
+/**
+ * Lyrics animating in sync, using the same language as the in-app view:
+ * the active line is marked by type — weight, colour, scale — never by a
+ * background fill, and neighbours recede rather than disappearing.
+ */
+function drawLyricOverlay(s: VideoScene, atTime: number): void {
+  const { ctx, W, H, lyricLines, accent } = s;
+
+  const index = lineIndexAt(lyricLines, atTime);
+  if (index < 0) {
+    drawCredit(s);
+    return;
+  }
+
+  const active = lyricLines[index];
+  const previous = lyricLines[index - 1];
+  const next = lyricLines[index + 1];
+
+  const centerY = H * 0.66;
+  const maxWidth = W * 0.84;
+
+  // Lines enter by rising into place. The offset is driven by how far into the
+  // line we are, so the movement is tied to the song rather than to a timer.
+  const lineAge = atTime - active.time;
+  const enter = Math.min(1, lineAge / 0.42);
+  const eased = 1 - Math.pow(1 - enter, 3);
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `600 ${Math.round(w * 0.058)}px "Fraunces", ui-serif, Georgia, serif`;
 
-  // Wrap to at most three lines.
-  const words = active.split(/\s+/);
-  const wrapped: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (ctx.measureText(candidate).width <= maxWidth) current = candidate;
-    else {
-      if (current) wrapped.push(current);
-      current = word;
-    }
+  // Neighbours, dimmed and smaller — context without competition.
+  if (previous) {
+    drawLyricLine(ctx, previous.text, W / 2, centerY - H * 0.11, maxWidth, 30, "rgba(255,255,255,0.28)");
   }
-  if (current) wrapped.push(current);
-  const shown = wrapped.slice(0, 3);
+  if (next) {
+    drawLyricLine(ctx, next.text, W / 2, centerY + H * 0.11, maxWidth, 30, "rgba(255,255,255,0.22)");
+  }
 
-  const lineHeight = w * 0.078;
-  let y = h * 0.76 - ((shown.length - 1) * lineHeight) / 2;
+  // The active line.
+  ctx.save();
+  ctx.globalAlpha = eased;
+  ctx.translate(0, (1 - eased) * 22);
 
-  for (const line of shown) {
-    // Shadow rather than a plate — keeps the artwork visible behind the text.
-    ctx.shadowColor = "rgba(0,0,0,0.85)";
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillText(line, w / 2, y);
+  if (active.words?.length) {
+    drawWordSweep(ctx, active, atTime, W / 2, centerY, maxWidth, accent);
+  } else {
+    // No word timings: the whole line lights at once. Deliberate — a sweep
+    // interpolated across a line we have no word data for drifts out of step
+    // with the voice within a couple of words.
+    drawLyricLine(ctx, active.text, W / 2, centerY, maxWidth, 44, "#FFFFFF", true);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+/** One lyric line, wrapped and centred. Returns the height it occupied. */
+function drawLyricLine(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  cx: number,
+  cy: number,
+  maxWidth: number,
+  size: number,
+  color: string,
+  bold = false
+): void {
+  ctx.save();
+  ctx.font = `${bold ? 700 : 500} ${size}px ${DISPLAY}`;
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const lines = wrapToWidth(ctx, text, maxWidth, 3);
+  const lineHeight = size * 1.3;
+  let y = cy - ((lines.length - 1) * lineHeight) / 2;
+
+  for (const line of lines) {
+    // Shadow rather than a plate, so the artwork stays visible behind the type.
+    ctx.shadowColor = "rgba(0,0,0,0.75)";
+    ctx.shadowBlur = 16;
+    ctx.fillText(line, cx, y);
     y += lineHeight;
   }
   ctx.restore();
 }
 
-function drawProgressBar(
+/**
+ * Word-by-word highlight for lines that carry word timings.
+ *
+ * Measured and drawn per chunk rather than masked by percentage: chunks in
+ * Japanese and Chinese are often a single glyph, and a percentage mask cuts
+ * through the middle of a character.
+ */
+function drawWordSweep(
   ctx: CanvasRenderingContext2D,
-  progress: number,
-  accentColor?: string | null
-) {
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
-  const barW = w * 0.8;
-  const x = w * 0.1;
-  const y = h * 0.87;
-  const barH = 5;
+  line: LyricLine,
+  atTime: number,
+  cx: number,
+  cy: number,
+  maxWidth: number,
+  accent: [number, number, number]
+): void {
+  const words = line.words!;
+  const size = 44;
 
   ctx.save();
+  ctx.font = `700 ${size}px ${DISPLAY}`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+
+  // Greedy wrap over chunks, keeping each chunk's timing with it.
+  const rows: { text: string; time: number; end?: number }[][] = [[]];
+  let rowWidth = 0;
+
+  for (const word of words) {
+    const w = ctx.measureText(word.text).width;
+    if (rowWidth + w > maxWidth && rows[rows.length - 1].length) {
+      rows.push([]);
+      rowWidth = 0;
+    }
+    rows[rows.length - 1].push({ text: word.text, time: word.time, end: word.end });
+    rowWidth += w;
+  }
+
+  const lineHeight = size * 1.3;
+  let y = cy - ((rows.length - 1) * lineHeight) / 2;
+
+  for (const row of rows) {
+    const width = row.reduce((n, w) => n + ctx.measureText(w.text).width, 0);
+    let x = cx - width / 2;
+
+    for (const word of row) {
+      const lit = atTime >= word.time;
+      ctx.shadowColor = "rgba(0,0,0,0.75)";
+      ctx.shadowBlur = 16;
+      // The word being sung takes the artwork's colour, so the sweep reads as
+      // part of the song rather than as a generic highlight. Words already
+      // sung settle to white; words still to come stay recessed.
+      ctx.fillStyle = lit
+        ? atTime <= (word.end ?? word.time + 0.4)
+          ? rgb(accent)
+          : "#FFFFFF"
+        : "rgba(255,255,255,0.42)";
+      ctx.fillText(word.text, x, y);
+      x += ctx.measureText(word.text).width;
+    }
+
+    y += lineHeight;
+  }
+
+  ctx.restore();
+}
+
+/* ── Chrome ──────────────────────────────────────────────────────────────── */
+
+/** Title, artist and brand mark — shown when lyrics aren't. */
+function drawCredit(s: VideoScene): void {
+  const { ctx, W, H, track } = s;
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 18;
+
+  ctx.font = `700 44px ${DISPLAY}`;
+  ctx.fillStyle = "#FFFFFF";
+  const title = wrapToWidth(ctx, track.title, W * 0.8, 2);
+  let y = H * 0.72;
+  for (const line of title) {
+    ctx.fillText(line, W / 2, y);
+    y += 52;
+  }
+
+  ctx.font = `500 28px ${BODY}`;
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.fillText(track.artist, W / 2, y + 6);
+
+  ctx.restore();
+}
+
+/** Elapsed rail along the bottom, plus the wordmark. */
+function drawProgressRail(s: VideoScene, progress: number): void {
+  const { ctx, W, H, accent } = s;
+
+  const railW = W * 0.8;
+  const x = (W - railW) / 2;
+  const y = H * 0.9;
+
+  ctx.save();
+  roundRect(ctx, x, y, railW, 4, 2);
   ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath();
-  ctx.roundRect(x, y, barW, barH, barH / 2);
   ctx.fill();
 
-  ctx.fillStyle = accentColor || "#F2789F";
-  ctx.beginPath();
-  ctx.roundRect(x, y, barW * progress, barH, barH / 2);
+  roundRect(ctx, x, y, Math.max(4, railW * progress), 4, 2);
+  ctx.fillStyle = rgb(accent);
   ctx.fill();
   ctx.restore();
+
+  drawWordmark(ctx, {
+    x: W / 2,
+    y: H * 0.945,
+    fontSize: 20,
+    color: "rgba(255,255,255,0.55)",
+    markColor: rgb(accent),
+  });
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+
+function drawCover(s: VideoScene, x: number, y: number, w: number, h: number): void {
+  const { ctx, cover, accent } = s;
+  if (!cover) {
+    ctx.fillStyle = rgb(shift(accent, -0.4));
+    ctx.fillRect(x, y, w, h);
+    return;
+  }
+
+  const targetRatio = w / h;
+  const sourceRatio = cover.width / cover.height;
+  let sx = 0;
+  let sy = 0;
+  let sw = cover.width;
+  let sh = cover.height;
+
+  if (sourceRatio > targetRatio) {
+    sw = cover.height * targetRatio;
+    sx = (cover.width - sw) / 2;
+  } else {
+    sh = cover.width / targetRatio;
+    sy = (cover.height - sh) / 2;
+  }
+
+  ctx.drawImage(cover, sx, sy, sw, sh, x, y, w, h);
+}
+
+function wrapToWidth(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number
+): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  let current = "";
+
+  // No spaces (CJK): break per character or it overflows as one run.
+  if (words.length <= 1 && ctx.measureText(text).width > maxWidth) {
+    for (const ch of text) {
+      if (ctx.measureText(current + ch).width > maxWidth && current) {
+        out.push(current);
+        current = ch;
+      } else {
+        current += ch;
+      }
+    }
+    if (current) out.push(current);
+    return out.slice(0, maxLines);
+  }
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+    } else {
+      if (current) out.push(current);
+      current = word;
+    }
+  }
+  if (current) out.push(current);
+
+  return out.slice(0, maxLines);
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: HTMLImageElement | null) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => finish(img);
+    img.onerror = () => finish(null);
+    img.src =
+      url.startsWith("/") || url.startsWith("data:") || url.startsWith("blob:")
+        ? url
+        : `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    setTimeout(() => finish(null), 8000);
+  });
 }

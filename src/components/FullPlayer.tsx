@@ -3,14 +3,15 @@
 import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
-import { ShareModal } from "./ShareModal";
 import { ShareIcon } from "./Icons";
 import { CreditsSection } from "./CreditsSection";
 import { LyricsPreviewCard } from "./LyricsPreviewCard";
 import { QueueModal } from "./QueueModal";
 import { LyricsModal } from "./LyricsModal";
+import { useShare } from "./share/ShareContext";
 import { useDrag } from "@/lib/useDrag";
 import { haptic } from "@/lib/haptics";
+import type { LyricData } from "@/lib/lyrics";
 import styles from "./FullPlayer.module.css";
 
 interface FullPlayerProps {
@@ -29,8 +30,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
   const [artFlipStyle, setArtFlipStyle] = useState<React.CSSProperties>({});
-  const [selectedLyricShare, setSelectedLyricShare] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
@@ -54,7 +53,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     togglePlay,
     seekTo,
     beginSeek,
-    lyrics,
+    lyrics: contextLyrics,
     loadingLyrics,
     setVolume,
     next,
@@ -72,11 +71,48 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     autoplayRadio,
   } = usePlayer();
 
+  const { openShare } = useShare();
+
+  /*
+   * A transliteration generated in the lyrics view replaces the context's copy
+   * for as long as this player is mounted. It isn't pushed back into
+   * PlayerContext because it's already written to the IndexedDB lyrics cache,
+   * so the next load of this track picks it up through the normal path — and
+   * writing it upward would mean a context-wide update per romanisation.
+   */
+  const [lyricsOverride, setLyricsOverride] = useState<LyricData | null>(null);
+  const lyrics = lyricsOverride ?? contextLyrics;
+
+  /*
+   * Bumped whenever the lyrics view should snap rather than drift: a seek, or
+   * a track change. Without it, tapping a line 40 lines away animates a long
+   * smooth scroll to somewhere the song is already playing.
+   */
+  const [snapToken, setSnapToken] = useState(0);
+  useEffect(() => {
+    setLyricsOverride(null);
+    setSnapToken((n) => n + 1);
+  }, [currentTrack?.id]);
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
+
+  /*
+   * Every seek goes through here so the lyrics view snaps to the new position
+   * instead of gliding to it. A seek is an explicit "put me here"; animating
+   * the scroll afterwards reads as lag, and on a long jump it means watching
+   * forty lines fly past.
+   */
+  const seekAndSnap = useCallback(
+    (time: number) => {
+      seekTo(time);
+      setSnapToken((n) => n + 1);
+    },
+    [seekTo]
+  );
 
   function handleLike() {
     if (!isLiked) setBurstKey((k) => k + 1);
@@ -443,7 +479,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             onScrubStart={beginSeek}
             onScrubMove={(t) => setSeekDrag(t)}
             onSeek={(t) => {
-              seekTo(t);
+              seekAndSnap(t);
               setSeekDrag(null);
             }}
           />
@@ -560,7 +596,14 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
             */}
             <button
               className={styles.iconBtn}
-              onClick={() => setShareOpen(true)}
+              onClick={() =>
+                openShare({
+                  track: currentTrack,
+                  lyrics,
+                  accentColor,
+                  atTime: displayProgress,
+                })
+              }
               aria-label="Share this track"
             >
               <ShareIcon size={20} />
@@ -645,8 +688,20 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         loadingLyrics={loadingLyrics}
         activeLineIndex={activeLineIndex}
         accentColor={accentColor}
-        onLineClick={(t) => seekTo(t)}
-        onShareLine={(text) => setSelectedLyricShare(text)}
+        onLineClick={seekAndSnap}
+        onShareLine={(line) =>
+          openShare({
+            track: currentTrack,
+            lines: [line],
+            lyrics,
+            accentColor,
+            atTime: line.time,
+          })
+        }
+        onShareTrack={() =>
+          openShare({ track: currentTrack, lyrics, accentColor, atTime: displayProgress })
+        }
+        onTransliterated={setLyricsOverride}
         progress={displayProgress}
         duration={duration}
         isPlaying={isPlaying}
@@ -656,22 +711,11 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         onScrubStart={beginSeek}
         onScrubMove={(t) => setSeekDrag(t)}
         onSeek={(t) => {
-          seekTo(t);
+          seekAndSnap(t);
           setSeekDrag(null);
         }}
         formatTime={formatTime}
-      />
-
-      <ShareModal
-        open={shareOpen || selectedLyricShare !== null}
-        onClose={() => {
-          setShareOpen(false);
-          setSelectedLyricShare(null);
-        }}
-        track={currentTrack}
-        lyricText={selectedLyricShare ?? undefined}
-        lyricTime={selectedLyricShare ? displayProgress : undefined}
-        accentColor={accentColor}
+        snapToken={snapToken}
       />
     </div>
   );

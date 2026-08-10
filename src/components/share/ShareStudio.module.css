@@ -1,0 +1,678 @@
+/* Share studio — see ShareStudio.tsx.
+ *
+ * Lives inside the Sheet primitive, so this file styles content only: the
+ * backdrop, panel, drag-to-dismiss and focus trap all come from Sheet.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+}
+
+/* ── What's being shared ──────────────────────────────────────────────────── */
+
+.subject {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+
+/* A track title is the name of a thing — display face. */
+.subjectTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subjectArtist {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* Each step arrives as a step forward rather than a swap, so the flow reads
+   * as one continuous thing rather than a series of dialogs. */
+  animation: stepIn var(--d-base) var(--ease) both;
+}
+
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  background: transparent;
+  border-radius: var(--r-full);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.backBtn:active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* ── Step 1: image or video ───────────────────────────────────────────────── */
+
+.kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  min-height: 8.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kindIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: var(--space-2);
+  border-radius: var(--r-md);
+  background: var(--accent-softer);
+  color: var(--accent);
+}
+
+.kindLabel {
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 650;
+}
+
+.kindHint {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kind:hover {
+    border-color: var(--accent);
+    background: var(--surface-3);
+  }
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkRow:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── Preview ──────────────────────────────────────────────────────────────── */
+
+.previewFrame {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+
+.previewCanvas {
+  display: block;
+  /* Bounded by height, not width: a story card is 9:16, and sizing by width
+   * would push the controls off a short viewport entirely. */
+  max-height: 42dvh;
+  max-width: 100%;
+  width: auto;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-3);
+  background: var(--surface-3);
+  transition: opacity var(--d-fast) var(--ease);
+}
+
+.previewCanvas[data-rendering] {
+  opacity: 0.45;
+}
+
+/* ── Pickers ──────────────────────────────────────────────────────────────── */
+
+.pickerGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* A label, not a name — body face, per the type rule. */
+.pickerLabel {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+  color: var(--text-3);
+  margin: 0;
+}
+
+.chipRow {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  /* Bleeds to the sheet's edge so the row reads as scrollable rather than
+   * clipped, while the first chip still aligns with the content gutter. */
+  margin: 0 calc(var(--space-5) * -1);
+  padding: 2px var(--space-5);
+  scroll-padding-inline: var(--space-5);
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 7.5rem;
+  min-height: var(--tap-min);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--d-fast) var(--ease), background-color var(--d-fast) var(--ease);
+}
+
+.chipActive {
+  border-color: var(--accent);
+  background: var(--accent-softer);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chipLabel {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 650;
+}
+
+.chipHint {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-snug);
+  color: var(--text-3);
+}
+
+.chip:focus-visible,
+.preset:focus-visible,
+.kind:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+}
+
+.segment {
+  flex: 1;
+  min-height: calc(var(--tap-min) - 6px);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: var(--surface-4);
+  color: var(--text);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ── Lyric switch ─────────────────────────────────────────────────────────── */
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+
+.switchDisabled {
+  cursor: default;
+}
+
+.switchLabel {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.switchHint {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.switch {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.switch:disabled {
+  cursor: default;
+}
+
+/* ── Trim ─────────────────────────────────────────────────────────────────── */
+
+.trim {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.trimHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.trimLength {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.wave {
+  position: relative;
+  height: 5.5rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  /* Handles are dragged along this rail, so the browser must not claim the
+   * gesture for horizontal scrolling. */
+  touch-action: none;
+  overflow: hidden;
+}
+
+.waveBars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 2px;
+}
+
+.waveBar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  background: var(--line-strong);
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+/* Bars inside the selection take the artwork's colour, so the chosen region is
+ * legible without an overlay obscuring the waveform it sits on. */
+.waveBar[data-in] {
+  background: var(--accent);
+}
+
+.waveNote {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+  margin: 0;
+}
+
+.region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-softer);
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  cursor: grab;
+}
+
+.region:active {
+  cursor: grabbing;
+}
+
+/*
+ * The visible grip is 14px — wider would hide the waveform it sits on. The
+ * *target* is 44px via a pseudo-element, with `position: relative` declared on
+ * this same rule: an absolutely-positioned ::before on an unpositioned element
+ * anchors to the nearest positioned ancestor and inflates into an invisible
+ * full-container shield that eats every tap. That exact bug made the mini
+ * player unusable.
+ */
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  /* Centred on its position, so the grip lines up with the edge it sets. */
+  margin-left: -7px;
+  border: none;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--tap-min);
+  transform: translateX(-50%);
+}
+
+.handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 1.1rem;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--on-accent);
+  opacity: 0.7;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.handle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.preset {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.presetActive {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.preset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Export progress ──────────────────────────────────────────────────────── */
+
+.exportPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.progressTrack {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  transform-origin: left center;
+  /* Transform rather than width: width animates layout, transform stays on the
+   * compositor, and this updates every frame for the length of an export. */
+  transition: transform var(--d-fast) linear;
+}
+
+.progressNote {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Result ───────────────────────────────────────────────────────────────── */
+
+.resultHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.resultTick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.resultMessage {
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 600;
+  line-height: var(--lh-normal);
+  color: var(--text);
+  margin: 0;
+}
+
+.resultActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.resultActions > * {
+  flex: 1 1 8rem;
+}
+
+.resultNote {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+.primary,
+.secondary {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-5);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.secondary {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .secondary:hover {
+    background: var(--surface-2);
+  }
+}
+
+/* ── Messages ─────────────────────────────────────────────────────────────── */
+
+.error {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--danger);
+  margin: 0;
+}
+
+.notice {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.noticeTitle {
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 650;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+}
+
+.noticeBody {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+  margin: 0;
+}
+
+/* Short viewports: the preview is the first thing that should give. */
+@media (max-height: 700px) {
+  .previewCanvas {
+    max-height: 30dvh;
+  }
+
+  .kind {
+    min-height: 7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step {
+    animation: none;
+  }
+
+  .progressFill {
+    transition: none;
+  }
+}

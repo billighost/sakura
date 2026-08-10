@@ -7,6 +7,8 @@ import { FullPlayer } from "@/components/FullPlayer";
 import { PlayerProvider, usePlayer } from "@/components/PlayerContext";
 import { MediaSessionProvider } from "@/components/MediaSessionProvider";
 import { AppNavProvider, useAppNav } from "@/components/AppNavContext";
+import { ShareProvider } from "@/components/share/ShareContext";
+import { ShareStudio } from "@/components/share/ShareStudio";
 import { useSwipeBack } from "@/lib/useSwipeBack";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import styles from "./layout.module.css";
@@ -61,6 +63,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <FullPlayer open={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
+
+      {/* Mounted once, at the root: every share site in the app drives this one
+          sheet through ShareContext rather than each rolling its own. */}
+      <ShareStudio />
     </div>
   );
 }
@@ -70,7 +76,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <PlayerProvider>
       <MediaSessionProvider />
       <AppNavProvider>
-        <AppShell>{children}</AppShell>
+        <ShareProvider>
+          <AppShell>{children}</AppShell>
+        </ShareProvider>
       </AppNavProvider>
     </PlayerProvider>
   );

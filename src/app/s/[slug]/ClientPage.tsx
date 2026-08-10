@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { renderShareCard, canvasToBlob, type CardTrack } from "@/lib/shareCard";
+import { deliverShare, shareFilename } from "@/lib/shareDelivery";
 import styles from "./page.module.css";
 
 interface Props {
@@ -26,12 +27,19 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
 
     (async () => {
       try {
+        /*
+         * A lyric share gets the quote variant so the recipient lands on the
+         * words that were actually sent; a track share gets the sleeve, where
+         * the artwork carries it. Rendering both as "sleeve" lost the point of
+         * a lyric link.
+         */
         await renderShareCard(canvasRef.current!, {
           track,
           lines,
+          variant: kind === "lyric" && lines.length > 0 ? "quote" : "sleeve",
           accentColor: null,
           format: "square",
-          seed: track.id,
+          theme: theme === "light" ? "light" : "dark",
         });
         const blob = await canvasToBlob(canvasRef.current!);
         if (blob && !cancelled) setImageBlob(blob);
@@ -43,7 +51,7 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
     return () => {
       cancelled = true;
     };
-  }, [track.id]);
+  }, [track.id, kind, theme, lines]);
 
   const handleGoToApp = () => {
     router.push("/home");
@@ -51,10 +59,16 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
 
   const handleShare = async () => {
     if (!imageBlob) return;
-    const file = new File([imageBlob], `${track.artist}-${track.title}.png`, { type: "image/png" });
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file] });
-    }
+    // Through the shared delivery layer so this page gets the same
+    // cancelled-is-not-an-error handling and download fallback as the studio.
+    // Previously an unsupported target silently did nothing at all.
+    const outcome = await deliverShare({
+      blob: imageBlob,
+      filename: shareFilename(track, "png"),
+      text: `${track.title} — ${track.artist}`,
+      title: track.title,
+    });
+    if (outcome.kind === "failed") setError(outcome.message);
   };
 
   return (

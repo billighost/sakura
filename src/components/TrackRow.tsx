@@ -443,12 +443,27 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
-              if (navigator.share) {
-                navigator.share({ title: track.title, url: `${window.location.origin}/track/${track.id}` }).catch(() => {});
-              } else {
-                navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
-                showToast("Link copied to clipboard", "success");
-              }
+              // Into the share studio, like every other track share. Sending a
+              // bare /track/<id> URL gave the recipient no idea what the song
+              // was until they opened it.
+              //
+              // Flattened on the way out: a row's `artist`/`album` are objects,
+              // while the studio (and the card renderer) want plain strings.
+              window.dispatchEvent(
+                new CustomEvent("sakura:share", {
+                  detail: {
+                    track: {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist.name,
+                      album: track.album?.title,
+                      coverUrl: track.coverUrl ?? track.album?.coverUrl,
+                      audioUrl: track.audioUrl,
+                      duration: track.duration,
+                    },
+                  },
+                })
+              );
             }}
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
           >
