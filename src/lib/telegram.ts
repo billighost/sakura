@@ -103,7 +103,6 @@ export class TelegramClient {
   private connected = false;
   private connectPromise: Promise<void> | null = null;
   private botUsername: string;
-  // Stored so we can recreate the GramClient on AUTH_KEY_DUPLICATED
   private readonly apiId: number;
   private readonly apiHash: string;
   private readonly sessionString: string;
@@ -115,7 +114,6 @@ export class TelegramClient {
     password?: string;
   };
   private activeCount = 0;
-  // Shared mutex — bot interactions from ALL concurrent downloads are serialized
   private static botMutex = new RedisMutex();
 
   constructor(
@@ -153,7 +151,7 @@ export class TelegramClient {
             await this.client.connect();
           }
           this.connected = true;
-          this.connectPromise = null; // clear so future reconnects re-enter
+          this.connectPromise = null;
           console.log("[Telegram] Connected");
           return;
         } catch (error: any) {
@@ -166,9 +164,6 @@ export class TelegramClient {
           if (isAuthKeyDuplicated && attempt < 3) {
             const jitterMs = 1500 + Math.floor(Math.random() * 2000);
             console.warn(`[Telegram] AUTH_KEY_DUPLICATED (attempt ${attempt}/3), retrying in ${jitterMs}ms...`);
-            // The auth key on this client instance is poisoned — Telegram has
-            // invalidated it. We must recreate the underlying GramJS client
-            // (new MTProto session object) rather than reconnecting the same one.
             try { await this.client.disconnect(); } catch { /* ignore */ }
             this.client = new GramClient(
               new StringSession(this.sessionString),
@@ -188,7 +183,6 @@ export class TelegramClient {
           }
         }
       }
-      // All retries exhausted
       this.connectPromise = null;
       throw new Error("[Telegram] Failed to connect after 3 attempts");
     })();
@@ -222,10 +216,6 @@ export class TelegramClient {
     }
   }
 
-  /**
-   * Send a search query to the bot and wait for the response with inline buttons.
-   * Serialized via mutex to prevent bot state confusion.
-   */
   async searchMusic(query: string, timeoutMs = 20000): Promise<{
     buttonMessageId: number;
     buttons: Array<{ index: number; text: string }>;
@@ -288,16 +278,11 @@ export class TelegramClient {
     throw lastErr || new Error("Unreachable");
   }
 
-  /**
-   * Atomically search and select a result, releasing the mutex after the audio arrives.
-   * This is the correct way to perform a full download with concurrency safety.
-   * Scores and selects the best matching inline button to avoid previews and low quality.
-   */
   async searchAndSelect(
     query: string,
     targetDuration?: number,
     searchTimeoutMs = 10000,
-    selectTimeoutMs = 60000, // increased to 60s
+    selectTimeoutMs = 60000,
     expectedTitle?: string,
     expectedArtist?: string
   ): Promise<MusicResult> {
@@ -308,7 +293,6 @@ export class TelegramClient {
 
         const botEntity = await this.client.getEntity(this.botUsername);
 
-        // FAST PATH: check if the bot already sent the audio we want recently (e.g. from a timed out previous attempt)
         if (expectedTitle) {
           const recent = await this.client.getMessages(botEntity, { limit: 15 });
           for (const msg of recent) {
@@ -336,7 +320,6 @@ export class TelegramClient {
           }
         }
 
-        // Helper to strip honorifics (King, Dr, Sir, Chief, DJ, MC, Prof) and brackets/symbols
         const cleanQueryString = (str: string) => {
           return str
             .replace(/\b(king|dr\.|dr|sir|chief|dj|mc|prof\.|prof)\b/gi, "")
@@ -370,13 +353,11 @@ export class TelegramClient {
         const text = btn.text.toLowerCase();
         let score = 0;
 
-        // 1. Avoid previews/snippets
         const isPreview = text.includes("preview") || text.includes("30s") || text.includes("30 sec") || text.includes("clip");
         if (isPreview) {
           score -= 1000;
         }
 
-        // 2. Parse duration from button text if present, e.g. "Artist - Title [03:45]"
         const durationRegex = /(?:\[|\()(\d{1,2}):(\d{2})(?:\]|\))/;
         const match = btn.text.match(durationRegex);
         if (match) {
@@ -387,24 +368,21 @@ export class TelegramClient {
           if (targetDuration && targetDuration > 0) {
             const diff = Math.abs(duration - targetDuration);
             if (diff <= 5) {
-              score += 200; // Perfect/near perfect match
+              score += 200;
             } else if (diff <= 15) {
               score += 100;
             } else if (diff > 45 && targetDuration > 45 && duration < 45) {
-              // Target is full length but this is a short preview clip
               score -= 500;
             } else {
-              score -= diff; // Small penalty proportional to duration mismatch
+              score -= diff;
             }
           } else {
-            // Avoid very short durations by default unless they are expected
             if (duration < 45) {
               score -= 300;
             }
           }
         }
 
-        // 3. Prefer high quality (e.g. 320kbps, flac)
         if (text.includes("320") || text.includes("flac") || text.includes("kbps")) {
           score += 10;
         }
@@ -431,26 +409,24 @@ export class TelegramClient {
     await this.ensureConnected();
     const botEntity = await this.client.getEntity(this.botUsername);
 
-    // Get last message ID before sending so we only look at NEW messages
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
 
     console.log(`[Telegram _searchMusic] Sending query: "${query}", lastKnownId=${lastKnownId}`);
 
-    // Send search query
     await this.ensureConnected();
     await this.client.sendMessage(botEntity, { message: query });
 
-    // Poll for the bot's response (message with inline buttons or audio)
     const deadline = Date.now() + timeoutMs;
     let pollCount = 0;
+
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 3000));
       pollCount++;
 
       await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
-        limit: 20,          // increased to catch more messages
+        limit: 20,
         minId: lastKnownId,
       });
 
@@ -458,22 +434,19 @@ export class TelegramClient {
 
       for (const msg of newMessages) {
         if (!msg || msg.id <= lastKnownId) continue;
-        // Skip messages we sent (outgoing)
         if (msg.out) continue;
 
         console.log(`[Telegram _searchMusic]   msg ${msg.id}: out=${msg.out}, text="${msg.message?.substring(0, 40) || ''}", hasMedia=${!!msg.media}, hasReplyMarkup=${!!msg.replyMarkup}`);
 
-        // Fast detection if bot sent a text response indicating no results found or rate limit
+        // Check for text responses
         if (msg.message && !msg.replyMarkup && !msg.media) {
           const txt = msg.message.trim();
           if (/daily.*(limit|search limit)/i.test(txt) || /limit reached/i.test(txt)) {
             throw new Error(`Bot rate-limited: ${txt.split('\n')[0]}`);
           }
-          // Don't throw on progress/status messages (e.g. "Downloading...", "Processing...")
-          // These appear when the bot is given a Deezer/Spotify URL and is fetching the file.
           if (/download|process|fetch|wait|please/i.test(txt)) {
             console.log(`[Telegram _searchMusic]   -> progress message, continuing`);
-            continue; // keep polling — the audio will follow
+            continue;
           }
           if (/not found|no result|nothing found|sorry|no tracks|unsupported|error/i.test(txt)) {
             throw new Error(`Bot responded: ${txt}`);
@@ -504,45 +477,69 @@ export class TelegramClient {
           }
         }
 
-        // Bot sent audio directly
+        // Check for media (audio)
         if (msg.media && "document" in msg.media) {
           const doc = (msg.media as Api.MessageMediaDocument).document;
           if (doc instanceof Api.Document) {
-            const isAudio = doc.mimeType?.startsWith("audio/") ||
-              doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
-            if (isAudio) {
+            const mime = doc.mimeType || '';
+            const size = Number(doc.size) || 0;
+            const attrNames = doc.attributes.map(a => a.className).join(', ');
+            console.log(`[Telegram _searchMusic]   doc mimeType: ${mime}, size: ${size}, attributes: ${attrNames}`);
+
+            // Expanded audio detection
+            const isAudio =
+              mime.startsWith("audio/") ||
+              doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
+              doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
+
+            // Also accept if it's not an image/video and size > 500 KB (likely audio)
+            const isNonMedia = !mime.startsWith("image/") && !mime.startsWith("video/");
+
+            if (isAudio || (isNonMedia && size > 500 * 1024)) {
               const audioAttr = doc.attributes.find(
                 (a) => a instanceof Api.DocumentAttributeAudio,
               ) as Api.DocumentAttributeAudio | undefined;
-              console.log(`[Telegram _searchMusic] Found direct audio in msg ${msg.id}: ${audioAttr?.title || "untitled"}`);
+              const voiceAttr = doc.attributes.find(
+                (a) => a instanceof Api.DocumentAttributeVoice,
+              ) as Api.DocumentAttributeVoice | undefined;
+
+              // Prefer title from audioAttr, else fallback to voice's duration
+              const title = audioAttr?.title || voiceAttr?.className || "Audio";
+              const performer = audioAttr?.performer || "Unknown";
+              const duration = audioAttr?.duration || voiceAttr?.duration || 0;
+
+              console.log(`[Telegram _searchMusic] Recognised as audio: "${title}" by ${performer}, duration ${duration}s`);
               return {
                 buttonMessageId: msg.id,
-                buttons: [{ index: 0, text: audioAttr?.title || "Download" }],
+                buttons: [{ index: 0, text: title }],
               };
+            } else {
+              console.log(`[Telegram _searchMusic]   not recognised as audio, skipping`);
             }
           }
         }
       }
     }
 
-    // --- TIMEOUT: final fallback - check recent messages for audio that may have been edited in ---
-    console.warn(`[Telegram _searchMusic] Polling timed out after ${timeoutMs}ms. Doing final fallback scan of recent messages.`);
-    const fallbackMessages = await this.client.getMessages(botEntity, { limit: 15 });
+    // Timeout fallback: scan recent messages for any audio-like document
+    console.warn(`[Telegram _searchMusic] Polling timed out after ${timeoutMs}ms. Doing final fallback scan.`);
+    const fallbackMessages = await this.client.getMessages(botEntity, { limit: 20 });
     for (const msg of fallbackMessages) {
       if (msg.out) continue;
       if (msg.media && "document" in msg.media) {
         const doc = (msg.media as Api.MessageMediaDocument).document;
         if (doc instanceof Api.Document) {
-          const isAudio = doc.mimeType?.startsWith("audio/") ||
-            doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
-          if (isAudio) {
-            const audioAttr = doc.attributes.find(
-              (a) => a instanceof Api.DocumentAttributeAudio,
-            ) as Api.DocumentAttributeAudio | undefined;
-            console.log(`[Telegram _searchMusic] FALLBACK: found audio in msg ${msg.id}: ${audioAttr?.title || "untitled"}`);
+          const mime = doc.mimeType || '';
+          const size = Number(doc.size) || 0;
+          const isAudio =
+            mime.startsWith("audio/") ||
+            doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
+            doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
+          if (isAudio || (size > 500 * 1024 && !mime.startsWith("image/") && !mime.startsWith("video/"))) {
+            console.log(`[Telegram _searchMusic] FALLBACK: found audio in msg ${msg.id}`);
             return {
               buttonMessageId: msg.id,
-              buttons: [{ index: 0, text: audioAttr?.title || "Download" }],
+              buttons: [{ index: 0, text: "Audio" }],
             };
           }
         }
@@ -552,11 +549,6 @@ export class TelegramClient {
     throw new Error(`Bot did not respond with buttons or audio within ${timeoutMs}ms`);
   }
 
-  /**
-   * Click a button on the bot's response message to trigger the audio download.
-   * Waits for the audio file to be sent back.
-   * @deprecated Use searchAndSelect for proper concurrency. Called internally.
-   */
   async selectResult(
     buttonMessageId: number,
     buttonIndex: number,
@@ -580,7 +572,7 @@ export class TelegramClient {
 
     if (!buttonMsg?.replyMarkup ||
         !(buttonMsg.replyMarkup instanceof Api.ReplyInlineMarkup)) {
-      // The bot sent audio directly (no buttons), try treating buttonMessageId as the audio msg
+      // Try direct audio
       const audioMsg = messages[0];
       if (audioMsg?.media && "document" in audioMsg.media) {
         const doc = (audioMsg.media as Api.MessageMediaDocument).document;
@@ -621,7 +613,6 @@ export class TelegramClient {
       throw new Error(`Button at index ${buttonIndex} not found`);
     }
 
-    // Click the button via callback query — retry once on BOT_RESPONSE_TIMEOUT
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         await this.client.invoke(
@@ -642,7 +633,6 @@ export class TelegramClient {
       }
     }
 
-    // Wait for the audio file to arrive
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
@@ -662,19 +652,23 @@ export class TelegramClient {
         if (!(doc instanceof Api.Document)) continue;
 
         const isAudio = doc.mimeType?.startsWith("audio/") ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
+          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
+          doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
 
         if (!isAudio) continue;
 
         const audioAttr = doc.attributes.find(
           (a) => a instanceof Api.DocumentAttributeAudio,
         ) as Api.DocumentAttributeAudio | undefined;
+        const voiceAttr = doc.attributes.find(
+          (a) => a instanceof Api.DocumentAttributeVoice,
+        ) as Api.DocumentAttributeVoice | undefined;
 
         return {
           messageId: msg.id,
-          title: audioAttr?.title || "Unknown",
+          title: audioAttr?.title || "Voice",
           artist: audioAttr?.performer || "Unknown",
-          duration: audioAttr?.duration || 0,
+          duration: audioAttr?.duration || voiceAttr?.duration || 0,
           fileId: doc.id.toString(),
           buttonIndex,
         };
@@ -684,27 +678,19 @@ export class TelegramClient {
     throw new Error(`Audio not received within ${timeoutMs}ms after clicking button`);
   }
 
-  /**
-   * Send a Spotify/Deezer playlist URL to the bot.
-   * The bot will automatically download all tracks one by one.
-   * Polls for audio files until no more arrive for a while.
-   */
   async importPlaylist(url: string, onTrack?: (track: MusicResult) => void): Promise<MusicResult[]> {
     return this.withRetry(async () => {
 
     const botEntity = await this.client.getEntity(this.botUsername);
 
-    // Get last message before sending
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
 
-    // Send the playlist URL
     await this.client.sendMessage(botEntity, { message: url });
 
-    // Poll for audio files arriving one by one
     const results: MusicResult[] = [];
     let lastNewAudioTime = Date.now();
-    const idleTimeout = 20000; // If no new audio for 20s, assume done
+    const idleTimeout = 20000;
 
     while (Date.now() - lastNewAudioTime < idleTimeout) {
       await new Promise((r) => setTimeout(r, 3000));
@@ -723,7 +709,8 @@ export class TelegramClient {
         if (!(doc instanceof Api.Document)) continue;
 
         const isAudio = doc.mimeType?.startsWith("audio/") ||
-          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
+          doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio) ||
+          doc.attributes.some((a) => a instanceof Api.DocumentAttributeVoice);
 
         if (!isAudio) continue;
 
@@ -733,12 +720,15 @@ export class TelegramClient {
         const audioAttr = doc.attributes.find(
           (a) => a instanceof Api.DocumentAttributeAudio,
         ) as Api.DocumentAttributeAudio | undefined;
+        const voiceAttr = doc.attributes.find(
+          (a) => a instanceof Api.DocumentAttributeVoice,
+        ) as Api.DocumentAttributeVoice | undefined;
 
         const track: MusicResult = {
           messageId: msgId,
-          title: audioAttr?.title || "Unknown",
+          title: audioAttr?.title || "Voice",
           artist: audioAttr?.performer || "Unknown",
-          duration: audioAttr?.duration || 0,
+          duration: audioAttr?.duration || voiceAttr?.duration || 0,
           fileId: doc.id.toString(),
           buttonIndex: 0,
         };
@@ -754,9 +744,6 @@ export class TelegramClient {
     });
   }
 
-  /**
-   * Download audio for a specific message (after it's been sent by the bot).
-   */
   async downloadAudio(messageId: number): Promise<Buffer> {
     return this.withRetry(async () => {
 
@@ -807,7 +794,6 @@ export class TelegramClient {
     }
 
     if (offsetBytes !== undefined) {
-      // GramJS requires big-integer for offsets
       const bigInt = require("big-integer");
       const iter = this.client.iterDownload({
         file: msg.media,
@@ -839,8 +825,6 @@ export class TelegramClient {
   private async ensureConnected(): Promise<void> {
     if (!this.connected || !this.client?.connected) {
       this.connected = false;
-      // Only null-out connectPromise if there isn't one in flight already —
-      // concurrent callers should join the same promise, not each start their own.
       if (!this.connectPromise) {
         await this.init();
       } else {
@@ -888,12 +872,6 @@ export function getTelegramClient(): TelegramClient {
   return globalForTelegram.telegramClient;
 }
 
-/**
- * Returns an ordered list of bot usernames to try. The first is the primary
- * configured bot; the rest are fallbacks tried when the primary is rate-limited.
- *
- * Overridable via TELEGRAM_FALLBACK_BOTS="deezload2bot,vkmusic_bot" in .env.
- */
 export function getBotFallbackChain(): string[] {
   const primary = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
   const fallbackEnv = process.env.TELEGRAM_FALLBACK_BOTS || "";
@@ -911,10 +889,6 @@ if (!globalForFallbackClients.telegramFallbackClients) {
   globalForFallbackClients.telegramFallbackClients = new Map();
 }
 
-/**
- * Get (or create) a TelegramClient pointed at a specific bot username.
- * Caches one client per bot in a global map so we don't recreate connections.
- */
 export function getTelegramClientForBot(botUsername: string): TelegramClient {
   const cache = globalForFallbackClients.telegramFallbackClients!;
   if (cache.has(botUsername)) return cache.get(botUsername)!;
