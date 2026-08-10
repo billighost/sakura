@@ -297,7 +297,7 @@ export class TelegramClient {
     query: string,
     targetDuration?: number,
     searchTimeoutMs = 10000,
-    selectTimeoutMs = 45000,
+    selectTimeoutMs = 60000, // increased to 60s
     expectedTitle?: string,
     expectedArtist?: string
   ): Promise<MusicResult> {
@@ -435,27 +435,33 @@ export class TelegramClient {
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
 
+    console.log(`[Telegram _searchMusic] Sending query: "${query}", lastKnownId=${lastKnownId}`);
+
     // Send search query
     await this.ensureConnected();
     await this.client.sendMessage(botEntity, { message: query });
 
-    // Poll for the bot's response (message with inline buttons)
+    // Poll for the bot's response (message with inline buttons or audio)
     const deadline = Date.now() + timeoutMs;
+    let pollCount = 0;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 3000));
+      pollCount++;
 
       await this.ensureConnected();
       const newMessages = await this.client.getMessages(botEntity, {
-        limit: 10,
-        // Only look at messages newer than what we saw before sending —
-        // without this we keep re-examining old messages and never see the reply.
+        limit: 20,          // increased to catch more messages
         minId: lastKnownId,
       });
+
+      console.log(`[Telegram _searchMusic] Poll #${pollCount}: got ${newMessages.length} new messages (minId=${lastKnownId})`);
 
       for (const msg of newMessages) {
         if (!msg || msg.id <= lastKnownId) continue;
         // Skip messages we sent (outgoing)
         if (msg.out) continue;
+
+        console.log(`[Telegram _searchMusic]   msg ${msg.id}: out=${msg.out}, text="${msg.message?.substring(0, 40) || ''}", hasMedia=${!!msg.media}, hasReplyMarkup=${!!msg.replyMarkup}`);
 
         // Fast detection if bot sent a text response indicating no results found or rate limit
         if (msg.message && !msg.replyMarkup && !msg.media) {
@@ -466,6 +472,7 @@ export class TelegramClient {
           // Don't throw on progress/status messages (e.g. "Downloading...", "Processing...")
           // These appear when the bot is given a Deezer/Spotify URL and is fetching the file.
           if (/download|process|fetch|wait|please/i.test(txt)) {
+            console.log(`[Telegram _searchMusic]   -> progress message, continuing`);
             continue; // keep polling — the audio will follow
           }
           if (/not found|no result|nothing found|sorry|no tracks|unsupported|error/i.test(txt)) {
@@ -473,6 +480,7 @@ export class TelegramClient {
           }
         }
 
+        // Check for inline buttons
         const replyMarkup = msg.replyMarkup;
         if (replyMarkup instanceof Api.ReplyInlineMarkup) {
           const buttons: Array<{ index: number; text: string }> = [];
@@ -491,6 +499,7 @@ export class TelegramClient {
           }
 
           if (buttons.length > 0) {
+            console.log(`[Telegram _searchMusic] Found ${buttons.length} buttons in msg ${msg.id}`);
             return { buttonMessageId: msg.id, buttons };
           }
         }
@@ -505,7 +514,7 @@ export class TelegramClient {
               const audioAttr = doc.attributes.find(
                 (a) => a instanceof Api.DocumentAttributeAudio,
               ) as Api.DocumentAttributeAudio | undefined;
-
+              console.log(`[Telegram _searchMusic] Found direct audio in msg ${msg.id}: ${audioAttr?.title || "untitled"}`);
               return {
                 buttonMessageId: msg.id,
                 buttons: [{ index: 0, text: audioAttr?.title || "Download" }],
@@ -516,7 +525,31 @@ export class TelegramClient {
       }
     }
 
-    throw new Error(`Bot did not respond with buttons within ${timeoutMs}ms`);
+    // --- TIMEOUT: final fallback - check recent messages for audio that may have been edited in ---
+    console.warn(`[Telegram _searchMusic] Polling timed out after ${timeoutMs}ms. Doing final fallback scan of recent messages.`);
+    const fallbackMessages = await this.client.getMessages(botEntity, { limit: 15 });
+    for (const msg of fallbackMessages) {
+      if (msg.out) continue;
+      if (msg.media && "document" in msg.media) {
+        const doc = (msg.media as Api.MessageMediaDocument).document;
+        if (doc instanceof Api.Document) {
+          const isAudio = doc.mimeType?.startsWith("audio/") ||
+            doc.attributes.some((a) => a instanceof Api.DocumentAttributeAudio);
+          if (isAudio) {
+            const audioAttr = doc.attributes.find(
+              (a) => a instanceof Api.DocumentAttributeAudio,
+            ) as Api.DocumentAttributeAudio | undefined;
+            console.log(`[Telegram _searchMusic] FALLBACK: found audio in msg ${msg.id}: ${audioAttr?.title || "untitled"}`);
+            return {
+              buttonMessageId: msg.id,
+              buttons: [{ index: 0, text: audioAttr?.title || "Download" }],
+            };
+          }
+        }
+      }
+    }
+
+    throw new Error(`Bot did not respond with buttons or audio within ${timeoutMs}ms`);
   }
 
   /**
@@ -527,7 +560,7 @@ export class TelegramClient {
   async selectResult(
     buttonMessageId: number,
     buttonIndex: number,
-    timeoutMs = 45000,
+    timeoutMs = 60000,
   ): Promise<MusicResult> {
     await this.ensureConnected();
     return this._selectResult(buttonMessageId, buttonIndex, timeoutMs);
