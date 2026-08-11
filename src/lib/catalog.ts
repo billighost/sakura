@@ -107,84 +107,21 @@ function compact(list: (VirtualTrack | null)[]): VirtualTrack[] {
 
 // ── Genre pools ─────────────────────────────────────────────────────────────
 
-/**
- * Deezer's genre ids are a small fixed set, and its `/genre/<id>/artists`
- * endpoint is the cheapest way to turn "this person likes amapiano" into
- * actual artists. Mapping our normalised genre strings onto those ids keeps
- * the lookup to one call per genre.
+/*
+ * There used to be a `getGenreArtists` here, backed by a
+ * normalised-genre → Deezer-genre-id table and `/genre/<id>/artists`.
  *
- * Unmapped genres fall through to a plain search, which is why the map doesn't
- * need to be exhaustive — it just makes the common cases one hop cheaper.
- */
-const DEEZER_GENRE_IDS: Record<string, number> = {
-  pop: 132,
-  rap: 116,
-  'hip hop': 116,
-  hiphop: 116,
-  rock: 152,
-  dance: 113,
-  electronic: 106,
-  edm: 106,
-  house: 113,
-  rnb: 165,
-  'r&b': 165,
-  soul: 165,
-  alternative: 85,
-  indie: 85,
-  jazz: 129,
-  classical: 98,
-  reggae: 144,
-  afrobeats: 2228,
-  afro: 2228,
-  african: 2228,
-  amapiano: 2228,
-  latin: 197,
-  reggaeton: 197,
-  country: 2,
-  metal: 464,
-  folk: 466,
-  blues: 153,
-  kpop: 2226,
-  'k-pop': 2226,
-};
-
-/**
- * Artists that define a genre, per the provider's own ranking.
+ * Both are gone because both were wrong. The endpoint stopped honouring the
+ * genre id — verified live, every id returns the same geo-localised
+ * popular-artist list — and its search fallback matched on artist *name*, so
+ * "metal" returned acts called "Metal!" and "M.E.T.A.L.". The id table had
+ * independently rotted too: `/genre` lists only 22 top-level genres, so the
+ * afrobeats/amapiano (2228) and k-pop (2226) entries pointed at nothing, and
+ * `country: 2` was actually "African Music".
  *
- * ⚠ The provider no longer honours the genre id on `/genre/<id>/artists`, so
- * what this actually returns is a geo-localised popular-artist list that is the
- * same for every genre — see the analysis on `getGenreSeedArtists` below, which
- * is the working implementation. Still wired into `buildCandidatePool`; the
- * switch-over is a recommender change rather than a drop-in, because pool size
- * and provider call volume both shift with it.
+ * Deleted rather than deprecated: a broken exported function is an invitation.
+ * `getGenreSeedArtists` below is the working replacement and has the same shape.
  */
-export async function getGenreArtists(genre: string, limit = 25): Promise<DzArtistLite[]> {
-  const g = genre.toLowerCase().trim();
-  const genreId = DEEZER_GENRE_IDS[g];
-
-  return (
-    (await cachedWithStale(
-      cacheKey('ext', 'dz', 'genreartists', g, limit),
-      TTL.EXT_GENRE_POOL,
-      async () => {
-        if (genreId) {
-          const data = await dz<{ data: DzArtistLite[] }>(
-            `/genre/${genreId}/artists?limit=${limit}`,
-            'genre.artists',
-          );
-          if (data?.data?.length) return data.data;
-        }
-        // Unmapped genre, or the genre endpoint came back empty.
-        const search = await dz<{ data: DzArtistLite[] }>(
-          `/search/artist?q=${encodeURIComponent(g)}&limit=${limit}`,
-          'genre.artistSearch',
-        );
-        return search?.data ?? null;
-      },
-      { label: `catalog.genreArtists:${g}` },
-    )) ?? []
-  );
-}
 
 // ── Genre → artists, via playlists ──────────────────────────────────────────
 
@@ -209,11 +146,15 @@ const GENRE_TITLE_VARIANTS: Record<string, string[]> = {
   'hip-hop': ['hiphop', 'rap'],
   'drum & bass': ['drumbass', 'dnb'],
   'k-pop': ['kpop'],
+  'j-pop': ['jpop', 'japanese'],
+  anime: ['anime', 'anisong'],
   'lo-fi': ['lofi'],
   afrobeats: ['afrobeats', 'afrobeat', 'afropop'],
   amapiano: ['amapiano', 'piano'],
   electronic: ['electronic', 'electro'],
   alternative: ['alternative', 'altrock'],
+  emo: ['emo', 'poppunk'],
+  bollywood: ['bollywood', 'hindi'],
 };
 
 /** How many on-topic playlists to aggregate. Enough to let agreement emerge. */
@@ -269,15 +210,25 @@ interface DzPlaylistLite {
  * TTL.EXT_GENRE_POOL with a stale fallback, and keyed on the genre alone — so
  * the popular genres are essentially always warm across all users.
  */
-export async function getGenreSeedArtists(
-  genre: string,
-  limit = 20,
-): Promise<DzArtistLite[]> {
+
+/**
+ * The shared step: find the genre's on-topic playlists and read their tracks.
+ *
+ * Returned as one array *per playlist* rather than flattened, because the
+ * artist ranking below needs to know how many distinct playlists an artist
+ * appeared in — flattening first would throw away exactly the signal that makes
+ * the result accurate.
+ *
+ * Cached independently of any `limit`, so the artist picker and the genre browse
+ * share one cache entry and one set of provider calls instead of each paying for
+ * its own.
+ */
+async function genrePlaylistTracks(genre: string): Promise<DzTrackLite[][]> {
   const g = genre.toLowerCase().trim();
 
   return (
     (await cachedWithStale(
-      cacheKey('ext', 'dz', 'genreseeds', g, limit),
+      cacheKey('ext', 'dz', 'genreplaylists', g),
       TTL.EXT_GENRE_POOL,
       async () => {
         const found = await dz<{ data: DzPlaylistLite[] }>(
@@ -304,51 +255,91 @@ export async function getGenreSeedArtists(
           ),
         );
 
-        /*
-         * `lists` counts distinct playlists the artist appeared in — the
-         * cross-curator agreement that does the real filtering. `tracks` only
-         * breaks ties within the same agreement level.
-         */
-        const ranked = new Map<
-          number,
-          { artist: DzArtistLite; lists: number; tracks: number }
-        >();
-
-        for (const list of lists) {
-          const seenHere = new Set<number>();
-          for (const t of list?.data ?? []) {
-            const a = t?.artist;
-            if (!a?.id || !a.name) continue;
-
-            const entry = ranked.get(a.id) ?? {
-              artist: {
-                id: a.id,
-                name: a.name,
-                picture_medium: a.picture_medium,
-                picture_big: a.picture_big,
-              },
-              lists: 0,
-              tracks: 0,
-            };
-            entry.tracks += 1;
-            if (!seenHere.has(a.id)) {
-              seenHere.add(a.id);
-              entry.lists += 1;
-            }
-            ranked.set(a.id, entry);
-          }
-        }
-
-        if (ranked.size === 0) return null;
-
-        return Array.from(ranked.values())
-          .sort((a, b) => b.lists - a.lists || b.tracks - a.tracks)
-          .slice(0, limit)
-          .map((e) => e.artist);
+        const out = lists.map((l) => l?.data ?? []).filter((l) => l.length > 0);
+        return out.length > 0 ? out : null;
       },
-      { label: `catalog.genreSeeds:${g}` },
+      { label: `catalog.genrePlaylists:${g}` },
     )) ?? []
   );
+}
+
+export async function getGenreSeedArtists(
+  genre: string,
+  limit = 20,
+): Promise<DzArtistLite[]> {
+  const lists = await genrePlaylistTracks(genre);
+  if (lists.length === 0) return [];
+
+  /*
+   * `lists` counts distinct playlists the artist appeared in — the
+   * cross-curator agreement that does the real filtering. `tracks` only
+   * breaks ties within the same agreement level.
+   */
+  const ranked = new Map<
+    number,
+    { artist: DzArtistLite; lists: number; tracks: number }
+  >();
+
+  for (const list of lists) {
+    const seenHere = new Set<number>();
+    for (const t of list) {
+      const a = t?.artist;
+      if (!a?.id || !a.name) continue;
+
+      const entry = ranked.get(a.id) ?? {
+        artist: {
+          id: a.id,
+          name: a.name,
+          picture_medium: a.picture_medium,
+          picture_big: a.picture_big,
+        },
+        lists: 0,
+        tracks: 0,
+      };
+      entry.tracks += 1;
+      if (!seenHere.has(a.id)) {
+        seenHere.add(a.id);
+        entry.lists += 1;
+      }
+      ranked.set(a.id, entry);
+    }
+  }
+
+  return Array.from(ranked.values())
+    .sort((a, b) => b.lists - a.lists || b.tracks - a.tracks)
+    .slice(0, limit)
+    .map((e) => e.artist);
+}
+
+/**
+ * Tracks for a genre, from the same curated playlists.
+ *
+ * This is the genre-browse counterpart to `getGenreSeedArtists`, and exists
+ * because Deezer's genre id space doesn't cover everything we offer: amapiano,
+ * drill, lo-fi, highlife, gqom and anime have no id, and the keyword fallback
+ * that used to handle them (`/search?q=genre:"Metal"`) matched on *title* and
+ * returned things like "Classical Option" and "GENREBENDER".
+ *
+ * Interleaved across playlists rather than concatenated, so the first screen of
+ * a browse isn't one playlist's opening run.
+ */
+export async function getGenreTracks(
+  genre: string,
+  limit = 30,
+): Promise<VirtualTrack[]> {
+  const lists = await genrePlaylistTracks(genre);
+  if (lists.length === 0) return [];
+
+  const picked: (VirtualTrack | null)[] = [];
+  const depth = Math.max(...lists.map((l) => l.length), 0);
+
+  for (let i = 0; i < depth && picked.length < limit * 2; i++) {
+    for (const list of lists) {
+      if (list[i]) picked.push(toVirtual(list[i]));
+    }
+  }
+
+  return compact(picked).slice(0, limit);
 }
 
 
@@ -445,7 +436,11 @@ export async function buildCandidatePool(req: PoolRequest): Promise<VirtualTrack
   // Step 1: resolve genres and seed artists to a set of artist ids, in one
   // concurrent wave.
   const [genreArtistLists, relatedLists] = await Promise.all([
-    Promise.all(genres.map((g) => getGenreArtists(g, 12))),
+    // `getGenreSeedArtists`, not `getGenreArtists` — the latter's endpoint
+    // stopped honouring the genre id, so every pool was being seeded from the
+    // same regional popular-artist list regardless of the user's taste. See the
+    // analysis on `getGenreSeedArtists`.
+    Promise.all(genres.map((g) => getGenreSeedArtists(g, 12))),
     // Related-artist expansion is what produces genuinely new names, so it
     // scales with the discovery dial rather than being a fixed cost.
     discovery > 0.2

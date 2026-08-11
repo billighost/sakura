@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { isTrackDownloaded, saveTrackOffline, saveAudioBlob } from "@/lib/offline-db";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
@@ -54,6 +53,18 @@ export default function PlaylistPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  /*
+   * Editing lives in a modal on this page rather than at
+   * `/playlist/<id>/edit`. That route was linked from the toolbar but never
+   * existed, so Next's Link prefetch turned every visit into a repeated 404 in
+   * the console — and a whole route for two fields would be the odd one out
+   * next to the delete confirmation, which is already a modal here.
+   */
+  const [showEdit, setShowEdit] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [showAddTracks, setShowAddTracks] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
@@ -150,6 +161,38 @@ export default function PlaylistPage() {
     } catch {
       setDeleting(false);
       setShowDeleteConfirm(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    const name = editName.trim();
+    if (!name) {
+      setEditError("Name is required");
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/playlists/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        // Only these two keys, so the handler's partial-update path leaves
+        // visibility alone rather than this page guessing at its value.
+        body: JSON.stringify({ name, description: editDescription.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Couldn't save changes");
+      }
+      setPlaylist((prev) =>
+        prev ? { ...prev, name, description: editDescription.trim() } : prev
+      );
+      setShowEdit(false);
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : "Couldn't save changes");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -321,9 +364,20 @@ export default function PlaylistPage() {
             )}
           </button>
         )}
-        <Link href={`/playlist/${params.id}/edit`} className={styles.iconBtn} title="Edit playlist" aria-label="Edit playlist">
+        <button
+          type="button"
+          className={styles.iconBtn}
+          onClick={() => {
+            setEditName(playlist.name);
+            setEditDescription(playlist.description ?? "");
+            setEditError(null);
+            setShowEdit(true);
+          }}
+          title="Edit playlist"
+          aria-label="Edit playlist"
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-        </Link>
+        </button>
         <button className={styles.iconBtn} onClick={handleShare} title="Share" aria-label="Share playlist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} width="16" height="16"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
         </button>
@@ -343,6 +397,66 @@ export default function PlaylistPage() {
             <div className={styles.modalActions}>
               <button className={styles.modalCancel} onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</button>
               <button className={styles.modalDelete} onClick={handleDelete} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEdit && (
+        <div className={styles.modalOverlay} onClick={() => !savingEdit && setShowEdit(false)}>
+          <div
+            className={`${styles.modal} ${styles.modalForm}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle}>Edit playlist</div>
+
+            <label className={styles.fieldLabel} htmlFor="playlist-name">
+              Name
+            </label>
+            <input
+              id="playlist-name"
+              className={styles.fieldInput}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              maxLength={100}
+              autoFocus
+              disabled={savingEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveEdit();
+              }}
+            />
+
+            <label className={styles.fieldLabel} htmlFor="playlist-description">
+              Description
+            </label>
+            <textarea
+              id="playlist-description"
+              className={styles.fieldTextarea}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Optional"
+              disabled={savingEdit}
+            />
+
+            {editError && <div className={styles.fieldError}>{editError}</div>}
+
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalCancel}
+                onClick={() => setShowEdit(false)}
+                disabled={savingEdit}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.modalSave}
+                onClick={handleSaveEdit}
+                disabled={savingEdit || !editName.trim()}
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </button>
             </div>
           </div>
         </div>

@@ -529,6 +529,97 @@
   cursor: not-allowed;
 }
 
+/* ── Edit form ─────────────────────────────────────────────────────────────
+ *
+ * The delete confirmation is centred prose; a form is not. Left-aligning the
+ * labels and fields — and letting the panel run a little wider — is what keeps
+ * this reading as something to fill in rather than something to acknowledge. */
+
+.modalForm {
+  max-width: 26rem;
+  text-align: left;
+}
+
+.modalForm .modalTitle {
+  text-align: center;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--sakura-text-secondary);
+  margin: 0.875rem 0 0.375rem;
+}
+
+.fieldInput,
+.fieldTextarea {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--sakura-radius-lg);
+  border: 1px solid var(--sakura-glass-border);
+  background: var(--sakura-surface-2);
+  color: var(--sakura-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.fieldInput:focus,
+.fieldTextarea:focus {
+  border-color: var(--sakura-accent);
+  background: var(--sakura-surface);
+}
+
+.fieldTextarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.fieldInput:disabled,
+.fieldTextarea:disabled {
+  opacity: 0.6;
+}
+
+.fieldError {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--sakura-danger);
+}
+
+.modalForm .modalActions {
+  margin-top: 1.375rem;
+  justify-content: flex-end;
+}
+
+.modalSave {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  height: 2.375rem;
+  padding: 0 1.125rem;
+  border-radius: 9999px;
+  background: var(--sakura-accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.modalSave:hover {
+  filter: brightness(1.08);
+}
+
+.modalSave:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 420px) {
   .hero {
     flex-direction: column;

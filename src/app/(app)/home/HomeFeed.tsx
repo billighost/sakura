@@ -269,7 +269,7 @@ export function HomeFeed({ data }: { data: HomeData }) {
             <MediaCard
               key={artist.id}
               index={i}
-              href={`/artist/${artist.id}`}
+              href={artist.href}
               title={artist.name}
               coverUrl={artist.avatarUrl}
               shape="round"

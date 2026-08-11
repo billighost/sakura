@@ -96,9 +96,7 @@
   max-height: 46vh;
   overflow-y: auto;
   padding-right: 0.25rem;
-}
-
-.chip {
+}.chip {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -124,6 +122,17 @@
 }
 
 .chipEmoji { font-size: 1rem; line-height: 1; }
+
+/* Drawn icons, not emoji — see the note in lib/genres.ts. Fixed box so the
+ * labels start on a common left edge regardless of glyph width. */
+.chipIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
 
 /* ── Artist grid ─────────────────────────────────────────────────────────── */
 

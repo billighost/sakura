@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { GENRES } from "@/lib/genres";
 import styles from "./page.module.css";
 
 /**
@@ -16,9 +17,21 @@ import styles from "./page.module.css";
  *
  * Skippable at every step. A skipped onboarding still leaves a usable profile
  * — the engine falls back to popularity and learns from behaviour instead.
+ *
+ * ── Why the genre list isn't fetched ────────────────────────────────────────
+ *
+ * It used to come from `/api/taste/seeds`, which intersected a curated list
+ * with `SELECT DISTINCT genre FROM Track/Artist` — so the picker only offered
+ * genres we already held music for. On a young catalogue that cut ~30 genres
+ * down to a handful, which is the wrong answer twice over: it made the app look
+ * empty, and the filter was pointless anyway now that both the artist picker and
+ * the mix pools are provider-backed. A genre we hold nothing for works fine.
+ *
+ * That endpoint also sent `{ id, label, icon }` while this page rendered
+ * `g.emoji`, so every chip drew an empty span. Importing the registry directly
+ * fixes that by construction — the icons are components, and there is one list.
  */
 
-type Genre = { id: string; label: string; emoji: string };
 type Artist = {
   id: string;
   deezerId: number;
@@ -32,23 +45,13 @@ const MIN_GENRES = 3;
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [genres, setGenres] = useState<Genre[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set());
   const [discovery, setDiscovery] = useState(0.35);
-  const [loading, setLoading] = useState(true);
   const [loadingArtists, setLoadingArtists] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/taste/seeds")
-      .then((r) => r.json())
-      .then((data) => setGenres(data.genres ?? []))
-      .catch(() => setError("Couldn't load choices. You can skip this for now."))
-      .finally(() => setLoading(false));
-  }, []);
 
   const toggleGenre = useCallback((id: string) => {
     setSelectedGenres((prev) => {
@@ -191,28 +194,22 @@ export default function OnboardingPage() {
               Pick at least {MIN_GENRES}. This shapes your mixes and what plays when a queue runs out.
             </p>
 
-            {loading ? (
-              <div className={styles.grid} data-lenis-prevent>
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className={`${styles.chip} skeleton`} style={{ height: "3rem" }} />
-                ))}
-              </div>
-            ) : (
-              <div className={styles.grid} data-lenis-prevent>
-                {genres.map((g) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    className={`${styles.chip} ${selectedGenres.has(g.id) ? styles.chipActive : ""}`}
-                    onClick={() => toggleGenre(g.id)}
-                    aria-pressed={selectedGenres.has(g.id)}
-                  >
-                    <span className={styles.chipEmoji} aria-hidden="true">{g.emoji}</span>
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className={styles.grid} data-lenis-prevent>
+              {GENRES.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`${styles.chip} ${selectedGenres.has(g.id) ? styles.chipActive : ""}`}
+                  onClick={() => toggleGenre(g.id)}
+                  aria-pressed={selectedGenres.has(g.id)}
+                >
+                  <span className={styles.chipIcon} aria-hidden="true">
+                    <g.Icon size={18} tone={g.tone} />
+                  </span>
+                  {g.label}
+                </button>
+              ))}
+            </div>
 
             <div className={styles.actions}>
               <button type="button" className={styles.skip} onClick={() => submit(true)} disabled={submitting}>

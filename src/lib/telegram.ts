@@ -106,13 +106,6 @@ export class TelegramClient {
   private readonly apiId: number;
   private readonly apiHash: string;
   private readonly sessionString: string;
-  private readonly proxyConfig?: {
-    ip: string;
-    port: number;
-    socksType: 5 | 4;
-    username?: string;
-    password?: string;
-  };
   private activeCount = 0;
   private static botMutex = new RedisMutex();
 
@@ -145,14 +138,12 @@ export class TelegramClient {
     apiId: number,
     apiHash: string,
     sessionString: string,
-    botUsername?: string,
-    proxyConfig?: TelegramClient["proxyConfig"]
+    botUsername?: string
   ) {
     this.apiId = apiId;
     this.apiHash = apiHash;
     this.sessionString = sessionString;
     this.botUsername = botUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
-    this.proxyConfig = proxyConfig;
     this.client = new GramClient(
       new StringSession(sessionString),
       apiId,
@@ -164,7 +155,6 @@ export class TelegramClient {
         // through a single sender: two listeners streaming different songs
         // take turns chunk by chunk instead of downloading in parallel.
         maxConcurrentDownloads: 8,
-        ...(proxyConfig ? { proxy: proxyConfig } : {}),
       },
     );
   }
@@ -201,7 +191,6 @@ export class TelegramClient {
               {
                 connectionRetries: 5,
                 autoReconnect: true,
-                ...(this.proxyConfig ? { proxy: this.proxyConfig } : {}),
               },
             );
             await new Promise((r) => setTimeout(r, jitterMs));
@@ -327,7 +316,6 @@ export class TelegramClient {
             {
               connectionRetries: 5,
               autoReconnect: true,
-              ...(this.proxyConfig ? { proxy: this.proxyConfig } : {}),
             }
           );
 
@@ -978,27 +966,11 @@ export function getTelegramClient(): TelegramClient {
       throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
     }
 
-    const proxyHost = process.env.TELEGRAM_PROXY_HOST || "";
-    const proxyPort = process.env.TELEGRAM_PROXY_PORT ? parseInt(process.env.TELEGRAM_PROXY_PORT, 10) : undefined;
-    const proxyUsername = process.env.TELEGRAM_PROXY_USERNAME || undefined;
-    const proxyPassword = process.env.TELEGRAM_PROXY_PASSWORD || undefined;
-    const proxySocksTypeInput = process.env.TELEGRAM_PROXY_SOCKS_TYPE ? parseInt(process.env.TELEGRAM_PROXY_SOCKS_TYPE, 10) : 5;
-    const proxySocksType: 5 | 4 = (proxySocksTypeInput === 4) ? 4 : 5;
-
-    const proxyConfig = proxyHost && proxyPort ? {
-      ip: proxyHost,
-      port: proxyPort,
-      socksType: proxySocksType,
-      username: proxyUsername,
-      password: proxyPassword,
-    } : undefined;
-
     globalForTelegram.telegramClient = new TelegramClient(
       apiId,
       apiHash,
       sessionString,
       process.env.TELEGRAM_BOT_USERNAME,
-      proxyConfig,
     );
   }
   return globalForTelegram.telegramClient;
@@ -1033,22 +1005,7 @@ export function getTelegramClientForBot(botUsername: string): TelegramClient {
     throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
   }
 
-  const proxyHost = process.env.TELEGRAM_PROXY_HOST || "";
-  const proxyPort = process.env.TELEGRAM_PROXY_PORT ? parseInt(process.env.TELEGRAM_PROXY_PORT, 10) : undefined;
-  const proxyUsername = process.env.TELEGRAM_PROXY_USERNAME || undefined;
-  const proxyPassword = process.env.TELEGRAM_PROXY_PASSWORD || undefined;
-  const proxySocksTypeInput = process.env.TELEGRAM_PROXY_SOCKS_TYPE ? parseInt(process.env.TELEGRAM_PROXY_SOCKS_TYPE, 10) : 5;
-  const proxySocksType: 5 | 4 = (proxySocksTypeInput === 4) ? 4 : 5;
-
-  const proxyConfig = proxyHost && proxyPort ? {
-    ip: proxyHost,
-    port: proxyPort,
-    socksType: proxySocksType,
-    username: proxyUsername,
-    password: proxyPassword,
-  } : undefined;
-
-  const client = new TelegramClient(apiId, apiHash, sessionString, botUsername, proxyConfig);
+  const client = new TelegramClient(apiId, apiHash, sessionString, botUsername);
   cache.set(botUsername, client);
   return client;
 }

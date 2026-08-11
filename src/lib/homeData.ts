@@ -4,13 +4,25 @@ import { cacheGet, cacheKey, cached, TTL } from "@/lib/cache";
 import { updateSystemPlaylist } from "@/lib/charts";
 import { pruneListeningHistory } from "@/lib/historyRetention";
 import { generateUserMixes } from "@/lib/mixes";
+import { getGenreSeedArtists } from "@/lib/catalog";
 
 export type HomeData = {
   user: { name: string; avatarUrl: string | null };
   onboarded: boolean;
   quickPicks: HomeTrack[];
   recentlyPlayed: HomeTrack[];
-  topArtists: { id: string; name: string; trackCount: number; avatarUrl: string | null }[];
+  topArtists: {
+    id: string;
+    name: string;
+    trackCount: number;
+    avatarUrl: string | null;
+    /**
+     * Where the card goes. Carried explicitly because these artists no longer
+     * all live in our database — a provider-sourced one has to open the external
+     * browse route, and only the query that produced it knows which it is.
+     */
+    href: string;
+  }[];
   playlists: { id: string; name: string; trackCount: number; coverUrl: string | null }[];
   madeForYou: {
     id: string;
@@ -123,9 +135,11 @@ async function buildHomeData(userId: string): Promise<HomeData> {
         [userId]
       ),
 
-      // 2. Onboarding state — drives the "build your taste" prompt.
-      queryOne<{ onboarded: boolean }>(
-        `SELECT onboarded FROM "TasteProfile" WHERE "userId" = $1`,
+      // 2. Onboarding state — drives the "build your taste" prompt. The genres
+      //    come along for the ride because the top-artists rail needs them when
+      //    the user has no listening history yet.
+      queryOne<{ onboarded: boolean; topGenres: string[] | null; seedGenres: string[] | null }>(
+        `SELECT onboarded, "topGenres", "seedGenres" FROM "TasteProfile" WHERE "userId" = $1`,
         [userId]
       ).catch(softFail("home:onboarded", null)),
 
@@ -178,8 +192,10 @@ async function buildHomeData(userId: string): Promise<HomeData> {
         [userId]
       ).catch(softFail("home:recentlyPlayed", [])),
 
-      // 5. Top artists — now driven by affinity score rather than a raw play
-      //    count, so an artist someone skips constantly stops ranking highly.
+      // 5. Top artists — driven by affinity score rather than a raw play count,
+      //    so an artist someone skips constantly stops ranking highly. The
+      //    cold-start case is handled after this block, where the taste genres
+      //    are available.
       query<{ id: string; name: string; trackCount: number; avatarUrl: string | null }>(
         `SELECT a.id, a.name, a."imageUrl" AS "avatarUrl", aff.plays AS "trackCount"
          FROM "ArtistAffinity" aff
@@ -188,19 +204,7 @@ async function buildHomeData(userId: string): Promise<HomeData> {
          ORDER BY aff.score DESC
          LIMIT 8`,
         [userId]
-      )
-        .then(async (artists) => {
-          if (artists.length > 0) return artists;
-          return query<{ id: string; name: string; trackCount: number; avatarUrl: string | null }>(
-            `SELECT a.id, a.name, 0 AS "trackCount", a."imageUrl" AS "avatarUrl"
-             FROM "Artist" a
-             JOIN "Track" t ON t."artistId" = a.id
-             GROUP BY a.id, a.name, a."imageUrl"
-             ORDER BY COUNT(t.id) DESC
-             LIMIT 8`
-          );
-        })
-        .catch(softFail("home:topArtists", [])),
+      ).catch(softFail("home:topArtists", [])),
 
       // 6. User playlists
       query<{ id: string; name: string; trackCount: number; coverUrl: string | null }>(
@@ -254,12 +258,66 @@ async function buildHomeData(userId: string): Promise<HomeData> {
       ).catch(softFail("home:systemPlaylists", [])),
     ]);
 
+  /*
+   * Cold start for the artist rail.
+   *
+   * Someone with no affinity rows yet used to get "the artists we happen to hold
+   * the most tracks for" — a list about our download history, not about them,
+   * and on a young catalogue a near-random one. Ask the provider for artists in
+   * the genres they actually chose instead.
+   *
+   * Runs after the batch above rather than inside it because it needs the taste
+   * genres, and it only runs at all on the cold path, which by definition has
+   * nothing else to show. A user who skipped onboarding has no genres, so the
+   * rail stays empty and hides itself — better than a list of strangers.
+   */
+  let artistRail: HomeData["topArtists"] = topArtists.map((a) => ({
+    ...a,
+    href: `/artist/${a.id}`,
+  }));
+
+  if (artistRail.length === 0) {
+    const genres = [...(taste?.topGenres ?? []), ...(taste?.seedGenres ?? [])]
+      .filter(Boolean)
+      .slice(0, 3);
+
+    if (genres.length > 0) {
+      const lists = await Promise.all(
+        genres.map((g) => getGenreSeedArtists(g, 6).catch(() => []))
+      );
+
+      // Interleaved so each chosen genre is represented, then deduped.
+      const seen = new Set<number>();
+      const picked: HomeData["topArtists"] = [];
+      const depth = Math.max(...lists.map((l) => l.length), 0);
+
+      for (let i = 0; i < depth && picked.length < 8; i++) {
+        for (const list of lists) {
+          if (picked.length >= 8) break;
+          const a = list[i];
+          if (!a?.id || !a.name || seen.has(a.id)) continue;
+          seen.add(a.id);
+          picked.push({
+            id: `deezer-${a.id}`,
+            name: a.name,
+            trackCount: 0,
+            avatarUrl: a.picture_medium ?? a.picture_big ?? null,
+            // The external browse route, not `/artist/<id>` — there is no row.
+            href: `/browse/artist/${a.id}`,
+          });
+        }
+      }
+
+      artistRail = picked;
+    }
+  }
+
   const result: HomeData = {
     user: user ?? { name: "Listener", avatarUrl: null },
     onboarded: taste?.onboarded ?? false,
     quickPicks,
     recentlyPlayed,
-    topArtists,
+    topArtists: artistRail,
     playlists,
     madeForYou: mixes,
     systemPlaylists,

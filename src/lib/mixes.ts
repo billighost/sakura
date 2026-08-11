@@ -4,7 +4,6 @@ import { invalidateTasteCaches } from "@/lib/taste";
 import {
   buildCandidatePool,
   getArtistTopTracks,
-  getGenreArtists,
   getChartTracks,
   resolveArtistDeezerIds,
   diversify,

@@ -26,6 +26,22 @@ import { queryOne } from "@/lib/sql";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Declared here, not only in `vercel.json`.
+ *
+ * Next exposes `maxDuration` to the deployment platform through its *build
+ * output*, so a route that never exports it ships with whatever the platform
+ * default happens to be — which is how full-file downloads through this proxy
+ * started coming back as `504 Gateway Timeout` while the three other
+ * long-running routes (which all declare it inline as well) were fine.
+ *
+ * It has to cover more than time-to-first-byte: `scheduleCdnPromotion` below
+ * runs in `after()`, and per Next's docs `after` shares the route's max
+ * duration, so the Cloudinary upload of an ~10MB track is inside this budget
+ * too.
+ */
+export const maxDuration = 60;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ messageId: string }> }

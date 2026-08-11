@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { query, softFail } from "@/lib/sql";
 import { cachedWithStale, cacheKey, TTL } from "@/lib/cache";
 import { callProvider, HttpError } from "@/lib/resilience";
+import { getGenreTracks } from "@/lib/catalog";
 import { GENRE_BY_ID } from "@/lib/genres";
 
 /**
@@ -18,50 +19,19 @@ import { GENRE_BY_ID } from "@/lib/genres";
  *
  *   1. Local catalogue, matched on the genre column and on the artist's genre
  *      array. These are tracks we actually hold, so they play instantly.
- *   2. Deezer's own genre-scoped charts, which return tracks *classified* as
- *      the genre rather than named after it.
- *   3. A last-resort keyword query, only if both above come back empty, so a
- *      thin catalogue still shows something.
+ *   2. Deezer's genre-scoped chart, for the genres that have a real id.
+ *   3. Curated playlists for that genre, via `getGenreTracks`, which is the
+ *      only option for the ~20 genres Deezer's taxonomy doesn't model.
  *
  * Local results lead, because "you already have this" is the most useful
  * answer, and are then topped up to the requested limit from the provider.
+ *
+ * The genre ids live on `GenreDef.deezerId` in lib/genres.ts rather than in a
+ * table here. There used to be one local to this file and another in
+ * lib/catalog.ts, and they disagreed with each other and with reality — this
+ * one had K-Pop and J-Pop mapped to `2`, which is Deezer's African Music, so
+ * browsing K-Pop returned Asake and BNXN.
  */
-
-/** Deezer's genre ids. Their chart endpoint is keyed on these, not on names. */
-const DEEZER_GENRE_ID: Record<string, number> = {
-  pop: 132,
-  "hip-hop": 116,
-  rnb: 165,
-  rock: 152,
-  alternative: 85,
-  indie: 85,
-  electronic: 106,
-  edm: 106,
-  house: 106,
-  "drum & bass": 106,
-  jazz: 129,
-  blues: 153,
-  soul: 165,
-  funk: 165,
-  reggae: 144,
-  dancehall: 144,
-  afrobeats: 2228,
-  amapiano: 2228,
-  highlife: 2228,
-  gospel: 187,
-  country: 84,
-  folk: 466,
-  classical: 98,
-  metal: 464,
-  punk: 464,
-  "k-pop": 2, // Deezer files K-pop under Asian music
-  "j-pop": 2,
-  latin: 197,
-  "lo-fi": 116,
-  ambient: 106,
-  drill: 116,
-  podcast: 0,
-};
 
 interface DeezerTrack {
   id: number;
@@ -102,7 +72,7 @@ export async function GET(req: NextRequest) {
       async () => {
         const [local, provider] = await Promise.all([
           localTracks(terms, limit),
-          deezerGenre(genreId, def.label, limit),
+          deezerGenre(def.deezerId, genreId, limit),
         ]);
 
         const seen = new Set<string>();
@@ -199,13 +169,18 @@ async function localTracks(terms: string[], limit: number) {
 }
 
 /**
- * Deezer's genre-scoped chart. This is the part that makes the feature
- * actually work: `/chart/{genreId}/tracks` returns tracks *classified* as the
- * genre. The old code's `/search?q=jazz` returned tracks *named* jazz.
+ * Provider tracks for a genre.
+ *
+ * `/chart/<genreId>/tracks` is the good path where an id exists — unlike the
+ * artist endpoints, this one really is genre-scoped (464 returns Ice Nine Kills
+ * and Wage War, 84 returns Luke Combs).
+ *
+ * Where there's no id, or the chart comes back empty, fall through to curated
+ * playlists. That replaces a keyword query on `genre:"<label>"`, which matched
+ * on *title* and so answered "Metal" with "Happy Birthday All Names" and
+ * "Classical" with "Classical Option" — worse than showing nothing.
  */
-async function deezerGenre(genreId: string, label: string, limit: number) {
-  const dzId = DEEZER_GENRE_ID[genreId];
-
+async function deezerGenre(dzId: number | undefined, genreId: string, limit: number) {
   let data: any = null;
 
   if (dzId !== undefined && dzId > 0) {
@@ -217,26 +192,33 @@ async function deezerGenre(genreId: string, label: string, limit: number) {
         return res.json();
       },
       { provider: "deezer", op: "genre-chart", timeoutMs: 5000, attempts: 2 }
-    );
+    ).catch(() => null);
   }
 
-  // Nothing classified under that id (or no mapping) — fall back to a keyword
-  // query. Still imperfect, but it only runs when the good path found nothing.
-  if (!data?.data?.length) {
-    data = await callProvider<any>(
-      async (signal) => {
-        const url = `https://api.deezer.com/search?q=${encodeURIComponent(
-          `genre:"${label}"`
-        )}&limit=${limit}`;
-        const res = await fetch(url, { signal });
-        if (!res.ok) throw new HttpError(res.status, url);
-        return res.json();
+  let tracks = (data?.data ?? []) as DeezerTrack[];
+
+  if (!tracks.length) {
+    /*
+     * `getGenreTracks` returns VirtualTrack, which carries the same fields
+     * under different names. Mapped rather than re-fetched so both paths share
+     * one cache entry with the onboarding artist picker.
+     */
+    const viaPlaylists = await getGenreTracks(genreId, limit).catch(() => []);
+    tracks = viaPlaylists.map((t) => ({
+      id: t.deezerId,
+      title: t.title,
+      duration: t.duration,
+      preview: "",
+      artist: { id: t.artistDeezerId ?? 0, name: t.artistName },
+      album: {
+        id: 0,
+        title: t.albumTitle ?? "",
+        cover_medium: t.coverUrl ?? "",
+        cover_big: t.coverUrl ?? undefined,
       },
-      { provider: "deezer", op: "genre-search", timeoutMs: 5000, attempts: 2 }
-    );
+    }));
   }
 
-  const tracks = (data?.data ?? []) as DeezerTrack[];
   if (!tracks.length) return [];
 
   // Resolve which of these we already hold, in one query rather than N.
