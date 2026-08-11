@@ -102,7 +102,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     resistance: { up: 1, down: 0.15 },
     // Downward never commits, so the bar can't be flicked into nothing.
     commitDirections: ["left", "right", "up"],
-    blockSelector: `.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}, .${styles.lyricTicker}`,
+    blockSelector: `.${styles.playBtn}, .${styles.likeBtn}, .${styles.scrubRow}, .${styles.lyricLine}`,
     longPressDelay: LONG_PRESS_MS,
     onLongPress: (point) => setMenuPos(point),
     onTap: () => handleExpand(),
@@ -147,7 +147,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
 
   return (
     <div
-      className={`${styles.root} ${activeLyricLine ? styles.hasLyrics : ""}`}
+      className={`${styles.root} ${isPlaying ? styles.isPlaying : ""}`}
       style={
         {
           "--track-accent": accentColor || undefined,
@@ -191,24 +191,6 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         Next <NextIcon size={12} />
       </span>
 
-      {activeLyricLine && (
-        <div
-          className={styles.lyricTicker}
-          onClick={lyricSeek}
-          tabIndex={0}
-          role="button"
-          aria-label={`Current lyric: ${activeLyricLine}. Activate to jump playback here.`}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              lyricSeek();
-            }
-          }}
-        >
-          {activeLyricLine}
-        </div>
-      )}
-
       <div className={styles.content}>
         <div
           ref={artWrapRef}
@@ -235,9 +217,33 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
               <MusicNoteIcon size={16} />
             </div>
           )}
+          {isPlaying && (
+            <div className={styles.eqBadge} aria-hidden="true">
+              <span className={styles.eqBar} />
+              <span className={styles.eqBar} />
+              <span className={styles.eqBar} />
+            </div>
+          )}
         </div>
 
         <div className={styles.info}>
+          {activeLyricLine && (
+            <div
+              className={styles.lyricLine}
+              onClick={lyricSeek}
+              tabIndex={0}
+              role="button"
+              aria-label={`Current lyric: ${activeLyricLine}. Activate to jump playback here.`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  lyricSeek();
+                }
+              }}
+            >
+              {activeLyricLine}
+            </div>
+          )}
           <div className={styles.title}>{currentTrack.title}</div>
           <div className={styles.artist}>{currentTrack.artist}</div>
         </div>

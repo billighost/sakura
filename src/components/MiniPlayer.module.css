@@ -16,6 +16,10 @@
   transition: transform var(--d-base) var(--ease), opacity var(--d-base) var(--ease);
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
+  /* The art now sits edge-to-edge and the artwork can gently scale while
+   * playing (see .artWrap.playing) — this keeps both clipped to the bar's
+   * own rounded top corners instead of poking past them. */
+  overflow: hidden;
 }
 
 /* A hairline of the track's accent along the very top edge. One pixel of
@@ -30,6 +34,37 @@
   background: var(--track-accent, var(--accent));
   opacity: 0.5;
   pointer-events: none;
+  z-index: 3;
+}
+
+/*
+ * The "now playing" cue for the bar as a whole: a flat wash of the track's
+ * accent that breathes in opacity — not a gradient. The house style reserves
+ * gradients for the scrim and progress fill (see globals.css design brief),
+ * so this stays a single flat colour and only its opacity moves.
+ */
+.root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--track-accent, var(--accent));
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.root.isPlaying::after {
+  animation: ambientBreathe 3.2s var(--ease-in-out) infinite;
+}
+
+@keyframes ambientBreathe {
+  0%,
+  100% {
+    opacity: 0.04;
+  }
+  50% {
+    opacity: 0.11;
+  }
 }
 
 .scrubRow {
@@ -41,65 +76,70 @@
   z-index: 2;
 }
 
-.lyricTicker {
-  position: relative;
-  z-index: 2;
-  flex-shrink: 0;
-  height: 13px;
-  line-height: 13px;
-  padding: 0 clamp(0.75rem, 3vw, 1rem);
-  font-size: var(--t-2xs);
-  font-weight: 600;
-  letter-spacing: var(--track-snug);
-  color: var(--track-accent, var(--accent));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.9;
-  animation: fadeIn var(--d-base) var(--ease);
-}
-
+/*
+ * Cover art, title/artist and controls. `align-items: stretch` is what lets
+ * .artWrap claim the row's full height below — everything else opts back
+ * out with its own fixed size or `align-self: center`.
+ *
+ * No left padding: the art sits flush against the bar's left edge. The
+ * right side keeps its padding for the like/play buttons.
+ */
 .content {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 clamp(0.5rem, 2.5vw, 0.75rem);
+  align-items: stretch;
+  gap: 0.625rem;
+  padding: 0 clamp(0.5rem, 2.5vw, 0.75rem) 0 0;
   flex: 1;
   min-height: 0;
 }
 
+/*
+ * Full-height, edge-to-edge, square. `aspect-ratio` derives the width from
+ * whatever height `.content` resolves to at any breakpoint, so this tracks
+ * `--miniplayer-h` (and its short-viewport steps) without a media query of
+ * its own — the old fixed clamp() needed one for every step this covers for
+ * free.
+ */
 .artWrap {
   position: relative;
-  width: clamp(2.25rem, 7vw, 2.625rem);
-  height: clamp(2.25rem, 7vw, 2.625rem);
+  align-self: stretch;
+  aspect-ratio: 1 / 1;
   flex-shrink: 0;
-  transition: width var(--d-slow) var(--ease), height var(--d-slow) var(--ease);
-}
-
-.root.hasLyrics .artWrap {
-  width: clamp(1.75rem, 5.5vw, 2rem);
-  height: clamp(1.75rem, 5.5vw, 2rem);
+  overflow: hidden;
 }
 
 .art {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: var(--r-sm);
   object-fit: cover;
   background: var(--skeleton);
-  box-shadow: var(--shadow-2);
   opacity: 0;
   transition: opacity var(--d-base) var(--ease);
+  transform-origin: center;
 }
 
 .art.loaded {
   opacity: 1;
 }
 
-/* A ring rather than a blur-glow. Glows read as neon; a ring reads as focus. */
+/* Replaces the old static ring: the art itself breathes gently while a
+ * track is playing, in step with the bar's ambient wash. Lightweight —
+ * transform only, no repaint. */
 .artWrap.playing .art {
-  box-shadow: var(--shadow-2), 0 0 0 1.5px var(--track-accent, var(--accent));
+  animation: artBreathe 3.2s var(--ease-in-out) infinite;
+}
+
+@keyframes artBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
 }
 
 .artFallback {
@@ -110,11 +150,96 @@
   opacity: 1;
 }
 
+/*
+ * Tiny equalizer badge, bottom-left corner of the art. Fixed white-on-black
+ * rather than theme tokens — like the Full Player's `--on-media` tokens,
+ * this sits on unpredictable artwork, not on an app surface, so it needs to
+ * read the same regardless of theme or cover colour.
+ */
+.eqBadge {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+  padding: 2px 3px;
+  border-radius: var(--r-xs);
+  background: rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.eqBar {
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.eqBar:nth-child(1) {
+  animation: eqBar1 0.9s ease-in-out infinite;
+}
+
+.eqBar:nth-child(2) {
+  animation: eqBar2 0.76s ease-in-out infinite;
+}
+
+.eqBar:nth-child(3) {
+  animation: eqBar3 1.06s ease-in-out infinite;
+}
+
+@keyframes eqBar1 {
+  0%,
+  100% {
+    height: 3px;
+  }
+  50% {
+    height: 10px;
+  }
+}
+
+@keyframes eqBar2 {
+  0%,
+  100% {
+    height: 7px;
+  }
+  50% {
+    height: 2px;
+  }
+}
+
+@keyframes eqBar3 {
+  0%,
+  100% {
+    height: 5px;
+  }
+  50% {
+    height: 11px;
+  }
+}
+
 .info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
   /* The tap-to-expand affordance lives here, so it must not swallow the
    * buttons' hit areas — it's a sibling, not an overlay. */
+}
+
+.lyricLine {
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--track-accent, var(--accent));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.95;
+  cursor: pointer;
+  animation: fadeIn var(--d-base) var(--ease);
 }
 
 .title {
@@ -134,7 +259,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 1px;
 }
 
 /* ── Controls ──────────────────────────────────────────────────────────────
@@ -279,6 +403,7 @@
  */
 .swipeHint {
   position: absolute;
+  z-index: 2;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
