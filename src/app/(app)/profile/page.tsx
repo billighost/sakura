@@ -289,7 +289,7 @@ export default function ProfilePage() {
 
   if (loadError) {
     return (
-      <div className={styles.page}>
+      <div className={styles.page} data-page-scroll>
         <div className={styles.errorState}>
           <AlertIcon size={30} />
           <p className={styles.errorText}>{loadError}</p>
@@ -303,7 +303,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className={styles.page}>
+      <div className={styles.page} data-page-scroll>
         <div className={styles.hero}>
           <div className={`${styles.avatar} skeleton`} />
           <div className={`${styles.skelName} skeleton`} />
@@ -319,7 +319,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-page-scroll>
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <header className={styles.hero}>
         {/* The settings entry point the profile was missing entirely. */}

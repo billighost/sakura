@@ -785,14 +785,104 @@ export async function recomputeTaste(userId: string): Promise<TasteProfile> {
 
 // ── Onboarding ──────────────────────────────────────────────────────────────
 
+/**
+ * An artist picked during onboarding, as it arrives from the client.
+ *
+ * These come from the provider, so there is no `Artist.id` yet — the name is
+ * the identity, and `saveOnboarding` upserts against the unique name index.
+ */
+export interface OnboardingArtist {
+  name: string;
+  deezerId?: number | null;
+  imageUrl?: string | null;
+  genres?: string[];
+}
+
+/** Cap on how many picks are materialised, as a guard against a crafted body. */
+const MAX_SEED_ARTISTS = 50;
+
+/**
+ * Turn provider artist picks into real `Artist` rows and return their ids.
+ *
+ * This has to happen before the profile is written, because `ArtistAffinity`
+ * has a foreign key to `Artist.id` — a `deezer-<n>` string cannot be stored in
+ * `seedArtistIds` and still take part in the taste model. Storing only names
+ * (which is what the write-only `seedArtistNames` column did) meant artist
+ * picks were silently discarded the moment onboarding finished.
+ *
+ * Artist rows are cheap in a way `Track` rows are not — a few hundred bytes,
+ * capped at what one person actually picked. And filling in `deezerId` here
+ * pays for itself immediately: `resolveArtistDeezerIds` then finds these on an
+ * indexed read, so the first mix build needs no provider lookups to use them.
+ */
+async function materialiseSeedArtists(artists: OnboardingArtist[]): Promise<string[]> {
+  const byName = new Map<string, OnboardingArtist>();
+  for (const a of artists) {
+    const name = a.name?.trim();
+    if (!name) continue;
+    if (!byName.has(name)) byName.set(name, a);
+    if (byName.size >= MAX_SEED_ARTISTS) break;
+  }
+  if (byName.size === 0) return [];
+
+  const rows = await Promise.all(
+    Array.from(byName.values()).map(async (a) => {
+      const genres = dedupe(
+        (a.genres ?? []).map(normaliseGenre).filter(Boolean) as string[]
+      );
+      /*
+       * COALESCE on update so an artist we already enriched at download time
+       * keeps its better metadata — the provider's onboarding thumbnail should
+       * never overwrite a full image or a deezerId we already trust.
+       */
+      const row = await queryOne<{ id: string }>(
+        `INSERT INTO "Artist" (id, name, "imageUrl", "deezerId", genres, "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW())
+         ON CONFLICT (name) DO UPDATE SET
+           "imageUrl" = COALESCE("Artist"."imageUrl", EXCLUDED."imageUrl"),
+           "deezerId" = COALESCE("Artist"."deezerId", EXCLUDED."deezerId"),
+           genres = CASE
+             WHEN COALESCE(array_length("Artist".genres, 1), 0) = 0
+               THEN EXCLUDED.genres
+             ELSE "Artist".genres
+           END
+         RETURNING id`,
+        [
+          a.name.trim(),
+          a.imageUrl ?? null,
+          a.deezerId != null ? String(a.deezerId) : null,
+          genres,
+        ]
+      ).catch((e) => {
+        console.error("[Taste] seed artist upsert failed:", e);
+        return null;
+      });
+      return row?.id ?? null;
+    })
+  );
+
+  return rows.filter((id): id is string => typeof id === "string");
+}
+
 export async function saveOnboarding(
   userId: string,
-  input: { artistIds?: string[]; artistNames?: string[]; genres?: string[]; discovery?: number }
+  input: {
+    artistIds?: string[];
+    artists?: OnboardingArtist[];
+    genres?: string[];
+    discovery?: number;
+  }
 ): Promise<void> {
   await ensureTasteProfile(userId);
 
-  const artistIds = dedupe(input.artistIds ?? []).slice(0, 50);
-  const artistNames = dedupe(input.artistNames ?? []).slice(0, 50);
+  // Provider picks become rows first, so their real ids can join the explicit
+  // ones. Names are kept alongside as a durable record independent of the row.
+  const materialised = await materialiseSeedArtists(input.artists ?? []);
+  const artistNames = dedupe(
+    (input.artists ?? []).map((a) => a.name?.trim()).filter(Boolean) as string[]
+  ).slice(0, MAX_SEED_ARTISTS);
+
+  const artistIds = dedupe([...(input.artistIds ?? []), ...materialised]).slice(0, MAX_SEED_ARTISTS);
   const genres = dedupe((input.genres ?? []).map(normaliseGenre).filter(Boolean) as string[]).slice(0, 30);
   const discovery = clamp(input.discovery ?? 0.35, 0, 1);
 

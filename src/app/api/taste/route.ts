@@ -8,6 +8,7 @@ import {
   recomputeTaste,
   recordFeedback,
   getTasteProfile,
+  type OnboardingArtist,
 } from "@/lib/taste";
 
 /** GET — the current taste profile, with names resolved for display. */
@@ -63,11 +64,28 @@ export async function POST(req: NextRequest) {
   const genres: string[] = Array.isArray(body?.genres)
     ? body.genres.filter((g: unknown) => typeof g === "string")
     : [];
+  /*
+   * Onboarding picks arrive as provider artists, not rows we already have — so
+   * they come as objects and `saveOnboarding` upserts them by name. `artistIds`
+   * is still accepted for any caller that already holds real `Artist.id`s.
+   */
+  const artists: OnboardingArtist[] = [];
+  for (const entry of Array.isArray(body?.artists) ? body.artists : []) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const a = entry as Record<string, unknown>;
+    if (typeof a.name !== "string" || !a.name.trim()) continue;
+    artists.push({
+      name: a.name.trim().slice(0, 200),
+      deezerId:
+        typeof a.deezerId === "number" && Number.isFinite(a.deezerId) ? a.deezerId : null,
+      imageUrl: typeof a.imageUrl === "string" ? a.imageUrl : null,
+      genres: Array.isArray(a.genres)
+        ? a.genres.filter((g): g is string => typeof g === "string")
+        : [],
+    });
+  }
   const artistIds: string[] = Array.isArray(body?.artistIds)
     ? body.artistIds.filter((a: unknown) => typeof a === "string")
-    : [];
-  const artistNames: string[] = Array.isArray(body?.artistNames)
-    ? body.artistNames.filter((a: unknown) => typeof a === "string")
     : [];
   const discovery = typeof body?.discovery === "number" ? body.discovery : 0.35;
   const skipped = body?.skipped === true;
@@ -75,14 +93,14 @@ export async function POST(req: NextRequest) {
   // A skip still marks them onboarded. Asking again on every visit would be
   // more annoying than a cold-start profile is costly — the engine learns
   // from behaviour regardless, it just takes a little longer to warm up.
-  if (!skipped && genres.length === 0 && artistIds.length === 0 && artistNames.length === 0) {
+  if (!skipped && genres.length === 0 && artistIds.length === 0 && artists.length === 0) {
     return NextResponse.json(
       { error: "Pick at least one genre or artist" },
       { status: 400 }
     );
   }
 
-  await saveOnboarding(userId, { genres, artistIds, artistNames, discovery });
+  await saveOnboarding(userId, { genres, artistIds, artists, discovery });
 
   const profile = await getTasteProfile(userId);
   return NextResponse.json({ ok: true, onboarded: true, topGenres: profile?.topGenres ?? [] });

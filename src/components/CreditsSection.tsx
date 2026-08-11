@@ -169,7 +169,7 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
                 </svg>
               </button>
             </div>
-            <div className={styles.modalBody}>
+            <div className={styles.modalBody} data-lenis-prevent>
                {artistData.imageUrl && (
                   <img src={artistData.imageUrl} alt={artistName} className={styles.modalImage} referrerPolicy="no-referrer" />
                )}

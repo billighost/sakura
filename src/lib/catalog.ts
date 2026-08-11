@@ -56,11 +56,11 @@ interface DzTrackLite {
   title: string;
   duration: number;
   rank?: number;
-  artist?: { id: number; name: string; picture_medium?: string };
+  artist?: { id: number; name: string; picture_medium?: string; picture_big?: string };
   album?: { id: number; title: string; cover_medium?: string; cover_big?: string };
 }
 
-interface DzArtistLite {
+export interface DzArtistLite {
   id: number;
   name: string;
   picture_medium?: string;
@@ -148,7 +148,16 @@ const DEEZER_GENRE_IDS: Record<string, number> = {
   'k-pop': 2226,
 };
 
-/** Artists that define a genre, per the provider's own ranking. */
+/**
+ * Artists that define a genre, per the provider's own ranking.
+ *
+ * ⚠ The provider no longer honours the genre id on `/genre/<id>/artists`, so
+ * what this actually returns is a geo-localised popular-artist list that is the
+ * same for every genre — see the analysis on `getGenreSeedArtists` below, which
+ * is the working implementation. Still wired into `buildCandidatePool`; the
+ * switch-over is a recommender change rather than a drop-in, because pool size
+ * and provider call volume both shift with it.
+ */
 export async function getGenreArtists(genre: string, limit = 25): Promise<DzArtistLite[]> {
   const g = genre.toLowerCase().trim();
   const genreId = DEEZER_GENRE_IDS[g];
@@ -176,6 +185,172 @@ export async function getGenreArtists(genre: string, limit = 25): Promise<DzArti
     )) ?? []
   );
 }
+
+// ── Genre → artists, via playlists ──────────────────────────────────────────
+
+/**
+ * Extra spelling variants for matching a genre against a playlist *title*.
+ *
+ * The general mechanism is `squash()` — strip everything but letters and digits
+ * from both sides and test for a substring, which already handles the common
+ * cases ("lo-fi" matches "chill lofi", "k-pop" matches "Top K-Pop", "drum &
+ * bass" matches "Drum & Bass"). This table exists only for the handful where
+ * squashing isn't enough, e.g. "rnb" never appears literally in "R&B Hits",
+ * which squashes to "rbhits".
+ *
+ * Deliberately *not* imported from `lib/genres.ts`: that module pulls in React
+ * icon components, and this one runs in API routes and background jobs. These
+ * are provider query-shaping terms, which is the same thing DEEZER_GENRE_IDS
+ * above already is.
+ */
+const GENRE_TITLE_VARIANTS: Record<string, string[]> = {
+  rnb: ['rnb', 'rb', 'rhythmandblues'],
+  edm: ['edm', 'dance', 'electrodance'],
+  'hip-hop': ['hiphop', 'rap'],
+  'drum & bass': ['drumbass', 'dnb'],
+  'k-pop': ['kpop'],
+  'lo-fi': ['lofi'],
+  afrobeats: ['afrobeats', 'afrobeat', 'afropop'],
+  amapiano: ['amapiano', 'piano'],
+  electronic: ['electronic', 'electro'],
+  alternative: ['alternative', 'altrock'],
+};
+
+/** How many on-topic playlists to aggregate. Enough to let agreement emerge. */
+const MAX_GENRE_PLAYLISTS = 4;
+
+function squash(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+interface DzPlaylistLite {
+  id: number;
+  title?: string;
+  nb_tracks?: number;
+}
+
+/**
+ * Artists that actually represent a genre.
+ *
+ * ── Why this doesn't use `/genre/<id>/artists` ──────────────────────────────
+ *
+ * Because that endpoint does not work. Verified against the live API: it
+ * returns the *same* geo-localised popular-artist list for every genre id —
+ * pop, metal, classical and jazz all come back with the identical set — and it
+ * ignores `limit` too. `/chart/<id>/artists` behaves the same way. Whatever
+ * those endpoints did once, today the genre id is not honoured.
+ *
+ * The old search fallback is no better: `/search/artist?q=metal` matches on
+ * artist *name*, so it returns acts called "Metal!", "Metal & Beats" and
+ * "M.E.T.A.L." rather than metal artists.
+ *
+ * Two of the ids in DEEZER_GENRE_IDS are also wrong on their own terms —
+ * `/genre` lists only 22 top-level genres, and 2228 (afrobeats/amapiano) and
+ * 2226 (k-pop) aren't among them, while id 2 is "African Music" rather than
+ * Country.
+ *
+ * ── What works instead ─────────────────────────────────────────────────────
+ *
+ * Playlists. `/search/playlist?q=amapiano` finds playlists whose curators have
+ * already done the genre classification, and a playlist's tracks carry full
+ * artist objects — including images, so the picker needs no extra calls.
+ *
+ * Two filters make it accurate rather than merely plausible:
+ *
+ *   1. Only keep playlists whose *title* names the genre. Searching "amapiano"
+ *      also returns "Afro House", and "lo-fi" returns "Chill Out Musik"; both
+ *      drag in artists from an adjacent genre.
+ *   2. Rank artists by how many of those playlists they appear in, not by
+ *      position. One curator slipping Tame Impala into a K-pop playlist is
+ *      noise; an artist three separate curators filed under the genre is a real
+ *      signal. This is what turns a plausible list into a correct one.
+ *
+ * Costs one search plus up to four playlist reads per genre, cached for
+ * TTL.EXT_GENRE_POOL with a stale fallback, and keyed on the genre alone — so
+ * the popular genres are essentially always warm across all users.
+ */
+export async function getGenreSeedArtists(
+  genre: string,
+  limit = 20,
+): Promise<DzArtistLite[]> {
+  const g = genre.toLowerCase().trim();
+
+  return (
+    (await cachedWithStale(
+      cacheKey('ext', 'dz', 'genreseeds', g, limit),
+      TTL.EXT_GENRE_POOL,
+      async () => {
+        const found = await dz<{ data: DzPlaylistLite[] }>(
+          `/search/playlist?q=${encodeURIComponent(g)}&limit=12`,
+          'genre.playlistSearch',
+        );
+
+        const terms = GENRE_TITLE_VARIANTS[g] ?? [squash(g)];
+        const onTopic = (found?.data ?? [])
+          .filter((p) => {
+            const t = squash(p.title ?? '');
+            return t && terms.some((term) => term && t.includes(term));
+          })
+          .slice(0, MAX_GENRE_PLAYLISTS);
+
+        if (onTopic.length === 0) return null;
+
+        const lists = await Promise.all(
+          onTopic.map((p) =>
+            dz<{ data: DzTrackLite[] }>(
+              `/playlist/${p.id}/tracks?limit=100`,
+              'genre.playlistTracks',
+            ),
+          ),
+        );
+
+        /*
+         * `lists` counts distinct playlists the artist appeared in — the
+         * cross-curator agreement that does the real filtering. `tracks` only
+         * breaks ties within the same agreement level.
+         */
+        const ranked = new Map<
+          number,
+          { artist: DzArtistLite; lists: number; tracks: number }
+        >();
+
+        for (const list of lists) {
+          const seenHere = new Set<number>();
+          for (const t of list?.data ?? []) {
+            const a = t?.artist;
+            if (!a?.id || !a.name) continue;
+
+            const entry = ranked.get(a.id) ?? {
+              artist: {
+                id: a.id,
+                name: a.name,
+                picture_medium: a.picture_medium,
+                picture_big: a.picture_big,
+              },
+              lists: 0,
+              tracks: 0,
+            };
+            entry.tracks += 1;
+            if (!seenHere.has(a.id)) {
+              seenHere.add(a.id);
+              entry.lists += 1;
+            }
+            ranked.set(a.id, entry);
+          }
+        }
+
+        if (ranked.size === 0) return null;
+
+        return Array.from(ranked.values())
+          .sort((a, b) => b.lists - a.lists || b.tracks - a.tracks)
+          .slice(0, limit)
+          .map((e) => e.artist);
+      },
+      { label: `catalog.genreSeeds:${g}` },
+    )) ?? []
+  );
+}
+
 
 /** An artist's best-known tracks — the workhorse for mix and radio pools. */
 export async function getArtistTopTracks(

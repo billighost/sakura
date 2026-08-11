@@ -440,7 +440,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         </button>
       </div>
 
-      <div ref={scrollContainerRef} className={styles.scrollContainer}>
+      <div ref={scrollContainerRef} className={styles.scrollContainer} data-lenis-prevent>
         <div className={styles.mainContent}>
           <div className={styles.artContainer}>
             <div

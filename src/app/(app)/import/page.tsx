@@ -376,7 +376,7 @@ export default function ImportPage() {
             </div>
           )}
 
-          <div className={styles.trackList}>
+          <div className={styles.trackList} data-lenis-prevent>
             {tracks.map((track, i) => (
               <div
                 key={i}

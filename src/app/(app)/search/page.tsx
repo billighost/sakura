@@ -414,7 +414,7 @@ export default function SearchPage() {
   const showPlaylists = tab === "all" || tab === "playlists";
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-page-scroll>
       <div className={styles.topRow}>
         <div className={styles.searchBox}>
           <span className={styles.searchIcon}>

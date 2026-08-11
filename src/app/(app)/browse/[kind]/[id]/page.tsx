@@ -124,7 +124,7 @@ export default function ExternalPage({
   }));
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-page-scroll>
       <header className={styles.hero}>
         {/* Reachable from search and from external links, so back needs a
             destination when there's no history to pop. */}

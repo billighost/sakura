@@ -5,7 +5,7 @@ import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 import { normaliseGenre } from "@/lib/taste";
 
 /**
- * Choices for the onboarding picker.
+ * Genres for the onboarding picker.
  *
  * Genres come from a curated list rather than straight from the catalogue:
  * raw genre tags are messy, long-tailed and full of near-duplicates, which
@@ -14,8 +14,12 @@ import { normaliseGenre } from "@/lib/taste";
  * genre with nothing behind it — except when the catalogue is too small to
  * fill a screen, where showing the full list is better than showing three.
  *
- * Artists come from the catalogue, ranked by real popularity, with a Deezer
- * top-up so a fresh install still presents recognisable names.
+ * Artists are deliberately *not* here. They used to be selected from
+ * `Artist JOIN Track`, which meant "artists we happen to have downloaded" — a
+ * near-empty grid on a young install, and unrelated to the genres the user had
+ * just picked. Step two now asks `/api/taste/artists` with those genres and
+ * gets them from the provider instead. That also takes an aggregate over
+ * ListeningHistory off the onboarding critical path.
  *
  * Each genre carries an `icon` key, not an emoji. Emoji render differently on
  * every platform, can't be themed, can't be animated, and are the single
@@ -62,30 +66,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const key = cacheKey("onboarding-seeds", "v1");
+  const key = cacheKey("onboarding-seeds", "v2");
   const cached = await cacheGet(key);
   if (cached) return NextResponse.json(cached);
 
-  const [catalogueGenres, artists] = await Promise.all([
-    query<{ genre: string }>(
-      `SELECT DISTINCT unnest(genres) AS genre FROM "Artist"
-       WHERE genres IS NOT NULL AND array_length(genres, 1) > 0
-       UNION
-       SELECT DISTINCT genre FROM "Track" WHERE genre IS NOT NULL AND genre <> ''`
-    ).catch(() => []),
-    query<{ id: string; name: string; imageUrl: string | null; trackCount: number; plays: number; genres: string[] | null }>(
-      `SELECT a.id, a.name, a."imageUrl", a.genres,
-              COUNT(DISTINCT t.id)::int AS "trackCount",
-              COALESCE(COUNT(h.id), 0)::int AS plays
-       FROM "Artist" a
-       JOIN "Track" t ON t."artistId" = a.id
-       LEFT JOIN "ListeningHistory" h ON h."trackId" = t.id
-       GROUP BY a.id, a.name, a."imageUrl", a.genres
-       HAVING COUNT(DISTINCT t.id) > 0
-       ORDER BY plays DESC, "trackCount" DESC
-       LIMIT 60`
-    ).catch(() => []),
-  ]);
+  const catalogueGenres = await query<{ genre: string }>(
+    `SELECT DISTINCT unnest(genres) AS genre FROM "Artist"
+     WHERE genres IS NOT NULL AND array_length(genres, 1) > 0
+     UNION
+     SELECT DISTINCT genre FROM "Track" WHERE genre IS NOT NULL AND genre <> ''`
+  ).catch(() => []);
 
   const available = new Set(
     catalogueGenres.map((g) => normaliseGenre(g.genre)).filter(Boolean) as string[]
@@ -101,15 +91,6 @@ export async function GET() {
 
   const result = {
     genres: genres.length >= 6 ? genres : CURATED_GENRES,
-    artists: artists.map((a) => ({
-      id: a.id,
-      name: a.name,
-      imageUrl: a.imageUrl,
-      trackCount: a.trackCount,
-      // Normalised so the client can match them against picked genre ids
-      // without duplicating the alias table.
-      genres: (a.genres ?? []).map(normaliseGenre).filter(Boolean) as string[],
-    })),
   };
 
   await cacheSet(key, result, 600);

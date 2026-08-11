@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
@@ -9,8 +9,8 @@ import styles from "./page.module.css";
  *
  * Three short steps, in deliberate order:
  *   1. Genres  — broad, fast, and something everyone can answer.
- *   2. Artists — narrower, and filtered by the genres just chosen so the grid
- *                is relevant rather than a wall of random names.
+ *   2. Artists — fetched *for* the genres just chosen, from the provider rather
+ *                than our own catalogue. See `/api/taste/artists` for why.
  *   3. Discovery — one slider, because "how adventurous are you" is genuinely
  *                  useful for scoring and can't be inferred on day one.
  *
@@ -19,7 +19,13 @@ import styles from "./page.module.css";
  */
 
 type Genre = { id: string; label: string; emoji: string };
-type Artist = { id: string; name: string; imageUrl: string | null; trackCount: number; genres: string[] };
+type Artist = {
+  id: string;
+  deezerId: number;
+  name: string;
+  imageUrl: string | null;
+  genres: string[];
+};
 
 const MIN_GENRES = 3;
 
@@ -32,16 +38,14 @@ export default function OnboardingPage() {
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set());
   const [discovery, setDiscovery] = useState(0.35);
   const [loading, setLoading] = useState(true);
+  const [loadingArtists, setLoadingArtists] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/taste/seeds")
       .then((r) => r.json())
-      .then((data) => {
-        setGenres(data.genres ?? []);
-        setArtists(data.artists ?? []);
-      })
+      .then((data) => setGenres(data.genres ?? []))
       .catch(() => setError("Couldn't load choices. You can skip this for now."))
       .finally(() => setLoading(false));
   }, []);
@@ -62,16 +66,77 @@ export default function OnboardingPage() {
     });
   }, []);
 
+  /*
+   * Artists depend on the genre picks, so they can't be fetched up front with
+   * the genres. Keyed by the sorted genre list: going back to step 1, changing
+   * nothing and continuing again shouldn't re-fetch, but changing a genre
+   * should.
+   */
+  const artistsKey = useRef<string>("");
+
+  const loadArtists = useCallback(async (picked: Set<string>) => {
+    const key = Array.from(picked).sort().join(",");
+    if (!key || key === artistsKey.current) return;
+    artistsKey.current = key;
+
+    setLoadingArtists(true);
+    try {
+      const res = await fetch("/api/taste/artists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ genres: Array.from(picked) }),
+      });
+      const data = await res.json();
+      const next: Artist[] = Array.isArray(data.artists) ? data.artists : [];
+      setArtists(next);
+      // Drop picks that are no longer on offer after a genre change, so a
+      // hidden selection can't be submitted.
+      setSelectedArtists((prev) => {
+        const ids = new Set(next.map((a) => a.id));
+        return new Set(Array.from(prev).filter((id) => ids.has(id)));
+      });
+    } catch {
+      // Leave the grid empty — step 2 is optional and has an empty state. The
+      // key is deliberately left set so a retry happens on the next change
+      // rather than on every render.
+      setArtists([]);
+    } finally {
+      setLoadingArtists(false);
+    }
+  }, []);
+
+  /*
+   * Warm the fetch as soon as the picks are valid, so Continue usually lands on
+   * a populated grid. `loadArtists` no-ops when the genre set hasn't changed, so
+   * this costs one request per distinct selection rather than one per toggle.
+   */
+  useEffect(() => {
+    if (step !== 0 || selectedGenres.size < MIN_GENRES) return;
+    const t = setTimeout(() => loadArtists(selectedGenres), 400);
+    return () => clearTimeout(t);
+  }, [step, selectedGenres, loadArtists]);
+
   async function submit(skipped = false) {
     setSubmitting(true);
     setError(null);
     try {
+      // Names travel with the ids: these artists don't exist in our DB yet, so
+      // the server upserts them by name and can't resolve a `deezer-` id alone.
+      const picked = artists.filter((a) => selectedArtists.has(a.id));
+
       const res = await fetch("/api/taste", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           genres: skipped ? [] : Array.from(selectedGenres),
-          artistIds: skipped ? [] : Array.from(selectedArtists),
+          artists: skipped
+            ? []
+            : picked.map((a) => ({
+                name: a.name,
+                deezerId: a.deezerId,
+                imageUrl: a.imageUrl,
+                genres: a.genres,
+              })),
           discovery: skipped ? 0.35 : discovery,
           // A skip still marks them onboarded — otherwise they'd be asked
           // again on every visit, which is worse than a cold-start profile.
@@ -110,18 +175,6 @@ export default function OnboardingPage() {
     }
   }
 
-  // Artists matching the chosen genres float to the top, so step 2 visibly
-  // responds to step 1. Non-matching artists stay in the list rather than
-  // being filtered out — a sparse catalogue would otherwise show an empty grid.
-  const sortedArtists = useMemo(() => {
-    if (selectedGenres.size === 0) return artists;
-    return [...artists].sort((a, b) => {
-      const aMatch = a.genres?.some((g) => selectedGenres.has(g)) ? 1 : 0;
-      const bMatch = b.genres?.some((g) => selectedGenres.has(g)) ? 1 : 0;
-      return bMatch - aMatch;
-    });
-  }, [artists, selectedGenres]);
-
   return (
     <div className={styles.container}>
       <div className={styles.bloom} aria-hidden="true" />
@@ -139,13 +192,13 @@ export default function OnboardingPage() {
             </p>
 
             {loading ? (
-              <div className={styles.grid}>
+              <div className={styles.grid} data-lenis-prevent>
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i} className={`${styles.chip} skeleton`} style={{ height: "3rem" }} />
                 ))}
               </div>
             ) : (
-              <div className={styles.grid}>
+              <div className={styles.grid} data-lenis-prevent>
                 {genres.map((g) => (
                   <button
                     key={g.id}
@@ -168,7 +221,12 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 className={styles.primary}
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  // Usually already warmed by the prefetch effect; this covers
+                  // the case where Continue is hit inside the debounce window.
+                  loadArtists(selectedGenres);
+                  setStep(1);
+                }}
                 disabled={selectedGenres.size < MIN_GENRES}
               >
                 {selectedGenres.size < MIN_GENRES
@@ -186,38 +244,52 @@ export default function OnboardingPage() {
               Optional — but picking a few gives your first mixes a real head start.
             </p>
 
-            <div className={styles.artistGrid}>
-              {sortedArtists.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  className={`${styles.artistCard} ${selectedArtists.has(a.id) ? styles.artistActive : ""}`}
-                  onClick={() => toggleArtist(a.id)}
-                  aria-pressed={selectedArtists.has(a.id)}
-                >
-                  <div className={styles.artistAvatarWrap}>
-                    {a.imageUrl ? (
-                      <img src={a.imageUrl} alt="" className={styles.artistAvatar} />
-                    ) : (
-                      <div className={styles.artistFallback}>{a.name.slice(0, 1).toUpperCase()}</div>
-                    )}
-                    {selectedArtists.has(a.id) && (
-                      <span className={styles.check} aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </span>
-                    )}
+            {loadingArtists ? (
+              <div className={styles.artistGrid} data-lenis-prevent>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className={styles.artistCard}>
+                    <div className={styles.artistAvatarWrap}>
+                      <div className={`${styles.artistAvatar} skeleton`} />
+                    </div>
+                    <span className={`${styles.artistName} skeleton`}>&nbsp;</span>
                   </div>
-                  <span className={styles.artistName}>{a.name}</span>
-                </button>
-              ))}
-              {sortedArtists.length === 0 && !loading && (
-                <p className={styles.empty}>
-                  Your library is still filling up — we'll learn from what you play instead.
-                </p>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.artistGrid} data-lenis-prevent>
+                {artists.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={`${styles.artistCard} ${selectedArtists.has(a.id) ? styles.artistActive : ""}`}
+                    onClick={() => toggleArtist(a.id)}
+                    aria-pressed={selectedArtists.has(a.id)}
+                  >
+                    <div className={styles.artistAvatarWrap}>
+                      {a.imageUrl ? (
+                        <img src={a.imageUrl} alt="" className={styles.artistAvatar} referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className={styles.artistFallback}>{a.name.slice(0, 1).toUpperCase()}</div>
+                      )}
+                      {selectedArtists.has(a.id) && (
+                        <span className={styles.check} aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    <span className={styles.artistName}>{a.name}</span>
+                  </button>
+                ))}
+                {artists.length === 0 && (
+                  <p className={styles.empty}>
+                    Couldn’t reach our music source just now — we’ll learn from what
+                    you play instead.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className={styles.actions}>
               <button type="button" className={styles.skip} onClick={() => setStep(0)}>
