@@ -347,7 +347,47 @@ export class TelegramClient {
 
         const botEntity = await this.client.getEntity(this.botUsername);
 
+        /*
+         * Fast path: the bot may already have this exact song sitting in its
+         * recent history, in which case we can skip the whole search-and-select
+         * round trip and reuse that message.
+         *
+         * The matching here has to be strict, because this history is *shared* —
+         * one bot serves every user, so the last 15 messages are whatever anyone
+         * happened to download. A loose match doesn't just miss the fast path,
+         * it silently serves somebody else's song.
+         *
+         * It previously OR'd three conditions, and each was wrong on its own:
+         *   - `wanted.includes(got)` matched a history entry titled "Die"
+         *     against a request for "Born to Die";
+         *   - the artist branch stood alone, so *any* Kelly Clarkson track
+         *     satisfied a request for any other Kelly Clarkson track;
+         *   - nothing ever required the artist to agree, which is how a request
+         *     for Kelly Clarkson's "Born to Die" was answered with Lana Del
+         *     Rey's.
+         *
+         * Now both title and artist must agree. When we know the artist but the
+         * Telegram attribute doesn't carry a performer, the match is refused —
+         * an unverifiable hit is worth less than the search it would skip.
+         */
         if (expectedTitle) {
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+          /**
+           * Containment is allowed because the bot's copy often carries an extra
+           * tag ("(2012 Remaster)"), but the shorter side must be most of the
+           * longer one — that's what stops a three-letter title matching.
+           */
+          const closeEnough = (a: string, b: string) => {
+            if (!a || !b) return false;
+            if (a === b) return true;
+            if (!a.includes(b) && !b.includes(a)) return false;
+            return Math.min(a.length, b.length) / Math.max(a.length, b.length) >= 0.6;
+          };
+
+          const wantTitle = norm(expectedTitle);
+          const wantArtist = expectedArtist ? norm(expectedArtist) : "";
+
           const recent = await this.client.getMessages(botEntity, { limit: 15 });
           for (const msg of recent) {
             if (msg.media && "document" in msg.media) {
@@ -355,10 +395,23 @@ export class TelegramClient {
               if (doc instanceof Api.Document) {
                 const audioAttr = doc.attributes.find((a) => a instanceof Api.DocumentAttributeAudio) as Api.DocumentAttributeAudio | undefined;
                 if (audioAttr && audioAttr.title) {
-                  const cleanExpected = expectedTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const cleanActual = audioAttr.title.toLowerCase().replace(/[^a-z0-9]/g, '');
-                  if (cleanActual.includes(cleanExpected) || cleanExpected.includes(cleanActual) || (expectedArtist && audioAttr.performer?.toLowerCase().includes(expectedArtist.toLowerCase()))) {
-                    console.log(`[Telegram AutoDownload] FAST PATH: Found matching audio "${audioAttr.title}" in recent history for query "${query}"!`);
+                  const gotTitle = norm(audioAttr.title);
+                  const gotArtist = audioAttr.performer ? norm(audioAttr.performer) : "";
+
+                  // Four characters is the floor for a meaningful title compare.
+                  const titleOk =
+                    wantTitle.length >= 4 &&
+                    gotTitle.length >= 4 &&
+                    closeEnough(gotTitle, wantTitle);
+
+                  const artistOk = wantArtist
+                    ? gotArtist !== "" && closeEnough(gotArtist, wantArtist)
+                    : true;
+
+                  if (titleOk && artistOk) {
+                    console.log(
+                      `[Telegram AutoDownload] FAST PATH: reusing "${audioAttr.performer ?? "?"} - ${audioAttr.title}" from recent history for "${query}"`,
+                    );
                     return {
                       messageId: msg.id,
                       title: audioAttr.title,
