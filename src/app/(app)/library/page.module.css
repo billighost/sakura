@@ -1,599 +1,243 @@
+/* Your Library.
+ *
+ * Search, sort and filter chips come from CollectionControls.module.css; grid
+ * cards come from MediaCard.module.css; the empty state from
+ * CollectionHero.module.css. What's left is the page frame, the two pinned
+ * tiles, and the list-view row. */
+
 .page {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  padding-bottom: calc(var(--bottom-chrome) + var(--space-5));
 }
 
-/* ---------- Header ---------- */
-
-/*
- * Title, layout and back behaviour now come from the shared PageHeader; what
- * used to be `.header`/`.title`/`.headerActions` here is gone. The action
- * buttons below are still local because they are library-specific controls
- * (new playlist, search toggle, list/grid switch) passed in as `actions`.
- */
-
 .iconBtn {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2.25rem, 6vw, 2.5rem);
-  height: clamp(2.25rem, 6vw, 2.5rem);
-  border-radius: 10px;
-  color: var(--sakura-text-secondary);
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, transform 0.15s;
 }
 
-.iconBtn:hover {
-  color: var(--sakura-text);
-  background: var(--sakura-hover);
+@media (hover: hover) and (pointer: fine) {
+  .iconBtn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 
-.iconBtn:active {
-  transform: scale(0.92);
+/* ── Pinned ───────────────────────────────────────────────────────────────
+ *
+ * Liked and Downloaded aren't library rows — they're always present and always
+ * in the same place, so they sit above the filtered list rather than inside
+ * it, and they disappear the moment a filter or search would exclude them. */
+
+.pinned {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3) var(--gutter) 0;
 }
 
-.iconBtnActive {
-  color: var(--sakura-accent);
-  background: var(--sakura-active);
-}
-
-/* ---------- Search ---------- */
-
-.searchBar {
+.pin {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  /* Rendered inside PageHeader's `extras` slot now, which already supplies the
-   * gutter and the top margin — hence no width/margin juggling here. */
-  width: 100%;
-  padding: 0.7rem 0.9rem;
+  gap: var(--space-3);
+  min-height: 3.75rem;
+  padding: var(--space-2) var(--space-3);
   background: var(--surface-2);
-  border-radius: var(--r-md);
   border: 1px solid var(--line);
-  animation: searchSlideIn 0.2s ease-out;
+  border-radius: var(--r-md);
+  color: var(--text);
+  text-decoration: none;
 }
 
-@keyframes searchSlideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.searchBar svg {
-  color: var(--sakura-text-secondary);
+.pinIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-sm);
 }
 
-.searchInput {
-  all: unset;
-  flex: 1;
-  font-size: 0.9375rem;
-  color: var(--sakura-text);
+.pinLiked {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pinDownloaded {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pinText {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
-.searchInput::placeholder {
-  color: var(--sakura-text-secondary);
-  opacity: 0.6;
-}
-
-.searchClear {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  flex-shrink: 0;
-}
-
-.searchClear:hover {
-  color: var(--sakura-text);
-  background: var(--sakura-hover);
-}
-
-/* ---------- Filter chips ---------- */
-
-.filterRow {
-  display: flex;
-  gap: 0.5rem;
-  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem);
-  max-width: 72rem;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.filterRow::-webkit-scrollbar {
-  display: none;
-}
-
-.filterChip {
-  all: unset;
-  flex-shrink: 0;
-  height: 2rem;
-  padding: 0 1rem;
-  border: 1.5px solid var(--sakura-border);
-  background: transparent;
-  color: var(--sakura-text-secondary);
-  border-radius: 9999px;
-  font-size: 0.8125rem;
+.pinTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
+  letter-spacing: var(--track-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.filterChipActive {
-  background: var(--sakura-text);
-  border-color: var(--sakura-text);
-  color: var(--sakura-bg);
+.pinSub {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.filterChip:not(.filterChipActive):hover {
-  border-color: var(--sakura-text-secondary);
-  color: var(--sakura-text);
-}
+/* ── List header ─────────────────────────────────────────────────────────── */
 
-/* ---------- Content ---------- */
-
-.content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-behavior: smooth;
-}
-
-.contentInner {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 0 clamp(1rem, 3vw, 1.5rem) 6rem;
-}
-
-.refreshIndicator {
+.listHeader {
   display: flex;
-  justify-content: center;
-  padding: 0.75rem 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--gutter) var(--space-3);
 }
 
-.refreshSpinner {
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2px solid var(--sakura-border);
-  border-top-color: var(--sakura-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.listCount {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Pinned quick access ---------- */
+/* ── Grid ────────────────────────────────────────────────────────────────── */
 
-.pinnedGrid {
+.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 0.625rem;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: var(--space-5) var(--space-3);
+  padding: 0 var(--gutter);
 }
 
-.pinnedCard {
-  all: unset;
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.625rem;
-  cursor: pointer;
-  border-radius: 12px;
-  background: var(--sakura-card-bg);
-  border: 1px solid var(--sakura-card-border);
-  transition: background 0.15s, transform 0.15s, border-color 0.15s;
-  box-sizing: border-box;
+.grid > * {
+  width: 100%;
 }
 
-.pinnedCard:hover {
-  background: var(--sakura-hover);
-  border-color: var(--sakura-text-secondary);
-}
-
-.pinnedCard:active {
-  transform: scale(0.99);
-}
-
-.pinnedArt {
-  width: 3.25rem;
-  height: 3.25rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.pinnedArtLiked {
-  background: var(--accent);
-}
-
-.pinnedArtDownloaded {
-  background: var(--accent);
-}
-
-.pinnedTitle {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--sakura-text);
-}
-
-.pinnedSubtitle {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 2px;
-}
-
-/* ---------- Section ---------- */
-
-.sectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.sectionTitle {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--sakura-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.sortWrapper {
-  position: relative;
-}
-
-.sortBtn {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-}
-
-.sortBtn:hover {
-  color: var(--sakura-text);
-  background: var(--sakura-hover);
-}
-
-.sortBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-}
-
-.sortDropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: var(--sakura-glass-strong);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--sakura-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px var(--sakura-shadow);
-  z-index: 11;
-  padding: 0.3125rem;
-  min-width: 9.5rem;
-  display: flex;
-  flex-direction: column;
-  animation: dropdownIn 0.15s ease-out;
-}
-
-@keyframes dropdownIn {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.sortOption {
-  all: unset;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--sakura-text);
-}
-
-.sortOption:hover {
-  background: var(--sakura-hover);
-}
-
-.sortOptionActive {
-  color: var(--sakura-accent);
-  font-weight: 700;
-}
-
-/* ---------- List view ---------- */
+/* ── List ────────────────────────────────────────────────────────────────── */
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  padding: 0 var(--gutter);
 }
 
-.listItem {
-  all: unset;
+.row {
   display: flex;
   align-items: center;
-  gap: clamp(0.75rem, 3vw, 1rem);
-  padding: 0.5rem;
-  cursor: pointer;
-  border-radius: 10px;
-  transition: background 0.15s;
-  box-sizing: border-box;
+  gap: var(--space-3);
+  min-height: 3.75rem;
+  padding: var(--space-2) var(--space-2);
+  margin: 0 calc(var(--space-2) * -1);
+  border-radius: var(--r-md);
+  color: inherit;
+  text-decoration: none;
 }
 
-.listItem:hover {
-  background: var(--sakura-hover);
-}
-
-.listItemArt {
-  width: clamp(3rem, 10vw, 3.5rem);
-  height: clamp(3rem, 10vw, 3.5rem);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--sakura-surface-2);
+.rowArt {
+  position: relative;
   flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
 }
 
-.listItemArtCircle {
-  border-radius: 50%;
+.rowArtRound {
+  border-radius: var(--r-full);
 }
 
-.listItemArtImg {
+.rowArt img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.listItemArtPlaceholder {
-  width: 100%;
-  height: 100%;
+.rowFallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
-  background: var(--accent);
-  color: var(--sakura-text-secondary);
+  width: 100%;
+  height: 100%;
+  color: var(--text-3);
 }
 
-.listItemInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.listItemTitle {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--sakura-text);
-}
-
-.listItemSubtitle {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-}
-
-.typeBadge {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-/* ---------- Grid view ---------- */
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(8rem, 22vw, 10.5rem), 1fr));
-  gap: clamp(0.875rem, 2.5vw, 1.25rem);
-}
-
-.gridItem {
-  all: unset;
+.rowText {
   display: flex;
   flex-direction: column;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: transform 0.15s;
-  box-sizing: border-box;
+  min-width: 0;
+  gap: 1px;
 }
 
-.gridItem:hover {
-  transform: translateY(-3px);
+.rowTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.gridItem:hover .gridItemArt {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+.rowSub {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.gridItemArt {
+@media (hover: hover) and (pointer: fine) {
+  .row:hover,
+  .pin:hover {
+    background: var(--surface-2);
+  }
+
+  .pin:hover {
+    background: var(--surface-3);
+  }
+}
+
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
+
+.skeletonArt {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 10px;
-  margin-bottom: 0.625rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  background: var(--sakura-surface-2);
-  position: relative;
-  transition: box-shadow 0.2s;
-}
-
-.gridItemArtCircle {
-  border-radius: 50%;
-}
-
-.gridItemArtImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.gridItemArtPlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  background: var(--accent);
-  color: var(--sakura-text-secondary);
-}
-
-.gridItemTitle {
-  font-size: 0.8438rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--sakura-text);
-}
-
-.gridItemSubtitle {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 2px;
-}
-
-/* ---------- Empty state ---------- */
-
-.emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(3rem, 12vh, 5rem) 1rem;
-  text-align: center;
-}
-
-.emptyIllustration {
-  margin-bottom: 1.25rem;
-  opacity: 0.9;
-}
-
-.emptyTitle {
-  font-family: var(--sakura-font-display);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--sakura-text);
-  margin-bottom: 0.5rem;
-}
-
-.emptyDesc {
-  font-size: 0.875rem;
-  color: var(--sakura-text-secondary);
-  max-width: 20rem;
-  line-height: 1.55;
-  margin-bottom: 1.25rem;
-}
-
-.emptyCta {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.625rem 1.375rem;
-  background: var(--sakura-accent);
-  color: white;
-  font-size: 0.8438rem;
-  font-weight: 700;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.emptyCta:hover {
-  filter: brightness(1.08);
-  transform: scale(1.02);
-}
-
-/* ---------- Skeletons ---------- */
-
-.skeletonRow {
-  display: flex;
-  align-items: center;
-  gap: clamp(0.75rem, 3vw, 1rem);
-  padding: 0.5rem;
-}
-
-.skeletonThumb {
-  width: clamp(3rem, 10vw, 3.5rem);
-  height: clamp(3rem, 10vw, 3.5rem);
-  border-radius: 8px;
-  background: var(--sakura-skeleton);
-  animation: shimmer-op 1.5s infinite;
-  flex-shrink: 0;
-}
-
-.skeletonInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+  border-radius: var(--r-md);
+  margin-bottom: var(--space-2);
 }
 
 .skeletonLine {
-  height: 0.875rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  animation: shimmer-op 1.5s infinite;
-}
-
-.skeletonLineSecondary {
+  width: 75%;
   height: 0.75rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  animation: shimmer-op 1.5s infinite;
-  opacity: 0.6;
+  border-radius: var(--r-xs);
+  margin-bottom: var(--space-2);
 }
 
-@keyframes shimmer-op {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.noResults {
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--sakura-text-secondary);
-  font-size: 0.9375rem;
+.skeletonLineShort {
+  width: 45%;
+  height: 0.65rem;
+  border-radius: var(--r-xs);
 }

@@ -44,13 +44,25 @@ import {
  * ── What it does not claim ───────────────────────────────────────────────────
  *
  * Accuracy differs by script and the UI says so. Cyrillic, Greek, Hangul and
- * kana are deterministic and effectively exact. Han readings are
- * context-free — 行 is "xing" or "hang" depending on the word, and without
- * morphological analysis we take the most frequent. Arabic and Hebrew are
- * written without most vowels, so a consonantal skeleton is the honest ceiling.
- * Thai is not attempted: its vowels are written before, after, above and below
- * the consonant they follow in speech, and a wrong answer that looks confident
- * is worse than saying we can't.
+ * kana are deterministic and effectively exact — Hangul including the liaison
+ * rules that make 한국어 "hangugeo" rather than "hangukeo".
+ *
+ * Han readings are the weak point, because they are genuinely contextual and
+ * a per-character table cannot see context. Chinese takes the most frequent
+ * Mandarin reading, which is wrong for the minority of characters that change
+ * by word: 乐 is "lè" alone and "yuè" in 音乐 (music), and only the first is
+ * available here. Japanese picks between on'yomi and kun'yomi using the kana
+ * that follow — okurigana, particles, and the する-verb construction — which
+ * handles the common cases but is not a morphological analyser and will
+ * mis-read unusual compounds.
+ *
+ * Arabic and Hebrew are written without most vowels, so a consonantal skeleton
+ * is the honest ceiling. Thai is not attempted: its vowels are written before,
+ * after, above and below the consonant they follow in speech, and a confident
+ * wrong answer is worse than saying we can't.
+ *
+ * `scripts/check-transliteration.ts` exercises all of the above against known
+ * strings; run it after touching anything here.
  */
 
 export type TransliterationScript =
@@ -145,40 +157,38 @@ function buildHanMap(readings: string): Map<string, string> {
 /**
  * Reading for one Han character.
  *
- * Japanese has two readings per character and which is right depends on the
- * word. The one signal available without a morphological analyser is
- * okurigana: kana directly after the kanji mean it stands as its own word and
- * takes the kun'yomi (駆ける → "kakeru"), while kana before it are particles
- * and a compound reading (on'yomi) applies (夜に → "yoru"). Anything else
- * defaults to on'yomi, which is correct more often than not.
+ * Chinese has one; Japanese defaults to on'yomi, which is what compounds use
+ * and therefore what most kanji in most text want. The kun'yomi path is
+ * handled by the caller, which has the surrounding kana needed to choose —
+ * see `hanKunReadings`.
  */
-function hanReading(
-  ch: string,
-  mode: "chinese" | "japanese",
-  nextIsKana: boolean
-): string | undefined {
+function hanReading(ch: string, mode: "chinese" | "japanese"): string | undefined {
   if (mode === "chinese") {
     hanMandarin ??= buildHanMap(HAN_MANDARIN);
     const reading = hanMandarin.get(ch);
     return reading ? stripToneMarks(reading) : undefined;
   }
 
-  if (nextIsKana) {
-    hanJapaneseKun ??= buildHanMap(HAN_JAPANESE_KUN);
-    const kun = hanJapaneseKun.get(ch);
-    if (kun) return kun;
-  }
-
   hanJapaneseOn ??= buildHanMap(HAN_JAPANESE_ON);
   const on = hanJapaneseOn.get(ch);
   if (on) return on;
 
-  // Unihan has no Japanese reading for some characters that still occur in
-  // Japanese text. A Mandarin reading is a poor substitute but closer than
-  // dropping the character and leaving a hole in the line.
+  // No on'yomi: fall back to the first kun reading, then to Mandarin. Unihan
+  // has no Japanese reading at all for some characters that still occur in
+  // Japanese text, and a Mandarin reading is closer than leaving a hole.
+  const kun = hanKunReadings(ch);
+  if (kun.length) return kun[0];
+
   hanMandarin ??= buildHanMap(HAN_MANDARIN);
   const fallback = hanMandarin.get(ch);
   return fallback ? stripToneMarks(fallback) : undefined;
+}
+
+/** Every kun'yomi candidate for a character, in Unihan's frequency order. */
+function hanKunReadings(ch: string): string[] {
+  hanJapaneseKun ??= buildHanMap(HAN_JAPANESE_KUN);
+  const packed = hanJapaneseKun.get(ch);
+  return packed ? packed.split(",").filter(Boolean) : [];
 }
 
 /* ── Cyrillic ─────────────────────────────────────────────────────────────── */
@@ -523,7 +533,7 @@ function romanizeHan(text: string, mode: "chinese" | "japanese"): string {
   // outside the BMP and a per-index loop splits them into broken surrogates.
   for (const ch of text) {
     // Chinese has one reading per character, so the okurigana signal is moot.
-    const reading = hanReading(ch, mode, false);
+    const reading = hanReading(ch, mode);
     if (reading) {
       // A space between readings — pinyin syllables are otherwise unreadable
       // run together, and this is the convention every pinyin renderer uses.
@@ -548,6 +558,16 @@ function isHiragana(ch: string | undefined): boolean {
   const code = ch.codePointAt(0)!;
   return code >= 0x3040 && code <= 0x309f;
 }
+
+/**
+ * Grammatical particles.
+ *
+ * A kanji directly before one of these is a standalone noun rather than a verb
+ * stem, which means it takes its kun reading: 夜に is "yo ni", not "ya ni".
+ * Only the single-kana particles are listed — they're the ones that can be
+ * mistaken for okurigana.
+ */
+const PARTICLES = new Set(["に", "は", "が", "を", "の", "と", "で", "も", "へ", "や", "ね", "よ"]);
 
 function romanizeJapanese(text: string): string {
   let out = "";
@@ -586,29 +606,98 @@ function romanizeJapanese(text: string): string {
       const nextCode = next?.codePointAt(0) ?? 0;
       const nextIsOkurigana = nextCode >= 0x3040 && nextCode <= 0x309f;
 
-      const reading = hanReading(ch, "japanese", nextIsOkurigana);
+      /*
+       * Pick a reading, and strip the okurigana the following kana will
+       * supply.
+       *
+       * Unihan's kun'yomi are dictionary forms with the okurigana included
+       * and no stem marker: 駆 is "KAKERU", of which only "ka" belongs to the
+       * kanji. A character usually has several, and which applies depends on
+       * the kana that follow — 好 is both KONOMU and SUKU, so 好き needs SUKU
+       * and 好む needs KONOMU.
+       *
+       * So the trailing kana are romanised first, then the candidate that ends
+       * with them wins and that suffix is removed. When nothing matches, the
+       * on'yomi is used: a kanji followed by kana is not always a kun word
+       * (愛してる is "ai shiteru" — on'yomi plus the verb する), and on'yomi is
+       * the better default for the leftovers.
+       */
+      let tail = "";
+      for (let j = i + 1; j < chars.length && isHiragana(chars[j]); j++) {
+        tail += chars[j];
+      }
+      const romanTail = tail ? romanizeKana(tail) : "";
+
+      let text = hanReading(ch, "japanese");
 
       /*
-       * Unihan's kun'yomi are dictionary forms with the okurigana included and
-       * no stem marker: 駆 is "KAKERU", of which only "ka" is the kanji and
-       * "keru" is the kana that follow it in the text. Those kana are about to
-       * be romanised from the text itself, so emitting the whole reading gives
-       * "kakerukeru".
+       * サ変 (suru-verb) conjugation. A kanji followed by し/す + an inflection
+       * is a noun with the verb する attached — 愛してる, 愛した, 愛します — and
+       * that construction always takes the *on'yomi* reading of the noun.
        *
-       * The fix is to romanise the okurigana first and drop that suffix from
-       * the reading when it matches. Where it doesn't match — a different
-       * inflection from the one Unihan lists — the full reading is kept, since
-       * a slightly long romanisation is better than a truncated guess.
+       * Checked before the kun matching below because the two collide: 愛's
+       * kun list contains ITOSHII, whose "sh" happily matches the し and yields
+       * "itoshiteru" instead of "ai shiteru". This is a real grammatical rule
+       * rather than a tiebreak, so it wins outright.
        */
-      let text = reading;
-      if (reading && nextIsOkurigana) {
-        let tail = "";
-        for (let j = i + 1; j < chars.length && isHiragana(chars[j]); j++) {
-          tail += chars[j];
+      const suruForm =
+        (tail.startsWith("し") && /^し[てたなまよ]/.test(tail)) || tail.startsWith("する");
+
+      if (romanTail && !suruForm) {
+        /*
+         * Exact match first: the candidate ends with exactly the kana that
+         * follow, so removing them leaves the stem. 駆ける vs KAKERU → "ka".
+         */
+        let matched = false;
+        for (const candidate of hanKunReadings(ch)) {
+          if (candidate.length > romanTail.length && candidate.endsWith(romanTail)) {
+            text = candidate.slice(0, -romanTail.length);
+            matched = true;
+            break;
+          }
         }
-        const romanTail = romanizeKana(tail);
-        if (romanTail && reading.endsWith(romanTail)) {
-          text = reading.slice(0, -romanTail.length);
+
+        /*
+         * Otherwise try the *inflected* case. Japanese verbs and adjectives
+         * change their ending, so the dictionary form Unihan lists rarely
+         * matches the text: 好き is the noun form of SUKU, and the two share
+         * only the consonant "s".
+         *
+         * Japanese inflection changes the vowel of the final mora while
+         * keeping its consonant — suku → suki → sukanai. So the test is
+         * whether the candidate's last syllable and the okurigana's first
+         * begin with the same consonant; if they do, everything before that
+         * syllable is the stem.
+         *
+         * Deliberately narrow. Anything looser starts inventing readings that
+         * were never in the data, which is worse than falling back to on'yomi.
+         */
+        if (!matched) {
+          const firstKana = romanizeKana(tail[0] ?? "");
+          const tailConsonant = firstKana.replace(/[aiueo]+$/, "");
+
+          if (tailConsonant) {
+            for (const candidate of hanKunReadings(ch)) {
+              // Split the trailing mora off the candidate: "suku" → "su"+"ku".
+              const match = /^(.*?)([bcdfghjklmnpqrstvwyz]*)[aiueo]+$/.exec(candidate);
+              if (!match || match[2] !== tailConsonant || !match[1]) continue;
+
+              text = match[1];
+              matched = true;
+              break;
+            }
+          }
+        }
+
+        /*
+         * Still nothing, and the kanji stands alone before a particle rather
+         * than before okurigana. A lone kanji is a noun taking its kun
+         * reading — 夜に is "yo ni", not "ya ni" — so prefer kun over the
+         * on'yomi default when the following kana is a particle.
+         */
+        if (!matched && PARTICLES.has(tail[0] ?? "")) {
+          const kun = hanKunReadings(ch);
+          if (kun.length) text = kun[0];
         }
       }
 

@@ -1,0 +1,220 @@
+/* Shared collection controls — search, sort, filter chips.
+ * See CollectionControls.tsx for why these live in one place. */
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  min-height: 2.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--text-3);
+  animation: slideDown var(--d-base) var(--ease) both;
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  color: var(--text);
+}
+
+.searchInput::placeholder {
+  color: var(--text-3);
+}
+
+/* WebKit draws its own clear button on type=search, on top of ours. */
+.searchInput::-webkit-search-cancel-button,
+.searchInput::-webkit-search-decoration {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.searchClear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  min-width: 1.375rem;
+  min-height: 1.375rem;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--surface-4);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* ── Sort ────────────────────────────────────────────────────────────────── */
+
+.sortWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sortLabel {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Covers the viewport so an outside tap anywhere dismisses. Transparent —
+ * a sort menu isn't modal enough to earn a scrim. */
+.sortBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.sortMenu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 61;
+  min-width: 11rem;
+  padding: var(--space-1);
+  background: var(--surface-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-3);
+  /* Grows from the trigger's corner rather than fading in place. */
+  transform-origin: top right;
+  animation: scaleIn var(--d-fast) var(--spring) both;
+}
+
+.sortOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sortOptionActive {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Keyboard focus moves through options, so the focused row needs a fill —
+ * the global focus ring alone is easy to lose inside a small popover. */
+.sortOption:focus-visible {
+  background: var(--surface-4);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sortOption:hover {
+    background: var(--surface-4);
+  }
+
+  .sortBtn:hover {
+    color: var(--text);
+    border-color: var(--line-strong);
+  }
+
+  .searchClear:hover {
+    background: var(--text-3);
+    color: var(--bg);
+  }
+}
+
+/* ── Filter chips ────────────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-1) var(--gutter);
+  /* Bleeds to the screen edge like a rail, so the last chip isn't clipped
+   * mid-glyph on a narrow phone. */
+  scroll-padding-left: var(--gutter);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The one accent on this row. Filled rather than outlined so "selected"
+ * survives at a glance without relying on a border-colour difference. */
+.chipActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.chipCount {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover:not(.chipActive) {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search,
+  .sortMenu {
+    animation: fadeIn var(--d-fast) var(--ease) both;
+  }
+}

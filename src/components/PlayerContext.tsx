@@ -5,6 +5,7 @@ import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrac
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { signalTracker } from "@/lib/signals";
+import { recordSignal as recordInstallSignal } from "@/lib/installPrompt";
 import {
   pushPlaybackState,
   fetchPlaybackState,
@@ -407,6 +408,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               artist: item.artist,
               duration: item.duration,
               albumId: item.albumId,
+              // Exact cache key. Without it the server can only match on
+              // title+artist strings, which miss whenever the bot's own
+              // metadata differs from Deezer's, forcing a fresh download of a
+              // file we already have in the chat.
+              deezerId: finalId.startsWith("deezer-") ? finalId.slice(7) : undefined,
             }),
           });
           const data = await res.json();
@@ -547,6 +553,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
 
         setDownloadStates((prev) => ({ ...prev, [item.id]: "completed", [finalId]: "completed" }));
+
+        // A finished download is the best moment in the app to offer an
+        // install — see lib/installPrompt.ts for the reasoning.
+        recordInstallSignal("download");
       } catch (err) {
         console.error("Centralized download failed for track:", item.id, err);
         setDownloadStates((prev) => ({ ...prev, [item.id]: "failed" }));
@@ -1147,6 +1157,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // A completed listen — the single strongest positive taste signal
         // there is. Bank it before the queue moves on.
         signalTracker.endTrack({ natural: true });
+        recordInstallSignal("play");
 
         if (repeatRef.current === "one") {
           audioRef.current?.play().catch(() => {});
@@ -1558,6 +1569,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               artist: currentTrack.artist,
               duration: currentTrack.duration,
               albumId: currentTrack.albumId,
+              deezerId: currentTrack.id.startsWith("deezer-")
+                ? currentTrack.id.slice(7)
+                : undefined,
             }),
           });
           const data = await res.json();

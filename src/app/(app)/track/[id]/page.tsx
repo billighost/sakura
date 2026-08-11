@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { queryOne, query } from "@/lib/sql";
+import { getDeezerTrack } from "@/lib/metadata";
 import Link from "next/link";
 import { PlayButton } from "./PlayButton";
 import { BackButton } from "@/components/BackButton";
@@ -33,6 +34,50 @@ interface Sample {
   artistName: string;
 }
 
+/**
+ * Build a track detail for a `deezer-<id>` link that has no local row yet.
+ *
+ * Search, charts, artist pages and album pages all hand the UI virtual ids
+ * (`src/lib/catalog.ts` `toVirtual`), but this page only ever looked in
+ * `Track`. A track is written to the database at download time, so every link
+ * from a browse surface pointed at a row that did not exist yet and the page
+ * 404'd — the reported bug. Resolving from Deezer here makes the page work
+ * before the download, and the local row still wins once it exists.
+ */
+async function resolveVirtualTrack(id: string): Promise<TrackDetail | null> {
+  const match = /^deezer-(\d+)$/.exec(id);
+  if (!match) return null;
+
+  const dt = await getDeezerTrack(Number(match[1]));
+  if (!dt) return null;
+
+  return {
+    id,
+    title: dt.title,
+    duration: dt.duration ?? 0,
+    // No stored audio yet: PlayButton resolves playback through the normal
+    // download path, the same way a search result row does.
+    audioUrl: "",
+    coverUrl: dt.album?.cover_big || dt.album?.cover_medium || undefined,
+    previewUrl: dt.preview || undefined,
+    isrc: dt.isrc || undefined,
+    createdAt: new Date().toISOString(),
+    artist: {
+      id: dt.artist?.id ? `deezer-${dt.artist.id}` : id,
+      name: dt.artist?.name ?? "Unknown Artist",
+      imageUrl: dt.artist?.picture_medium || undefined,
+    },
+    album: dt.album?.id
+      ? {
+          id: `deezer-${dt.album.id}`,
+          title: dt.album.title,
+          coverUrl: dt.album.cover_big || dt.album.cover_medium || undefined,
+        }
+      : undefined,
+    otherArtists: [],
+  };
+}
+
 async function getTrack(id: string): Promise<TrackDetail | null> {
   const track = await queryOne<{
     id: string;
@@ -60,7 +105,7 @@ async function getTrack(id: string): Promise<TrackDetail | null> {
     [id]
   );
 
-  if (!track) return null;
+  if (!track) return resolveVirtualTrack(id);
 
   const otherArtists = await query<{ id: string; name: string; role: string }>(
     `SELECT a.id, a.name, ta.role

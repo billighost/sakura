@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { title, artist, duration, albumId: providedAlbumId } = body;
+  // Stable exact key when the client has one. Title+artist strings drift
+  // between Deezer and the bot's own tags, so they miss and we re-download a
+  // file already sitting in the chat.
+  const deezerId: string | null =
+    typeof body.deezerId === "string" && /^\d+$/.test(body.deezerId)
+      ? body.deezerId
+      : null;
 
   if (!title || !artist) {
     return NextResponse.json(
@@ -70,8 +77,12 @@ export async function POST(req: NextRequest) {
       `SELECT t.id, t.title, a.name as "artistName", t.duration, t."audioUrl", t."albumId", t."coverUrl", t."telegramMessageId"
        FROM "Track" t
        JOIN "Artist" a ON t."artistId" = a.id
-       WHERE lower(t.title) = lower($1) AND lower(a.name) = lower($2)`,
-      [title, artist]
+       WHERE ($3::text IS NOT NULL AND t."deezerId" = $3)
+          OR (lower(t.title) = lower($1) AND lower(a.name) = lower($2))
+       ORDER BY (t."deezerId" IS NOT DISTINCT FROM $3) DESC,
+                (t."telegramMessageId" IS NOT NULL) DESC
+       LIMIT 1`,
+      [title, artist, deezerId]
     );
 
     if (existingTrack) {
@@ -370,10 +381,15 @@ export async function POST(req: NextRequest) {
 
     let dbTrack = null;
 
-    if (metadata.track?.deezerId) {
+    // The id the client asked for is authoritative for dedupe: it is the one a
+    // later request will send again. Metadata's own lookup can resolve to a
+    // different release of the same song.
+    const canonicalDeezerId = deezerId || metadata.track?.deezerId?.toString() || null;
+
+    if (canonicalDeezerId) {
       dbTrack = await queryOne<{ id: string; audioUrl: string }>(
         `SELECT id, "audioUrl" FROM "Track" WHERE "deezerId" = $1`,
-        [metadata.track.deezerId.toString()]
+        [canonicalDeezerId]
       );
     }
 
@@ -387,10 +403,11 @@ export async function POST(req: NextRequest) {
     if (dbTrack) {
       const newAudioUrl = `/api/stream/telegram/${track.messageId}`;
       await execute(
-        `UPDATE "Track" 
-         SET "audioUrl" = $1, "telegramMessageId" = $2, duration = GREATEST(duration, $3), "source" = 'telegram'
+        `UPDATE "Track"
+         SET "audioUrl" = $1, "telegramMessageId" = $2, duration = GREATEST(duration, $3), "source" = 'telegram',
+             "deezerId" = COALESCE("deezerId", $5)
          WHERE id = $4`,
-        [newAudioUrl, track.messageId.toString(), track.duration || 0, dbTrack.id]
+        [newAudioUrl, track.messageId.toString(), track.duration || 0, dbTrack.id, canonicalDeezerId]
       );
       (dbTrack as any).audioUrl = newAudioUrl;
     } else {
@@ -406,7 +423,7 @@ export async function POST(req: NextRequest) {
             track.duration || 0,
             `/api/stream/telegram/${track.messageId}`,
             track.messageId.toString(),
-            metadata.track?.deezerId?.toString() || null,
+            canonicalDeezerId,
             metadata.track?.isrc || null,
             metadata.track?.previewUrl || null,
             metadata.album?.coverUrl || null,

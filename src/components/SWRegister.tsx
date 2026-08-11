@@ -1,18 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import styles from "./SWRegister.module.css";
 
 /**
  * Registers the worker and handles the update handshake.
  *
- * The previous version fired `register()` and ignored the result, so a
- * deployed update sat in the "waiting" state until every tab was closed —
- * which for an installed PWA can be days. Now an update is detected and the
- * user is offered a one-tap reload.
+ * ── The first-visit reload ─────────────────────────────────────────────────
  *
- * Registration is deferred until after load so it never competes with the
- * first paint for bandwidth.
+ * `controllerchange` fires in two quite different situations and this used to
+ * treat them as one:
+ *
+ *   1. An update took over from a previous worker. Reloading is right — the
+ *      page is running code the new worker no longer serves.
+ *   2. The *first* worker claimed an until-then uncontrolled page, which is
+ *      what `clients.claim()` in the activate handler does on a first visit.
+ *
+ * Case 2 meant every brand-new visitor got a full page reload a second or two
+ * after landing, for no reason and with no warning. Capturing whether a
+ * controller existed *before* registering separates the two: no prior
+ * controller means this is a first install and there is nothing to reload for.
+ *
+ * ── Checking for updates at all ────────────────────────────────────────────
+ *
+ * The browser re-fetches sw.js on navigation, which a single-page app almost
+ * never performs — an installed PWA can stay open for days and never once look
+ * for a new version. So this also checks explicitly when the app comes back to
+ * the foreground, throttled so tabbing in and out doesn't hammer the origin.
+ *
+ * Registration itself is deferred until after load so it never competes with
+ * the first paint for bandwidth.
  */
+
+/** Minimum gap between explicit update checks. */
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
 export function SWRegister() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
 
@@ -20,7 +42,15 @@ export function SWRegister() {
     if (!("serviceWorker" in navigator)) return;
     if (process.env.NODE_ENV === "development") return;
 
+    /*
+     * Read before registering. Once `register()` resolves and the worker
+     * activates, this is no longer answerable — which is the whole reason the
+     * spurious first-visit reload was so easy to miss.
+     */
+    const hadController = Boolean(navigator.serviceWorker.controller);
+
     let registration: ServiceWorkerRegistration | undefined;
+    let lastCheck = Date.now();
 
     const register = async () => {
       try {
@@ -52,10 +82,22 @@ export function SWRegister() {
     if (document.readyState === "complete") void register();
     else window.addEventListener("load", register, { once: true });
 
-    // The new worker taking control is the signal that a reload is safe.
+    const checkForUpdate = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS) return;
+      lastCheck = Date.now();
+      registration?.update().catch(() => {
+        // Offline, or the origin is unreachable. Nothing to do — the next
+        // foreground pass tries again.
+      });
+    };
+    document.addEventListener("visibilitychange", checkForUpdate);
+
+    // The new worker taking control is the signal that a reload is safe — but
+    // only when it displaced an older one. See the header.
     let reloading = false;
     const onControllerChange = () => {
-      if (reloading) return;
+      if (!hadController || reloading) return;
       reloading = true;
       window.location.reload();
     };
@@ -63,6 +105,7 @@ export function SWRegister() {
 
     return () => {
       window.removeEventListener("load", register);
+      document.removeEventListener("visibilitychange", checkForUpdate);
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
     };
   }, []);
@@ -70,45 +113,12 @@ export function SWRegister() {
   if (!waitingWorker) return null;
 
   return (
-    <div
-      role="status"
-      style={{
-        position: "fixed",
-        left: "50%",
-        transform: "translateX(-50%)",
-        bottom: "calc(var(--bottom-chrome, 7rem) + 0.75rem)",
-        zIndex: 420,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        padding: "0.625rem 0.75rem 0.625rem 1rem",
-        borderRadius: "999px",
-        background: "var(--sakura-glass-strong)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        border: "1px solid var(--sakura-glass-border)",
-        boxShadow: "0 8px 30px -8px var(--sakura-shadow)",
-        color: "var(--sakura-text)",
-        fontSize: "0.8125rem",
-        maxWidth: "calc(100vw - 2rem)",
-      }}
-    >
-      <span>A new version is ready</span>
+    <div className={styles.pill} role="status">
+      <span className={styles.label}>A new version is ready</span>
       <button
+        type="button"
+        className={`${styles.button} pressable`}
         onClick={() => waitingWorker.postMessage({ type: "SKIP_WAITING" })}
-        style={{
-          border: "none",
-          borderRadius: "999px",
-          padding: "0.375rem 0.875rem",
-          minHeight: "unset",
-          minWidth: "unset",
-          background: "var(--sakura-accent-gradient)",
-          color: "#fff",
-          fontSize: "0.8125rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-        }}
       >
         Update
       </button>

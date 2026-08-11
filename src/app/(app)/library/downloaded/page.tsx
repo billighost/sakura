@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { getAllDownloadedTracks, getCachedUserId, getDeviceId } from "@/lib/offline-db";
+import {
+  CollectionHero,
+  CollectionTransport,
+  EmptyState,
+  TrackListSkeleton,
+} from "@/components/CollectionHero";
+import { DownloadedIcon, OfflineIcon, TrashIcon } from "@/components/Icons";
+import { Sheet } from "@/components/Sheet";
+import { getAllDownloadedTracks, getCachedUserId, getDeviceId, clearAudioCache } from "@/lib/offline-db";
+import { formatCollectionMeta, shuffled } from "@/lib/collection";
+import { haptic } from "@/lib/haptics";
 import styles from "./page.module.css";
 
 interface OfflineTrack {
@@ -19,91 +27,137 @@ interface OfflineTrack {
   savedAt: number;
 }
 
-function formatTotalDuration(tracks: OfflineTrack[]): string {
-  const totalSec = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  if (h > 0) return `${tracks.length} song${tracks.length !== 1 ? "s" : ""} · ${h} hr ${m} min`;
-  return `${tracks.length} song${tracks.length !== 1 ? "s" : ""} · ${m} min`;
-}
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
 export default function DownloadedPage() {
-  const router = useRouter();
-  const { play, downloadQueue, downloadStates } = usePlayer();
+  const { play, downloadQueue, downloadStates, showToast } = usePlayer();
   const [tracks, setTracks] = useState<OfflineTrack[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadTracks = useCallback(async () => {
-    try {
-      const uId = getCachedUserId();
-      const dId = getDeviceId();
-      const allTracks = await getAllDownloadedTracks(uId, dId);
-      setTracks(allTracks.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
-    } catch {
-      /* silent */
-    }
-    setLoading(false);
-  }, []);
+  /**
+   * Reload whenever a queued download lands. The old version fetched once on
+   * mount, so a track that finished while the page was open stayed invisible
+   * until a full reload — on a page whose entire job is to show what's saved,
+   * the fresh completion is the one row the user is actually waiting for.
+   */
+  const queueSignature = downloadQueue.map((q) => `${q.id}:${downloadStates[q.id]}`).join(",");
+
+  /* Bumped to force a re-read after clearing, which changes nothing the
+   * effect's other dependencies would notice. */
+  const [reloadToken, setReloadToken] = useState(0);
+  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
   useEffect(() => {
-    loadTracks();
-  }, [loadTracks]);
+    let cancelled = false;
 
-  // Combine completed downloaded tracks with any in-flight downloads
-  const inProgressDownloads = (downloadQueue || []).filter(
-    (item) => downloadStates[item.id] === "queued" || downloadStates[item.id] === "downloading"
+    void (async () => {
+      try {
+        const uId = getCachedUserId();
+        const dId = getDeviceId();
+        const all = await getAllDownloadedTracks(uId, dId);
+        if (cancelled) return;
+        setTracks([...all].sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
+      } catch {
+        /* silent — nothing useful to do with an IndexedDB failure here */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-runs when a queued download's state flips (queued → downloading →
+    // completed), which is when new rows appear in the store.
+  }, [reloadToken, queueSignature]);
+
+  /**
+   * Rows for downloads in flight but not yet in the store.
+   *
+   * `savedAt: 0` rather than `Date.now()`: these are prepended unconditionally
+   * (they're the ones the user is waiting on), so the field is never actually
+   * sorted by — and calling a clock during render makes the memo produce a
+   * different value on every pass, which is both impure and defeats the memo.
+   */
+  const pending = useMemo(
+    () =>
+      downloadQueue
+        .filter((item) => {
+          const state = downloadStates[item.id];
+          return (state === "queued" || state === "downloading") && !tracks.some((t) => t.id === item.id);
+        })
+        .map((item) => ({
+          id: item.id,
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          coverUrl: item.coverUrl,
+          audioUrl: item.audioUrl || "",
+          duration: item.duration || 0,
+          savedAt: 0,
+        })),
+    [downloadQueue, downloadStates, tracks]
   );
 
-  const pendingTracks: OfflineTrack[] = inProgressDownloads
-    .filter((item) => !tracks.some((t) => t.id === item.id))
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      artist: item.artist,
-      album: item.album,
-      coverUrl: item.coverUrl,
-      audioUrl: item.audioUrl || "",
-      duration: item.duration || 0,
-      savedAt: Date.now(),
-    }));
+  const display = useMemo(() => [...pending, ...tracks], [pending, tracks]);
 
-  const displayTracks = [...pendingTracks, ...tracks];
+  const toQueue = (t: OfflineTrack) => ({
+    id: t.id,
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    coverUrl: t.coverUrl,
+    audioUrl: t.audioUrl,
+    duration: t.duration,
+  });
 
-  function toQueue(t: OfflineTrack) {
-    return {
-      id: t.id,
-      title: t.title,
-      artist: t.artist,
-      album: t.album,
-      coverUrl: t.coverUrl,
-      audioUrl: t.audioUrl,
-      duration: t.duration,
-    };
-  }
+  const playAll = () => {
+    const q = display.map(toQueue);
+    if (q.length) play(q[0], q);
+  };
 
-  function handlePlayAll() {
-    if (displayTracks.length === 0) return;
-    const q = displayTracks.map(toQueue);
-    play(q[0], q);
-  }
+  const shufflePlay = () => {
+    const q = shuffled(display).map(toQueue);
+    if (q.length) play(q[0], q);
+  };
 
-  function handleShufflePlay() {
-    if (displayTracks.length === 0) return;
-    const shuffled = shuffleArray(displayTracks);
-    const q = shuffled.map(toQueue);
-    play(q[0], q);
-  }
+  /* Summed play time, guarded per track: a download interrupted before its
+   * metadata landed can carry a NaN duration, and one of those poisons the
+   * whole sum into "NaN min". */
+  const totalSeconds = useMemo(
+    () =>
+      display.reduce((sum, t) => {
+        const n = Number(t.duration);
+        return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+      }, 0),
+    [display]
+  );
 
-  const trackQueue = displayTracks.map((t) => ({
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  /**
+   * Deleting every download is irreversible and re-downloading costs real data,
+   * so it asks first. The previous pages had no destructive control at all,
+   * which meant the only way to reclaim the space was Settings → clear storage.
+   */
+  const removeAll = useCallback(() => {
+    setClearing(true);
+    void (async () => {
+      try {
+        await clearAudioCache();
+        reload();
+        haptic("success");
+        showToast("Downloads removed from this device.", "success");
+      } catch {
+        haptic("error");
+        showToast("Couldn't remove downloads. Try again.", "error");
+      } finally {
+        setClearing(false);
+        setConfirmClear(false);
+      }
+    })();
+  }, [reload, showToast]);
+
+  const trackRows = display.map((t) => ({
     id: t.id,
     title: t.title,
     artist: { name: t.artist },
@@ -113,115 +167,107 @@ export default function DownloadedPage() {
     duration: t.duration,
   }));
 
+  const meta = loading && display.length === 0 ? undefined : formatCollectionMeta(display.length, totalSeconds);
+
   return (
     <div className={styles.page}>
-      <div className={styles.headerGradient}>
-        <div className={styles.header}>
-          <button className={styles.backBtn} onClick={() => router.back()} aria-label="Go back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <div className={styles.headerArt}>
-            <svg viewBox="0 0 24 24" fill="white" width="clamp(1.75rem, 6vw, 2.75rem)" height="clamp(1.75rem, 6vw, 2.75rem)">
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-            </svg>
-          </div>
-          <div className={styles.headerInfo}>
-            <span className={styles.headerLabel}>Playlist</span>
-            <h1 className={styles.headerTitle}>Downloaded Songs</h1>
-            <div className={styles.headerMeta}>
-              {loading ? (
-                <span className={styles.skeletonTextSmall} />
-              ) : (
-                <span>{displayTracks.length > 0 ? formatTotalDuration(displayTracks) : "0 songs"}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {!loading && displayTracks.length > 0 && (
-        <div className={styles.storageNote}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a5 5 0 0 0-5 5v3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3h-1V7a5 5 0 0 0-5-5z" />
-          </svg>
-          Saved on this device for offline playback.
-        </div>
-      )}
-
-      {displayTracks.length > 0 && (
-        <div className={styles.controlsRow}>
-          <div className={styles.playButtons}>
-            <button className={styles.playAllBtn} onClick={handlePlayAll}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Play
-            </button>
-            <button className={styles.shuffleBtn} onClick={handleShufflePlay}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                <polyline points="16 3 21 3 21 8" />
-                <line x1="4" y1="20" x2="21" y2="3" />
-                <polyline points="21 16 21 21 16 21" />
-                <line x1="15" y1="15" x2="21" y2="21" />
-                <line x1="4" y1="4" x2="9" y2="9" />
-              </svg>
-              Shuffle
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className={styles.trackList}>
-        {loading ? (
-          [...Array(5)].map((_, i) => (
-            <div key={i} className={styles.skeletonRow}>
-              <div className={styles.skeletonThumb} />
-              <div className={styles.skeletonCol}>
-                <div className={styles.skeletonLineW70} />
-                <div className={styles.skeletonLineW40} />
-              </div>
-            </div>
-          ))
-        ) : (
-          displayTracks.map((track, i) => (
-            <TrackRow
-              key={track.id}
-              track={{
-                id: track.id,
-                title: track.title,
-                artist: { name: track.artist },
-                album: track.album ? { title: track.album, coverUrl: track.coverUrl } : null,
-                coverUrl: track.coverUrl,
-                audioUrl: track.audioUrl,
-                duration: track.duration,
+      <CollectionHero
+        eyebrow="On this device"
+        title="Downloaded Songs"
+        coverUrl={tracks[0]?.coverUrl}
+        fallbackIcon={<DownloadedIcon size={36} />}
+        loading={loading && display.length === 0}
+        meta={meta}
+        actions={
+          display.length > 0 ? (
+            <button
+              type="button"
+              className={`${styles.iconBtn} pressable`}
+              onClick={() => {
+                haptic("selection");
+                setConfirmClear(true);
               }}
-              queue={trackQueue}
-              index={i}
-              showNumber
-            />
-          ))
+              aria-label="Remove all downloads from this device"
+            >
+              <TrashIcon size={18} />
+            </button>
+          ) : undefined
+        }
+      >
+        {display.length > 0 && (
+          <p className={styles.note}>
+            <OfflineIcon size={14} />
+            Saved to this device — plays with no connection.
+          </p>
+        )}
+      </CollectionHero>
+
+      {display.length > 0 && (
+        <CollectionTransport
+          onPlay={playAll}
+          onShuffle={shufflePlay}
+          disabled={display.length === 0}
+          // Everything on this page is already downloaded by definition, so
+          // the transport shows a statement rather than a button.
+          downloaded={display.length}
+          total={display.length}
+        />
+      )}
+
+      <div className={styles.list}>
+        {loading && display.length === 0 ? (
+          <TrackListSkeleton rows={6} />
+        ) : display.length === 0 ? (
+          <EmptyState
+            icon={<DownloadedIcon size={26} />}
+            title="Nothing saved yet"
+            body="Download a song (or a whole playlist) and it lands here, ready to play with no connection. It only counts against your phone's storage, not your data."
+            action={{ href: "/library", label: "Browse your library" }}
+            secondaryAction={{ href: "/search", label: "Find something to save" }}
+          />
+        ) : (
+          <div className="anim-stagger">
+            {display.map((track, i) => (
+              <div key={track.id} style={{ "--i": Math.min(i, 12) } as React.CSSProperties}>
+                <TrackRow track={trackRows[i]} queue={trackRows} index={i} showNumber />
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {!loading && displayTracks.length === 0 && (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyIllustration}>
-            <svg viewBox="0 0 120 120" width="100" height="100" fill="none">
-              <circle cx="60" cy="60" r="56" stroke="var(--sakura-border)" strokeWidth="1.5" />
-              <path d="M60 38 C60 38 76 52 76 64 C76 71 69 78 60 78 C51 78 44 71 44 64 C44 52 60 38 60 38Z" fill="var(--sakura-accent)" opacity="0.12" />
-              <path d="M45 75 L60 60 L75 75" stroke="var(--sakura-accent)" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
-              <line x1="60" y1="60" x2="60" y2="85" stroke="var(--sakura-accent)" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
-            </svg>
+      <Sheet
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        variant="dialog"
+        title="Remove all downloads?"
+        dismissible={!clearing}
+        footer={
+          <div className={styles.confirmActions}>
+            <button
+              type="button"
+              className={`${styles.confirmCancel} pressable`}
+              onClick={() => setConfirmClear(false)}
+              disabled={clearing}
+            >
+              Keep them
+            </button>
+            <button
+              type="button"
+              className={`${styles.confirmDanger} pressable`}
+              onClick={removeAll}
+              disabled={clearing}
+            >
+              {clearing ? "Removing…" : `Remove ${display.length}`}
+            </button>
           </div>
-          <p className={styles.emptyTitle}>No downloaded songs</p>
-          <p className={styles.emptySubtext}>Songs you download for offline listening will appear here.</p>
-          <Link href="/liked" className={styles.emptyCta}>
-            Go to Liked Songs
-          </Link>
-        </div>
-      )}
+        }
+      >
+        <p className={styles.confirmBody}>
+          This frees up space on your phone. The songs stay in your library and
+          you can download them again whenever you like — but that uses data.
+        </p>
+      </Sheet>
     </div>
   );
 }

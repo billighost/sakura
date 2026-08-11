@@ -2,7 +2,7 @@ import { fetchJsonResilient } from './resilience';
 import { cachedWithStale, cacheKey, TTL } from './cache';
 import { execute, query } from './sql';
 
-interface DeezerTrack {
+export interface DeezerTrack {
   id: number;
   title: string;
   duration: number;
@@ -264,6 +264,30 @@ export async function searchTracksITunes(
     },
     contributors: [],
   })) as unknown as DeezerTrack[];
+}
+
+/**
+ * Fetch one track by its Deezer id.
+ *
+ * Distinct from `searchDeezerTrack`, which guesses from a title/artist pair.
+ * When a `deezer-<id>` link is already in hand — every track link a browse
+ * surface produces — this resolves it exactly, with no chance of matching the
+ * wrong recording. Cached like its album/artist siblings: a track's identity
+ * doesn't change.
+ */
+export async function getDeezerTrack(trackId: number): Promise<DeezerTrack | null> {
+  if (!Number.isFinite(trackId) || trackId <= 0) return null;
+  const track = await cachedWithStale(
+    cacheKey('ext', 'dz', 'track', trackId),
+    TTL.EXT_ALBUM,
+    () => fetchDeezer<DeezerTrack & { error?: unknown }>(`/track/${trackId}`, 'track'),
+    { label: 'deezer.track' },
+  );
+  // A deleted or region-blocked track answers 200 with an `error` body rather
+  // than a 4xx, so the HTTP layer sees success — same shape the playlist
+  // resolver already guards against.
+  if (!track || track.error || !track.title) return null;
+  return track;
 }
 
 export async function getDeezerAlbum(albumId: number): Promise<DeezerAlbum | null> {

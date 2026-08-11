@@ -1,7 +1,7 @@
 import { TelegramClient as GramClient, sessions } from "telegram";
 const { StringSession } = sessions;
 import { Api } from "telegram/tl";
-import { Readable } from "stream";
+import { Readable } from "node:stream";
 
 // Prevent GramJS background _recvLoop RPC errors (406 AUTH_KEY_DUPLICATED) from bringing down Node process
 if (typeof process !== "undefined" && typeof process.on === "function") {
@@ -116,6 +116,31 @@ export class TelegramClient {
   private activeCount = 0;
   private static botMutex = new RedisMutex();
 
+  /**
+   * How long the MTProto connection is kept after the last reader lets go.
+   *
+   * Long enough that seeking around a track, or an audio element's follow-up
+   * Range request, reuses one connection; short enough that an idle instance
+   * isn't holding a socket open indefinitely.
+   */
+  private static readonly IDLE_DISCONNECT_MS = 60_000;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * messageId → the file location and size needed to start a download.
+   *
+   * Resolving a message id to its document costs a `getEntity` plus a
+   * `getMessages` round trip, and every Range request the browser sends for the
+   * same song repeated both. The document's id/accessHash/fileReference don't
+   * change between those requests, so caching them turns a seek into a single
+   * `upload.GetFile` call.
+   *
+   * `fileReference` is the one part Telegram does expire (hours, not minutes).
+   * A stale one surfaces as FILE_REFERENCE_EXPIRED, which `getAudioStream`
+   * treats as "drop the entry and resolve again" rather than as a failure.
+   */
+  private docCache = new Map<number, { location: Api.InputDocumentFileLocation; size: number; dcId?: number }>();
+
   constructor(
     apiId: number,
     apiHash: string,
@@ -135,6 +160,10 @@ export class TelegramClient {
       {
         connectionRetries: 5,
         autoReconnect: true,
+        // gramJS defaults this to 1, which serialises every `upload.GetFile`
+        // through a single sender: two listeners streaming different songs
+        // take turns chunk by chunk instead of downloading in parallel.
+        maxConcurrentDownloads: 8,
         ...(proxyConfig ? { proxy: proxyConfig } : {}),
       },
     );
@@ -192,20 +221,57 @@ export class TelegramClient {
 
   async acquire(): Promise<void> {
     this.activeCount++;
+    // A request arriving during the idle window keeps the existing connection.
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
     await this.ensureConnected();
   }
 
+  /**
+   * Release a user of the connection — but don't tear it down immediately.
+   *
+   * This used to `disconnect()` the moment the last caller finished, which made
+   * every request pay a full MTProto handshake (TCP + auth + layer negotiation)
+   * before it could ask for a single byte. Measured against the live bot that
+   * was ~3s of pure setup on a request whose useful work is a 512KB read, and
+   * it actively broke back-to-back requests: an audio element sending a second
+   * Range request while the first response was still being torn down hit a
+   * client that had just been disconnected underneath it, and got a connection
+   * error rather than audio.
+   *
+   * Holding the connection for a short idle window instead makes the handshake
+   * a per-listening-session cost rather than a per-request one, which is what
+   * seeking through a track actually needs. The window is short enough that an
+   * idle serverless instance still lets the socket go.
+   */
   async release(): Promise<void> {
     this.activeCount--;
     if (this.activeCount <= 0) {
       this.activeCount = 0;
-      await this.disconnect();
+      if (this.idleTimer) clearTimeout(this.idleTimer);
+      this.idleTimer = setTimeout(() => {
+        this.idleTimer = null;
+        if (this.activeCount <= 0) {
+          this.disconnect().catch((err) =>
+            console.warn("[Telegram] Idle disconnect failed:", err),
+          );
+        }
+      }, TelegramClient.IDLE_DISCONNECT_MS);
+      // Node shouldn't be held alive purely by this timer.
+      this.idleTimer.unref?.();
     }
   }
 
   async disconnect(): Promise<void> {
     this.connected = false;
     this.connectPromise = null;
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+    this.docCache.clear();
     if (this.client) {
       try {
         await this.client.disconnect();
@@ -747,50 +813,144 @@ export class TelegramClient {
     });
   }
 
-  async getAudioStream(messageId: number, offsetBytes?: number, limitBytes?: number): Promise<{ stream: Readable; size: number }> {
-    return this.withRetry(async () => {
+  /** Resolve a message id to its document location, going to Telegram only on a miss. */
+  private async resolveDocument(
+    messageId: number,
+    forceRefresh = false,
+  ): Promise<{ location: Api.InputDocumentFileLocation; size: number; dcId?: number }> {
+    if (!forceRefresh) {
+      const hit = this.docCache.get(messageId);
+      if (hit) return hit;
+    }
 
     const botEntity = await this.client.getEntity(this.botUsername);
-    const messages = await this.client.getMessages(botEntity, {
-      ids: [messageId],
-    });
-
+    const messages = await this.client.getMessages(botEntity, { ids: [messageId] });
     const msg = messages[0];
     if (!msg || !msg.media) {
       throw new Error(`Message ${messageId} not found or has no media`);
     }
 
-    let size = 0;
-    if ("document" in msg.media) {
-      size = Number((msg.media as any).document.size) || 0;
-    }
+    const doc = (msg.media as Api.MessageMediaDocument).document as Api.Document;
+    if (!doc) throw new Error(`Message ${messageId} has no document`);
 
-    if (offsetBytes !== undefined) {
+    const entry = {
+      location: new Api.InputDocumentFileLocation({
+        id: doc.id,
+        accessHash: doc.accessHash,
+        fileReference: doc.fileReference,
+        thumbSize: "",
+      }),
+      size: Number(doc.size) || 0,
+      dcId: doc.dcId as number | undefined,
+    };
+    this.docCache.set(messageId, entry);
+    return entry;
+  }
+
+  /**
+   * Stream audio out of the bot chat, forwarding bytes as they arrive.
+   *
+   * Two things used to make this slow enough to look broken:
+   *
+   * 1. With no Range header it called `downloadMedia`, which resolves only once
+   *    the *entire* file has been pulled into a Buffer. The user waited for all
+   *    ~9MB to land on the server before receiving byte one, even though the
+   *    client was perfectly happy to consume a stream. Now every path goes
+   *    through `iterDownload`, so the first chunk ships as soon as it arrives.
+   *
+   * 2. `iterDownload`'s `limit` counts *chunks*, not bytes — gramJS derives it
+   *    as `ceil(fileSize / chunkSize)` when omitted, and decrements it once per
+   *    chunk yielded. Passing a byte count meant a 64KB Range request asked for
+   *    64K chunks of 512KB, so it kept pulling to end-of-file while the response
+   *    advertised a Content-Length of 64KB. Every seek downloaded the whole
+   *    remainder of the track, and the mismatch left the connection wrong-sized.
+   *    `limit` is now a real chunk count derived from the requested range.
+   *
+   * Telegram also requires the read offset to be 4KB-aligned, so the request is
+   * widened down to the previous boundary and the extra head bytes are dropped
+   * here rather than sent to the client.
+   */
+  async getAudioStream(
+    messageId: number,
+    offsetBytes?: number,
+    limitBytes?: number,
+  ): Promise<{ stream: Readable; size: number }> {
+    return this.withRetry(async () => {
       const bigInt = require("big-integer");
-      const iter = this.client.iterDownload({
-        file: msg.media,
-        offset: bigInt(offsetBytes),
-        limit: limitBytes,
-        requestSize: 512 * 1024,
-      });
-      return { stream: Readable.from(iter), size };
-    }
+      const CHUNK = 512 * 1024; // gramJS MAX_CHUNK_SIZE; larger is rejected
+      const ALIGN = 4096; // Telegram's required offset granularity
 
-    const result = await this.client.downloadMedia(msg);
+      let doc = await this.resolveDocument(messageId);
+      const size = doc.size;
 
-    if (Buffer.isBuffer(result)) {
-      return { stream: Readable.from(result), size };
-    }
+      const start = Math.max(0, offsetBytes ?? 0);
+      const wanted =
+        limitBytes !== undefined
+          ? Math.max(0, Math.min(limitBytes, Math.max(0, size - start)))
+          : Math.max(0, size - start);
 
-    if (result && (result as any) instanceof Readable) {
-      return { stream: result as unknown as Readable, size };
-    }
+      const alignedStart = Math.floor(start / ALIGN) * ALIGN;
+      const skip = start - alignedStart;
+      const chunkCount = Math.max(1, Math.ceil((skip + wanted) / CHUNK));
 
-    if (result && typeof result === "object" && (Symbol.asyncIterator in result || Symbol.iterator in result)) {
-      return { stream: Readable.from(result as AsyncIterable<Uint8Array>), size };
-    }
+      const openIter = (location: Api.InputDocumentFileLocation, dcId?: number) =>
+        this.client.iterDownload({
+          file: location,
+          dcId,
+          fileSize: bigInt(size),
+          offset: bigInt(alignedStart),
+          limit: chunkCount,
+          requestSize: CHUNK,
+          chunkSize: CHUNK,
+        });
 
-    throw new Error(`Unexpected download result type: ${typeof result}`);
+      let iter = openIter(doc.location, doc.dcId);
+
+      // Trim the alignment padding and stop at exactly the requested length, so
+      // what goes out matches the Content-Length the route advertises.
+      const self = this;
+      async function* trimmed(): AsyncGenerator<Buffer> {
+        let toSkip = skip;
+        let sent = 0;
+        let started = false;
+        while (true) {
+          try {
+            for await (const raw of iter as AsyncIterable<Buffer>) {
+              started = true;
+              let buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+              if (toSkip > 0) {
+                if (buf.length <= toSkip) {
+                  toSkip -= buf.length;
+                  continue;
+                }
+                buf = buf.subarray(toSkip);
+                toSkip = 0;
+              }
+              const remaining = wanted - sent;
+              if (remaining <= 0) return;
+              if (buf.length > remaining) buf = buf.subarray(0, remaining);
+              sent += buf.length;
+              yield buf;
+              if (sent >= wanted) return;
+            }
+            return;
+          } catch (err) {
+            const m = err instanceof Error ? err.message : String(err);
+            // A cached fileReference went stale. Safe to retry only if nothing
+            // has been emitted yet, otherwise the client already holds a prefix.
+            if (!started && /FILE_REFERENCE|FILEREF/i.test(m)) {
+              console.warn(`[Telegram] Stale file reference for ${messageId}, re-resolving`);
+              self.docCache.delete(messageId);
+              doc = await self.resolveDocument(messageId, true);
+              iter = openIter(doc.location, doc.dcId);
+              continue;
+            }
+            throw err;
+          }
+        }
+      }
+
+      return { stream: Readable.from(trimmed(), { objectMode: false }), size };
     });
   }
 

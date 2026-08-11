@@ -10,6 +10,7 @@ import { MediaSessionProvider } from "@/components/MediaSessionProvider";
 import { AppNavProvider, useAppNav } from "@/components/AppNavContext";
 import { ShareProvider } from "@/components/share/ShareContext";
 import { ShareStudio } from "@/components/share/ShareStudio";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { useSwipeBack } from "@/lib/useSwipeBack";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
@@ -74,6 +75,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mounted once, at the root: every share site in the app drives this one
           sheet through ShareContext rather than each rolling its own. */}
       <ShareStudio />
+
+      {/* Decides for itself whether this is a moment worth asking at — see
+          lib/installPrompt.ts. Renders nothing the overwhelming majority of
+          the time. Kept inside the app group so it can never appear over the
+          auth screens, where the app hasn't earned the ask yet. */}
+      <InstallPrompt />
     </div>
   );
 }

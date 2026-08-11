@@ -1,15 +1,25 @@
 {
+  "id": "/home",
   "name": "Sakura - Music Library",
   "short_name": "Sakura",
   "description": "Your personal music library",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/home",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#0E0B0F",
   "theme_color": "#0E0B0F",
   "categories": ["music", "entertainment"],
+  "launch_handler": { "client_mode": "navigate-existing" },
   "icons": [
+    { "src": "/icons/icon-transparent-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-transparent-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-transparent-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-transparent-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-transparent-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-transparent-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/maskable-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icons/maskable-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
@@ -20,21 +30,28 @@
       "short_name": "Resume",
       "description": "Resume your music playback",
       "url": "/home",
-      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Liked Songs",
       "short_name": "Liked",
       "description": "Open your liked songs list",
       "url": "/liked",
-      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Downloads",
+      "short_name": "Downloads",
+      "description": "Music saved to this device",
+      "url": "/library/downloaded",
+      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Search",
       "short_name": "Search",
       "description": "Search for music",
       "url": "/search",
-      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icons/icon-transparent-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

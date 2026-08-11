@@ -1,409 +1,106 @@
+/* Downloaded Songs.
+ *
+ * Hero, transport, empty state and skeletons all come from
+ * CollectionHero.module.css — shared with Liked and the playlist pages. What's
+ * left is the page frame, the offline note, and the confirm dialog's buttons. */
+
 .page {
-  padding: clamp(1rem, 3vw, 1.5rem);
-  padding-bottom: 6rem;
-  max-width: 72rem;
-  margin: 0 auto;
+  min-height: 100%;
+  padding-bottom: calc(var(--bottom-chrome) + var(--space-5));
 }
 
-/* ---------- Hero ---------- */
-
-.headerGradient {
-  position: relative;
-  margin: clamp(-1rem, -3vw, -1.5rem) clamp(-1rem, -3vw, -1.5rem) clamp(1.25rem, 4vw, 2rem);
-  padding: clamp(2rem, 7vw, 3.25rem) clamp(1.25rem, 4vw, 2rem) clamp(1.5rem, 5vw, 2.25rem);
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.headerGradient::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background: var(--surface-1);
-}
-
-.headerGradient::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(180deg, transparent, var(--bg));
-}
-
-.header {
-  display: flex;
-  align-items: flex-end;
-  gap: clamp(1rem, 3vw, 1.5rem);
-}
-
-.backBtn {
-  all: unset;
+.iconBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(2.25rem, 6vw, 2.5rem);
-  height: clamp(2.25rem, 6vw, 2.5rem);
-  border-radius: 50%;
-  color: var(--sakura-text);
-  cursor: pointer;
-  background: var(--sakura-glass);
-  border: 1px solid var(--sakura-glass-border);
-  backdrop-filter: blur(8px);
-  transition: background 0.15s, transform 0.15s;
-  flex-shrink: 0;
-  margin-bottom: 0.25rem;
-}
-
-.backBtn:hover {
-  background: var(--sakura-hover);
-}
-
-.backBtn:active {
-  transform: scale(0.92);
-}
-
-.headerArt {
-  width: clamp(6rem, 22vw, 9rem);
-  height: clamp(6rem, 22vw, 9rem);
-  border-radius: var(--sakura-radius-lg);
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 16px 40px rgba(242, 120, 159, 0.32);
-}
-
-.headerInfo {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.headerLabel {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--sakura-text-secondary);
-  font-weight: 700;
-}
-
-.headerTitle {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.75rem, 6vw, 3rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  color: var(--sakura-text);
-}
-
-.headerMeta {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 1.25rem;
-}
-
-.skeletonTextSmall {
-  display: inline-block;
-  width: 6rem;
-  height: 0.8125rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-}
-
-.skeletonTextSmall::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
-  animation: shimmer 1.5s infinite;
-}
-
-/* ---------- Storage note ---------- */
-
-.storageNote {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  background: var(--sakura-card-bg);
-  border: 1px solid var(--sakura-card-border);
-  border-radius: 10px;
-  padding: 0.625rem 0.875rem;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
-}
-
-.storageNote svg {
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-/* ---------- Controls ---------- */
-
-.controlsRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
-  flex-wrap: wrap;
-}
-
-.playButtons {
-  display: flex;
-  gap: 0.625rem;
-}
-
-.playAllBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: clamp(2.5rem, 6vw, 2.75rem);
-  padding: 0 clamp(1rem, 3vw, 1.375rem);
+  width: var(--tap-min);
+  height: var(--tap-min);
   border: none;
-  border-radius: 9999px;
-  background: var(--sakura-accent);
-  color: #fff;
-  font-size: 0.875rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.12s, filter 0.15s, box-shadow 0.15s;
-  box-shadow: 0 6px 20px rgba(242, 120, 159, 0.3);
-}
-
-.playAllBtn:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 24px rgba(242, 120, 159, 0.4);
-}
-
-.playAllBtn:active {
-  transform: scale(0.96);
-}
-
-.shuffleBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: clamp(2.5rem, 6vw, 2.75rem);
-  padding: 0 clamp(1rem, 3vw, 1.25rem);
-  border: 1.5px solid var(--sakura-border);
-  border-radius: 9999px;
+  border-radius: var(--r-full);
   background: transparent;
-  color: var(--sakura-text);
-  font-size: 0.875rem;
-  font-weight: 600;
+  color: var(--text-2);
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.shuffleBtn:active {
-  transform: scale(0.96);
+@media (hover: hover) and (pointer: fine) {
+  .iconBtn:hover {
+    background: var(--surface-2);
+    color: var(--danger);
+  }
 }
 
-.shuffleBtn:hover {
-  border-color: var(--sakura-text-secondary);
-  background: var(--sakura-hover);
-}
-
-.rightControls {
+/* The one thing this page can say that no other page can. */
+.note {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--success-soft);
+  border-radius: var(--r-sm);
+  color: var(--success);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 500;
 }
 
-.manageBtn {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  height: clamp(2.25rem, 5vw, 2.5rem);
-  padding: 0 0.75rem;
-  border-radius: 9999px;
-  border: 1px solid var(--sakura-border);
+.list {
+  padding: 0 var(--gutter);
+}
+
+/* ── Confirm dialog ──────────────────────────────────────────────────────── */
+
+.confirmBody {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.confirmCancel,
+.confirmDanger {
+  flex: 1;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Keeping the downloads is the safe default, so it gets the solid treatment
+ * and the destructive option is the outlined one. */
+.confirmCancel {
+  border: none;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.confirmDanger {
+  border: 1px solid var(--danger);
   background: transparent;
-  color: var(--sakura-text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
+  color: var(--danger);
 }
 
-.manageBtn:hover {
-  border-color: var(--sakura-danger);
-  color: var(--sakura-danger);
+.confirmCancel:disabled,
+.confirmDanger:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
-.manageBtnActive {
-  border-color: var(--sakura-danger);
-  color: var(--sakura-danger);
-  background: rgba(232, 93, 117, 0.08);
-}
+@media (hover: hover) and (pointer: fine) {
+  .confirmCancel:hover:not(:disabled) {
+    background: var(--surface-4);
+  }
 
-/* ---------- Track list ---------- */
-
-.trackList {
-  display: flex;
-  flex-direction: column;
-}
-
-.trackRowWrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.trackRowWrap > :first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-.removeBtn {
-  all: unset;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  color: var(--sakura-danger);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, transform 0.1s;
-  animation: popIn 0.15s ease-out;
-}
-
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.removeBtn:hover {
-  background: rgba(232, 93, 117, 0.12);
-}
-
-.removeBtn:active {
-  transform: scale(0.9);
-}
-
-.skeletonRow {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.625rem 0.5rem;
-}
-
-.skeletonThumb {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 8px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.skeletonThumb::after,
-.skeletonLineW70::after,
-.skeletonLineW40::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, var(--sakura-skeleton-shimmer), transparent);
-  animation: shimmer 1.5s infinite;
-}
-
-.skeletonCol {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.skeletonLineW70 {
-  width: 70%;
-  height: 0.875rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-}
-
-.skeletonLineW40 {
-  width: 40%;
-  height: 0.75rem;
-  border-radius: 4px;
-  background: var(--sakura-skeleton);
-  position: relative;
-  overflow: hidden;
-}
-
-/* ---------- Empty state ---------- */
-
-.emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: clamp(3.5rem, 14vh, 6rem) clamp(1rem, 4vw, 2rem);
-}
-
-.emptyIllustration {
-  margin-bottom: clamp(1.25rem, 4vw, 1.75rem);
-  opacity: 0.9;
-}
-
-.emptyTitle {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.125rem, 3vw, 1.375rem);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: var(--sakura-text);
-}
-
-.emptySubtext {
-  font-size: 0.9375rem;
-  color: var(--sakura-text-secondary);
-  max-width: 22rem;
-  line-height: 1.6;
-  margin-bottom: 1.25rem;
-}
-
-.emptyCta {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.625rem 1.375rem;
-  background: var(--sakura-accent);
-  color: white;
-  font-size: 0.8438rem;
-  font-weight: 700;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: filter 0.15s, transform 0.15s;
-}
-
-.emptyCta:hover {
-  filter: brightness(1.08);
-  transform: scale(1.02);
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@media (max-width: 480px) {
-  .header {
-    align-items: center;
+  .confirmDanger:hover:not(:disabled) {
+    background: var(--danger-soft);
   }
 }

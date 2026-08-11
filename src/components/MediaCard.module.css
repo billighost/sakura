@@ -1,0 +1,231 @@
+/* The app's one card. See MediaCard.tsx.
+ *
+ * Sizes are set here rather than by the caller so every rail in the app lines
+ * up on the same three widths. A rail chooses a size; it doesn't invent one. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  width: var(--card-w);
+  text-decoration: none;
+  color: inherit;
+  /* Inside .anim-stagger the child carries the animation, so a card in a rail
+   * needs no entry of its own. */
+}
+
+.sm {
+  --card-w: 6.5rem;
+}
+
+.md {
+  --card-w: 8.75rem;
+}
+
+.lg {
+  --card-w: 11.5rem;
+}
+
+/* ── Artwork ─────────────────────────────────────────────────────────────── */
+
+.art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  /* A real surface, not a translucent overlay — see design note 2. Also stops
+   * a transparent PNG cover showing the page background through it. */
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--d-base) var(--ease);
+}
+
+.round {
+  border-radius: var(--r-full);
+}
+
+/* The playing card lifts and takes an accent ring. Ring rather than a border:
+ * a border would change the box and nudge the layout by a pixel. */
+.artActive {
+  box-shadow: var(--shadow-2), inset 0 0 0 2px var(--accent);
+}
+
+.image,
+.mosaicCell {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Four-up mosaic for mixes. No gap: the seams read as one assembled object
+ * rather than four separate thumbnails. */
+.mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+/* Count / label over the artwork's bottom edge. The scrim behind it is the
+ * sanctioned readability gradient — one colour, ramping opacity. */
+.badge {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: var(--space-4) var(--space-2) var(--space-1);
+  background: linear-gradient(to top, var(--scrim), transparent);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* ── Play affordance ─────────────────────────────────────────────────────── */
+
+.play {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Below the 44px minimum on purpose, and compensated: see .play::before. */
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+
+  /* Hidden until wanted on pointer devices; always present on touch, where
+   * there is no hover to reveal it with. */
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition: opacity var(--d-fast) var(--ease), transform var(--d-base) var(--spring);
+}
+
+/*
+ * The 44px hit area, without a 44px box.
+ *
+ * `position: relative` is deliberately NOT needed here — .play is already
+ * absolutely positioned, which makes it the containing block for its own
+ * pseudo-element. That is the distinction the mini-player bug turned on: a
+ * `static` element's ::before anchors to some ancestor and `max(100%, 44px)`
+ * inflates against *that* box, shielding the whole card. Here the anchor is
+ * the button itself, so the pseudo-element is 44px and no larger.
+ */
+.play::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  transform: translate(-50%, -50%);
+}
+
+.playActive {
+  background: var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .play {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.9);
+  }
+
+  /* Revealed by hovering the card, or by focusing the button itself so it
+   * stays reachable from the keyboard. */
+  .card:hover .play,
+  .play:focus-visible,
+  .playActive {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .card:hover .art {
+    box-shadow: var(--shadow-2);
+  }
+
+  .play:hover {
+    background: var(--accent-press);
+  }
+}
+
+/* ── Text ────────────────────────────────────────────────────────────────── */
+
+.meta {
+  min-width: 0;
+}
+
+/* Names of things get the display face — see the type note in globals.css. */
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+}
+
+.titleActive {
+  color: var(--accent);
+}
+
+.titleText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars {
+  flex-shrink: 0;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play {
+    transition: opacity var(--d-fast) var(--ease);
+    transform: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .play {
+      transform: none;
+    }
+  }
+}

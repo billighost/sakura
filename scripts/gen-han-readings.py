@@ -71,7 +71,12 @@ def parse():
                 elif field == "kJapaneseOn":
                     on[code] = first.lower()
                 elif field == "kJapaneseKun":
-                    kun[code] = first.lower()
+                    # ALL kun readings, not just the first. Which one applies
+                    # depends on the okurigana that follows: the kanji in
+                    # both KONOMU and SUKU, so 好き needs SUKU while 好む needs
+                    # KONOMU. The runtime picks by matching the trailing kana,
+                    # which it can only do if every candidate is available.
+                    kun[code] = ",".join(v.lower() for v in value.split(" ") if v)
 
     return mandarin, on, kun
 
@@ -127,7 +132,7 @@ def main():
         + const("HAN_JAPANESE_ON", "Japanese on'yomi, for compounds. Aligned to HAN_CHARS.", ja_on)
         + const(
             "HAN_JAPANESE_KUN",
-            "Japanese kun'yomi, for kanji with okurigana. Aligned to HAN_CHARS.",
+            "Japanese kun'yomi, comma-separated candidates. Aligned to HAN_CHARS.",
             ja_kun,
         )
     )

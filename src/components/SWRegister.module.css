@@ -1,0 +1,52 @@
+/* Update prompt. Sits above the bottom chrome so it can't cover the transport
+ * controls — an update is never urgent enough to interrupt playback. */
+
+.pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottom-chrome) + var(--space-3));
+  transform: translateX(-50%);
+  z-index: 320;
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - var(--space-6));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  box-shadow: var(--shadow-3);
+
+  color: var(--text);
+  font-size: var(--t-sm);
+
+  animation: slideUp var(--d-slow) var(--spring-soft) both;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.button {
+  flex-shrink: 0;
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button:hover {
+    background: var(--accent-press);
+  }
+}

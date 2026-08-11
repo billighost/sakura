@@ -1,0 +1,378 @@
+/* Collection hero, transport row, empty state and skeletons.
+ * Shared by Liked, Downloaded, Playlist, System Playlist and Mix. */
+
+/* ── Hero ─────────────────────────────────────────────────────────────────
+ *
+ * The tint is the one gradient allowed here: a single extracted artwork colour
+ * ramping to transparent, so the title sits on something related to the art
+ * without a second hue appearing from nowhere. With no artwork `--hero-tint`
+ * is unset and the whole layer resolves to transparent. */
+
+.hero {
+  position: relative;
+  padding: max(var(--space-4), env(safe-area-inset-top)) var(--gutter) var(--space-4);
+  isolation: isolate;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--hero-tint, transparent), transparent);
+  /* Held back from full strength: this sits behind body text, and the
+   * extracted colour can be arbitrarily saturated. */
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.art {
+  position: relative;
+  flex-shrink: 0;
+  width: clamp(6.5rem, 34vw, 10rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-3);
+}
+
+.image,
+.mosaicCell {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--accent-softer);
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* The name of the thing — display face, and the largest type on the page. */
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: var(--space-2) 0 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-2);
+}
+
+.metaSkeleton {
+  display: block;
+  width: 9rem;
+  height: 0.75rem;
+  border-radius: var(--r-xs);
+}
+
+/* ── Transport ───────────────────────────────────────────────────────────── */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--gutter) var(--space-4);
+}
+
+.play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  min-width: 0;
+  padding: 0 var(--space-5);
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shuffle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.play:disabled,
+.shuffle:disabled,
+.download:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.downloadLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Not a button. Everything here is already on the device, so the honest
+ * rendering is a statement rather than a control that does nothing. */
+.savedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  min-height: 2rem;
+  border-radius: var(--r-full);
+  background: var(--success-soft);
+  color: var(--success);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.spin {
+  animation: heroSpin 0.9s linear infinite;
+}
+
+@keyframes heroSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .play:hover:not(:disabled) {
+    background: var(--accent-press);
+  }
+
+  .shuffle:hover:not(:disabled),
+  .download:hover:not(:disabled) {
+    color: var(--text);
+    border-color: var(--text-3);
+  }
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-7) var(--gutter);
+  animation: slideUp var(--d-slow) var(--spring-soft) both;
+}
+
+.emptyGlyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: var(--space-4);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+.emptyTitle {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+}
+
+.emptyBody {
+  max-width: 24rem;
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.emptyPrimary,
+.emptySecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-5);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.emptyPrimary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.emptySecondary {
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .emptyPrimary:hover {
+    background: var(--accent-press);
+  }
+
+  .emptySecondary:hover {
+    background: var(--surface-2);
+  }
+}
+
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--gutter);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.skeletonArt {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--r-sm);
+}
+
+.skeletonText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonLine {
+  width: 65%;
+  height: 0.75rem;
+  border-radius: var(--r-xs);
+}
+
+.skeletonLineShort {
+  width: 38%;
+  height: 0.65rem;
+  border-radius: var(--r-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty {
+    animation: fadeIn var(--d-base) var(--ease) both;
+  }
+
+  .spin {
+    animation-duration: 1.6s;
+  }
+}

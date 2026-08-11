@@ -1,0 +1,330 @@
+/* Install offer. See InstallPrompt.tsx for when it appears and why.
+ *
+ * It floats above the bottom chrome instead of docking to the viewport edge:
+ * the mini player and tab bar stay fully usable while it's up, so the offer
+ * never stops the app working. */
+
+.card {
+  position: fixed;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(var(--bottom-chrome) + var(--space-3));
+  z-index: 300;
+
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  align-items: start;
+
+  max-width: 30rem;
+  margin-inline: auto;
+  padding: var(--space-4);
+
+  /* Elevation 3 with a real border, not a translucent overlay — see design
+   * note 2 in globals.css. */
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3);
+
+  animation: installEnter var(--d-slow) var(--spring-soft) both;
+}
+
+@keyframes installEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Exit is faster than entry and doesn't spring: a dismissal should feel
+ * like it got out of the way, not like it took a bow. */
+.leaving {
+  animation: none;
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  transition: opacity var(--d-fast) var(--ease-out), transform var(--d-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.text {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  /* A name, not an instruction — display face. */
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  /* Room for the close button in the top-right corner. */
+  padding-right: var(--space-5);
+}
+
+.body {
+  margin: var(--space-1) 0 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+.actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.primary,
+.secondary {
+  flex: 1;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.secondary {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-2);
+  /* The decline is deliberately the narrower of the two — easy to hit, not
+   * competing for attention. */
+  flex: 0 0 auto;
+}
+
+.close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover {
+    background: var(--accent-press);
+  }
+
+  .secondary:hover,
+  .close:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+}
+
+/* ── iOS walkthrough ──────────────────────────────────────────────────────
+ *
+ * Rendered inside <Sheet>, so it owns only its own content. */
+
+.lede {
+  margin: 0 0 var(--space-5);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.stepNum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepBody {
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: var(--t-base);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  color: var(--text);
+}
+
+.stepNote {
+  margin: var(--space-1) 0 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+/* ── Control mock-ups ─────────────────────────────────────────────────────
+ *
+ * Not decoration. People locate a toolbar button by shape and position, not by
+ * its name, so each step draws the real control where iOS puts it. */
+
+.mock {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  /* Bottom toolbar: square off the top edge so it reads as attached to the
+   * bottom of a screen rather than as a free-floating card. */
+  border-radius: var(--r-sm) var(--r-sm) var(--r-md) var(--r-md);
+}
+
+/* iPad's share button is top-right, so the mock flips to match. */
+.mockTop {
+  justify-content: flex-end;
+  border-radius: var(--r-md) var(--r-md) var(--r-sm) var(--r-sm);
+}
+
+/* Stand-ins for the toolbar buttons we aren't pointing at. Deliberately
+ * shapeless — drawing them properly would compete with the one that matters. */
+.mockGhost {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: var(--r-xs);
+  background: var(--surface-4);
+  opacity: 0.5;
+}
+
+.mockKey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+}
+
+.mockHighlight {
+  background: var(--accent-soft);
+  color: var(--accent);
+  /* A slow pulse draws the eye to the one control being described. Ring only —
+   * no movement, so it survives reduced motion as a static highlight. */
+  animation: mockPulse 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes mockPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+.mockRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) 0;
+}
+
+.mockRowLabel {
+  flex: 1;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.mockRowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-xs);
+  background: var(--surface-4);
+  color: var(--text-2);
+}
+
+.mockAppIcon {
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: var(--r-xs);
+  object-fit: cover;
+}
+
+.mockAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--t-xs);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: fadeIn var(--d-base) var(--ease) both;
+  }
+
+  .mockHighlight {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}

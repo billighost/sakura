@@ -8,8 +8,8 @@ import { generateUserMixes } from "@/lib/mixes";
 export type HomeData = {
   user: { name: string; avatarUrl: string | null };
   onboarded: boolean;
-  quickPicks: { id: string; title: string; artist: string; coverUrl: string | null }[];
-  recentlyPlayed: { id: string; title: string; artist: string; coverUrl: string | null }[];
+  quickPicks: HomeTrack[];
+  recentlyPlayed: HomeTrack[];
   topArtists: { id: string; name: string; trackCount: number; avatarUrl: string | null }[];
   playlists: { id: string; name: string; trackCount: number; coverUrl: string | null }[];
   madeForYou: {
@@ -24,6 +24,21 @@ export type HomeData = {
     trackCount: number;
   }[];
   systemPlaylists: { id: string; systemId: string; name: string; coverUrl: string | null }[];
+};
+
+/**
+ * `audioUrl` and `duration` are carried through so a home card can start
+ * playback where it stands. Without them the cards could only link to a detail
+ * page, which is two taps and a page load to hear a track the rail is
+ * explicitly recommending.
+ */
+export type HomeTrack = {
+  id: string;
+  title: string;
+  artist: string;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  duration: number;
 };
 
 /**
@@ -116,8 +131,9 @@ async function buildHomeData(userId: string): Promise<HomeData> {
 
       // 3. Quick Picks — favourites and heavy rotation, newest signal first.
       //    Falls back to popular catalogue tracks for a user with no history.
-      query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
-        `SELECT t.id, t.title, a.name AS artist, COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
+      query<HomeTrack>(
+        `SELECT t.id, t.title, a.name AS artist, t."audioUrl", t.duration,
+                COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
          FROM "Track" t
          LEFT JOIN "Artist" a ON a.id = t."artistId"
          LEFT JOIN "Album"  al ON al.id = t."albumId"
@@ -134,8 +150,9 @@ async function buildHomeData(userId: string): Promise<HomeData> {
       )
         .then(async (tracks) => {
           if (tracks.length > 0) return tracks;
-          return query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
-            `SELECT t.id, t.title, a.name AS artist, COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
+          return query<HomeTrack>(
+            `SELECT t.id, t.title, a.name AS artist, t."audioUrl", t.duration,
+                    COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
              FROM "Track" t
              LEFT JOIN "Artist" a ON a.id = t."artistId"
              LEFT JOIN "Album"  al ON al.id = t."albumId"
@@ -147,9 +164,9 @@ async function buildHomeData(userId: string): Promise<HomeData> {
         .catch(softFail("home:quickPicks", [])),
 
       // 4. Recently played
-      query<{ id: string; title: string; artist: string; coverUrl: string | null }>(
+      query<HomeTrack>(
         `SELECT DISTINCT ON (h."trackId")
-           t.id, t.title, a.name AS artist,
+           t.id, t.title, a.name AS artist, t."audioUrl", t.duration,
            COALESCE(t."coverUrl", al."coverUrl") AS "coverUrl"
          FROM "ListeningHistory" h
          JOIN  "Track"  t  ON t.id  = h."trackId"
@@ -227,14 +244,14 @@ async function buildHomeData(userId: string): Promise<HomeData> {
            slot ASC
          LIMIT 8`,
         [userId]
-      ).catch(softFail("home:playlists", [])),
+      ).catch(softFail("home:mixes", [])),
 
       // 8. System Playlists (Top 50s)
       query<{ id: string; systemId: string; name: string; coverUrl: string | null }>(
         `SELECT id, "systemId", name, "coverUrl"
          FROM "SystemPlaylist"
          ORDER BY "name" ASC`
-      ).catch(softFail("home:mixes", [])),
+      ).catch(softFail("home:systemPlaylists", [])),
     ]);
 
   const result: HomeData = {

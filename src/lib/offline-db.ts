@@ -427,7 +427,18 @@ export async function getStorageEstimate() {
 
 export async function clearAudioCache(userId = getCachedUserId(), deviceId = getDeviceId()) {
   if ("caches" in window) {
-    await caches.delete("sakura-audio");
+    /*
+     * The service worker's audio cache is version-suffixed (`sakura-audio-v5`
+     * — see public/sw.js), so deleting the bare name matched nothing and every
+     * "remove downloads" left the Cache Storage copies behind. On a device
+     * where someone had cleared downloads to reclaim space, the space was
+     * never actually reclaimed. Match by prefix so it also catches entries
+     * left by an older worker version.
+     */
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((k) => k.startsWith("sakura-audio")).map((k) => caches.delete(k))
+    );
   }
   const db = await getDB();
   // Clear only this device & user's tracks/audio
