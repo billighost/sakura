@@ -49,6 +49,7 @@ interface LibraryItem {
   title: string;
   subtitle?: string;
   coverUrl?: string;
+  coverUrls?: string[];
   addedAt?: string;
   trackCount?: number;
 }
@@ -132,14 +133,25 @@ export default function LibraryPage() {
         createdAt?: string;
         trackCount?: number;
       }>(playlistsRes.status === "fulfilled" ? playlistsRes.value : null).map(
-        (p): LibraryItem => ({
-          id: p.id,
-          type: "playlist",
-          title: p.name,
-          coverUrl: p.coverUrl,
-          addedAt: p.createdAt,
-          trackCount: p.trackCount,
-        })
+        (p): LibraryItem => {
+          let coverUrl = p.coverUrl;
+          let coverUrls: string[] | undefined;
+          if (coverUrl?.startsWith('[')) {
+            try {
+              coverUrls = JSON.parse(coverUrl);
+              coverUrl = coverUrls?.[0]; // fallback to first image for list views
+            } catch {}
+          }
+          return {
+            id: p.id,
+            type: "playlist",
+            title: p.name,
+            coverUrl,
+            coverUrls,
+            addedAt: p.createdAt,
+            trackCount: p.trackCount,
+          };
+        }
       );
 
       const albums = asList<{
@@ -398,6 +410,7 @@ export default function LibraryPage() {
               title={item.title}
               subtitle={item.subtitle ?? TYPE_LABEL[item.type]}
               coverUrl={item.coverUrl}
+              coverUrls={item.coverUrls}
               shape={item.type === "artist" ? "round" : "square"}
               fallbackIcon={iconFor(item.type, 24)}
             />

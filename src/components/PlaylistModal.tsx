@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./PlaylistModal.module.css";
 import { usePlayer } from "./PlayerContext";
@@ -12,6 +12,14 @@ interface PlaylistModalProps {
   onSuccess?: (playlistId: string) => void;
 }
 
+interface PreviewTrack {
+  title: string;
+  artist: string;
+  duration: number;
+  coverUrl: string;
+  id: string; // generated client-side for keyed mapping
+}
+
 export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps) {
   const router = useRouter();
   const { showToast } = usePlayer();
@@ -20,117 +28,155 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
   const [description, setDescription] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [importStatus, setImportStatus] = useState("");
+  const [status, setStatus] = useState("");
+  
+  const [step, setStep] = useState<"input" | "preview">("input");
+  const [previewTracks, setPreviewTracks] = useState<PreviewTrack[]>([]);
+  const [playlistName, setPlaylistName] = useState("");
+  const [removedTrack, setRemovedTrack] = useState<{ track: PreviewTrack, index: number } | null>(null);
 
-  // No early `if (!isOpen) return null` — <Sheet> stays mounted through its
-  // exit animation and unmounts itself afterwards. Returning null here would
-  // rip the sheet out of the tree the instant it closed, which is exactly the
-  // hard cut this migration removes.
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() && !importUrl.trim()) return;
+  // Reset state when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeout(() => {
+        setStep("input");
+        setPreviewTracks([]);
+        setRemovedTrack(null);
+        setName("");
+        setDescription("");
+        setImportUrl("");
+      }, 300);
+    }
+  }, [isOpen]);
 
+  async function handleFetchPreview() {
+    if (!importUrl.trim()) return;
     setIsLoading(true);
+    setStatus("Fetching playlist details...");
 
     try {
-      if (importUrl.trim()) {
-        // Handle Import
-        setImportStatus("Importing playlist...");
-        
-        // 1. Create the playlist first, using URL as temporary name if none provided
-        const tempName = name.trim() || "Imported Playlist";
-        const createRes = await fetch("/api/playlists", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: tempName, description }),
-        });
-        
-        if (!createRes.ok) throw new Error("Failed to create playlist");
-        const playlist = await createRes.json();
-        
-        // 2. Start streaming tracks from Telegram Bot via SSE
-        setImportStatus("Waiting for tracks...");
-        
-        const response = await fetch("/api/import/spotify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: importUrl }),
-        });
+      const res = await fetch("/api/import/spotify/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      });
 
-        if (!response.ok || !response.body) {
-          throw new Error("Failed to start import");
-        }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch playlist");
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+      const tracksWithIds = data.tracks.map((t: any) => ({
+        ...t,
+        id: Math.random().toString(36).substring(7),
+      }));
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      setPreviewTracks(tracksWithIds);
+      setPlaylistName(data.name || "Imported Playlist");
+      setStep("preview");
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message, "error");
+    } finally {
+      setIsLoading(false);
+      setStatus("");
+    }
+  }
 
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process SSE chunks
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ""; // Keep the last incomplete line in buffer
+  function handleRemoveTrack(index: number) {
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.slice(6);
-              if (!dataStr || dataStr === "{}") continue; // done event payload
-              
-              try {
-                const track = JSON.parse(dataStr);
-                setImportStatus(`Imported: ${track.title}`);
-                
-                // Add track to DB
-                // Since this uses Telegram, we first need to make sure the track exists in DB
-                // We will call an endpoint to save track info from telegram, then add to playlist
-                const addRes = await fetch(`/api/playlists/${playlist.id}/tracks/import`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ 
-                    telegramMetadata: track 
-                  }),
-                });
-                // Note: the above API call needs backend support to handle telegramMetadata
-                // For now, we'll assume the backend handles it or we'll update it later.
-              } catch (e) {
-                console.error("Failed to parse SSE data", e);
-              }
-            }
-          }
-        }
+    const track = previewTracks[index];
+    setRemovedTrack({ track, index });
+    
+    setPreviewTracks(prev => {
+      const copy = [...prev];
+      copy.splice(index, 1);
+      return copy;
+    });
 
-        showToast("Playlist imported successfully!", "success");
-        if (onSuccess) onSuccess(playlist.id);
-        
-      } else {
-        // Handle Creation
-        const res = await fetch("/api/playlists", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description }),
-        });
-        
-        if (!res.ok) throw new Error("Failed to create playlist");
-        
-        const data = await res.json();
-        showToast("Playlist created!", "success");
-        if (onSuccess) onSuccess(data.id);
-      }
+    undoTimeoutRef.current = setTimeout(() => {
+      setRemovedTrack(null);
+    }, 5000);
+  }
+
+  function handleUndoRemove() {
+    if (removedTrack) {
+      setPreviewTracks(prev => {
+        const copy = [...prev];
+        copy.splice(removedTrack.index, 0, removedTrack.track);
+        return copy;
+      });
+      setRemovedTrack(null);
+      if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    }
+  }
+
+  async function handleConfirmImport() {
+    setIsLoading(true);
+    setStatus("Creating playlist...");
+    
+    try {
+      const finalName = name.trim() || playlistName || "Imported Playlist";
+      
+      const createRes = await fetch("/api/playlists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: finalName, description }),
+      });
+      
+      if (!createRes.ok) throw new Error("Failed to create playlist");
+      const playlist = await createRes.json();
+      
+      setStatus("Saving tracks...");
+      
+      const batchRes = await fetch(`/api/playlists/${playlist.id}/tracks/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tracks: previewTracks }),
+      });
+      
+      if (!batchRes.ok) throw new Error("Failed to save tracks");
+
+      showToast(`Imported ${previewTracks.length} tracks successfully!`, "success");
+      if (onSuccess) onSuccess(playlist.id);
       
       onClose();
       router.refresh();
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message, "error");
+    } finally {
+      setIsLoading(false);
+      setStatus("");
+    }
+  }
+
+  async function handleCreateEmpty(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/playlists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description }),
+      });
       
+      if (!res.ok) throw new Error("Failed to create playlist");
+      
+      const data = await res.json();
+      showToast("Playlist created!", "success");
+      if (onSuccess) onSuccess(data.id);
+      
+      onClose();
+      router.refresh();
     } catch (err: any) {
       console.error(err);
       showToast(err.message || "Something went wrong", "error");
     } finally {
       setIsLoading(false);
-      setImportStatus("");
     }
   }
 
@@ -138,80 +184,156 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
     <Sheet
       open={isOpen}
       onClose={onClose}
-      title="New Playlist"
+      title={step === "preview" ? "Preview Playlist" : "New Playlist"}
       variant="dialog"
-      // A form mid-submit shouldn't be dismissable by a stray backdrop tap —
-      // the import streams tracks in and losing the sheet loses the progress.
       dismissible={!isLoading}
     >
-      <form onSubmit={handleSubmit}>
-        <div className={styles.inputGroup}>
-          <label htmlFor="playlist-name" className={styles.label}>Name</label>
-          <input
-            id="playlist-name"
-            className={styles.input}
-            placeholder="My Awesome Playlist"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className={styles.inputGroup} style={{ marginTop: 12 }}>
-          <label htmlFor="playlist-desc" className={styles.label}>Description (optional)</label>
-          <textarea
-            id="playlist-desc"
-            className={`${styles.input} ${styles.textarea}`}
-            placeholder="A brief description..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className={styles.divider} style={{ margin: "20px 0" }}>OR</div>
-
-        <div className={styles.inputGroup}>
-          <label htmlFor="playlist-import" className={styles.label}>Import Public Spotify Playlist</label>
-          <input
-            id="playlist-import"
-            className={styles.input}
-            placeholder="https://open.spotify.com/playlist/..."
-            value={importUrl}
-            onChange={(e) => setImportUrl(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-
-        {isLoading && importStatus && (
-          <div className={styles.progressContainer}>
-            <div className={styles.spinner} />
-            {/* Announced, because the status is the only sign anything is
-                happening during a long import. */}
-            <div className={styles.progressText} role="status" aria-live="polite">
-              {importStatus}
-            </div>
+      {step === "input" ? (
+        <form onSubmit={handleCreateEmpty}>
+          <div className={styles.inputGroup}>
+            <label htmlFor="playlist-name" className={styles.label}>Name</label>
+            <input
+              id="playlist-name"
+              className={styles.input}
+              placeholder="My Awesome Playlist"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isLoading}
+            />
           </div>
-        )}
 
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnCancel} pressable`}
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={`${styles.btn} ${styles.btnSubmit} pressable`}
-            disabled={isLoading || (!name.trim() && !importUrl.trim())}
-          >
-            {isLoading ? "Saving..." : importUrl.trim() ? "Import" : "Create"}
-          </button>
+          <div className={styles.inputGroup} style={{ marginTop: 12 }}>
+            <label htmlFor="playlist-desc" className={styles.label}>Description (optional)</label>
+            <textarea
+              id="playlist-desc"
+              className={`${styles.input} ${styles.textarea}`}
+              placeholder="A brief description..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className={styles.divider} style={{ margin: "20px 0" }}>OR</div>
+
+          <div className={styles.inputGroup}>
+            <label htmlFor="playlist-import" className={styles.label}>Import Public Spotify Playlist</label>
+            <input
+              id="playlist-import"
+              className={styles.input}
+              placeholder="https://open.spotify.com/playlist/..."
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+
+          {isLoading && status && (
+            <div className={styles.progressContainer}>
+              <div className={styles.spinner} />
+              <div className={styles.progressText} role="status" aria-live="polite">
+                {status}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnCancel} pressable`}
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            {importUrl.trim() ? (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnSubmit} pressable`}
+                onClick={handleFetchPreview}
+                disabled={isLoading}
+              >
+                Preview
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className={`${styles.btn} ${styles.btnSubmit} pressable`}
+                disabled={isLoading || !name.trim()}
+              >
+                Create
+              </button>
+            )}
+          </div>
+        </form>
+      ) : (
+        <div className={styles.previewContainer}>
+          <div className={styles.previewHeader}>
+            <h3 className={styles.previewTitle}>{playlistName}</h3>
+            <span className={styles.previewCount}>{previewTracks.length} tracks</span>
+          </div>
+          
+          <div className={styles.trackList}>
+            {previewTracks.map((track, i) => (
+              <div key={track.id} className={styles.trackRow}>
+                {track.coverUrl ? (
+                  <img src={track.coverUrl} className={styles.trackCover} alt="" />
+                ) : (
+                  <div className={styles.trackCoverPlaceholder} />
+                )}
+                <div className={styles.trackInfo}>
+                  <div className={styles.trackTitle}>{track.title}</div>
+                  <div className={styles.trackArtist}>{track.artist}</div>
+                </div>
+                <button 
+                  className={styles.removeBtn}
+                  onClick={() => handleRemoveTrack(i)}
+                  title="Remove track"
+                  disabled={isLoading}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {removedTrack && (
+            <div className={styles.undoToast}>
+              <span>Removed "{removedTrack.track.title}"</span>
+              <button onClick={handleUndoRemove} className={styles.undoBtn}>Undo</button>
+            </div>
+          )}
+
+          {isLoading && status && (
+            <div className={styles.progressContainer}>
+              <div className={styles.spinner} />
+              <div className={styles.progressText}>{status}</div>
+            </div>
+          )}
+
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnCancel} pressable`}
+              onClick={() => setStep("input")}
+              disabled={isLoading}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnSubmit} pressable`}
+              onClick={handleConfirmImport}
+              disabled={isLoading || previewTracks.length === 0}
+            >
+              Confirm Import
+            </button>
+          </div>
         </div>
-      </form>
+      )}
     </Sheet>
   );
 }

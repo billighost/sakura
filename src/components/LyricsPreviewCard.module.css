@@ -38,16 +38,31 @@
   width: 100%;
   padding: var(--space-4);
   border-radius: var(--r-lg);
-  background: var(--on-media-fill);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /*
+   * Tinted with the track's own accent — extracted from the artwork, see
+   * color.ts — rather than a flat neutral fill, so the card carries this
+   * song's mood instead of reading as a generic panel. Mixed down to ~28%
+   * into a dark base, not shown at full saturation, so the on-media text
+   * tokens stay legible regardless of how bright the source photo is.
+   */
+  background: color-mix(in srgb, var(--track-accent, var(--accent)) 28%, #16121a 72%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   box-sizing: border-box;
   transition: background var(--d-fast) var(--ease);
 }
 
+/* Browsers without color-mix (rare) fall back to the old flat fill rather
+ * than an unstyled background. */
+@supports not (background: color-mix(in srgb, red, blue)) {
+  .card {
+    background: var(--on-media-fill);
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    background: var(--on-media-fill-strong);
+    background: color-mix(in srgb, var(--track-accent, var(--accent)) 36%, #16121a 64%);
   }
 }
 

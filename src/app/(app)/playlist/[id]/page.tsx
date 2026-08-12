@@ -273,6 +273,16 @@ export default function PlaylistPage() {
     );
   }
 
+  const coverUrls = useMemo(() => {
+    if (!playlist?.coverUrl) return [];
+    if (playlist.coverUrl.startsWith('[')) {
+      try { return JSON.parse(playlist.coverUrl); } catch { return [playlist.coverUrl]; }
+    }
+    return [playlist.coverUrl];
+  }, [playlist?.coverUrl]);
+  const mainCover = coverUrls[0];
+  const isCollage = coverUrls.length >= 4;
+
   if (!playlist) return null;
 
   return (
@@ -284,8 +294,8 @@ export default function PlaylistPage() {
       </button>
 
       <div className={`${styles.stickyHeader} ${stickyVisible ? styles.visible : ""}`}>
-        {playlist.coverUrl ? (
-          <img className={styles.stickyCover} src={playlist.coverUrl} alt="" />
+        {mainCover ? (
+          <img className={styles.stickyCover} src={mainCover} alt="" />
         ) : (
           <div className={styles.stickyCover} style={{ background: "var(--sakura-accent-gradient)" }} />
         )}
@@ -298,15 +308,21 @@ export default function PlaylistPage() {
       </div>
 
       <div className={styles.heroSection}>
-        {playlist.coverUrl ? (
-          <img className={styles.heroBleed} src={playlist.coverUrl} alt="" aria-hidden="true" />
+        {mainCover ? (
+          <img className={styles.heroBleed} src={mainCover} alt="" aria-hidden="true" />
         ) : (
           <div className={styles.heroBleedFallback} />
         )}
         <div className={styles.hero}>
           <div className={styles.coverArtWrapper}>
-            {playlist.coverUrl ? (
-              <img src={playlist.coverUrl} alt="" className={styles.coverArtImg} />
+            {isCollage ? (
+              <div className={styles.coverArtCollage} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', width: '100%', height: '100%', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
+                {coverUrls.slice(0, 4).map((url: string, i: number) => (
+                  <img key={i} src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ))}
+              </div>
+            ) : mainCover ? (
+              <img src={mainCover} alt="" className={styles.coverArtImg} />
             ) : (
               <svg viewBox="0 0 24 24" fill="white" width="clamp(1.5rem, 5vw, 2rem)" height="clamp(1.5rem, 5vw, 2rem)">
                 <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
