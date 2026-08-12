@@ -1,136 +1,117 @@
 .container {
   display: flex;
   flex-direction: column;
-  color: white;
-  margin-top: 16px;
-  animation: fadeIn 0.3s ease;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  animation: fadeIn var(--d-slow) var(--ease);
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .header {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--t-2xs);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 16px;
-  padding: 0 16px;
+  letter-spacing: var(--track-caps);
+  color: var(--on-media-tertiary);
 }
 
-
-
-.content {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  padding: 0 16px;
+/* Same tokens as LyricsPreviewCard's `.card` right above this — see the note
+ * in that file. This one isn't a button, so no `pressable` here; the
+ * interactive pieces inside it (read more, close) carry their own. */
+.card {
+  border-radius: var(--r-lg);
+  background: var(--on-media-fill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--space-4);
+  box-sizing: border-box;
 }
 
-.loading {
+.cardLoading {
   display: flex;
-  justify-content: center;
   align-items: center;
-  flex: 1;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 15px;
+  justify-content: center;
+  min-height: 5.75rem;
 }
 
-/* Artist Card */
-/* Artist Card */
-.artistCard {
-  position: relative;
-  overflow: hidden;
-  border-radius: 20px;
-  min-height: 250px;
+.loadingText {
+  color: var(--on-media-tertiary);
+  font-size: var(--t-sm);
+}
+
+.noExtra {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: var(--t-sm);
+  color: var(--on-media-tertiary);
+}
+
+/* ── Main artist ──────────────────────────────────────────────────────────── */
+
+.artistRow {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.artistCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-}
-
-.artistImage {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.artistAvatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--r-full);
   object-fit: cover;
-  background: var(--sakura-skeleton, rgba(255, 255, 255, 0.08));
-  z-index: 1;
+  background: var(--on-media-fill-strong);
+  flex-shrink: 0;
 }
 
-.artistFallback {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.artistAvatarFallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(40, 30, 45, 0.9), rgba(15, 12, 18, 0.95));
-  color: rgba(255, 255, 255, 0.35);
-  z-index: 1;
+  color: var(--on-media-tertiary);
 }
 
-.artistOverlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.55) 45%, rgba(0, 0, 0, 0.92) 100%);
-  z-index: 2;
-  pointer-events: none;
-}
-
-.artistInfo {
-  position: relative;
-  z-index: 3;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.artistMeta {
+  min-width: 0;
 }
 
 .artistRole {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  font-size: 10.5px;
+  font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #ffffff;
+  letter-spacing: var(--track-caps);
+  color: var(--track-accent, var(--accent));
+  margin-bottom: 2px;
 }
 
 .artistName {
-  font-size: 26px;
-  font-weight: 800;
-  color: #ffffff;
-  margin: 6px 0 2px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  line-height: 1.2;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--on-media);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bioBlock {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .truncatedBio {
-  margin-top: 4px;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.88);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--on-media-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -139,170 +120,181 @@
 }
 
 .readMoreBtn {
-  margin-top: 10px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  all: unset;
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-size: var(--t-xs);
   font-weight: 600;
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 20px;
+  color: var(--on-media);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 3px;
   cursor: pointer;
-  align-self: flex-start;
-  transition: all 0.2s ease;
 }
 
-.readMoreBtn:hover {
-  background: rgba(255, 255, 255, 0.35);
-  transform: translateY(-1px);
-}
+/* ── Role-grouped credits ─────────────────────────────────────────────────── */
 
-/* Other Credits */
-.otherCredits {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.sectionTitle {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
+.creditRows {
+  margin-top: var(--space-3);
+  padding-top: var(--space-1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .creditRow {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  transition: background 0.2s;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.creditRow:hover {
-  background: rgba(255, 255, 255, 0.08);
+.creditRow:first-child {
+  border-top: none;
 }
 
-.creditAvatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.5);
+.creditRoleLabel {
   flex-shrink: 0;
+  font-size: var(--t-xs);
+  color: var(--on-media-tertiary);
 }
 
-.creditDetails {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-}
-
-.creditName {
-  font-size: 15px;
+.creditNames {
+  text-align: right;
+  font-size: var(--t-sm);
   font-weight: 500;
-  white-space: nowrap;
+  color: var(--on-media);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.creditRole {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
+/* ── Samples ──────────────────────────────────────────────────────────────── */
+
+.sampleGroup {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sampleGroupLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+  color: var(--on-media-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.sampleRow {
+  padding: var(--space-2) 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sampleRow:first-of-type {
+  border-top: none;
+}
+
+.sampleTitle {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--on-media);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Modal */
+.sampleMeta {
+  font-size: var(--t-xs);
+  color: var(--on-media-tertiary);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Bio modal ────────────────────────────────────────────────────────────── */
+
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 4, 8, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  animation: fadeIn 0.2s ease forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  padding: var(--space-5);
+  animation: fadeIn var(--d-base) var(--ease);
 }
 
 .modalContent {
-  background: #181818;
-  border-radius: 24px;
+  background: #16121a;
+  border-radius: var(--r-xl);
   width: 100%;
-  max-width: 500px;
+  max-width: 28rem;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-4);
 }
 
 .modalHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .modalTitle {
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
   font-weight: 600;
+  color: var(--on-media);
   margin: 0;
 }
 
 .modalCloseBtn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: var(--r-full);
+  background: var(--on-media-fill);
+  color: var(--on-media);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--d-fast) var(--ease);
 }
 
-.modalCloseBtn:hover {
-  background: rgba(255, 255, 255, 0.2);
+@media (hover: hover) and (pointer: fine) {
+  .modalCloseBtn:hover {
+    background: var(--on-media-fill-strong);
+  }
 }
 
 .modalBody {
-  padding: 24px;
+  padding: var(--space-4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-4);
 }
 
 .modalImage {
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   object-fit: cover;
 }
 
 .fullBio {
-  font-size: 15px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--t-base);
+  line-height: var(--lh-loose);
+  color: var(--on-media-secondary);
   margin: 0;
   white-space: pre-wrap;
 }

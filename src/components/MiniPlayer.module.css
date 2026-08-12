@@ -7,7 +7,7 @@
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border-top: 1px solid var(--chrome-line);
-  border-radius: var(--r-md) var(--r-md) 0 0;
+  border-radius: 0;
   cursor: pointer;
   flex-shrink: 0;
   z-index: 49;
@@ -17,8 +17,8 @@
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
   /* The art now sits edge-to-edge and the artwork can gently scale while
-   * playing (see .artWrap.playing) — this keeps both clipped to the bar's
-   * own rounded top corners instead of poking past them. */
+   * playing (see .artWrap.playing) — this keeps that scale, and the ambient
+   * wash below, clipped to the bar's own bounds instead of poking past them. */
   overflow: hidden;
 }
 
