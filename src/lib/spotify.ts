@@ -17,7 +17,8 @@ export async function getSpotifyToken(): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get Spotify token: ${response.statusText}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Failed to get Spotify token: ${response.status} ${response.statusText} — ${body}`);
   }
 
   const data = await response.json();
@@ -26,42 +27,121 @@ export async function getSpotifyToken(): Promise<string> {
 
 export async function fetchSpotifyPlaylist(url: string) {
   const token = await getSpotifyToken();
-  const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
-  if (!match) throw new Error("Invalid Spotify playlist URL");
+
+  // Support both full URLs and bare playlist IDs
+  const match = url.match(/playlist[/:]([a-zA-Z0-9]+)/);
+  if (!match) throw new Error("Invalid Spotify playlist URL — could not extract playlist ID");
   const playlistId = match[1];
 
   let tracks: any[] = [];
-  let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(name,artists,duration_ms,album(images)))`;
 
   while (nextUrl) {
     const response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error("Failed to fetch playlist tracks");
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Spotify API error ${response.status}: ${body}`);
+    }
     const data = await response.json();
-    
-    for (const item of data.items) {
-      if (!item.track) continue;
+
+    for (const item of data.items ?? []) {
+      if (!item || !item.track) continue;
+      const track = item.track;
       tracks.push({
-        title: item.track.name,
-        artist: item.track.artists.map((a: any) => a.name).join(", "),
-        duration: Math.floor(item.track.duration_ms / 1000),
-        coverUrl: item.track.album?.images?.[0]?.url || "",
+        title: track.name,
+        artist: track.artists?.map((a: any) => a.name).join(", ") ?? "Unknown",
+        duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : 0,
+        coverUrl: track.album?.images?.[0]?.url ?? "",
         messageId: 0,
       });
     }
-    nextUrl = data.next;
+    nextUrl = data.next ?? null;
   }
-  
+
   // Fetch playlist details for name/cover
-  const detailsRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const detailsRes = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   const details = await detailsRes.json();
 
   return {
-    name: details.name,
-    coverUrl: details.images?.[0]?.url || "",
-    tracks
+    name: details.name ?? "Imported Playlist",
+    coverUrl: details.images?.[0]?.url ?? "",
+    tracks,
+  };
+}
+
+// ─── User-authenticated Spotify API ───────────────────────────────────────────
+
+export async function fetchSpotifyUserPlaylists(accessToken: string) {
+  let playlists: any[] = [];
+  let nextUrl: string | null = "https://api.spotify.com/v1/me/playlists?limit=50";
+
+  while (nextUrl) {
+    const response = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Spotify API error ${response.status}: ${body}`);
+    }
+    const data = await response.json();
+    for (const p of data.items ?? []) {
+      if (!p) continue;
+      playlists.push({
+        id: p.id,
+        name: p.name,
+        coverUrl: p.images?.[0]?.url ?? "",
+        trackCount: p.tracks?.total ?? 0,
+        owner: p.owner?.display_name ?? "",
+      });
+    }
+    nextUrl = data.next ?? null;
+  }
+
+  return playlists;
+}
+
+export async function fetchSpotifyPlaylistWithToken(playlistId: string, accessToken: string) {
+  let tracks: any[] = [];
+  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+
+  while (nextUrl) {
+    const response = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Spotify API error ${response.status}: ${body}`);
+    }
+    const data = await response.json();
+
+    for (const item of data.items ?? []) {
+      if (!item || !item.track) continue;
+      const track = item.track;
+      tracks.push({
+        title: track.name,
+        artist: track.artists?.map((a: any) => a.name).join(", ") ?? "Unknown",
+        duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : 0,
+        coverUrl: track.album?.images?.[0]?.url ?? "",
+        messageId: 0,
+      });
+    }
+    nextUrl = data.next ?? null;
+  }
+
+  const detailsRes = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const details = await detailsRes.json();
+
+  return {
+    name: details.name ?? "Imported Playlist",
+    coverUrl: details.images?.[0]?.url ?? "",
+    tracks,
   };
 }

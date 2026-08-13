@@ -1,11 +1,111 @@
-/* Playlist create/import form, and the "add to playlist" picker that shares it.
- * Shell, header, close button and animations come from <Sheet>.
+/* PlaylistModal — Create Manually or Import from Spotify
  *
- * Migrated off the `--sakura-*` aliases. Two of the names this file used —
- * `--sakura-text-muted` and `--sakura-accent-rgb` — were never defined
- * anywhere, so the placeholder colour and both focus rings silently resolved
- * to nothing.
+ * Shell, header, close button and animations come from <Sheet>.
+ * This file owns: pick step, manual form, Spotify import flow,
+ * preview track list, and all shared action buttons.
  */
+
+/* ── Pick step: two option cards ─────────────────────────────────────────── */
+
+.pickStep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+
+.pickTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  letter-spacing: var(--track-snug);
+  margin-bottom: var(--space-2);
+}
+
+.pickSubtitle {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  text-align: center;
+  margin-top: calc(var(--space-2) * -1);
+  margin-bottom: var(--space-3);
+  line-height: var(--lh-normal);
+}
+
+.optionCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.optionCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+  background: var(--surface-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--spring);
+  text-align: center;
+  min-height: 130px;
+  justify-content: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .optionCard:hover {
+    background: var(--surface-3);
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+.optionCard:active {
+  transform: scale(0.97);
+}
+
+.optionCardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-md);
+  flex-shrink: 0;
+}
+
+.optionCardIconManual {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.optionCardIconSpotify {
+  background: rgba(30, 215, 96, 0.12);
+  color: #1ed760;
+}
+
+.optionCardLabel {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--track-snug);
+}
+
+.optionCardDesc {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  line-height: var(--lh-snug);
+}
+
+/* ── Manual form ─────────────────────────────────────────────────────────── */
 
 .inputGroup {
   display: flex;
@@ -47,6 +147,29 @@
   min-height: 5rem;
 }
 
+/* ── Spotify import step ─────────────────────────────────────────────────── */
+
+.spotifyStep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.spotifySection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionHeading {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
 .divider {
   display: flex;
   align-items: center;
@@ -71,6 +194,313 @@
 .divider:not(:empty)::after {
   margin-left: var(--space-3);
 }
+
+.urlInputRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.urlInputRow .input {
+  flex: 1;
+}
+
+.pasteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  font-family: var(--font-body);
+  flex-shrink: 0;
+  transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pasteBtn:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+}
+
+/* Spotify connect button */
+.connectSpotifyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  background: #1ed760;
+  color: #000;
+  border: none;
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease), transform var(--d-fast) var(--spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .connectSpotifyBtn:hover {
+    background: #1fdf64;
+    transform: translateY(-1px);
+  }
+}
+
+.connectSpotifyBtn:active {
+  transform: scale(0.98);
+}
+
+.spotifyLogo {
+  flex-shrink: 0;
+}
+
+/* User playlists list */
+.userPlaylistList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.userPlaylistList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.userPlaylistList::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--r-full);
+}
+
+.userPlaylistRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .userPlaylistRow:hover {
+    background: var(--surface-3);
+  }
+}
+
+.userPlaylistCover {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--surface-3);
+  flex-shrink: 0;
+}
+
+.userPlaylistCoverPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.userPlaylistInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.userPlaylistName {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: var(--track-snug);
+}
+
+.userPlaylistMeta {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Spotify connected badge */
+.connectedBadge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(30, 215, 96, 0.1);
+  border: 1px solid rgba(30, 215, 96, 0.2);
+  border-radius: var(--r-md);
+  font-size: var(--t-xs);
+  color: #1ed760;
+  font-weight: 600;
+  font-family: var(--font-body);
+}
+
+.connectedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1ed760;
+  flex-shrink: 0;
+}
+
+/* ── Preview step ─────────────────────────────────────────────────────────── */
+
+.previewContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.previewTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.previewCount {
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.trackList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.trackList::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--r-full);
+}
+
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  transition: background-color 0.2s ease;
+}
+
+.trackRow:hover {
+  background: var(--surface-3);
+}
+
+.trackCover {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--surface-1);
+}
+
+.trackCoverPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  flex-shrink: 0;
+}
+
+.trackInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.trackTitle {
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--t-sm);
+}
+
+.trackArtist {
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--t-xs);
+}
+
+.removeBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.removeBtn:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.removeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────────── */
 
 .actions {
   display: flex;
@@ -99,6 +529,12 @@
   color: var(--text);
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .btnCancel:hover {
+    background: var(--surface-3);
+  }
+}
+
 .btnSubmit {
   background: var(--accent);
   color: var(--on-accent);
@@ -110,14 +546,12 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btnCancel:hover {
-    background: var(--surface-3);
-  }
-
   .btnSubmit:hover:not(:disabled) {
     background: var(--accent-press);
   }
 }
+
+/* ── Progress / spinner ───────────────────────────────────────────────────── */
 
 .progressContainer {
   margin-top: var(--space-4);
@@ -142,13 +576,27 @@
   margin: 0 auto;
 }
 
+.spinnerSmall {
+  width: 1rem;
+  height: 1rem;
+  border-width: 2px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-/* ── Playlist picker (AddToPlaylistModal) ─────────────────────────────────── */
+/* ── Shared utilities ─────────────────────────────────────────────────────── */
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Playlist picker (AddToPlaylistModal) ──────────────────────────────────  */
 
 .pickList {
   display: flex;
@@ -215,131 +663,7 @@
   margin-top: var(--space-4);
 }
 
-/* ── Preview UI ───────────────────────────────────────────────────────────── */
-
-.previewContainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-height: 70vh;
-  overflow: hidden;
-}
-
-.previewHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.previewTitle {
-  font-family: var(--font-display);
-  font-size: var(--t-lg);
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.previewCount {
-  font-size: var(--t-sm);
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-
-.trackList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  overflow-y: auto;
-  padding-right: var(--space-2);
-  /* custom scrollbar for webkit */
-}
-
-.trackList::-webkit-scrollbar {
-  width: 6px;
-}
-.trackList::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
-  border-radius: var(--r-full);
-}
-
-.trackRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  transition: background-color 0.2s ease;
-}
-
-.trackRow:hover {
-  background: var(--surface-3);
-}
-
-.trackCover {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
-  background: var(--surface-1);
-}
-
-.trackCoverPlaceholder {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  background: var(--surface-3);
-}
-
-.trackInfo {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.trackTitle {
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--t-sm);
-}
-
-.trackArtist {
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--t-xs);
-}
-
-.removeBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-3);
-  cursor: pointer;
-  padding: var(--space-2);
-  border-radius: var(--r-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-
-.removeBtn:hover:not(:disabled) {
-  color: var(--sakura-danger, #ff4d4d);
-  background: rgba(255, 77, 77, 0.1);
-}
-
-.removeBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* ── Undo toast ───────────────────────────────────────────────────────────── */
 
 .undoToast {
   position: absolute;
@@ -353,8 +677,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: var(--shadow-3);
+  animation: slideUp 0.3s var(--spring) both;
   z-index: 100;
 }
 
@@ -379,15 +703,4 @@
 
 .undoBtn:hover {
   text-decoration: underline;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translate(-50%, 20px);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
 }

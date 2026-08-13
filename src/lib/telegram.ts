@@ -96,6 +96,79 @@ class RedisMutex {
       await new Promise(r => setTimeout(r, 1000));
     }
   }
+
+  /**
+   * Distributed lock specifically for the MTProto connect() call.
+   *
+   * Vercel spins up many serverless instances concurrently. Each gets its own
+   * GramClient (globalThis is per-process) and all race to call connect() with
+   * the same session string. Telegram sees the same auth key arriving from
+   * multiple IPs simultaneously and responds with AUTH_KEY_DUPLICATED.
+   *
+   * This lock serialises connect() across all instances: one wins, connects,
+   * then releases. The others wait, see the connect lock is free, and by that
+   * time the winning instance has already torn down its connection (serverless
+   * idle disconnect) or the subsequent request reuses the warm connection.
+   */
+  async acquireConnectLock(): Promise<() => Promise<void>> {
+    if (!this.redis) {
+      // No Redis — local dev, no concurrent instances, no problem.
+      return async () => {};
+    }
+
+    const lockKey = "telegram:connect:lock";
+    const token = Math.random().toString(36).slice(2);
+    // 30 s is long enough for a cold connect but short enough that a crashed
+    // instance doesn't block everything indefinitely.
+    const lockTimeoutMs = 30_000;
+    const maxWaitMs = 25_000;
+    const started = Date.now();
+
+    while (Date.now() - started < maxWaitMs) {
+      const acquired = await this.redis.set(lockKey, token, { nx: true, px: lockTimeoutMs });
+      if (acquired) {
+        return async () => {
+          const script = `
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+              return redis.call("del", KEYS[1])
+            else
+              return 0
+            end
+          `;
+          try {
+            await this.redis!.eval(script, [lockKey], [token]);
+          } catch { /* best-effort */ }
+        };
+      }
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    // Couldn't get the lock in time — another instance is connecting.
+    // Return a no-op release so the caller doesn't hang.
+    console.warn("[RedisMutex] Connect lock timed out — proceeding without lock");
+    return async () => {};
+  }
+
+  /**
+   * Mark the current Telegram session as poisoned in Redis (AUTH_KEY_DUPLICATED).
+   * All instances will fast-fail Telegram calls until the key is manually cleared
+   * (i.e. after the operator regenerates the session string).
+   */
+  async markSessionPoisoned(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      // 10-minute TTL — short enough that a new session survives the deployment.
+      await this.redis.set("telegram:session:poisoned", "1", { px: 10 * 60 * 1000 });
+    } catch { /* best-effort */ }
+  }
+
+  async isSessionPoisoned(): Promise<boolean> {
+    if (!this.redis) return false;
+    try {
+      const v = await this.redis.get("telegram:session:poisoned");
+      return !!v;
+    } catch { return false; }
+  }
 }
 
 export class TelegramClient {
@@ -164,45 +237,59 @@ export class TelegramClient {
     if (this.connectPromise) return this.connectPromise;
 
     this.connectPromise = (async () => {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          if (!this.client?.connected) {
-            await this.client.connect();
-          }
-          this.connected = true;
-          this.connectPromise = null;
-          console.log("[Telegram] Connected");
-          return;
-        } catch (error: any) {
-          this.connected = false;
-          const isAuthKeyDuplicated =
-            error?.errorMessage === "AUTH_KEY_DUPLICATED" ||
-            error?.code === 406 ||
-            String(error).includes("AUTH_KEY_DUPLICATED");
-
-          if (isAuthKeyDuplicated && attempt < 3) {
-            const jitterMs = 1500 + Math.floor(Math.random() * 2000);
-            console.warn(`[Telegram] AUTH_KEY_DUPLICATED (attempt ${attempt}/3), retrying in ${jitterMs}ms...`);
-            try { await this.client.disconnect(); } catch { /* ignore */ }
-            this.client = new GramClient(
-              new StringSession(this.sessionString),
-              this.apiId,
-              this.apiHash,
-              {
-                connectionRetries: 5,
-                autoReconnect: true,
-              },
-            );
-            await new Promise((r) => setTimeout(r, jitterMs));
-          } else {
-            this.connectPromise = null;
-            console.error("[Telegram] Connection failed:", error);
-            throw error;
-          }
-        }
+      // Fast-fail if a previous instance already poisoned this session.
+      if (await TelegramClient.botMutex.isSessionPoisoned()) {
+        this.connectPromise = null;
+        throw new Error(
+          "[Telegram] Session is poisoned (AUTH_KEY_DUPLICATED). " +
+          "Regenerate TELEGRAM_SESSION_STRING and redeploy."
+        );
       }
-      this.connectPromise = null;
-      throw new Error("[Telegram] Failed to connect after 3 attempts");
+
+      // Serialise connect() across all concurrent Vercel instances.
+      // Without this every cold-start simultaneously opens a TCP+MTProto
+      // handshake with the same auth key → Telegram revokes it.
+      const releaseConnectLock = await TelegramClient.botMutex.acquireConnectLock();
+      try {
+        // Re-check: a sibling instance may have connected (and disconnected)
+        // while we waited for the lock.
+        if (this.connected && this.client?.connected) {
+          this.connectPromise = null;
+          return;
+        }
+
+        if (!this.client?.connected) {
+          await this.client.connect();
+        }
+        this.connected = true;
+        this.connectPromise = null;
+        console.log("[Telegram] Connected");
+      } catch (error: any) {
+        this.connected = false;
+        this.connectPromise = null;
+
+        const isAuthKeyDuplicated =
+          error?.errorMessage === "AUTH_KEY_DUPLICATED" ||
+          error?.code === 406 ||
+          String(error).includes("AUTH_KEY_DUPLICATED");
+
+        if (isAuthKeyDuplicated) {
+          // Retrying with the same session string cannot work — the key is
+          // already revoked by Telegram. Mark it poisoned in Redis so every
+          // other instance fast-fails instead of hammering Telegram further.
+          console.error(
+            "[Telegram] AUTH_KEY_DUPLICATED during connect(). " +
+            "Session poisoned. Regenerate TELEGRAM_SESSION_STRING and redeploy."
+          );
+          await TelegramClient.botMutex.markSessionPoisoned();
+          try { await this.client.disconnect(); } catch { /* ignore */ }
+        } else {
+          console.error("[Telegram] Connection failed:", error);
+        }
+        throw error;
+      } finally {
+        await releaseConnectLock();
+      }
     })();
 
     return this.connectPromise;
@@ -289,14 +376,40 @@ export class TelegramClient {
     let lastErr: any;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        // Fast-fail before even trying if the session is known-poisoned.
+        if (await TelegramClient.botMutex.isSessionPoisoned()) {
+          throw new Error(
+            "[Telegram] Session is poisoned (AUTH_KEY_DUPLICATED). " +
+            "Regenerate TELEGRAM_SESSION_STRING and redeploy."
+          );
+        }
         await this.ensureConnected();
         return await fn();
       } catch (err: any) {
         lastErr = err;
-        const isRetriableError =
+
+        const isAuthKeyDuplicated =
           err?.code === 406 ||
           err?.errorMessage === "AUTH_KEY_DUPLICATED" ||
-          String(err).includes("AUTH_KEY_DUPLICATED") ||
+          String(err).includes("AUTH_KEY_DUPLICATED");
+
+        // AUTH_KEY_DUPLICATED means the session is revoked by Telegram.
+        // Retrying with the same session string — even with a new GramClient —
+        // cannot recover: the auth key is already gone. Stop immediately,
+        // mark the session as poisoned, and let the operator regenerate.
+        if (isAuthKeyDuplicated) {
+          console.error(
+            "[Telegram] AUTH_KEY_DUPLICATED in withRetry — session poisoned. " +
+            "Not retrying. Regenerate TELEGRAM_SESSION_STRING and redeploy."
+          );
+          await TelegramClient.botMutex.markSessionPoisoned();
+          this.connected = false;
+          this.connectPromise = null;
+          try { await this.client.disconnect(); } catch { /* ignore */ }
+          throw err;
+        }
+
+        const isRetriableError =
           err?.message?.includes("ECONNRESET") ||
           err?.message?.includes("ETIMEDOUT") ||
           err?.message?.includes("socket") ||
@@ -321,7 +434,7 @@ export class TelegramClient {
 
           if (attempt < 3) {
             const jitterMs = 1500 + Math.floor(Math.random() * 2000);
-            console.warn(`[Telegram] Retriable error (${err.message || err.errorMessage || "AUTH_KEY_DUPLICATED"}), attempt ${attempt}/3. Recreated client and retrying in ${jitterMs}ms...`);
+            console.warn(`[Telegram] Retriable error (${err.message || err.errorMessage}), attempt ${attempt}/3. Retrying in ${jitterMs}ms...`);
             await new Promise((r) => setTimeout(r, jitterMs));
             continue;
           }

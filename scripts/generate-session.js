@@ -1,5 +1,5 @@
-const { TelegramClient } = require('telegram');
-const { StringSession } = require('telegram/sessions');
+const { sessions, TelegramClient } = require('telegram');
+const { StringSession } = sessions;
 const readline = require('readline');
 require('dotenv').config();
 
@@ -12,6 +12,11 @@ const ask = (question) => new Promise((resolve) => rl.question(question, resolve
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
+
+if (!apiId || !apiHash) {
+  console.error('ERROR: TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env');
+  process.exit(1);
+}
 
 (async () => {
   console.log('Loading interactive Telegram sign-in...');
@@ -28,7 +33,7 @@ const apiHash = process.env.TELEGRAM_API_HASH;
 
   console.log('\n======================================================');
   console.log('You are now connected!');
-  console.log('Copy the string below and update TELEGRAM_SESSION_STRING in your .env file:');
+  console.log('Copy the string below and update TELEGRAM_SESSION_STRING in your .env / Vercel env:');
   console.log('======================================================\n');
   
   console.log(client.session.save());
@@ -36,4 +41,5 @@ const apiHash = process.env.TELEGRAM_API_HASH;
   console.log('\n======================================================\n');
   await client.disconnect();
   rl.close();
+  process.exit(0);
 })();
