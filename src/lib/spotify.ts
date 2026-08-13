@@ -37,14 +37,14 @@ export async function fetchSpotifyPlaylist(url: string) {
   let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(name,artists,duration_ms,album(images)))`;
 
   while (nextUrl) {
-    const response = await fetch(nextUrl, {
+    const response: Response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Spotify API error ${response.status}: ${body}`);
     }
-    const data = await response.json();
+    const data: any = await response.json();
 
     for (const item of data.items ?? []) {
       if (!item || !item.track) continue;
@@ -81,14 +81,14 @@ export async function fetchSpotifyUserPlaylists(accessToken: string) {
   let nextUrl: string | null = "https://api.spotify.com/v1/me/playlists?limit=50";
 
   while (nextUrl) {
-    const response = await fetch(nextUrl, {
+    const response: Response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Spotify API error ${response.status}: ${body}`);
     }
-    const data = await response.json();
+    const data: any = await response.json();
     for (const p of data.items ?? []) {
       if (!p) continue;
       playlists.push({
@@ -110,14 +110,14 @@ export async function fetchSpotifyPlaylistWithToken(playlistId: string, accessTo
   let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
 
   while (nextUrl) {
-    const response = await fetch(nextUrl, {
+    const response: Response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Spotify API error ${response.status}: ${body}`);
     }
-    const data = await response.json();
+    const data: any = await response.json();
 
     for (const item of data.items ?? []) {
       if (!item || !item.track) continue;

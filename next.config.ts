@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
-  serverExternalPackages: ["telegram", "big-integer"],
+  // serverExternalPackages: ["telegram", "big-integer"],
   experimental: {
     serverActions: {
       allowedOrigins: ["*"],
