@@ -287,7 +287,11 @@ export class TelegramClient {
         const latestSession = await TelegramClient.botMutex.loadSession();
         const sessionToUse = latestSession || this.sessionString;
         
-        if (latestSession && latestSession !== this.client.session.save()) {
+        // Cast through StringSession to get the serialised string — session.save()
+        // is typed as void in some gramJS declaration versions even though it
+        // returns the encoded string at runtime. Using StringSession.save() is safer.
+        const currentSessionStr = (this.client.session as unknown as { save: () => string }).save();
+        if (latestSession && latestSession !== currentSessionStr) {
           console.log("[Telegram] Reloading client with newer session string from Redis");
           this.client = new GramClient(
             new StringSession(sessionToUse),
@@ -935,7 +939,10 @@ export class TelegramClient {
   async importPlaylist(url: string, onTrack?: (track: MusicResult) => void): Promise<MusicResult[]> {
     return this.withRetry(async () => {
 
-    const botEntity = await this.client.getEntity(this.botUsername);
+    // importPlaylist talks to the bot's own chat — use the env-var fallback since
+    // botUsername was removed from the class and is now a per-call parameter.
+    const importBotUsername = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
+    const botEntity = await this.client.getEntity(importBotUsername);
 
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
@@ -994,7 +1001,9 @@ export class TelegramClient {
   async downloadAudio(messageId: number): Promise<Buffer> {
     return this.withRetry(async () => {
 
-    const botEntity = await this.client.getEntity(this.botUsername);
+    // downloadAudio fetches by message id from the bot chat history.
+    const downloadBotUsername = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
+    const botEntity = await this.client.getEntity(downloadBotUsername);
     const messages = await this.client.getMessages(botEntity, {
       ids: [messageId],
     });
@@ -1032,7 +1041,10 @@ export class TelegramClient {
       if (hit) return hit;
     }
 
-    const botEntity = await this.client.getEntity(this.botUsername);
+    // resolveDocument looks up a message by id in the bot's chat to get the file
+    // location — same bot every time, use the env-var default.
+    const resolveBotUsername = process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
+    const botEntity = await this.client.getEntity(resolveBotUsername);
     const messages = await this.client.getMessages(botEntity, { ids: [messageId] });
     const msg = messages[0];
     if (!msg || !msg.media) {
