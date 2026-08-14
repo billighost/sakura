@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getTelegramClientForBot, getBotFallbackChain } from "@/lib/telegram";
+import { getTelegramClient, getBotFallbackChain } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata, enrichMusicBrainzAndSave, searchDeezerTrack } from "@/lib/metadata";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
@@ -244,9 +244,9 @@ export async function POST(req: NextRequest) {
     let track: any = null;
     let lastError: any = null;
     const botChain = getBotFallbackChain();
+    const botClient = getTelegramClient();
 
     for (const botUsername of botChain) {
-      const botClient = getTelegramClientForBot(botUsername);
       await botClient.acquire();
       try {
         const queriesToTry = deezerUrl ? [deezerUrl, searchQuery] : [searchQuery];
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
           for (let attempt = 1; attempt <= 2; attempt++) {
             try {
               console.log(`[Telegram AutoDownload] Trying bot "${botUsername}" for "${query}" (attempt ${attempt})`);
-              track = await botClient.searchAndSelect(query, duration ? Number(duration) : undefined, isUrl ? 120000 : 45000, 60000, title, artist);
+              track = await botClient.searchAndSelect(query, duration ? Number(duration) : undefined, isUrl ? 120000 : 45000, 60000, title, artist, botUsername);
               break;
             } catch (err: any) {
               const msg = String(err?.message || "");
@@ -267,13 +267,10 @@ export async function POST(req: NextRequest) {
               lastError = err;
               
               if (isRateLimited) {
-                // If text search is rate-limited and we have a Deezer URL we didn't try (shouldn't happen with the new order, but just in case),
-                // we break the current query loop.
                 break;
               }
               
               if (isNotFound && isUrl) {
-                // If Deezer URL wasn't found by the bot, break attempt loop to fallback to text search immediately
                 break;
               }
 
@@ -284,17 +281,13 @@ export async function POST(req: NextRequest) {
           }
           if (track) break; // success, break query loop
           
-          // If we got rate-limited on the current query, and it was a text search, skip to next bot.
-          // Or if it was a URL and got rate limited (unlikely), also skip to next bot.
           const msg = String(lastError?.message || "");
           if (msg.includes("rate-limited") || msg.includes("limit reached") || msg.includes("daily")) {
-            break; // breaks query loop, proceeds to throw below and catch skips to next bot
+            break; 
           }
         }
         if (track) break; // success, break bot loop
         
-        // If we exhausted all queries for this bot and still no track, throw the last error
-        // to either propagate it or trigger the next bot in the chain.
         throw lastError;
       } catch (err: any) {
         const msg = String(err?.message || "");
@@ -304,7 +297,7 @@ export async function POST(req: NextRequest) {
           lastError = err;
           continue; // try next bot
         }
-        throw err; // non-rate-limit error: propagate immediately
+        throw err; 
       } finally {
         await botClient.release();
       }

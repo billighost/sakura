@@ -169,13 +169,38 @@ class RedisMutex {
       return !!v;
     } catch { return false; }
   }
+
+  /**
+   * Save the latest GramJS session string to Redis.
+   */
+  async saveSession(sessionString: string): Promise<void> {
+    if (!this.redis) return;
+    try {
+      await this.redis.set("telegram:session:latest", sessionString);
+    } catch (err) {
+      console.error("[RedisMutex] Failed to save session string", err);
+    }
+  }
+
+  /**
+   * Load the latest GramJS session string from Redis.
+   */
+  async loadSession(): Promise<string | null> {
+    if (!this.redis) return null;
+    try {
+      const val = await this.redis.get<string>("telegram:session:latest");
+      return val ?? null;
+    } catch (err) {
+      console.error("[RedisMutex] Failed to load session string", err);
+      return null;
+    }
+  }
 }
 
 export class TelegramClient {
   private client: GramClient;
   private connected = false;
   private connectPromise: Promise<void> | null = null;
-  private botUsername: string;
   private readonly apiId: number;
   private readonly apiHash: string;
   private readonly sessionString: string;
@@ -210,13 +235,11 @@ export class TelegramClient {
   constructor(
     apiId: number,
     apiHash: string,
-    sessionString: string,
-    botUsername?: string
+    sessionString: string
   ) {
     this.apiId = apiId;
     this.apiHash = apiHash;
     this.sessionString = sessionString;
-    this.botUsername = botUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
     this.client = new GramClient(
       new StringSession(sessionString),
       apiId,
@@ -258,8 +281,35 @@ export class TelegramClient {
           return;
         }
 
+        // Pull the absolute latest session string from Redis. If a previous
+        // serverless invocation connected and mutated the session (e.g. DC migration),
+        // we MUST use their updated string or Telegram will see a sequence mismatch.
+        const latestSession = await TelegramClient.botMutex.loadSession();
+        const sessionToUse = latestSession || this.sessionString;
+        
+        if (latestSession && latestSession !== this.client.session.save()) {
+          console.log("[Telegram] Reloading client with newer session string from Redis");
+          this.client = new GramClient(
+            new StringSession(sessionToUse),
+            this.apiId,
+            this.apiHash,
+            {
+              connectionRetries: 5,
+              autoReconnect: true,
+              maxConcurrentDownloads: 8,
+            }
+          );
+        }
+
         if (!this.client?.connected) {
           await this.client.connect();
+          
+          // Save the fresh session string back to Redis so the next serverless
+          // container uses this exact state.
+          const newSessionString = (this.client.session as unknown as { save: () => string }).save();
+          if (newSessionString) {
+            await TelegramClient.botMutex.saveSession(newSessionString);
+          }
         }
         this.connected = true;
         this.connectPromise = null;
@@ -451,14 +501,16 @@ export class TelegramClient {
     searchTimeoutMs = 10000,
     selectTimeoutMs = 60000,
     expectedTitle?: string,
-    expectedArtist?: string
+    expectedArtist?: string,
+    targetBotUsername?: string
   ): Promise<MusicResult> {
     return this.withRetry(async () => {
       const release = await TelegramClient.botMutex.acquire();
       try {
+        const botUsername = targetBotUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
         let buttonResult: { buttonMessageId: number; buttons: Array<{ index: number; text: string }> };
 
-        const botEntity = await this.client.getEntity(this.botUsername);
+        const botEntity = await this.client.getEntity(botUsername);
 
         /*
          * Fast path: the bot may already have this exact song sitting in its
@@ -550,12 +602,12 @@ export class TelegramClient {
         };
 
         try {
-          buttonResult = await this._searchMusic(query, searchTimeoutMs);
+          buttonResult = await this._searchMusic(query, searchTimeoutMs, botUsername);
         } catch (err: any) {
           const cleaned = cleanQueryString(query);
           if (cleaned && cleaned.toLowerCase() !== query.toLowerCase()) {
             console.warn(`[Telegram AutoDownload] Initial search timed out or failed. Retrying with cleaned query: "${cleaned}"`);
-            buttonResult = await this._searchMusic(cleaned, searchTimeoutMs);
+            buttonResult = await this._searchMusic(cleaned, searchTimeoutMs, botUsername);
           } else {
             throw err;
           }
@@ -614,7 +666,7 @@ export class TelegramClient {
       }
 
       console.log(`[Telegram AutoDownload] Got ${buttons.length} results. Selecting index ${selectedIndex}: "${buttons[selectedIndex]?.text}" (score: ${bestScore}) for query "${query}"`);
-      const result = await this._selectResult(buttonMessageId, selectedIndex, selectTimeoutMs);
+      const result = await this._selectResult(buttonMessageId, selectedIndex, botUsername, selectTimeoutMs);
       return result;
     } finally {
       await release();
@@ -622,12 +674,13 @@ export class TelegramClient {
     });
   }
 
-  private async _searchMusic(query: string, timeoutMs: number): Promise<{
+  private async _searchMusic(query: string, timeoutMs: number, targetBotUsername?: string): Promise<{
     buttonMessageId: number;
     buttons: Array<{ index: number; text: string }>;
   }> {
+    const botUsername = targetBotUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot";
     await this.ensureConnected();
-    const botEntity = await this.client.getEntity(this.botUsername);
+    const botEntity = await this.client.getEntity(botUsername);
 
     const before = await this.client.getMessages(botEntity, { limit: 1 });
     const lastKnownId = before[0]?.id || 0;
@@ -759,17 +812,19 @@ export class TelegramClient {
     buttonMessageId: number,
     buttonIndex: number,
     timeoutMs = 60000,
+    targetBotUsername?: string
   ): Promise<MusicResult> {
     await this.ensureConnected();
-    return this._selectResult(buttonMessageId, buttonIndex, timeoutMs);
+    return this._selectResult(buttonMessageId, buttonIndex, targetBotUsername || process.env.TELEGRAM_BOT_USERNAME || "musicshuntersbot", timeoutMs);
   }
 
   private async _selectResult(
     buttonMessageId: number,
     buttonIndex: number,
+    botUsername: string,
     timeoutMs: number,
   ): Promise<MusicResult> {
-    const botEntity = await this.client.getEntity(this.botUsername);
+    const botEntity = await this.client.getEntity(botUsername);
 
     const messages = await this.client.getMessages(botEntity, {
       ids: [buttonMessageId],
@@ -1135,8 +1190,7 @@ export function getTelegramClient(): TelegramClient {
     globalForTelegram.telegramClient = new TelegramClient(
       apiId,
       apiHash,
-      sessionString,
-      process.env.TELEGRAM_BOT_USERNAME,
+      sessionString
     );
   }
   return globalForTelegram.telegramClient;
@@ -1150,28 +1204,4 @@ export function getBotFallbackChain(): string[] {
     .map((b) => b.trim())
     .filter((b) => b && b !== primary);
   return [primary, ...fallbacks];
-}
-
-const globalForFallbackClients = globalThis as unknown as {
-  telegramFallbackClients?: Map<string, TelegramClient>;
-};
-if (!globalForFallbackClients.telegramFallbackClients) {
-  globalForFallbackClients.telegramFallbackClients = new Map();
-}
-
-export function getTelegramClientForBot(botUsername: string): TelegramClient {
-  const cache = globalForFallbackClients.telegramFallbackClients!;
-  if (cache.has(botUsername)) return cache.get(botUsername)!;
-
-  const apiId = parseInt(process.env.TELEGRAM_API_ID || "0", 10);
-  const apiHash = process.env.TELEGRAM_API_HASH || "";
-  const sessionString = process.env.TELEGRAM_SESSION_STRING || "";
-
-  if (!apiId || !apiHash) {
-    throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
-  }
-
-  const client = new TelegramClient(apiId, apiHash, sessionString, botUsername);
-  cache.set(botUsername, client);
-  return client;
 }
