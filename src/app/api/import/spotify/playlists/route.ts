@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { fetchSpotifyUserPlaylists, fetchSpotifyPlaylistWithToken } from "@/lib/spotify";
+import { fetchSpotifyUserPlaylists, fetchSpotifyPlaylist } from "@/lib/spotify";
 
 /**
  * GET /api/import/spotify/playlists
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const data = await fetchSpotifyPlaylistWithToken(playlistId, spotifyToken);
+    const data = await fetchSpotifyPlaylist(playlistId, spotifyToken);
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[Spotify Playlist Tracks] Error:", error);

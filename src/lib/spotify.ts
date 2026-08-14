@@ -1,3 +1,6 @@
+import { execFile } from "child_process";
+import path from "path";
+
 export async function getSpotifyToken(): Promise<string> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -25,18 +28,120 @@ export async function getSpotifyToken(): Promise<string> {
   return data.access_token;
 }
 
+/**
+ * Scrapes a public Spotify playlist without requiring any API keys or credentials.
+ * Works by fetching the initial server-side rendered state embedded in the open.spotify.com page.
+ */
+export async function scrapePublicSpotifyPlaylist(playlistId: string) {
+  const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
+  
+  const response = await fetch(embedUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load Spotify embed page: HTTP ${response.status}`);
+  }
+
+  const html = await response.text();
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([^<]+)<\/script>/);
+  if (!match) {
+    throw new Error("Unable to parse Spotify embed payload");
+  }
+
+  const nextData = JSON.parse(match[1]);
+  const entity = nextData.props?.pageProps?.state?.data?.entity;
+  
+  if (!entity || !Array.isArray(entity.trackList)) {
+    throw new Error("No tracks found in Spotify embed data");
+  }
+
+  const tracks: any[] = [];
+  for (const item of entity.trackList) {
+    if (!item) continue;
+    const title = item.title || item.name || "Unknown Track";
+    const artist = item.subtitle || (Array.isArray(item.artists) ? item.artists.map((a: any) => a.name).join(", ") : "Unknown Artist");
+    const durationMs = item.duration || item.duration_ms || 0;
+    const coverUrl = item.images?.[0]?.url || item.coverArt?.sources?.[0]?.url || entity.coverArt?.sources?.[0]?.url || "";
+
+    tracks.push({
+      title,
+      artist,
+      duration: durationMs ? Math.floor(durationMs / 1000) : 0,
+      coverUrl,
+      messageId: 0,
+    });
+  }
+
+  return {
+    name: entity.name || entity.title || "Imported Playlist",
+    coverUrl: entity.coverArt?.sources?.[0]?.url || "",
+    tracks,
+  };
+}
+
+/**
+ * Executes the Python spotifyscraper CLI as an optional secondary engine.
+ */
+export async function scrapeWithPython(urlOrId: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), "scripts", "spotify_scrape.py");
+    execFile("python", [scriptPath, urlOrId], { timeout: 25000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr || err.message));
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        if (parsed.error) return reject(new Error(parsed.error));
+        resolve(parsed);
+      } catch (e) {
+        reject(new Error(`Failed to parse python scraper output: ${stdout.slice(0, 200)}`));
+      }
+    });
+  });
+}
+
 export async function fetchSpotifyPlaylist(url: string, userAccessToken?: string) {
-  // Prefer the user's personal OAuth token when available.
-  // Client Credentials tokens cannot access private playlists and, in Spotify's
-  // Development Mode, will return 403 even for public playlists owned by
-  // accounts not in the app's tester allowlist.
-  const token = userAccessToken ?? await getSpotifyToken();
-
-  // Support both full URLs and bare playlist IDs
+  // Support both full URLs, URI schemes, and bare playlist IDs
   const match = url.match(/playlist[/:]([a-zA-Z0-9]+)/);
-  if (!match) throw new Error("Invalid Spotify playlist URL — could not extract playlist ID");
-  const playlistId = match[1];
+  const playlistId = match ? match[1] : (url.match(/^[a-zA-Z0-9]{15,30}$/) ? url : null);
+  if (!playlistId) throw new Error("Invalid Spotify playlist URL or ID — could not extract playlist ID");
 
+  // 1. If user provided their OAuth access token, use official Web API (handles private & user playlists)
+  if (userAccessToken) {
+    try {
+      return await fetchSpotifyPlaylistWithToken(playlistId, userAccessToken);
+    } catch (err) {
+      console.warn("[Spotify] User OAuth fetch failed, falling back to scrapers:", err);
+    }
+  }
+
+  // 2. Primary Public Engine: Pure Node.js Embed Scraper (No API keys needed, no 403 Dev Mode restrictions)
+  try {
+    const scraped = await scrapePublicSpotifyPlaylist(playlistId);
+    if (scraped.tracks.length > 0) {
+      return scraped;
+    }
+  } catch (err) {
+    console.warn("[Spotify] Node embed scraper failed, trying Python scraper...", err);
+  }
+
+  // 3. Secondary Public Engine: Python spotifyscraper
+  try {
+    const pyScraped = await scrapeWithPython(playlistId);
+    if (pyScraped && Array.isArray(pyScraped.tracks) && pyScraped.tracks.length > 0) {
+      return pyScraped;
+    }
+  } catch (err) {
+    console.warn("[Spotify] Python scraper fallback failed, trying client credentials...", err);
+  }
+
+  // 4. Tertiary Fallback: Official Web API using Client Credentials
+  const token = await getSpotifyToken();
   let tracks: any[] = [];
   let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(name,artists,duration_ms,album(images)))`;
 
@@ -64,12 +169,11 @@ export async function fetchSpotifyPlaylist(url: string, userAccessToken?: string
     nextUrl = data.next ?? null;
   }
 
-  // Fetch playlist details for name/cover
   const detailsRes = await fetch(
     `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  const details = await detailsRes.json();
+  const details = await detailsRes.json().catch(() => ({}));
 
   return {
     name: details.name ?? "Imported Playlist",
@@ -141,7 +245,7 @@ export async function fetchSpotifyPlaylistWithToken(playlistId: string, accessTo
     `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  const details = await detailsRes.json();
+  const details = await detailsRes.json().catch(() => ({}));
 
   return {
     name: details.name ?? "Imported Playlist",
