@@ -14,11 +14,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Provide a valid URL" }, { status: 400 });
   }
 
+  // If the user has previously authenticated with Spotify via OAuth, use their
+  // personal access token. This is necessary for:
+  //   1. Private/collaborative playlists that client credentials can't access.
+  //   2. Apps in Spotify's Development Mode — public API calls still return 403
+  //      unless the requesting token belongs to an allowlisted tester account.
+  const userSpotifyToken = req.cookies.get("spotify_access_token")?.value ?? undefined;
+
   try {
     const isSpotify = url.includes("open.spotify.com") || url.includes("spotify.link");
     
     if (isSpotify) {
-      const data = await fetchSpotifyPlaylist(url);
+      const data = await fetchSpotifyPlaylist(url, userSpotifyToken);
       return NextResponse.json(data);
     }
     

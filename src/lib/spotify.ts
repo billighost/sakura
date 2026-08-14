@@ -25,8 +25,12 @@ export async function getSpotifyToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function fetchSpotifyPlaylist(url: string) {
-  const token = await getSpotifyToken();
+export async function fetchSpotifyPlaylist(url: string, userAccessToken?: string) {
+  // Prefer the user's personal OAuth token when available.
+  // Client Credentials tokens cannot access private playlists and, in Spotify's
+  // Development Mode, will return 403 even for public playlists owned by
+  // accounts not in the app's tester allowlist.
+  const token = userAccessToken ?? await getSpotifyToken();
 
   // Support both full URLs and bare playlist IDs
   const match = url.match(/playlist[/:]([a-zA-Z0-9]+)/);
