@@ -4,6 +4,7 @@ import "./globals.css";
 import { SWRegister } from "@/components/SWRegister";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { LogoLoader } from "@/components/LogoLoader";
+import { ThemeInit } from "@/components/ThemeInit";
 
 /**
  * Self-hosted via next/font rather than a <link> to fonts.googleapis.com.
@@ -110,6 +111,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="appRoot">
         <LogoLoader />
         <SWRegister />
+        {/* Owns the live theme: cross-tab sync, the chrome colour the boot
+            script above can't set, and the swap cross-fade. Renders nothing. */}
+        <ThemeInit />
         <OfflineBanner />
         {children}
       </body>

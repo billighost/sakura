@@ -2,7 +2,17 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: clamp(3.5rem, 9vh, 4.25rem);
+  /*
+   * `min-height`, not `height`. The bar carries two lines normally and three
+   * while a synced lyric is showing, and a fixed height clipped the third one
+   * against `overflow: hidden` below — the lyric was there, cropped off under
+   * the artist. The bar is a flex child of the app shell's bottom chrome, so
+   * growing shortens the scroll area rather than covering any content.
+   *
+   * The floor tracks `--miniplayer-h` so it steps down with the density scale
+   * on short viewports, instead of the clamp() that used to duplicate it.
+   */
+  min-height: var(--miniplayer-h);
   background: var(--chrome);
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
@@ -224,19 +234,31 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  /*
+   * Explicit line boxes, and a little vertical breathing room. Everything in
+   * this column inherits the body's 1.55 line-height otherwise, which at three
+   * lines came to more than the bar was tall — the reason the lyric ended up
+   * cropped. Each line now declares its own tighter leading (see below) and
+   * this padding keeps the block off the bar's edges.
+   */
   gap: 1px;
+  padding: 0.1875rem 0;
   /* The tap-to-expand affordance lives here, so it must not swallow the
    * buttons' hit areas — it's a sibling, not an overlay. */
 }
 
 .lyricLine {
   font-size: var(--t-2xs);
+  line-height: 1.3;
   font-weight: 600;
   letter-spacing: var(--track-snug);
   color: var(--track-accent, var(--accent));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Descenders and CJK glyphs sit below the 1.3 line box; a hair of padding
+   * stops `overflow: hidden` shaving them off. */
+  padding-bottom: 1px;
   opacity: 0.95;
   cursor: pointer;
   animation: fadeIn var(--d-base) var(--ease);
@@ -245,6 +267,7 @@
 .title {
   font-family: var(--font-display);
   font-size: 0.875rem;
+  line-height: 1.25;
   font-weight: 600;
   letter-spacing: var(--track-snug);
   overflow: hidden;
@@ -255,6 +278,7 @@
 
 .artist {
   font-size: var(--t-2xs);
+  line-height: 1.3;
   color: var(--text-2);
   overflow: hidden;
   text-overflow: ellipsis;

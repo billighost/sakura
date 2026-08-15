@@ -172,6 +172,7 @@ export default function LikedPage() {
       <CollectionHero
         eyebrow="Playlist"
         title="Liked Songs"
+        backFallback="/library"
         coverUrls={mosaic}
         fallbackIcon={<HeartIcon size={36} filled />}
         loading={loading && tracks.length === 0}

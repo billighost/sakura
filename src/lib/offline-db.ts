@@ -134,6 +134,61 @@ export function setCachedUserId(userId: string) {
   localStorage.setItem("sakura-user-id", userId);
 }
 
+/**
+ * ── Why downloads are scoped to the device, not to the user ─────────────────
+ *
+ * A download is a file on this phone. It costs *this device's* storage and it
+ * was paid for with *this device's* data, so "who was signed in when it landed"
+ * is provenance, not ownership.
+ *
+ * Scoping reads by `(userId, deviceId)` — which is what this module used to do —
+ * made that file invisible the moment the signed-in user changed, in three ways
+ * that all look like data loss to the person holding the phone:
+ *
+ *   1. Download while signed out (`userId` is `"anon"`), then sign in: every
+ *      track vanishes from Downloads, and the audio is still on the device
+ *      taking up space with no way to reach it.
+ *   2. Switch accounts: same disappearance, in both directions.
+ *   3. A shared device: two people download twenty songs each, and each sees
+ *      only their own — while the storage bill is the sum of both.
+ *
+ * So reads match on `deviceId` alone. Writes still record `userId`, because
+ * knowing who fetched a file is occasionally useful and costs nothing; nothing
+ * reads it as a filter any more.
+ *
+ * Existing rows are left exactly where they are. The audio store's keys are
+ * `${userId}:${deviceId}:${trackId}`, so a blob saved under `anon:` has to stay
+ * reachable after sign-in — `resolveAudioKey` does that by falling back to a
+ * suffix match on the key list. That's deliberately preferred over rewriting
+ * keys in an IndexedDB upgrade: a migration would have to read and re-put every
+ * audio blob on the device, which is minutes of main-thread work and a real risk
+ * of hitting quota mid-rewrite, to buy nothing a cheap lookup can't.
+ */
+
+/**
+ * Find the audio store key holding this track's blob, whoever downloaded it.
+ *
+ * Fast path is the exact key for the current user. The scan only runs on a miss
+ * and only reads *keys* — never the blobs — so it stays cheap even on a device
+ * with hundreds of downloads.
+ */
+async function resolveAudioKey(
+  store: "audio" | "partial_audio",
+  trackId: string,
+  userId: string,
+  deviceId: string
+): Promise<string | null> {
+  const db = await getDB();
+  const exact = `${userId}:${deviceId}:${trackId}`;
+
+  const keys = (await db.getAllKeys(store)) as string[];
+  if (keys.includes(exact)) return exact;
+
+  // Any user on this device will do — the file is the device's.
+  const suffix = `:${deviceId}:${trackId}`;
+  return keys.find((k) => typeof k === "string" && k.endsWith(suffix)) ?? null;
+}
+
 // --- Offline track management (used by TrackRow) ---
 
 export async function saveTrackOffline(track: {
@@ -168,7 +223,11 @@ export async function getAllOfflineTracks() {
 export async function removeOfflineTrack(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
   await db.delete("tracks", id);
-  await db.delete("audio", `${userId}:${deviceId}:${id}`);
+  // Resolve rather than rebuild the key: the blob may have been written while a
+  // different account was signed in, and a delete against the wrong prefix
+  // matches nothing and silently leaves the file on the device.
+  const key = await resolveAudioKey("audio", id, userId, deviceId);
+  if (key) await db.delete("audio", key);
 }
 
 export async function isTrackCached(id: string): Promise<boolean> {
@@ -185,9 +244,12 @@ export async function saveAudioBlob(id: string, blob: Blob, userId = getCachedUs
 
 export async function getAudioBlob(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
-  const key = `${userId}:${deviceId}:${id}`;
-  const result = await db.get("audio", key);
-  if (result?.blob) return result.blob;
+
+  const key = await resolveAudioKey("audio", id, userId, deviceId);
+  if (key) {
+    const result = await db.get("audio", key);
+    if (result?.blob) return result.blob;
+  }
 
   // Nothing stored under this id directly. If it's the queued-side id of a
   // track that finished under a resolved one, follow the pointer rather than
@@ -196,8 +258,11 @@ export async function getAudioBlob(id: string, userId = getCachedUserId(), devic
   const track = await db.get("tracks", id);
   const aliasId = track?.blobId;
   if (aliasId && aliasId !== id) {
-    const aliased = await db.get("audio", `${userId}:${deviceId}:${aliasId}`);
-    return aliased?.blob;
+    const aliasKey = await resolveAudioKey("audio", aliasId, userId, deviceId);
+    if (aliasKey) {
+      const aliased = await db.get("audio", aliasKey);
+      return aliased?.blob;
+    }
   }
 
   return undefined;
@@ -211,22 +276,26 @@ export async function savePartialAudio(id: string, chunks: Blob[], totalBytes: n
 
 export async function getPartialAudio(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
-  const key = `${userId}:${deviceId}:${id}`;
+  // Device-scoped so a download interrupted before sign-in resumes afterwards
+  // rather than restarting from byte zero.
+  const key = await resolveAudioKey("partial_audio", id, userId, deviceId);
+  if (!key) return undefined;
   return db.get("partial_audio", key);
 }
 
 export async function removePartialAudio(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
-  const key = `${userId}:${deviceId}:${id}`;
-  await db.delete("partial_audio", key);
+  const key = await resolveAudioKey("partial_audio", id, userId, deviceId);
+  if (key) await db.delete("partial_audio", key);
 }
 
 export async function isTrackDownloaded(id: string, userId = getCachedUserId(), deviceId = getDeviceId()): Promise<boolean> {
   const db = await getDB();
   const track = await db.get("tracks", id);
   if (!track) return false;
-  // Verify it belongs to this specific user & device
-  return track.userId === userId && track.deviceId === deviceId;
+  // Device-scoped: a file on this device counts as downloaded no matter which
+  // account fetched it. See the scoping note above.
+  return track.deviceId === deviceId;
 }
 
 export async function findDownloadedTrackByMetadata(
@@ -242,7 +311,6 @@ export async function findDownloadedTrackByMetadata(
 
   return all.find(
     (t) =>
-      t.userId === userId &&
       t.deviceId === deviceId &&
       t.title.toLowerCase().trim() === normTitle &&
       t.artist.toLowerCase().trim() === normArtist
@@ -287,7 +355,8 @@ export async function cloneDownloadedTrack(
 export async function getAllDownloadedTracks(userId = getCachedUserId(), deviceId = getDeviceId()) {
   const db = await getDB();
   const all = await db.getAll("tracks");
-  return all.filter(t => t.userId === userId && t.deviceId === deviceId);
+  // Everything downloaded on this device, whoever was signed in at the time.
+  return all.filter(t => t.deviceId === deviceId);
 }
 
 export async function removeDownloadedTrack(id: string, userId = getCachedUserId(), deviceId = getDeviceId()) {
@@ -304,6 +373,11 @@ export async function removeDownloadedTrack(id: string, userId = getCachedUserId
    *
    * So resolve to whichever id owns the audio, remove that blob, then remove
    * every metadata row that referred to it — the alias and the target alike.
+   *
+   * Matching is device-scoped for the same reason reads are: the row being
+   * deleted may well have been written under a different account, and a delete
+   * that silently skipped it would leave a row the UI still shows and a blob
+   * nothing can reach.
    */
   const record = await db.get("tracks", id);
   const audioOwnerId = record?.blobId ?? id;
@@ -311,22 +385,25 @@ export async function removeDownloadedTrack(id: string, userId = getCachedUserId
   const all = await db.getAll("tracks");
   const affected = all.filter(
     (t) =>
-      t.userId === userId &&
       t.deviceId === deviceId &&
       (t.id === id || t.id === audioOwnerId || t.blobId === audioOwnerId),
   );
 
-  await db.delete("audio", `${userId}:${deviceId}:${audioOwnerId}`);
-  await db.delete("partial_audio", `${userId}:${deviceId}:${audioOwnerId}`);
+  // Delete blobs by resolved key so a row written under another account's id
+  // prefix is actually removed rather than leaking storage.
+  for (const trackId of new Set([id, audioOwnerId, ...affected.map((t) => t.id)])) {
+    const audioKey = await resolveAudioKey("audio", trackId, userId, deviceId);
+    if (audioKey) await db.delete("audio", audioKey);
+    const partialKey = await resolveAudioKey("partial_audio", trackId, userId, deviceId);
+    if (partialKey) await db.delete("partial_audio", partialKey);
+  }
 
   for (const t of affected) {
     await db.delete("tracks", t.id);
-    await db.delete("audio", `${userId}:${deviceId}:${t.id}`);
   }
 
   // Guard the case where the id had no metadata row at all.
   await db.delete("tracks", id);
-  await db.delete("audio", `${userId}:${deviceId}:${id}`);
 }
 
 // --- Library cache (stale-while-revalidate for instant page loads) ---
@@ -441,24 +518,48 @@ export async function clearAudioCache(userId = getCachedUserId(), deviceId = get
     );
   }
   const db = await getDB();
-  // Clear only this device & user's tracks/audio
+
+  /**
+   * Device-scoped, matching what the Downloaded page shows.
+   *
+   * This is reached from a "Remove all downloads?" confirmation whose stated
+   * promise is "this frees up space on your phone". Filtering by `userId` broke
+   * that promise twice over: rows saved under a previous account survived while
+   * being listed as removed, and — worse — their blobs stayed on disk, so the
+   * space the user cleared downloads to reclaim was never actually reclaimed.
+   */
   const tx = db.transaction("tracks", "readwrite");
   const tracks = await tx.store.getAll();
   for (const t of tracks) {
-    if (t.userId === userId && t.deviceId === deviceId) {
+    if (t.deviceId === deviceId) {
       await tx.store.delete(t.id);
     }
   }
   await tx.done;
 
+  // Keys are `${userId}:${deviceId}:${trackId}`, so match on the device segment
+  // to catch blobs written under any account that used this device.
+  const deviceSegment = `:${deviceId}:`;
+
   const tx2 = db.transaction("audio", "readwrite");
   const audioKeys = await tx2.store.getAllKeys();
   for (const key of audioKeys) {
-    if (typeof key === "string" && key.startsWith(`${userId}:${deviceId}:`)) {
+    if (typeof key === "string" && key.includes(deviceSegment)) {
       await tx2.store.delete(key);
     }
   }
   await tx2.done;
+
+  // Half-finished downloads hold chunks too, and leaving them behind meant
+  // "remove all" could free far less than the user expected.
+  const tx3 = db.transaction("partial_audio", "readwrite");
+  const partialKeys = await tx3.store.getAllKeys();
+  for (const key of partialKeys) {
+    if (typeof key === "string" && key.includes(deviceSegment)) {
+      await tx3.store.delete(key);
+    }
+  }
+  await tx3.done;
 
   await clearLibraryCache(userId);
 }

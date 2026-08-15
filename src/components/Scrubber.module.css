@@ -17,7 +17,10 @@
   transform: translateY(-50%);
   height: var(--scrub-track-height, 4px);
   border-radius: 999px;
-  background: var(--scrub-track-bg, rgba(255, 255, 255, 0.16));
+  /* On the full player this resolves against the media tokens; in the mini
+   * bar and anywhere else it falls back to the app's own line colour, so the
+   * rail is visible in light mode instead of white-on-white. */
+  background: var(--scrub-track-bg, var(--on-media-fill-strong));
   transition: height 0.15s ease;
 }
 
@@ -28,7 +31,7 @@
   transform: translateY(-50%);
   height: var(--scrub-track-height, 4px);
   border-radius: 999px;
-  background: var(--track-accent, var(--sakura-accent-gradient));
+  background: var(--track-accent, var(--accent));
   transition: height 0.15s ease;
 }
 
@@ -38,7 +41,7 @@
   width: var(--scrub-thumb-size, 14px);
   height: var(--scrub-thumb-size, 14px);
   border-radius: 50%;
-  background: #fff;
+  background: var(--on-media);
   transform: translate(-50%, -50%) scale(0);
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 3px var(--track-accent, rgba(242, 120, 159, 0.3));
@@ -111,11 +114,11 @@
   transform: translateX(-50%) translateY(4px);
   padding: 0.25rem 0.5rem;
   border-radius: 8px;
-  background: var(--sakura-glass-strong, rgba(20, 16, 23, 0.9));
+  background: var(--media-chrome-solid);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--sakura-glass-border);
-  color: #fff;
+  border: 1px solid var(--media-chrome-line);
+  color: var(--on-media);
   font-size: 0.6875rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;

@@ -14,6 +14,7 @@ import {
 import { TransliterateControl } from "./TransliterateControl";
 import { useLyricsScroll } from "@/lib/useLyricsScroll";
 import { useSmoothTime } from "@/lib/useSmoothTime";
+import { readableOn } from "@/lib/color";
 import type { LyricData, LyricLine } from "@/lib/lyrics";
 import { haptic } from "@/lib/haptics";
 import styles from "./LyricsModal.module.css";
@@ -127,7 +128,14 @@ export function LyricsModal({
   return (
     <div
       className={`${styles.overlay} ${open ? styles.open : ""}`}
-      style={{ "--track-accent": accentColor || undefined } as React.CSSProperties}
+      style={
+        {
+          // Drives the surface wash *and* anything filled with the accent, so
+          // the whole view is the colour of the record being played.
+          "--track-accent": accentColor || undefined,
+          "--on-track-accent": readableOn(accentColor) || undefined,
+        } as React.CSSProperties
+      }
       {...(!open ? { inert: true } : {})}
       data-block-drag
     >

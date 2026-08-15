@@ -174,6 +174,7 @@ export default function DownloadedPage() {
       <CollectionHero
         eyebrow="On this device"
         title="Downloaded Songs"
+        backFallback="/library"
         coverUrl={tracks[0]?.coverUrl}
         fallbackIcon={<DownloadedIcon size={36} />}
         loading={loading && display.length === 0}

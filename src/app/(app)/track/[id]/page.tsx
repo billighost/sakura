@@ -172,8 +172,10 @@ function NoteIcon() {
   );
 }
 
-export default async function TrackDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+import { Suspense } from "react";
+import Loading from "./loading";
+
+async function TrackDetail({ id }: { id: string }) {
   const [track, { credits, samples, sampledBy }] = await Promise.all([
     getTrack(id),
     getTrackCredits(id),
@@ -309,5 +311,15 @@ export default async function TrackDetailPage({ params }: { params: Promise<{ id
         )}
       </div>
     </div>
+  );
+}
+
+export default function TrackDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<Loading />}>
+      {params.then(({ id }) => (
+        <TrackDetail id={id} />
+      ))}
+    </Suspense>
   );
 }

@@ -10,6 +10,7 @@ import { QueueModal } from "./QueueModal";
 import { LyricsModal } from "./LyricsModal";
 import { useShare } from "./share/ShareContext";
 import { useDrag } from "@/lib/useDrag";
+import { readableOn } from "@/lib/color";
 import { haptic } from "@/lib/haptics";
 import type { LyricData } from "@/lib/lyrics";
 import styles from "./FullPlayer.module.css";
@@ -72,6 +73,15 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   } = usePlayer();
 
   const { openShare } = useShare();
+
+  /*
+   * The glyph colour for anything filled with the artwork's accent — the
+   * play/pause chip above all. Computed rather than fixed, because the accent
+   * comes from a photograph: a fixed dark glyph disappears on a deep cover and a
+   * fixed white one disappears on a pale one. Null when there's no artwork
+   * colour yet, and the CSS falls back to the theme's `--on-accent`.
+   */
+  const onAccent = useMemo(() => readableOn(accentColor), [accentColor]);
 
   /*
    * A transliteration generated in the lyrics view replaces the context's copy
@@ -405,6 +415,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         {
           backgroundImage: currentTrack.coverUrl ? `url(${currentTrack.coverUrl})` : undefined,
           "--track-accent": accentColor || undefined,
+          "--on-track-accent": onAccent || undefined,
           transform: dragTransform,
           // While the finger is down the transform must track it exactly; the
           // class transition takes back over the moment it lifts and snaps home.

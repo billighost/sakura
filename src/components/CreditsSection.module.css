@@ -29,7 +29,7 @@
 .card {
   border-radius: var(--r-lg);
   background: var(--on-media-fill);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--media-chrome-line);
   padding: var(--space-4);
   box-sizing: border-box;
 }
@@ -49,7 +49,7 @@
 .noExtra {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--media-chrome-line);
   font-size: var(--t-sm);
   color: var(--on-media-tertiary);
 }
@@ -104,7 +104,7 @@
 .bioBlock {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .truncatedBio {
@@ -127,7 +127,7 @@
   font-weight: 600;
   color: var(--on-media);
   text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-decoration-color: rgb(var(--on-media-rgb) / 0.35);
   text-underline-offset: 3px;
   cursor: pointer;
 }
@@ -137,7 +137,7 @@
 .creditRows {
   margin-top: var(--space-3);
   padding-top: var(--space-1);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .creditRow {
@@ -146,7 +146,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-2) 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .creditRow:first-child {
@@ -174,7 +174,7 @@
 .sampleGroup {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .sampleGroupLabel {
@@ -188,7 +188,7 @@
 
 .sampleRow {
   padding: var(--space-2) 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .sampleRow:first-of-type {
@@ -246,7 +246,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-4);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--media-chrome-line);
 }
 
 .modalTitle {

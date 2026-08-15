@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePlayer } from "@/components/PlayerContext";
@@ -18,7 +18,16 @@ import {
   ContrastIcon,
   CheckIcon,
 } from "@/components/Icons";
-import { getStorageEstimate, clearAudioCache } from "@/lib/offline-db";
+import { getStorageEstimate, clearAudioCache, clearLibraryCache } from "@/lib/offline-db";
+import { clearServiceWorkerCaches } from "@/components/SWRegister";
+import { clearPageState } from "@/lib/usePageState";
+import {
+  getServerTheme,
+  getTheme,
+  setTheme as applyThemeGlobally,
+  subscribeTheme,
+  type ThemeId,
+} from "@/lib/theme";
 import { haptic } from "@/lib/haptics";
 import styles from "./page.module.css";
 
@@ -114,14 +123,16 @@ function Row({
 /* ── Theme ─────────────────────────────────────────────────────────────────
  * Swatches drawn from real surface tokens instead of the three decorative
  * 135° gradients that used to stand in for previews.
+ *
+ * The mechanics — storage, the `data-theme` attribute, the theme-color metas,
+ * the swap cross-fade, cross-tab sync — all live in `lib/theme.ts`. This page
+ * only chooses; it no longer owns a second private copy of the rules.
  */
-const THEMES = [
+const THEMES: readonly { id: ThemeId; name: string; Icon: typeof SunIcon }[] = [
   { id: "light", name: "Light", Icon: SunIcon },
   { id: "dark", name: "Dark", Icon: MoonIcon },
   { id: "system", name: "Auto", Icon: ContrastIcon },
-] as const;
-
-type ThemeId = (typeof THEMES)[number]["id"];
+];
 
 /**
  * Quality is stored as a stable token, never as the label shown on screen.
@@ -148,48 +159,10 @@ function formatBytes(bytes: number) {
 /**
  * Keep the browser/OS chrome in step with the active theme.
  *
- * The layout declares theme-color via prefers-color-scheme media queries, so
- * when the user overrides the system theme the *page* switches but the status
- * bar and tab colour keep following the OS. Rewriting the meta tags to the
- * resolved palette fixes the mismatch.
+ * Moved to `lib/theme.ts` — it has to run on boot and after every navigation
+ * (Next re-inserts the metas it owns), not only when this page happens to be
+ * mounted. `components/ThemeInit.tsx` drives it.
  */
-function syncThemeColor(next: ThemeId) {
-  const DARK = "#0E0B0F";
-  const LIGHT = "#FAF8FA";
-
-  const existing = Array.from(
-    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
-  );
-
-  if (next === "system") {
-    /*
-     * Hand control back to the OS. Restoring the two media-scoped tags the
-     * layout ships means Auto tracks a change to the system appearance while
-     * the app is open, which a single resolved colour would freeze.
-     */
-    for (const m of existing) m.remove();
-    for (const [scheme, color] of [
-      ["dark", DARK],
-      ["light", LIGHT],
-    ] as const) {
-      const m = document.createElement("meta");
-      m.name = "theme-color";
-      m.media = `(prefers-color-scheme: ${scheme})`;
-      m.content = color;
-      document.head.appendChild(m);
-    }
-    return;
-  }
-
-  // An explicit choice outranks the OS, so collapse to one unscoped tag —
-  // leaving the media-scoped pair in place would let the OS win again.
-  for (const m of existing.slice(1)) m.remove();
-  const meta = existing[0] ?? document.createElement("meta");
-  meta.name = "theme-color";
-  meta.removeAttribute("media");
-  meta.content = next === "light" ? LIGHT : DARK;
-  if (!meta.parentNode) document.head.appendChild(meta);
-}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -197,7 +170,20 @@ export default function SettingsPage() {
 
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>("dark");
+
+  /*
+   * The theme is read from the shared store rather than held in local state.
+   *
+   * Two things fall out of that. The radio can't drift from what the page is
+   * actually painted as — which it could when this was `useState("dark")`,
+   * showing Dark selected over a light page until the settings fetch resolved.
+   * And a change made in another tab moves this control, because the store
+   * publishes cross-tab updates.
+   *
+   * `getServerTheme` returns "system" so the server render commits to no
+   * palette; the real preference arrives on hydration without a mismatch.
+   */
+  const theme = useSyncExternalStore(subscribeTheme, getTheme, getServerTheme);
   const [quality, setQuality] = useState<string>("high");
   const [privateSession, setPrivateSession] = useState(false);
 
@@ -214,6 +200,13 @@ export default function SettingsPage() {
   const pending = useRef<Record<string, unknown>>({});
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /*
+   * Set the moment the user picks a theme here, so the settings fetch — which
+   * may land afterwards — doesn't overwrite the choice they just made with the
+   * server's older value.
+   */
+  const themeChosenLocally = useRef(false);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -223,25 +216,25 @@ export default function SettingsPage() {
         const data = await res.json();
         if (!alive) return;
 
-        const serverTheme = (data.theme as ThemeId) || "dark";
-        setTheme(serverTheme);
-
         /*
          * Reconcile the server's theme with what this device actually painted.
          *
-         * The boot script in the root layout paints from localStorage, which
-         * is per-device. If the theme was last changed on another device the
-         * two disagree, and the radio would show "Light" over a dark page.
-         * Re-apply only on a mismatch, so the common case does no DOM work.
+         * The boot script in the root layout paints from localStorage, which is
+         * per-device. If the theme was last changed on another device the two
+         * disagree, and the radio would show "Light" over a dark page. The
+         * store's own value is the local truth, so only a genuine mismatch does
+         * any work — and a choice the user made on this page in the last second
+         * wins over both, since it's newer than either.
          */
-        let localTheme: string | null = null;
-        try {
-          localTheme = localStorage.getItem("sakura-theme");
-        } catch {
-          // Storage unavailable — fall through and apply.
-        }
-        if (localTheme !== serverTheme) {
-          applyTheme(serverTheme, { fromServer: true });
+        const serverTheme: ThemeId | null =
+          data.theme === "light" || data.theme === "dark" || data.theme === "system"
+            ? data.theme
+            : null;
+
+        if (serverTheme && !themeChosenLocally.current && serverTheme !== getTheme()) {
+          // No cross-fade: this is reconciliation on load, not a user action,
+          // and fading the whole page a beat after it appears reads as a fault.
+          applyThemeGlobally(serverTheme, { animate: false });
         }
 
         setQuality(data.audioQuality || "high");
@@ -257,9 +250,6 @@ export default function SettingsPage() {
     return () => {
       alive = false;
     };
-    // applyTheme is re-created each render but only closes over `save`, which
-    // is itself inert until `loaded` flips — so running this once is correct.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -287,15 +277,34 @@ export default function SettingsPage() {
     }
   }, []);
 
+  /**
+   * Queue a settings write.
+   *
+   * The write is recorded even before the initial load resolves — it used to
+   * early-return on `!loaded`, so a control touched in the first few hundred
+   * milliseconds looked like it had taken effect (the UI moved, the theme
+   * repainted) while the server never heard about it. The flush is what waits:
+   * writing before the load lands would race the response we're about to
+   * reconcile against.
+   */
   const save = useCallback(
     (key: string, value: unknown) => {
-      if (!loaded) return;
       pending.current[key] = value;
+      if (!loaded) return;
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, 350);
     },
     [loaded, flush]
   );
+
+  // Anything the user changed while the page was still loading is sent as soon
+  // as it's safe to.
+  useEffect(() => {
+    if (!loaded) return;
+    if (Object.keys(pending.current).length === 0) return;
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = setTimeout(flush, 350);
+  }, [loaded, flush]);
 
   // Don't lose a debounced write if the page unmounts mid-timer.
   useEffect(() => {
@@ -308,25 +317,23 @@ export default function SettingsPage() {
   }, [flush]);
 
   /**
-   * Paints a theme and records it.
+   * Paint a theme and record it.
    *
-   * `fromServer: true` skips the server write — the value already came from
-   * there, so saving it back is a pointless round trip that also races the
-   * debounced flush.
+   * The painting is the shared store's job (`lib/theme.ts`): the attribute, the
+   * localStorage write, the chrome colour, the cross-fade and telling other tabs
+   * all happen there. This adds the one thing that's specific to this screen —
+   * persisting the choice to the account so it follows the user to their other
+   * devices.
    */
-  function applyTheme(next: ThemeId, opts?: { fromServer?: boolean }) {
-    setTheme(next);
-    if (!opts?.fromServer) save("theme", next);
-    try {
-      localStorage.setItem("sakura-theme", next);
-    } catch {
-      // Private-mode Safari throws on write; the in-memory change still applies.
-    }
-    const root = document.documentElement;
-    if (next === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", next);
-    syncThemeColor(next);
-  }
+  const chooseTheme = useCallback(
+    (next: ThemeId) => {
+      haptic("selection");
+      themeChosenLocally.current = true;
+      applyThemeGlobally(next);
+      save("theme", next);
+    },
+    [save]
+  );
 
   async function handleClearCache() {
     setClearing(true);
@@ -350,6 +357,33 @@ export default function SettingsPage() {
     } catch {
       // Sign out locally even if the round trip fails.
     }
+
+    /*
+     * Purge everything on this device that belongs to the account, but leave the
+     * downloads alone.
+     *
+     * None of this was being cleared: `clearServiceWorkerCaches` was exported
+     * and never called, and the IndexedDB library cache and in-memory page state
+     * both survived sign-out. On a shared device the next person to sign in was
+     * handed the previous user's cached pages, library lists and last screens —
+     * their liked songs and playlists included.
+     *
+     * Downloaded audio is deliberately excluded. It's a file on this device,
+     * paid for with this device's storage and data, and it stays across sign-out
+     * and account switches by design — see the scoping note in lib/offline-db.
+     * Clearing it here would silently delete someone else's downloads too.
+     *
+     * Best-effort: a failure here must not strand the user in a half-signed-out
+     * state, so the redirect happens regardless.
+     */
+    try {
+      clearPageState();
+      clearServiceWorkerCaches();
+      await clearLibraryCache();
+    } catch {
+      /* nothing useful to do — the redirect below still has to happen */
+    }
+
     // `replace`, not `push` — otherwise Back returns to a signed-out app shell.
     router.replace("/login");
   }
@@ -404,7 +438,7 @@ export default function SettingsPage() {
               role="radio"
               aria-checked={theme === t.id}
               className={`${styles.themeCard} ${theme === t.id ? styles.themeCardActive : ""}`}
-              onClick={() => applyTheme(t.id)}
+              onClick={() => chooseTheme(t.id)}
             >
               <span className={styles.themeIcon}>
                 <t.Icon size={20} />

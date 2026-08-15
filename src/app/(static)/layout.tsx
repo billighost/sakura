@@ -5,6 +5,19 @@ export const metadata: Metadata = {
   title: "Sakura",
 };
 
+/**
+ * Frame for the public policy pages (/about, /privacy, /terms).
+ *
+ * The Back link points at `/` rather than `/settings`, and that matters because
+ * these pages are public: they're linked from the login and register screens as
+ * well as from Settings. A signed-out reader who followed one from /login and
+ * then tapped "Back to settings" was sent to a route the proxy guards, so they
+ * landed on /login with no explanation of why.
+ *
+ * `/` already resolves this correctly with no session read of its own — it
+ * redirects to /home when signed in and /login when not — so one static link
+ * serves both audiences and this layout stays fully prerenderable.
+ */
 export default function StaticLayout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ height: "100dvh", overflowY: "auto", background: "var(--sakura-bg)" }}>
@@ -19,7 +32,7 @@ export default function StaticLayout({ children }: { children: React.ReactNode }
         zIndex: 40,
       }}>
         <Link
-          href="/settings"
+          href="/"
           style={{
             display: "flex",
             alignItems: "center",
@@ -31,7 +44,7 @@ export default function StaticLayout({ children }: { children: React.ReactNode }
             fontSize: "0.8125rem",
             fontWeight: 500,
           }}
-          aria-label="Back to settings"
+          aria-label="Back to Sakura"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
             <path d="M15 18l-6-6 6-6" />

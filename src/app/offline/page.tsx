@@ -7,9 +7,14 @@ import styles from "./page.module.css";
  *
  * Statically rendered on purpose — it must be cacheable at install time, which
  * rules out anything that touches the session or the database.
+ *
+ * `dynamic = "force-static"` used to say that here. Under Cache Components the
+ * export is gone (it errors) and the guarantee comes from the page itself: with
+ * no runtime data access at all, the prerender extracts a fully static shell,
+ * which is exactly what the worker needs to pre-cache. Keep it that way — a
+ * `cookies()` or a database call anywhere in here would quietly turn the app's
+ * offline fallback into something that needs the network.
  */
-export const dynamic = "force-static";
-
 export default function OfflinePage() {
   return (
     <div className={styles.wrap}>

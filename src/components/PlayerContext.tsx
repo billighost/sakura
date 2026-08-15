@@ -190,6 +190,33 @@ function useDebouncedStorage(key: string, value: unknown, delayMs = 500) {
   }, [key]);
 }
 
+/** localStorage keys for the "resume where you left off" pair. */
+const PROGRESS_KEY = "sakura-player-progress";
+const PROGRESS_TRACK_KEY = "sakura-player-track-id";
+
+/**
+ * Read the persisted resume point.
+ *
+ * Returns a position of 0 rather than null on a miss so callers always have a
+ * concrete pair to compare against the track that ends up loading — the
+ * position is only ever applied when `trackId` matches, so a missing entry is
+ * indistinguishable from "belongs to some other track" and needs no special
+ * case at the call site.
+ */
+function readSavedResumePoint(): { positionSec: number; trackId: string | null } {
+  if (typeof window === "undefined") return { positionSec: 0, trackId: null };
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    const position = Number(raw);
+    return {
+      positionSec: Number.isFinite(position) && position > 0 ? position : 0,
+      trackId: localStorage.getItem(PROGRESS_TRACK_KEY),
+    };
+  } catch {
+    return { positionSec: 0, trackId: null };
+  }
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seekingRef = useRef(false);
@@ -200,6 +227,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // next track would wrongly re-seek to an old saved position instead of playing.
   const hasRestoredProgressRef = useRef(false);
   const lastProgressSaveRef = useRef(0);
+  /**
+   * The persisted resume point, snapshotted during the first render.
+   *
+   * This has to be read here — synchronously, before any effect runs — rather
+   * than out of localStorage at the point of use. `lastProgressSaveRef` starts
+   * at 0, so on the first commit the throttled progress saver below sees
+   * `Date.now() - 0` as "long enough" and writes the initial `progress` of 0
+   * straight over the stored value. That happened before the load effect ever
+   * got to read it, so the track was restored but always from the beginning —
+   * the position half of "resume where you left off" was destroyed by the code
+   * meant to persist it.
+   *
+   * Snapshotting at init makes the resume point immune to that ordering
+   * entirely: whatever the writers do afterwards, the value the load effect
+   * consumes is the one that was on disk when the page opened.
+   */
+  const savedResumeRef = useRef<{ positionSec: number; trackId: string | null } | undefined>(
+    undefined
+  );
+  if (savedResumeRef.current === undefined) {
+    savedResumeRef.current = readSavedResumePoint();
+  }
+  /**
+   * False until the resume point has been consumed (applied to the audio
+   * element, or discarded because it didn't belong to the loaded track).
+   *
+   * Gates every progress writer. Without it the writers race the restore and
+   * can persist a position of 0 for a track that is about to be seeked, which
+   * loses the resume point for the *next* reload even when this one worked.
+   */
+  const resumeSettledRef = useRef(false);
   // When a remote-sync restore sets a seek target for the current track, we
   // can't go through loadAudio (the track ID hasn't changed, so that effect
   // won't re-run). This ref lets the seek happen directly on the audio element,
@@ -1150,6 +1208,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audioRef.current.currentTime = clamped;
           setProgress(clamped);
           pendingSeekMsRef.current = null;
+          resumeSettledRef.current = true;
         }
       });
 
@@ -1282,7 +1341,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // resumes a position against the track it was actually saved for.
   useEffect(() => {
     if (currentTrack) {
-      localStorage.setItem("sakura-player-track-id", currentTrack.id);
+      localStorage.setItem(PROGRESS_TRACK_KEY, currentTrack.id);
     }
   }, [currentTrack?.id]);
 
@@ -1293,10 +1352,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const PROGRESS_SAVE_INTERVAL_MS = 3000;
   useEffect(() => {
     if (seekingRef.current) return;
+    // Until the resume point has been consumed, writing here would overwrite it
+    // with the player's pre-restore position (0 on a fresh load) and destroy the
+    // very thing the load effect is about to read.
+    if (!resumeSettledRef.current) return;
     const now = Date.now();
     if (now - lastProgressSaveRef.current < PROGRESS_SAVE_INTERVAL_MS) return;
     lastProgressSaveRef.current = now;
-    localStorage.setItem("sakura-player-progress", String(progress));
+    localStorage.setItem(PROGRESS_KEY, String(progress));
   }, [progress]);
 
   // Always flush the latest position on tab-hide and page unload — those are
@@ -1307,9 +1370,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // immediately rather than waiting for the next throttled tick.
   useEffect(() => {
     function flushProgress() {
+      // Same guard as the throttled saver: before the restore lands, the
+      // element still reads 0 and flushing that loses the resume point.
+      if (!resumeSettledRef.current) return;
       if (audioRef.current) {
         lastProgressSaveRef.current = Date.now();
-        localStorage.setItem("sakura-player-progress", String(audioRef.current.currentTime));
+        localStorage.setItem(PROGRESS_KEY, String(audioRef.current.currentTime));
       }
     }
     function handleVisibility() {
@@ -1447,6 +1513,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           audioRef.current.currentTime = clamped;
           setProgress(clamped);
           pendingSeekMsRef.current = null;
+          // The element now holds the adopted position, so the progress savers
+          // are free to persist it.
+          resumeSettledRef.current = true;
         };
 
         if (remote.trackId === snapshotRef.current.trackId) {
@@ -1456,18 +1525,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           } else {
             pendingSeekMsRef.current = remote.positionMs ?? 0;
           }
-          // Also update localStorage so a future reload resumes at this position.
-          localStorage.setItem("sakura-player-progress", String(targetSec));
-          localStorage.setItem("sakura-player-track-id", remote.trackId!);
+          // Also update the snapshot and localStorage so a future reload
+          // resumes at this position. The snapshot is what the load effect
+          // actually consults, so updating only localStorage would leave a
+          // remote restore invisible to it.
+          savedResumeRef.current = { positionSec: targetSec, trackId: remote.trackId! };
+          localStorage.setItem(PROGRESS_KEY, String(targetSec));
+          localStorage.setItem(PROGRESS_TRACK_KEY, remote.trackId!);
           setProgress(targetSec);
         } else {
           // Different track — loadAudio will run when currentIndex/currentTrack
-          // changes. Funnel the position through localStorage + the flag so the
+          // changes. Funnel the position through the snapshot + the flag so the
           // existing loadedmetadata path in loadAudio applies it.
-          localStorage.setItem("sakura-player-progress", String(targetSec));
-          localStorage.setItem("sakura-player-track-id", remote.trackId!);
+          savedResumeRef.current = { positionSec: targetSec, trackId: remote.trackId! };
+          localStorage.setItem(PROGRESS_KEY, String(targetSec));
+          localStorage.setItem(PROGRESS_TRACK_KEY, remote.trackId!);
           setProgress(targetSec);
           hasRestoredProgressRef.current = false;
+          // Re-arm the writer guard: the adopted position hasn't been applied
+          // to the element yet, so letting the savers run would persist the
+          // outgoing track's position against the incoming track's id.
+          resumeSettledRef.current = false;
         }
 
         showToast("Picked up where you left off", "accent");
@@ -1644,13 +1722,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // Only resume a saved position if it was actually saved against this
         // same track — otherwise a stale/mismatched value could seek a
         // freshly-picked track to a meaningless timestamp.
-        const savedProgress = localStorage.getItem("sakura-player-progress");
-        const savedTrackId = localStorage.getItem("sakura-player-track-id");
+        //
+        // The resume point comes from the render-time snapshot, not from
+        // localStorage: by the time this runs the throttled saver has already
+        // had a chance to overwrite the stored value with the player's initial
+        // 0. See `savedResumeRef` for the full story.
+        const saved = savedResumeRef.current ?? { positionSec: 0, trackId: null };
+        const savedTrackId = saved.trackId;
         const trackMatches =
           savedTrackId === currentTrack.id ||
           (currentTrack.resolvedId && savedTrackId === currentTrack.resolvedId);
-        if (savedProgress && trackMatches) {
-          const time = Number(savedProgress);
+        if (saved.positionSec > 0 && trackMatches) {
+          const time = saved.positionSec;
           const applySavedSeek = () => {
             if (!audioRef.current) return;
             // Clamp to duration in case of a stale value longer than the track.
@@ -1658,6 +1741,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             const clamped = isFinite(dur) && dur > 0 ? Math.min(time, dur) : time;
             audioRef.current.currentTime = clamped;
             setProgress(clamped);
+            // Only now is it safe to let the writers run again: the element is
+            // at the resumed position, so anything they persist is real.
+            resumeSettledRef.current = true;
           };
           // Setting currentTime immediately after .load() is unreliable across
           // browsers (metadata isn't guaranteed to be ready yet) — wait for
@@ -1667,7 +1753,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             applySavedSeek();
           } else {
             audioRef.current.addEventListener("loadedmetadata", applySavedSeek, { once: true });
+            // Belt-and-braces: if `loadedmetadata` never fires (a src that
+            // fails to load, a browser that already had metadata and won't
+            // re-emit), the writers would stay frozen for the whole session and
+            // no position would ever be saved again. Release them on a timer.
+            setTimeout(() => {
+              resumeSettledRef.current = true;
+            }, 10_000);
           }
+        } else {
+          // Nothing to resume for this track — the writers can run immediately.
+          resumeSettledRef.current = true;
         }
         // at the right spot for the person to hit play.
       }

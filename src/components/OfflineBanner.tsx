@@ -1,47 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useOffline } from "next/offline";
 import styles from "./OfflineBanner.module.css";
 
 /**
  * Connection status.
  *
- * Two behaviours worth noting beyond the styling:
+ * ── Why `useOffline()` and not `navigator.onLine` ───────────────────────────
  *
- *  - It confirms *re*connection for a couple of seconds instead of just
- *    vanishing. Silently disappearing leaves people unsure whether the app
- *    recovered or the banner simply timed out.
- *  - `navigator.onLine` is only trustworthy when false — it reports true for a
- *    connected-but-useless network (captive portal, no upstream). A cheap HEAD
- *    against our own origin is what actually confirms reachability.
+ * This used to read `navigator.onLine` through `useSyncExternalStore`, plus a
+ * hand-rolled HEAD probe against our own origin to confirm recovery. The probe
+ * existed because `navigator.onLine` is only trustworthy when false: it reports
+ * the state of the OS network interface, so a phone on WiFi with no upstream —
+ * a captive portal, a dead router, a hotel network — reports "online" while
+ * nothing in the app works. That's precisely when a user needs to be told, and
+ * precisely when the old banner stayed hidden.
  *
- * The raw online flag is read through `useSyncExternalStore` rather than being
- * mirrored into state from an effect. That's the API built for exactly this
- * shape — an external, subscribable browser value — and it avoids both the
- * hydration mismatch of reading `navigator` during render and the cascading
- * re-render of a setState in an effect body.
+ * `useOffline` (enabled by `experimental.useOffline` in next.config.ts) flips
+ * true on the browser's offline event *or* when a navigation, prefetch or Server
+ * Action fetch actually fails, and flips back only after a background
+ * connectivity check succeeds. So it catches the connected-but-useless case on
+ * the way down, and it already does the work the HEAD probe was doing on the way
+ * back up — which is why that probe is gone rather than merely moved.
+ *
+ * It returns false during SSR and initial hydration, which matches what the old
+ * server snapshot asserted, so the markup still hydrates quietly.
+ *
+ * The one behaviour kept deliberately: reconnection is *confirmed* for a couple
+ * of seconds rather than the banner just vanishing. Silently disappearing leaves
+ * people unsure whether the app recovered or the banner simply timed out.
  */
-
-function subscribeToOnline(callback: () => void) {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-}
-
-const getOnlineSnapshot = () => navigator.onLine;
-// The server has no connection state; assume online so the markup matches the
-// overwhelmingly common client case and hydration stays quiet.
-const getOnlineServerSnapshot = () => true;
-
 export function OfflineBanner() {
-  const online = useSyncExternalStore(
-    subscribeToOnline,
-    getOnlineSnapshot,
-    getOnlineServerSnapshot
-  );
+  const offline = useOffline();
 
   // Was the connection previously lost? Drives the transient "Back online"
   // confirmation, which is the one piece of genuinely derived state here.
@@ -49,7 +40,7 @@ export function OfflineBanner() {
   const wasOfflineRef = useRef(false);
 
   useEffect(() => {
-    if (!online) {
+    if (offline) {
       // No need to clear `showRestored` here: the offline branch takes
       // precedence in render, and coming back online re-arms it anyway.
       wasOfflineRef.current = true;
@@ -61,31 +52,12 @@ export function OfflineBanner() {
     if (!wasOfflineRef.current) return;
     wasOfflineRef.current = false;
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    setShowRestored(true);
+    const timer = setTimeout(() => setShowRestored(false), 2600);
+    return () => clearTimeout(timer);
+  }, [offline]);
 
-    // Only claim recovery once a real request succeeds — `navigator.onLine`
-    // going true proves a link exists, not that there's a working route to us.
-    void (async () => {
-      try {
-        await fetch("/manifest.json", { method: "HEAD", cache: "no-store" });
-      } catch {
-        return; // still unusable; leave the offline banner to re-arm
-      }
-      if (cancelled) return;
-      setShowRestored(true);
-      timer = setTimeout(() => setShowRestored(false), 2600);
-    })();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [online]);
-
-  if (online && !showRestored) return null;
-
-  const offline = !online;
+  if (!offline && !showRestored) return null;
 
   return (
     <div

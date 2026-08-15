@@ -45,12 +45,99 @@ export interface FastEncodeOptions {
   drawFrame: (ctx: CanvasRenderingContext2D, t: number) => void;
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
+  /** Bits per second for video. Defaults to `videoBitrateFor(...)`. */
+  videoBitrate?: number;
+  /** Bits per second for audio. Defaults to `AUDIO_BITRATE`. */
+  audioBitrate?: number;
 }
 
 export interface FastEncodeResult {
   blob: Blob;
   extension: "mp4" | "webm";
 }
+
+/**
+ * Bits per pixel per frame.
+ *
+ * The exports used a flat 4.5 Mbps, which at 720×1280/30 is roughly 0.16 bpp —
+ * a rate meant for camera footage, spent on frames that are mostly a flat colour
+ * field, one blurred still and some type. It made a 15-second clip about 8.5 MB
+ * and a whole song around 140 MB: too large to keep, and past what several share
+ * targets will accept.
+ *
+ * 0.065 bpp is the visually-lossless point for this material — I compared bloom,
+ * vinyl and pulse at 0.05/0.065/0.09 and could see banding in the vinyl grooves
+ * below 0.06 and nothing above it. Roughly 1.8 Mbps at the export size, so a
+ * 2.5× smaller file for the same clip.
+ */
+const BITS_PER_PIXEL = 0.065;
+
+/** Floor and ceiling, so an unusual size can't produce a silly rate. */
+const MIN_VIDEO_BITRATE = 900_000;
+const MAX_VIDEO_BITRATE = 3_200_000;
+
+/**
+ * AAC at 96k is transparent enough for a phone speaker or earbuds, which is
+ * where a shared clip is heard. 128k was costing ~4 MB on a four-minute export
+ * for a difference nobody can hear on this material.
+ */
+export const AUDIO_BITRATE = 96_000;
+
+export function videoBitrateFor(width: number, height: number, fps: number): number {
+  const raw = width * height * fps * BITS_PER_PIXEL;
+  return Math.round(Math.min(MAX_VIDEO_BITRATE, Math.max(MIN_VIDEO_BITRATE, raw)));
+}
+
+/** Rough size of an export, for telling the user before they commit to it. */
+export function estimateVideoBytes(
+  seconds: number,
+  width: number,
+  height: number,
+  fps: number
+): number {
+  const bitsPerSecond = videoBitrateFor(width, height, fps) + AUDIO_BITRATE;
+  // ~2% container overhead: moov atom, per-frame headers, interleaving.
+  return Math.round((seconds * bitsPerSecond * 1.02) / 8);
+}
+
+/**
+ * Hand the main thread back for one turn of the event loop.
+ *
+ * This is what stops an export freezing the share sheet. `encode()` is
+ * synchronous from JS's point of view, so a 900-frame loop that only yields on
+ * encoder backpressure — which a hardware encoder rarely applies, because it
+ * drains as fast as we fill — never yields at all. The whole export ran as one
+ * task: no paint, no progress bar, no Cancel, and the sheet looked hung for as
+ * long as it took.
+ *
+ * `scheduler.yield()` is the purpose-built API and resumes at the front of the
+ * queue, so yielding every frame costs almost nothing. The MessageChannel
+ * fallback is a real macrotask without `setTimeout`'s 4ms clamp — that clamp
+ * would add 3.6 seconds to a 30-second clip on its own.
+ */
+const yieldToUi: () => Promise<void> = (() => {
+  const scheduler = (
+    globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
+  ).scheduler;
+
+  if (typeof scheduler?.yield === "function") {
+    return () => scheduler.yield!();
+  }
+
+  if (typeof MessageChannel === "function") {
+    return () =>
+      new Promise<void>((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => {
+          channel.port1.close();
+          resolve();
+        };
+        channel.port2.postMessage(null);
+      });
+  }
+
+  return () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+})();
 
 /** Codec probe results, cached — `isConfigSupported` is async and not cheap. */
 let supportCache: Promise<FastEncodeSupport | null> | null = null;
@@ -121,7 +208,18 @@ export async function detectFastEncode(): Promise<FastEncodeSupport | null> {
 }
 
 export async function encodeFast(options: FastEncodeOptions): Promise<FastEncodeResult> {
-  const { width, height, fps, duration, audio, drawFrame, onProgress, signal } = options;
+  const {
+    width,
+    height,
+    fps,
+    duration,
+    audio,
+    drawFrame,
+    onProgress,
+    signal,
+    videoBitrate = videoBitrateFor(width, height, fps),
+    audioBitrate = AUDIO_BITRATE,
+  } = options;
 
   const support = await detectFastEncode();
   if (!support) throw new Error("This browser can't use fast export.");
@@ -173,11 +271,16 @@ export async function encodeFast(options: FastEncodeOptions): Promise<FastEncode
     codec: support.videoCodec,
     width,
     height,
-    bitrate: 4_500_000,
+    bitrate: videoBitrate,
     framerate: fps,
-    // Realtime latency mode lets the encoder emit chunks without buffering a
-    // long GOP, which keeps memory flat over a long clip.
-    latencyMode: "realtime",
+    /*
+     * `quality`, not `realtime`. This is an offline encode, so there's no
+     * latency budget to protect, and letting the encoder look ahead is worth
+     * real bits at the lower bitrate this now runs at — the same file size buys
+     * noticeably cleaner gradients in the vinyl and field styles. Memory stays
+     * flat because the loop below yields on queue depth.
+     */
+    latencyMode: "quality",
   });
 
   const frameDuration = 1_000_000 / fps; // microseconds
@@ -203,12 +306,16 @@ export async function encodeFast(options: FastEncodeOptions): Promise<FastEncode
     frame.close();
 
     /*
-     * Backpressure. `encode()` is synchronous but the encoder works on its own
-     * thread; queueing 900 frames at once spikes memory into the hundreds of
-     * megabytes and gets the tab killed on a phone. Yielding whenever the queue
-     * runs deep keeps it bounded, and yields to the UI thread at the same time
-     * so the progress bar actually paints.
+     * Yield on *every* frame, not only under backpressure.
+     *
+     * The queue check below is about memory: 900 queued frames is hundreds of
+     * megabytes and gets the tab killed on a phone. But it is not enough to keep
+     * the UI alive, because a hardware encoder usually keeps the queue shallow —
+     * so the old `if (queue > 8) await` never fired and the entire export ran as
+     * one blocking task. One cheap yield per frame is what lets the progress bar
+     * paint and the Cancel button respond.
      */
+    await yieldToUi();
     if (videoEncoder.encodeQueueSize > 8) {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
@@ -235,7 +342,7 @@ export async function encodeFast(options: FastEncodeOptions): Promise<FastEncode
       codec: support.audioCodec,
       sampleRate: audio.sampleRate,
       numberOfChannels: 2,
-      bitrate: 128_000,
+      bitrate: audioBitrate,
     });
 
     /*
@@ -281,6 +388,10 @@ export async function encodeFast(options: FastEncodeOptions): Promise<FastEncode
 
       audioEncoder.encode(data);
       data.close();
+
+      // Same reasoning as the video loop: the interleave below is real work on
+      // the main thread, and a four-minute clip is 240 iterations of it.
+      await yieldToUi();
 
       onProgress?.(0.85 + (offset / totalAudioFrames) * 0.14);
     }

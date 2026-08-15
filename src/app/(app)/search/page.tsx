@@ -14,6 +14,7 @@ import {
   MusicNoteIcon,
 } from "@/components/Icons";
 import { getCachedLibraryData, setCachedLibraryData } from "@/lib/offline-db";
+import { usePageState } from "@/lib/usePageState";
 import styles from "./page.module.css";
 
 interface SearchResult {
@@ -121,16 +122,28 @@ function entityHref(
 }
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [artists, setArtists] = useState<ArtistResult[]>([]);
-  const [playlists, setPlaylists] = useState<PlaylistResult[]>([]);
+  /*
+   * Search state is cached across unmount (see lib/usePageState).
+   *
+   * Leaving search to open a result and coming back used to reset everything —
+   * empty box, no results, back on the "all" tab, scrolled to the top — and then
+   * re-fetch what it had just thrown away. Since the query is restored on the
+   * first render, the results are on screen before the browser paints, so Back
+   * lands on the page exactly as it was left.
+   *
+   * `loading` is deliberately NOT cached: a restored `true` would show a spinner
+   * that no in-flight request will ever resolve.
+   */
+  const [query, setQuery] = usePageState("search:query", "");
+  const [results, setResults] = usePageState<SearchResult[]>("search:results", []);
+  const [artists, setArtists] = usePageState<ArtistResult[]>("search:artists", []);
+  const [playlists, setPlaylists] = usePageState<PlaylistResult[]>("search:playlists", []);
   const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [searched, setSearched] = usePageState("search:searched", false);
   const [history, setHistory] = useState<string[]>([]);
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = usePageState<Tab>("search:tab", "all");
   /** Set while browsing a genre, so the header can say what you're looking at. */
-  const [browsing, setBrowsing] = useState<string | null>(null);
+  const [browsing, setBrowsing] = usePageState<string | null>("search:browsing", null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,7 +159,24 @@ export default function SearchPage() {
 
   useEffect(() => {
     setHistory(getHistory());
-    inputRef.current?.focus();
+    /*
+     * Autofocus only when there's nothing on screen to read.
+     *
+     * Now that the query survives unmount, focusing unconditionally means
+     * pressing Back from a result throws the on-screen keyboard up over the
+     * results the user came back for — and on a phone that covers half of them.
+     * A restored query means they've already searched; leave the field alone.
+     *
+     * Testing the restored *value* rather than "is there a cache entry": the
+     * cache always has an entry by the time this runs, because usePageState's
+     * sync effect is declared above this one and so commits first.
+     */
+    if (!query && results.length === 0) {
+      inputRef.current?.focus();
+    }
+    // Mount-only on purpose — this is a first-paint decision, not something to
+    // re-evaluate as the query changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

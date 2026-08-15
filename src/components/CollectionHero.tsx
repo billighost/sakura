@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackButton } from "./BackButton";
 import { DownloadIcon, DownloadedIcon, PlayIcon, ShuffleIcon, SpinnerIcon } from "./Icons";
 import { haptic } from "@/lib/haptics";
 import styles from "./CollectionHero.module.css";
@@ -38,6 +39,20 @@ export interface CollectionHeroProps {
   loading?: boolean;
   /** Trailing controls in the top-right — search toggles, overflow menus. */
   actions?: React.ReactNode;
+  /**
+   * Where Back goes when there's nothing to pop — a shared link, a PWA cold
+   * start, a refresh. Defaults to the library, which is where every collection
+   * in the app is reachable from.
+   */
+  backFallback?: string;
+  /**
+   * Set false only for a collection that is itself a tab root. Every page using
+   * this hero today is a detail page reached by tapping something, so the
+   * control is on by default: making it opt-in is how five of these pages ended
+   * up with no way back but the system gesture, which a standalone PWA doesn't
+   * always have.
+   */
+  showBack?: boolean;
   children?: React.ReactNode;
 }
 
@@ -52,6 +67,8 @@ export function CollectionHero({
   tint,
   loading = false,
   actions,
+  backFallback = "/library",
+  showBack = true,
   children,
 }: CollectionHeroProps) {
   const mosaic = coverUrls && coverUrls.length >= 4 ? coverUrls.slice(0, 4) : null;
@@ -61,6 +78,12 @@ export function CollectionHero({
       className={styles.hero}
       style={tint ? ({ "--hero-tint": tint } as React.CSSProperties) : undefined}
     >
+      {showBack && (
+        <div className={styles.backRow}>
+          <BackButton fallback={backFallback} />
+        </div>
+      )}
+
       <div className={styles.top}>
         <div className={styles.art}>
           {mosaic ? (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useAppNav } from "@/components/AppNavContext";
 import { haptic } from "./haptics";
 
 /**
@@ -13,6 +14,11 @@ import { haptic } from "./haptics";
  * user landed two entries back in history. A module-level token means that even
  * if it's mounted more than once only the first instance is live, and the rest
  * are inert until it unmounts.
+ *
+ * The gesture goes through `useAppNav().back()` rather than `router.back()`
+ * directly, so it gets the same treatment as tapping the back button: the
+ * back-direction page transition, the depth accounting, and — the part that was
+ * actually broken — waiting for a pending overlay pop instead of racing it.
  */
 let activeToken: symbol | null = null;
 
@@ -20,7 +26,7 @@ let activeToken: symbol | null = null;
 const TAB_ROOTS = ["/home", "/search", "/library", "/profile"];
 
 export function useSwipeBack(enabled = true) {
-  const router = useRouter();
+  const { back } = useAppNav();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -56,7 +62,7 @@ export function useSwipeBack(enabled = true) {
       // Horizontal intent: travelled far enough, and mostly sideways.
       if (dx > 70 && Math.abs(dy) < Math.abs(dx) * 0.6) {
         haptic("impact");
-        router.back();
+        back();
       }
     };
 
@@ -68,5 +74,5 @@ export function useSwipeBack(enabled = true) {
       window.removeEventListener("touchend", onTouchEnd);
       if (activeToken === token) activeToken = null;
     };
-  }, [router, pathname, enabled]);
+  }, [back, pathname, enabled]);
 }

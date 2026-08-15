@@ -1,99 +1,46 @@
-"use client";
+import AppShellRoot from "./AppShellRoot";
 
-import { useState, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
-import { TabBar } from "@/components/TabBar";
-import { MiniPlayer } from "@/components/MiniPlayer";
-import { FullPlayer } from "@/components/FullPlayer";
-import { PlayerProvider, usePlayer } from "@/components/PlayerContext";
-import { MediaSessionProvider } from "@/components/MediaSessionProvider";
-import { AppNavProvider, useAppNav } from "@/components/AppNavContext";
-import { ShareProvider } from "@/components/share/ShareContext";
-import { ShareStudio } from "@/components/share/ShareStudio";
-import { InstallPrompt } from "@/components/InstallPrompt";
-import { SmoothScroll } from "@/components/SmoothScroll";
-import { useSwipeBack } from "@/lib/useSwipeBack";
-import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
-import styles from "./layout.module.css";
-
-function AppShell({ children }: { children: React.ReactNode }) {
-  const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
-  const { currentTrack } = usePlayer();
-  const { registerScroller } = useAppNav();
-  const pathname = usePathname();
-
-  // Single registration. This used to be an inline copy of the same listener
-  // that `useSwipeBack` installs, so on pages calling the hook a swipe fired
-  // router.back() twice.
-  useSwipeBack();
-
-  useKeyboardShortcuts({
-    onToggleFullPlayer: useCallback(() => {
-      setFullPlayerOpen((open) => !open);
-    }, []),
-    fullPlayerOpen,
-  });
-
-  // Close the player on Back rather than leaving the page, so the hardware/
-  // browser back button matches the visual stack the user sees.
-  useEffect(() => {
-    if (!fullPlayerOpen) return;
-    window.history.pushState({ sakuraPlayer: true }, "");
-    const onPop = () => setFullPlayerOpen(false);
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      // If the player was closed by any other means, retire the history entry
-      // we pushed so Back doesn't need pressing twice.
-      if (window.history.state?.sakuraPlayer) window.history.back();
-    };
-  }, [fullPlayerOpen]);
-
-  return (
-    <div className={styles.root}>
-      {/*
-        The app's one scroll container. Everything that needs to read or drive
-        page scroll — scroll restoration, the collapsing header, tap-active-tab
-        -to-top, the scroll lock behind a sheet — finds it by this ref or the
-        `data-app-scroll` attribute, rather than each guessing at `window`.
-      */}
-      <div ref={registerScroller} className={styles.content} data-app-scroll>
-        {children}
-      </div>
-
-      {/* Smooth wheel scrolling for the resolved page scroller. Touch stays
-          native — see the note in SmoothScroll.tsx. */}
-      <SmoothScroll routeKey={pathname} />
-
-      <div className={styles.bottom}>
-        {currentTrack && <MiniPlayer onExpand={() => setFullPlayerOpen(true)} />}
-        <TabBar />
-      </div>
-
-      <FullPlayer open={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
-
-      {/* Mounted once, at the root: every share site in the app drives this one
-          sheet through ShareContext rather than each rolling its own. */}
-      <ShareStudio />
-
-      {/* Decides for itself whether this is a moment worth asking at — see
-          lib/installPrompt.ts. Renders nothing the overwhelming majority of
-          the time. Kept inside the app group so it can never appear over the
-          auth screens, where the app hasn't earned the ask yet. */}
-      <InstallPrompt />
-    </div>
-  );
-}
+/**
+ * Server layout for the signed-in app, wrapping the client shell.
+ *
+ * ── Why this file is a server component and the shell is not ────────────────
+ *
+ * The whole app shell — player, nav, share, tab bar, mini player — is client
+ * code, and it used to live here with a `"use client"` at the top. That worked
+ * until Cache Components arrived, because `instant` is a route segment config
+ * and Next.js only reads it from a **server** module: exported from a
+ * `"use client"` file it fails the build with "can only be used when the segment
+ * is a Server Component module". So the shell moved to `AppShellRoot.tsx` and
+ * this file became the thin server wrapper that can carry the config.
+ *
+ * ── Why the whole group opts out of instant validation ──────────────────────
+ *
+ * `AppNavProvider` reads `usePathname()` (for scroll restoration and for
+ * resolving the view transition on route commit) and `PlayerContext` reads it
+ * too. Both sit above every page in the group. On a static route the path is
+ * known at build time and prerenders fine; on a `[param]` route — album, artist,
+ * playlist, mix, browse, track — it's runtime data, so prerendering stops at the
+ * provider and validation fails with `CLIENT_HOOK_DYNAMIC`.
+ *
+ * The two documented fixes are to wrap the offending component in `<Suspense>`
+ * or to opt the segment out. Suspense is the wrong tool here: these providers
+ * sit above the entire UI, so suspending them would push the tab bar, the mini
+ * player and the page frame behind a boundary and leave nothing to prerender —
+ * paying the cost of a boundary to gain an empty shell.
+ *
+ * Declaring it once at the group level rather than per page is deliberate: the
+ * cause is shared by every route underneath, so six copies of the same opt-out
+ * would just be six places to forget. Note this does *not* force these routes
+ * dynamic — a genuinely prerenderable route still ships its static shell, and
+ * `partialPrefetching` still prefetches one App Shell per route. What's given up
+ * is the dev-time validation nag, not the prerendering.
+ *
+ * To undo it, the providers have to stop reading URL state above the page — move
+ * `usePathname()` down into only the components that need it (TabBar,
+ * SmoothScroll), each behind its own boundary.
+ */
+export const instant = false;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <PlayerProvider>
-      <MediaSessionProvider />
-      <AppNavProvider>
-        <ShareProvider>
-          <AppShell>{children}</AppShell>
-        </ShareProvider>
-      </AppNavProvider>
-    </PlayerProvider>
-  );
+  return <AppShellRoot>{children}</AppShellRoot>;
 }

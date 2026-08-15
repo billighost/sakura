@@ -1,28 +1,34 @@
 /*
  * Lyrics view.
  *
- * Like the full player, an always-dark media surface in both themes — the base
- * is opaque enough that the theme underneath never shows through, so white
- * text is correct here regardless of light/dark mode. The on-media tokens are
- * declared once rather than repeating rgba(255,255,255,.x) inline.
+ * ── The surface takes its colour from the artwork ───────────────────────────
  *
- * The governing rule: the active line is marked by TYPE, never by a filled
- * background. A background plate behind the current line reads as a selected
- * table row rather than as singing. Everything below — weight, colour, scale,
- * and the graded recession of neighbours — exists to carry "now" without one.
+ * The base is the theme's media veil; over it sits one flat wash of the
+ * track's own accent (`--track-accent`, extracted from the cover in
+ * lib/color.ts). So the screen you read the words on is the colour of the
+ * record you're listening to, and it changes with the song.
+ *
+ * A wash, not a gradient: the design brief allows gradients only for the
+ * artwork scrim and progress fills. And a *token* veil rather than a fixed
+ * dark one, so light mode gets a pale surface with dark type — see the
+ * `--media-*` / `--on-media-*` block in globals.css. The wash is applied at
+ * `--media-tint-strong`, which is lower in light mode because a pale surface
+ * takes colour much faster than a dark one does.
+ *
+ * ── The active line is marked by TYPE, never by a filled background ─────────
+ *
+ * A background plate behind the current line reads as a selected table row
+ * rather than as singing. Everything below — weight, colour, scale, and the
+ * graded recession of neighbours — exists to carry "now" without one.
  */
 .overlay {
-  --on-media: rgba(255, 255, 255, 0.96);
-  --on-media-secondary: rgba(255, 255, 255, 0.7);
-  --on-media-tertiary: rgba(255, 255, 255, 0.42);
-  --on-media-fill: rgba(255, 255, 255, 0.09);
-
   position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
   flex-direction: column;
-  background: rgba(14, 11, 15, 0.97);
+  background: var(--media-veil);
+  color: var(--on-media);
   /* Sanctioned blur: the player genuinely sits underneath this. */
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
@@ -30,6 +36,23 @@
   transition: transform var(--d-slow) var(--ease);
   pointer-events: none;
   padding-top: env(safe-area-inset-top);
+}
+
+/*
+ * The artwork's colour. `z-index: -1` keeps it behind the header, list and
+ * footer while staying above the overlay's own background — safe because the
+ * transform above already makes `.overlay` a stacking context, so the negative
+ * index can't escape it.
+ */
+.overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--track-accent, var(--accent));
+  opacity: var(--media-tint-strong);
+  pointer-events: none;
+  transition: background var(--d-slower) var(--ease);
 }
 
 .overlay.open {
@@ -115,12 +138,25 @@
   flex: 1;
   overflow-y: auto;
   /*
-   * Generous top and bottom padding so the first and last lines can still
-   * reach the focus point (42% down the viewport). Without it the final line
-   * can never centre — the scroller runs out of travel — and the song appears
-   * to stop following you a few lines before the end.
+   * Top padding is deliberately *small*, bottom padding large — and that
+   * asymmetry is the fix for "the lyrics start halfway down the screen".
+   *
+   * This used to be `38vh` on top, one viewport-relative pad mirroring the
+   * bottom one. But the auto-scroller clamps its target to `scrollTop >= 0`
+   * (see useLyricsScroll), so at the start of a song there is nothing to
+   * scroll: the first line simply sat wherever the padding put it — 38% of the
+   * way down, under a screen of empty space, before a note had played.
+   *
+   * With a small pad the song opens at the top of the page, the way a page of
+   * words should. The active line then walks down to the 42% focus point over
+   * the first few lines and the list starts scrolling under it from there,
+   * which is also what every player people know does.
+   *
+   * The bottom pad stays generous: without it the *last* line can never reach
+   * the focus point — the scroller runs out of travel — and the song appears to
+   * stop following you a few lines before the end.
    */
-  padding: 38vh 0 52vh;
+  padding: var(--space-3) 0 56vh;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   /*
@@ -171,14 +207,20 @@
    * distant ones fall back far enough to stop competing. Capped at 3 in the
    * component so the ends of a long song never become invisible.
    */
-  color: rgba(255, 255, 255, calc(0.46 - var(--depth, 0) * 0.1));
+  color: rgb(
+    var(--on-media-rgb) /
+      calc((0.46 - var(--depth, 0) * 0.1) * var(--on-media-dim-boost, 1))
+  );
   transition: color var(--d-slow) var(--ease), opacity var(--d-slow) var(--ease);
   margin: 0;
 }
 
 /* Sung lines settle back rather than staying as bright as what's coming. */
 .row[data-state="past"] .line {
-  color: rgba(255, 255, 255, calc(0.34 - var(--depth, 0) * 0.07));
+  color: rgb(
+    var(--on-media-rgb) /
+      calc((0.34 - var(--depth, 0) * 0.07) * var(--on-media-dim-boost, 1))
+  );
 }
 
 /*
@@ -200,7 +242,10 @@
   font-size: clamp(0.8rem, 2.6vw, 0.98rem);
   font-weight: 500;
   line-height: var(--lh-normal);
-  color: rgba(255, 255, 255, calc(0.26 - var(--depth, 0) * 0.05));
+  color: rgb(
+    var(--on-media-rgb) /
+      calc((0.26 - var(--depth, 0) * 0.05) * var(--on-media-dim-boost, 1))
+  );
   transition: color var(--d-slow) var(--ease);
   margin: 3px 0 0;
 }
@@ -223,7 +268,7 @@
  * timings for drifts out of step with the voice within a couple of words.
  */
 .word {
-  color: rgba(255, 255, 255, 0.32);
+  color: rgb(var(--on-media-rgb) / calc(0.32 * var(--on-media-dim-boost, 1)));
   transition: color var(--d-fast) var(--ease-in-out);
 }
 
@@ -239,13 +284,13 @@
 
 @media (hover: hover) and (pointer: fine) {
   .lineBtn:hover .line {
-    color: rgba(255, 255, 255, 0.82);
+    color: rgb(var(--on-media-rgb) / 0.82);
   }
 
   /* The only hint that lines are seekable, shown where a pointer can see it. */
   .lineBtn:hover .line {
     text-decoration: underline;
-    text-decoration-color: rgba(255, 255, 255, 0.22);
+    text-decoration-color: rgb(var(--on-media-rgb) / 0.28);
     text-underline-offset: 5px;
     text-decoration-thickness: 1px;
   }
@@ -319,9 +364,9 @@
   gap: var(--space-2);
   padding: 0 var(--space-4);
   height: var(--tap-min);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--on-media-fill-strong);
   border-radius: var(--r-full);
-  background: rgba(28, 22, 30, 0.92);
+  background: var(--media-chrome-solid);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--on-media);
@@ -375,13 +420,14 @@
   margin: 0;
 }
 
-/* Shaped like lyrics rather than a spinner, so the wait previews the content. */
+/* Shaped like lyrics rather than a spinner, so the wait previews the content.
+ * Top-aligned, matching where the real lines will appear. */
 .skeletonList {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: 18vh 0 0;
+  padding: var(--space-4) 0 0;
 }
 
 .skeletonLine {
@@ -406,7 +452,7 @@
 .footer {
   flex-shrink: 0;
   padding: var(--space-2) var(--gutter) calc(var(--space-5) + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--media-chrome-line);
 }
 
 .timeRow {
@@ -457,7 +503,8 @@
   border-radius: var(--r-full);
   /* Flat accent — the artwork's colour when we have it, sakura pink otherwise. */
   background: var(--track-accent, var(--accent));
-  color: var(--on-accent);
+  /* Computed from the accent's own luminance — see FullPlayer.module.css. */
+  color: var(--on-track-accent, var(--on-accent));
   cursor: pointer;
   box-shadow: var(--shadow-2);
 }
@@ -470,7 +517,7 @@
  */
 @media (max-height: 640px) {
   .list {
-    padding: 30vh 0 40vh;
+    padding: var(--space-2) 0 46vh;
   }
 
   .row {

@@ -13,9 +13,17 @@ interface Props {
   lyricTime?: number;
   theme: string;
   sharedBy: string;
+  /**
+   * Whether the viewer has an account and is signed in.
+   *
+   * A share link is the one page in the app built to be opened by someone who
+   * isn't a user yet, so it has to tell them the truth about what the button
+   * does — see the CTA below.
+   */
+  isSignedIn: boolean;
 }
 
-export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy }: Props) {
+export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy, isSignedIn }: Props) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
@@ -53,8 +61,26 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
     };
   }, [track.id, kind, theme, lines]);
 
+  /**
+   * Where the primary button goes, and what it admits to.
+   *
+   * This used to be an unconditional "Open Sakura" that pushed `/home`. For a
+   * signed-in viewer that's right, but a share link is deliberately public — the
+   * whole point is that it's sent to someone else — so the typical visitor here
+   * is *not* signed in, and for them the proxy turned that tap into a silent
+   * bounce to a login screen they hadn't asked for and weren't told about.
+   *
+   * Signed out, the button now says so and carries `next`, so signing in lands
+   * them on the track that was shared with them rather than a generic home feed.
+   * That's the difference between a share link that recruits someone and one
+   * that loses them at an unexplained login wall.
+   */
+  const destination = track.id ? `/track/${track.id}` : "/home";
+
   const handleGoToApp = () => {
-    router.push("/home");
+    router.push(
+      isSignedIn ? destination : `/login?next=${encodeURIComponent(destination)}`
+    );
   };
 
   const handleShare = async () => {
@@ -104,7 +130,7 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
 
         <div className={styles.actions}>
           <button className={styles.primary} onClick={handleGoToApp}>
-            Open Sakura
+            {isSignedIn ? "Open Sakura" : "Log in to listen"}
           </button>
           {imageBlob && (
             <button className={styles.secondary} onClick={handleShare}>

@@ -46,7 +46,7 @@
    * tokens stay legible regardless of how bright the source photo is.
    */
   background: color-mix(in srgb, var(--track-accent, var(--accent)) 28%, #16121a 72%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--media-chrome-line);
   cursor: pointer;
   box-sizing: border-box;
   transition: background var(--d-fast) var(--ease);
@@ -121,7 +121,10 @@
    * two views agree on what "two lines away" looks like.
    */
   font-size: calc(1.0625rem - var(--depth, 0) * 0.0625rem);
-  color: rgba(255, 255, 255, calc(0.46 - var(--depth, 0) * 0.14));
+  color: rgb(
+    var(--on-media-rgb) /
+      calc((0.46 - var(--depth, 0) * 0.14) * var(--on-media-dim-boost, 1))
+  );
   transition: color var(--d-slow) var(--ease), font-size var(--d-slow) var(--ease);
 }
 

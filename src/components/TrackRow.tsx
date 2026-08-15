@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePlayer } from "./PlayerContext";
-import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeOfflineTrack, getCachedUserId, getDeviceId } from "@/lib/offline-db";
+import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeDownloadedTrack, getCachedUserId, getDeviceId } from "@/lib/offline-db";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import { AddToPlaylistModal } from "./AddToPlaylistModal";
 import styles from "./TrackRow.module.css";
@@ -210,7 +210,11 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
     try {
       const uId = getCachedUserId();
       const dId = getDeviceId();
-      await removeOfflineTrack(track.id, uId, dId);
+      // Use the full removal path, not the bare metadata delete: a track whose
+      // audio landed under a resolved id (Deezer → Telegram) keeps its blob and
+      // any partial chunks otherwise, so "Removed from device" would free
+      // nothing while claiming to.
+      await removeDownloadedTrack(track.id, uId, dId);
       setOffline(false);
       showToast("Removed from device", "success");
     } catch {}

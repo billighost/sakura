@@ -19,12 +19,19 @@ import { queryOne } from "@/lib/sql";
  * `lib/audioOffload.ts`.
  */
 /**
- * Never let this response be treated as static. A rangeless request returns the
+ * This response must never be treated as static. A rangeless request returns the
  * whole file, and anything that wants to hash or buffer the body to make it
  * cacheable has to read all of it first — which shows up as a request that
  * sends nothing for two minutes and then flushes 11MB at once.
+ *
+ * That used to be an `export const dynamic = "force-dynamic"`, which Cache
+ * Components rejects outright ("not compatible with nextConfig.cacheComponents").
+ * Nothing is lost: route handlers are dynamic by default under Cache Components,
+ * and this one opens with `await auth()`, so it reads cookies before it does
+ * anything else and could not be prerendered even in principle. Keep that
+ * ordering — moving the auth check below the streaming setup would be the one
+ * change that makes this reasoning stop holding.
  */
-export const dynamic = "force-dynamic";
 
 /**
  * Declared here, not only in `vercel.json`.

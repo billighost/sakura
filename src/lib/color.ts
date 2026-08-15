@@ -81,6 +81,70 @@ export async function extractDominantColor(url: string | undefined | null): Prom
   return result;
 }
 
+/**
+ * A foreground colour guaranteed to read on top of `color`.
+ *
+ * The accent is extracted from artwork, so it can land anywhere between a deep
+ * indigo and pale sand. Anything painted *on* it — the play glyph on the accent
+ * chip, most obviously — therefore can't be a fixed dark or a fixed white
+ * without failing on a large share of covers. This picks whichever of the two
+ * has more contrast, using the WCAG relative-luminance formula rather than a
+ * naive average, because green at the same average is far brighter than blue.
+ *
+ * Accepts the `rgb(r, g, b)` strings `extractDominantColor` returns, plus
+ * `#rgb`/`#rrggbb`. Returns null for anything it can't parse, so callers can
+ * fall back to their theme token.
+ */
+export function readableOn(color: string | null | undefined): string | null {
+  const parsed = parseRgb(color);
+  if (!parsed) return null;
+
+  const [r, g, b] = parsed;
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const luminance =
+    0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+
+  // Contrast against white vs. against near-black, per WCAG's (L1+0.05)/(L2+0.05).
+  const againstLight = 1.05 / (luminance + 0.05);
+  const againstDark = (luminance + 0.05) / (DARK_INK_LUMINANCE + 0.05);
+
+  return againstDark >= againstLight ? DARK_INK : "#FFFFFF";
+}
+
+/** Matches --on-accent in the dark palette, so the two agree. */
+const DARK_INK = "#17070E";
+const DARK_INK_LUMINANCE = 0.0125;
+
+function parseRgb(color: string | null | undefined): [number, number, number] | null {
+  if (!color) return null;
+  const value = color.trim();
+
+  const fn = value.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
+  if (fn) return [Number(fn[1]), Number(fn[2]), Number(fn[3])];
+
+  const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const h = hex[1];
+    const full =
+      h.length === 3
+        ? h
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : h;
+    return [
+      parseInt(full.slice(0, 2), 16),
+      parseInt(full.slice(2, 4), 16),
+      parseInt(full.slice(4, 6), 16),
+    ];
+  }
+
+  return null;
+}
+
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);

@@ -26,6 +26,20 @@
   pointer-events: none;
 }
 
+/*
+ * Back control, above the artwork.
+ *
+ * <BackButton> is a full --tap-min square so it stays hittable at the screen
+ * edge, which insets its glyph. The negative margin pulls that inset back out
+ * so the chevron optically lines up with the gutter — and therefore with the
+ * eyebrow and title below it — rather than floating a few pixels inboard.
+ */
+.backRow {
+  display: flex;
+  margin-left: -0.6875rem;
+  margin-bottom: var(--space-1);
+}
+
 .top {
   display: flex;
   align-items: flex-start;

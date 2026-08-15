@@ -73,6 +73,47 @@
   --skeleton: #1c1820;
   --skeleton-hi: #262029;
 
+  /* ── Media surfaces ──────────────────────────────────────────────────────
+   *
+   * The full player and the lyrics view are the only screens that sit on
+   * *artwork* rather than on an app surface, so they get their own set: a base
+   * colour under the blurred cover, the scrim ramp over it, and foreground
+   * colours guaranteed to read against the result.
+   *
+   * These are tokens rather than the fixed whites those two stylesheets used
+   * to hardcode. Hardcoding was a real fix for a real bug — white text on a
+   * near-white light-mode surface — but it also meant the player looked
+   * identical in both themes, which is not what a themed app should do. The
+   * scrim is defined per theme instead, so light mode gets a pale surface with
+   * dark type and the contrast holds either way.
+   */
+  --media-base: #0b090c;
+  --media-art-filter: blur(70px) brightness(0.42) saturate(1.6);
+  --media-scrim-1: rgba(6, 4, 8, 0.62);
+  --media-scrim-2: rgba(6, 4, 8, 0.44);
+  --media-scrim-3: rgba(8, 6, 10, 0.66);
+  --media-scrim-4: rgba(8, 6, 10, 0.94);
+  --media-veil: rgba(14, 11, 15, 0.94);
+  --media-chrome: rgba(18, 14, 21, 0.78);
+  --media-chrome-solid: rgba(14, 11, 15, 0.94);
+  --media-chrome-line: rgba(255, 255, 255, 0.08);
+  --media-shadow: 0 20px 70px rgba(0, 0, 0, 0.55);
+
+  /* Foreground over media. `--on-media-rgb` is the same colour as a bare
+   * triple, for the graded lyric recession that needs a computed alpha. */
+  --on-media: rgba(255, 255, 255, 0.97);
+  --on-media-secondary: rgba(255, 255, 255, 0.66);
+  --on-media-tertiary: rgba(255, 255, 255, 0.45);
+  --on-media-fill: rgba(255, 255, 255, 0.12);
+  --on-media-fill-strong: rgba(255, 255, 255, 0.2);
+  --on-media-rgb: 255 255 255;
+  /* Recessed type needs more alpha on paper than it does on ink. */
+  --on-media-dim-boost: 1;
+
+  /* How strongly the artwork's own colour tints the lyrics surface. */
+  --media-tint: 0.26;
+  --media-tint-strong: 0.4;
+
   color-scheme: dark;
 }
 
@@ -121,6 +162,32 @@
   --skeleton: #efeaf0;
   --skeleton-hi: #e4dde6;
 
+  /* Media surfaces, light. The artwork is brightened and veiled rather than
+   * darkened, so the surface stays paper-like and the type stays dark — the
+   * same relationship as dark mode, mirrored. */
+  --media-base: #f7f3f8;
+  --media-art-filter: blur(70px) brightness(1.35) saturate(1.35);
+  --media-scrim-1: rgba(255, 253, 255, 0.6);
+  --media-scrim-2: rgba(255, 253, 255, 0.44);
+  --media-scrim-3: rgba(252, 250, 253, 0.66);
+  --media-scrim-4: rgba(250, 247, 251, 0.94);
+  --media-veil: rgba(250, 247, 251, 0.94);
+  --media-chrome: rgba(255, 255, 255, 0.74);
+  --media-chrome-solid: rgba(252, 250, 253, 0.96);
+  --media-chrome-line: rgba(25, 19, 32, 0.09);
+  --media-shadow: 0 20px 70px rgba(40, 28, 46, 0.22);
+
+  --on-media: #17111d;
+  --on-media-secondary: rgba(23, 17, 29, 0.68);
+  --on-media-tertiary: rgba(23, 17, 29, 0.46);
+  --on-media-fill: rgba(23, 17, 29, 0.08);
+  --on-media-fill-strong: rgba(23, 17, 29, 0.16);
+  --on-media-rgb: 23 17 29;
+  --on-media-dim-boost: 1.25;
+
+  --media-tint: 0.2;
+  --media-tint-strong: 0.3;
+
   color-scheme: light;
 }
 
@@ -157,6 +224,26 @@
     --shadow-4: 0 24px 60px rgba(40, 28, 46, 0.16);
     --skeleton: #efeaf0;
     --skeleton-hi: #e4dde6;
+    --media-base: #f7f3f8;
+    --media-art-filter: blur(70px) brightness(1.35) saturate(1.35);
+    --media-scrim-1: rgba(255, 253, 255, 0.6);
+    --media-scrim-2: rgba(255, 253, 255, 0.44);
+    --media-scrim-3: rgba(252, 250, 253, 0.66);
+    --media-scrim-4: rgba(250, 247, 251, 0.94);
+    --media-veil: rgba(250, 247, 251, 0.94);
+    --media-chrome: rgba(255, 255, 255, 0.74);
+    --media-chrome-solid: rgba(252, 250, 253, 0.96);
+    --media-chrome-line: rgba(25, 19, 32, 0.09);
+    --media-shadow: 0 20px 70px rgba(40, 28, 46, 0.22);
+    --on-media: #17111d;
+    --on-media-secondary: rgba(23, 17, 29, 0.68);
+    --on-media-tertiary: rgba(23, 17, 29, 0.46);
+    --on-media-fill: rgba(23, 17, 29, 0.08);
+    --on-media-fill-strong: rgba(23, 17, 29, 0.16);
+    --on-media-rgb: 23 17 29;
+    --on-media-dim-boost: 1.25;
+    --media-tint: 0.2;
+    --media-tint-strong: 0.3;
     color-scheme: light;
   }
 }
@@ -326,8 +413,13 @@ summary,
 
 /*
  * Theme switching is the one moment a whole-page colour transition earns its
- * cost. `ThemeInit` adds this class for the duration of the swap and removes
- * it, so the cost is bounded to ~300ms rather than permanent.
+ * cost. `lib/theme.ts` adds this class to <html> for the duration of the swap
+ * and removes it again (see `animateSwap`), so the cost is bounded to ~300ms
+ * rather than being paid on every hover for the rest of the session.
+ *
+ * It is skipped entirely under `prefers-reduced-motion`, in JS rather than
+ * here: a 280ms fade of every colour on screen at once is precisely the kind of
+ * full-viewport change that setting exists to suppress.
  */
 .theme-transition,
 .theme-transition *,

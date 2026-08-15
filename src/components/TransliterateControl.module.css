@@ -16,10 +16,10 @@
   gap: var(--space-2);
   min-height: var(--tap-min);
   padding: 0 var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--on-media-fill-strong);
   border-radius: var(--r-full);
   background: transparent;
-  color: var(--on-media-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--on-media-secondary);
   font-family: var(--font-body);
   font-size: var(--t-sm);
   font-weight: 600;
@@ -40,7 +40,7 @@
 }
 
 .toggle:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--on-media-fill);
 }
 
 .toggleOn:active {
@@ -49,8 +49,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .toggle:hover:not(:disabled):not(.toggleOn) {
-    border-color: rgba(255, 255, 255, 0.26);
-    color: var(--on-media, rgba(255, 255, 255, 0.96));
+    border-color: rgb(var(--on-media-rgb) / 0.3);
+    color: var(--on-media);
   }
 }
 
@@ -75,7 +75,7 @@
 }
 
 .unsupported {
-  color: var(--on-media-tertiary, rgba(255, 255, 255, 0.42));
+  color: var(--on-media-tertiary);
 }
 
 .error {

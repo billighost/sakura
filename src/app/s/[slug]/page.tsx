@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { ShareClientPage } from "./ClientPage";
 
 /**
@@ -66,9 +67,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SharePage({ params }: Props) {
-  const { slug } = await params;
+/**
+ * `instant = false` — this route is allowed to block, for now.
+ *
+ * Under Cache Components, awaiting `params` and then querying the database in
+ * the page body is uncached runtime data outside `<Suspense>`, which fails
+ * prerender validation. Converting it properly means splitting the page into a
+ * prerenderable shell plus a suspended data child; until that happens this
+ * opt-out keeps the route building and serving exactly as before.
+ *
+ * It does not force the route dynamic — a genuinely prerenderable route still
+ * ships a static shell. See docs/01-app/02-guides/migrating-to-cache-components.
+ */
+export const instant = false;
 
+import { Suspense } from "react";
+
+async function ShareContent({ slug }: { slug: string }) {
   const share = await prisma.share.findUnique({
     where: { slug },
     select: {
@@ -91,9 +106,16 @@ export default async function SharePage({ params }: Props) {
   const lines = (Array.isArray(p.lines) ? p.lines.filter((l: unknown): l is string => typeof l === "string") : []);
   const lyricTime = typeof p.lyricTime === "number" ? p.lyricTime : undefined;
 
+  // A share is public by design, so most viewers here are signed out. The page
+  // reads the session purely so the call-to-action can tell them which of the
+  // two things it's about to do, rather than bouncing them to an unexplained
+  // login screen.
+  const session = await auth();
+
   return (
     <ShareClientPage
       kind={share.kind}
+      isSignedIn={!!session?.user}
       track={{
         id: share.targetId ?? track.id ?? "",
         title: track.title ?? "Unknown",
@@ -108,3 +130,14 @@ export default async function SharePage({ params }: Props) {
     />
   );
 }
+
+export default function SharePage({ params }: Props) {
+  return (
+    <Suspense fallback={<div />}>
+      {params.then(({ slug }) => (
+        <ShareContent slug={slug} />
+      ))}
+    </Suspense>
+  );
+}
+
