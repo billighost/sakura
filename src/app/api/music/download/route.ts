@@ -449,7 +449,7 @@ export async function POST(req: NextRequest) {
             [finalTrackId, track.messageId.toString(), track.title, artistId]
           );
         }
-        if (!dbTrack) throw insertErr;
+      }
     }
 
     // ── Contributors ────────────────────────────────────────────────────────
