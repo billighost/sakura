@@ -715,6 +715,21 @@ export class TelegramClient {
 
         console.log(`[Telegram _searchMusic]   msg ${msg.id}: out=${msg.out}, text="${msg.message?.substring(0, 40) || ''}", hasMedia=${!!msg.media}, hasReplyMarkup=${!!msg.replyMarkup}`);
 
+        if (msg.message) {
+          const txt = msg.message.toLowerCase();
+          const isForceJoin = txt.includes("join our channel") || 
+                              txt.includes("join channel") || 
+                              txt.includes("subscribe") || 
+                              txt.includes("must join") || 
+                              txt.includes("join to use") ||
+                              txt.includes("join the channel") ||
+                              txt.includes("join group") ||
+                              txt.includes("subscrib");
+          if (isForceJoin) {
+            throw new Error(`Bot requires channel subscription: ${msg.message.split('\n')[0]}`);
+          }
+        }
+
         // Check for text responses
         if (msg.message && !msg.replyMarkup && !msg.media) {
           const txt = msg.message.trim();
@@ -910,6 +925,21 @@ export class TelegramClient {
       });
 
       for (const msg of newMessages) {
+        if (msg && msg.message) {
+          const txt = msg.message.toLowerCase();
+          const isForceJoin = txt.includes("join our channel") || 
+                              txt.includes("join channel") || 
+                              txt.includes("subscribe") || 
+                              txt.includes("must join") || 
+                              txt.includes("join to use") ||
+                              txt.includes("join the channel") ||
+                              txt.includes("join group") ||
+                              txt.includes("subscrib");
+          if (isForceJoin) {
+            throw new Error(`Bot requires channel subscription: ${msg.message.split('\n')[0]}`);
+          }
+        }
+
         if (!msg || !msg.media || !("document" in msg.media)) continue;
         if (msg.id <= buttonMessageId) continue;
 
@@ -964,6 +994,21 @@ export class TelegramClient {
       });
 
       for (const msg of newMessages) {
+        if (msg && msg.message) {
+          const txt = msg.message.toLowerCase();
+          const isForceJoin = txt.includes("join our channel") || 
+                              txt.includes("join channel") || 
+                              txt.includes("subscribe") || 
+                              txt.includes("must join") || 
+                              txt.includes("join to use") ||
+                              txt.includes("join the channel") ||
+                              txt.includes("join group") ||
+                              txt.includes("subscrib");
+          if (isForceJoin) {
+            throw new Error(`Bot requires channel subscription: ${msg.message.split('\n')[0]}`);
+          }
+        }
+
         if (!msg || !msg.media || !("document" in msg.media)) continue;
 
         const doc = (msg.media as Api.MessageMediaDocument).document;
