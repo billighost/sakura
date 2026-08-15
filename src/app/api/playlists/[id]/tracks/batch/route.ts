@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
+import { enrichMusicBrainzAndSave } from "@/lib/metadata";
+import { getDeterministicTrackId } from "@/lib/deterministic";
 
 export async function POST(
   req: NextRequest,
@@ -59,24 +60,24 @@ export async function POST(
         [track.artist]
       ))!.id;
 
-      // Create Track with telegramMessageId = '0' indicating it needs to be downloaded on playback
-      // Also save the coverUrl
+      // Check for duplicate track by deterministic ID
+      const trackId = getDeterministicTrackId(track.title, track.artist);
       let dbTrack = await queryOne<{ id: string }>(
-        `SELECT id FROM "Track" WHERE title = $1 AND "artistId" = $2 LIMIT 1`,
-        [track.title, artistId]
+        `SELECT id FROM "Track" WHERE id = $1 LIMIT 1`,
+        [trackId]
       );
 
       if (!dbTrack) {
         dbTrack = await queryOne<{ id: string }>(
           `INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", source, "telegramMessageId", "coverUrl", "createdAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 'telegram', $5, $6, NOW())
+           VALUES ($1, $2, $3, $4, $5, 'telegram', '0', $6, NOW())
            RETURNING id`,
           [
+            trackId,
             track.title,
             artistId,
             track.duration || 0,
             `/api/stream/telegram/0`, // 0 means it will be auto-downloaded on first play
-            '0',
             track.coverUrl || null,
           ]
         );

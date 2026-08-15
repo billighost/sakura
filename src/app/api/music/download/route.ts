@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getTelegramClient, getBotFallbackChain } from "@/lib/telegram";
 import { queryOne, query, execute } from "@/lib/sql";
 import { enrichTrackMetadata, enrichMusicBrainzAndSave, searchDeezerTrack } from "@/lib/metadata";
+import { getDeterministicTrackId } from "@/lib/deterministic";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { Redis } from "@upstash/redis";
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
   const aliasKey = `dl:alias:${requestKey}`;
 
   try {
+    const trackId = getDeterministicTrackId(title, artist);
     const existingTrack = await queryOne<{
       id: string;
       title: string;
@@ -77,12 +79,14 @@ export async function POST(req: NextRequest) {
       `SELECT t.id, t.title, a.name as "artistName", t.duration, t."audioUrl", t."albumId", t."coverUrl", t."telegramMessageId"
        FROM "Track" t
        JOIN "Artist" a ON t."artistId" = a.id
-       WHERE ($3::text IS NOT NULL AND t."deezerId" = $3)
+       WHERE t.id = $4
+          OR ($3::text IS NOT NULL AND t."deezerId" = $3)
           OR (lower(t.title) = lower($1) AND lower(a.name) = lower($2))
-       ORDER BY (t."deezerId" IS NOT DISTINCT FROM $3) DESC,
+       ORDER BY (t.id = $4) DESC,
+                (t."deezerId" IS NOT DISTINCT FROM $3) DESC,
                 (t."telegramMessageId" IS NOT NULL) DESC
        LIMIT 1`,
-      [title, artist, deezerId]
+      [title, artist, deezerId, trackId]
     );
 
     if (existingTrack) {
@@ -374,15 +378,21 @@ export async function POST(req: NextRequest) {
 
     let dbTrack = null;
 
-    // The id the client asked for is authoritative for dedupe: it is the one a
-    // later request will send again. Metadata's own lookup can resolve to a
     // different release of the same song.
     const canonicalDeezerId = deezerId || metadata.track?.deezerId?.toString() || null;
+    const finalTrackId = getDeterministicTrackId(track.title, track.artist || artist);
 
     if (canonicalDeezerId) {
       dbTrack = await queryOne<{ id: string; audioUrl: string }>(
         `SELECT id, "audioUrl" FROM "Track" WHERE "deezerId" = $1`,
         [canonicalDeezerId]
+      );
+    }
+
+    if (!dbTrack) {
+      dbTrack = await queryOne<{ id: string; audioUrl: string }>(
+        `SELECT id, "audioUrl" FROM "Track" WHERE id = $1 LIMIT 1`,
+        [finalTrackId]
       );
     }
 
@@ -407,8 +417,8 @@ export async function POST(req: NextRequest) {
       try {
         dbTrack = await queryOne<{ id: string; audioUrl: string }>(
           `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "deezerId", isrc, "previewUrl", "coverUrl", "createdAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'telegram', $6, $7, $8, $9, $10, NOW())
-           RETURNING id, "audioUrl"`,
+            VALUES ($11, $1, $2, $3, $4, $5, 'telegram', $6, $7, $8, $9, $10, NOW())
+            RETURNING id, "audioUrl"`,
           [
             track.title,
             artistId,
@@ -420,6 +430,7 @@ export async function POST(req: NextRequest) {
             metadata.track?.isrc || null,
             metadata.track?.previewUrl || null,
             metadata.album?.coverUrl || null,
+            finalTrackId,
           ]
         );
       } catch (insertErr: any) {
@@ -431,14 +442,14 @@ export async function POST(req: NextRequest) {
           console.warn("[Telegram AutoDownload] Concurrent insert race detected, selecting existing row");
           dbTrack = await queryOne<{ id: string; audioUrl: string }>(
             `SELECT id, "audioUrl" FROM "Track"
-              WHERE "telegramMessageId" = $1
-                 OR (lower(title) = lower($2) AND "artistId" = $3)
+              WHERE id = $1
+                 OR "telegramMessageId" = $2
+                 OR (lower(title) = lower($3) AND "artistId" = $4)
               LIMIT 1`,
-            [track.messageId.toString(), track.title, artistId]
+            [finalTrackId, track.messageId.toString(), track.title, artistId]
           );
         }
         if (!dbTrack) throw insertErr;
-      }
     }
 
     // ── Contributors ────────────────────────────────────────────────────────

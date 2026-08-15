@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTelegramClient } from "@/lib/telegram";
-import { queryOne } from "@/lib/sql";
+import { queryOne, execute } from "@/lib/sql";
+import { getDeterministicTrackId } from "@/lib/deterministic";
 
 export const maxDuration = 60;
-
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { buttonMessageId, buttonIndex, title, artist, duration } = body;
+  const { buttonMessageId, buttonIndex } = body;
 
   if (buttonMessageId === undefined || buttonIndex === undefined) {
     return NextResponse.json(
@@ -33,8 +33,6 @@ export async function POST(req: NextRequest) {
       30000
     );
 
-    const userId = session.user.id as string;
-
     const artistId = (await queryOne<{ id: string }>(
       `INSERT INTO "Artist" (id, name, "createdAt")
        VALUES (gen_random_uuid()::text, $1, NOW())
@@ -43,10 +41,11 @@ export async function POST(req: NextRequest) {
       [track.artist]
     ))!.id;
 
-    // Check if track already exists by telegramMessageId
+    // Check if track already exists by deterministic ID or message ID
+    const trackId = getDeterministicTrackId(track.title, track.artist);
     let dbTrack = await queryOne<{ id: string; audioUrl: string }>(
-      `SELECT id, "audioUrl" FROM "Track" WHERE "telegramMessageId" = $1`,
-      [track.messageId.toString()]
+      `SELECT id, "audioUrl" FROM "Track" WHERE id = $1 OR "telegramMessageId" = $2 LIMIT 1`,
+      [trackId, track.messageId.toString()]
     );
 
     if (!dbTrack) {
@@ -55,15 +54,25 @@ export async function POST(req: NextRequest) {
         `INSERT INTO "Track" (
           id, title, duration, "audioUrl", source, "telegramMessageId",
           "artistId", "createdAt"
-        ) VALUES (gen_random_uuid()::text, $1, $2, $3, 'telegram', $4, $5, NOW())
+        ) VALUES ($1, $2, $3, $4, 'telegram', $5, $6, NOW())
         RETURNING id, "audioUrl"`,
         [
+          trackId,
           track.title,
           track.duration || 0,
           `/api/stream/telegram/${track.messageId}`,
           track.messageId.toString(),
           artistId,
         ]
+      );
+    } else {
+      // Update existing track with telegramMessageId and audioUrl if they were missing/stubbed
+      await execute(
+        `UPDATE "Track" 
+         SET "audioUrl" = COALESCE(NULLIF("audioUrl", 'pending'), $1),
+             "telegramMessageId" = COALESCE(NULLIF("telegramMessageId", '0'), $2)
+         WHERE id = $3`,
+        [`/api/stream/telegram/${track.messageId}`, track.messageId.toString(), dbTrack.id]
       );
     }
 

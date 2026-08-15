@@ -66,7 +66,7 @@ export async function scrapePublicSpotifyPlaylist(playlistId: string) {
     const title = item.title || item.name || "Unknown Track";
     const artist = item.subtitle || (Array.isArray(item.artists) ? item.artists.map((a: any) => a.name).join(", ") : "Unknown Artist");
     const durationMs = item.duration || item.duration_ms || 0;
-    const coverUrl = item.images?.[0]?.url || item.coverArt?.sources?.[0]?.url || entity.coverArt?.sources?.[0]?.url || "";
+    const coverUrl = item.images?.[0]?.url || item.coverArt?.sources?.[0]?.url || item.album?.images?.[0]?.url || item.album?.coverArt?.sources?.[0]?.url || entity.coverArt?.sources?.[0]?.url || "";
 
     tracks.push({
       title,

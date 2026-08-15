@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { query, queryOne } from "@/lib/sql";
+import { queryOne } from "@/lib/sql";
+import { getDeterministicTrackId } from "@/lib/deterministic";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -18,7 +19,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userId = session.user.id as string;
   const results = [];
 
   for (const track of tracks) {
@@ -32,22 +32,32 @@ export async function POST(req: NextRequest) {
         [track.artist]
       );
 
-      // Check for duplicate track by title + artist
+      // Check for duplicate track by deterministic ID
+      const trackId = getDeterministicTrackId(track.title, track.artist);
       const existing = await queryOne<{ id: string }>(
-        `SELECT t.id FROM "Track" t WHERE t.title = $1 AND t."artistId" = $2`,
-        [track.title, artist!.id]
+        `SELECT id FROM "Track" WHERE id = $1`,
+        [trackId]
       );
       if (existing) {
+        // If it exists, update the telegramMessageId and audioUrl if they were missing/stubbed
+        await queryOne(
+          `UPDATE "Track" 
+           SET "audioUrl" = COALESCE(NULLIF("audioUrl", 'pending'), $1),
+               "telegramMessageId" = COALESCE(NULLIF("telegramMessageId", '0'), $2)
+           WHERE id = $3`,
+          [`/api/stream/telegram/${track.messageId}`, String(track.messageId), trackId]
+        );
         results.push({ ...track, status: "exists", trackId: existing.id });
         continue;
       }
 
-      // Insert track
+      // Insert track with deterministic ID
       const newTrack = await queryOne<{ id: string }>(
         `INSERT INTO "Track" (id, title, "artistId", duration, "audioUrl", source, "telegramMessageId", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 'telegram', $5, NOW())
+         VALUES ($1, $2, $3, $4, $5, 'telegram', $6, NOW())
          RETURNING id`,
         [
+          trackId,
           track.title,
           artist!.id,
           track.duration || 0,

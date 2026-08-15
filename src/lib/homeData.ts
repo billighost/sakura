@@ -318,7 +318,16 @@ async function buildHomeData(userId: string): Promise<HomeData> {
     quickPicks,
     recentlyPlayed,
     topArtists: artistRail,
-    playlists,
+    playlists: playlists.map(p => {
+      let coverUrl = p.coverUrl;
+      if (coverUrl?.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(coverUrl);
+          coverUrl = parsed?.[0] || null;
+        } catch {}
+      }
+      return { ...p, coverUrl };
+    }),
     madeForYou: mixes,
     systemPlaylists,
   };

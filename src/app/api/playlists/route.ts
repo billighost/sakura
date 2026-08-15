@@ -17,13 +17,39 @@ export async function GET() {
     return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
   }
 
-  const playlists = await query(
+  const playlists = await query<{
+    id: string;
+    userId: string;
+    name: string;
+    description: string | null;
+    coverUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+    isPublic: boolean;
+    trackCount: number;
+  }>(
     `SELECT p.*, COUNT(pt."trackId")::int as "trackCount" FROM "Playlist" p LEFT JOIN "PlaylistTrack" pt ON pt."playlistId" = p.id WHERE p."userId" = $1 GROUP BY p.id ORDER BY p."createdAt" DESC`,
     [userId]
   );
 
-  await cacheSet(key, playlists, TTL.PLAYLISTS);
-  return NextResponse.json(playlists);
+  const mappedPlaylists = playlists.map((p) => {
+    let coverUrl = p.coverUrl;
+    let coverUrls: string[] | null = null;
+    if (coverUrl?.startsWith('[')) {
+      try {
+        coverUrls = JSON.parse(coverUrl);
+        coverUrl = coverUrls?.[0] || null;
+      } catch {}
+    }
+    return {
+      ...p,
+      coverUrl,
+      coverUrls,
+    };
+  });
+
+  await cacheSet(key, mappedPlaylists, TTL.PLAYLISTS);
+  return NextResponse.json(mappedPlaylists);
 }
 
 export async function POST(req: NextRequest) {

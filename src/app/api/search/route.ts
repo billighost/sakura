@@ -210,15 +210,26 @@ async function searchLocalPlaylists(q: string, limit: number): Promise<PlaylistH
     [q, `%${q}%`, limit]
   ).catch(softFail<any[]>("search:playlists", []));
 
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    coverUrl: r.coverUrl,
-    trackCount: r.trackCount,
-    ownerName: r.ownerName,
-    source: "library" as const,
-  }));
+  return rows.map((r) => {
+    let coverUrl = r.coverUrl;
+    let coverUrls: string[] | null = null;
+    if (coverUrl?.startsWith('[')) {
+      try {
+        coverUrls = JSON.parse(coverUrl);
+        coverUrl = coverUrls?.[0] || null;
+      } catch {}
+    }
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      coverUrl,
+      coverUrls,
+      trackCount: r.trackCount,
+      ownerName: r.ownerName,
+      source: "library" as const,
+    };
+  });
 }
 
 /* ── Deezer ───────────────────────────────────────────────────────────────

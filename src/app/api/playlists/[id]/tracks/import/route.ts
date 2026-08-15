@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, execute, query } from "@/lib/sql";
+import { queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 import { enrichTrackMetadata, enrichMusicBrainzAndSave } from "@/lib/metadata";
+import { getDeterministicTrackId } from "@/lib/deterministic";
 
 export async function POST(
   req: NextRequest,
@@ -65,18 +66,20 @@ export async function POST(
       }
     }
 
-    // Get or Create Track
+    // Get or Create Track by deterministic ID
+    const trackId = getDeterministicTrackId(track.title, track.artist);
     let dbTrack = await queryOne<{ id: string }>(
-      `SELECT id FROM "Track" WHERE "telegramMessageId" = $1`,
-      [track.messageId.toString()]
+      `SELECT id FROM "Track" WHERE id = $1 OR "telegramMessageId" = $2 LIMIT 1`,
+      [trackId, track.messageId.toString()]
     );
 
     if (!dbTrack) {
       dbTrack = await queryOne<{ id: string }>(
         `INSERT INTO "Track" (id, title, "artistId", "albumId", duration, "audioUrl", source, "telegramMessageId", "coverUrl", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'telegram', $6, $7, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, 'telegram', $7, $8, NOW())
          RETURNING id`,
         [
+          trackId,
           track.title,
           artistId,
           albumId,
@@ -85,6 +88,15 @@ export async function POST(
           track.messageId.toString(),
           metadata.album?.coverUrl || null,
         ]
+      );
+    } else {
+      // If it exists, update the telegramMessageId and audioUrl if they were missing/stubbed
+      await execute(
+        `UPDATE "Track" 
+         SET "audioUrl" = COALESCE(NULLIF("audioUrl", 'pending'), $1),
+             "telegramMessageId" = COALESCE(NULLIF("telegramMessageId", '0'), $2)
+         WHERE id = $3`,
+        [`/api/stream/telegram/${track.messageId}`, track.messageId.toString(), dbTrack.id]
       );
     }
 

@@ -130,16 +130,18 @@ export default function LibraryPage() {
         id: string;
         name: string;
         coverUrl?: string;
+        coverUrls?: string[];
         createdAt?: string;
         trackCount?: number;
       }>(playlistsRes.status === "fulfilled" ? playlistsRes.value : null).map(
         (p): LibraryItem => {
           let coverUrl = p.coverUrl;
-          let coverUrls: string[] | undefined;
+          let coverUrls = p.coverUrls;
           if (coverUrl?.startsWith('[')) {
             try {
-              coverUrls = JSON.parse(coverUrl);
-              coverUrl = coverUrls?.[0]; // fallback to first image for list views
+              const parsed = JSON.parse(coverUrl);
+              coverUrl = parsed?.[0] || undefined;
+              coverUrls = parsed;
             } catch {}
           }
           return {
