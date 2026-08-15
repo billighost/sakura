@@ -162,6 +162,13 @@ class RedisMutex {
     } catch { /* best-effort */ }
   }
 
+  async clearSessionPoisoned(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      await this.redis.del("telegram:session:poisoned");
+    } catch { /* best-effort */ }
+  }
+
   async isSessionPoisoned(): Promise<boolean> {
     if (!this.redis) return false;
     try {
@@ -261,12 +268,26 @@ export class TelegramClient {
 
     this.connectPromise = (async () => {
       // Fast-fail if a previous instance already poisoned this session.
+      // BUT: if the operator redeployed with a brand-new TELEGRAM_SESSION_STRING
+      // (env-var differs from what's stored in Redis), automatically clear the
+      // poison so the fresh session can be used immediately without waiting for
+      // the 10-minute TTL to expire.
       if (await TelegramClient.botMutex.isSessionPoisoned()) {
-        this.connectPromise = null;
-        throw new Error(
-          "[Telegram] Session is poisoned (AUTH_KEY_DUPLICATED). " +
-          "Regenerate TELEGRAM_SESSION_STRING and redeploy."
-        );
+        const storedSession = await TelegramClient.botMutex.loadSession().catch(() => null);
+        const envSession = this.sessionString;
+        const isNewSession = envSession && storedSession && envSession !== storedSession;
+        if (isNewSession) {
+          console.log("[Telegram] New TELEGRAM_SESSION_STRING detected after poison — clearing poison flag.");
+          await TelegramClient.botMutex.clearSessionPoisoned().catch(() => {});
+          // Also wipe the stale Redis session so the fresh env-var is used.
+          await TelegramClient.botMutex.saveSession(envSession).catch(() => {});
+        } else {
+          this.connectPromise = null;
+          throw new Error(
+            "[Telegram] Session is poisoned (AUTH_KEY_DUPLICATED). " +
+            "Regenerate TELEGRAM_SESSION_STRING and redeploy."
+          );
+        }
       }
 
       // Serialise connect() across all concurrent Vercel instances.
@@ -475,9 +496,16 @@ export class TelegramClient {
           this.connected = false;
           this.connectPromise = null;
           try { await this.client.disconnect(); } catch { /* ignore */ }
-          
+
+          // Always reload the latest session from Redis before reconnecting.
+          // If a sibling serverless instance already mutated the session
+          // (e.g. DC migration), using the original env-var string would
+          // present an outdated auth key → Telegram → AUTH_KEY_DUPLICATED.
+          const latestForRetry = await TelegramClient.botMutex.loadSession().catch(() => null);
+          const sessionForRetry = latestForRetry || this.sessionString;
+
           this.client = new GramClient(
-            new StringSession(this.sessionString),
+            new StringSession(sessionForRetry),
             this.apiId,
             this.apiHash,
             {
