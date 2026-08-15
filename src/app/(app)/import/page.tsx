@@ -122,7 +122,7 @@ export default function ImportPage() {
     }, 300);
 
     try {
-      const res = await fetch("/api/import/spotify", {
+      const res = await fetch("/api/import/spotify/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),

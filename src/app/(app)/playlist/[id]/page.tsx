@@ -233,6 +233,16 @@ export default function PlaylistPage() {
     ? playlist.tracks.reduce((sum, t) => sum + t.duration, 0)
     : 0;
 
+  const coverUrls = useMemo(() => {
+    if (!playlist?.coverUrl) return [];
+    if (playlist.coverUrl.startsWith('[')) {
+      try { return JSON.parse(playlist.coverUrl); } catch { return [playlist.coverUrl]; }
+    }
+    return [playlist.coverUrl];
+  }, [playlist?.coverUrl]);
+  const mainCover = coverUrls[0];
+  const isCollage = coverUrls.length >= 4;
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -272,16 +282,6 @@ export default function PlaylistPage() {
       </div>
     );
   }
-
-  const coverUrls = useMemo(() => {
-    if (!playlist?.coverUrl) return [];
-    if (playlist.coverUrl.startsWith('[')) {
-      try { return JSON.parse(playlist.coverUrl); } catch { return [playlist.coverUrl]; }
-    }
-    return [playlist.coverUrl];
-  }, [playlist?.coverUrl]);
-  const mainCover = coverUrls[0];
-  const isCollage = coverUrls.length >= 4;
 
   if (!playlist) return null;
 
