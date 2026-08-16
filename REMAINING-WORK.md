@@ -32,8 +32,26 @@ runs out of usable context and starts guessing. Fresh session per prompt.
 - Profile page redesign + Settings entry point
 - Settings page redesign + dead-control removal
 - Theme "Auto" bug (`data-theme="system"` matched no stylesheet)
+- Phases 1–4 (interaction layer, app-shell chrome, lyrics, share studio, PWA)
+- Phase 5 in full. 5.3–5.7 landed in commit `b866f48`; the legacy `--sakura-*`
+  alias layer is now referenced from exactly one comment and nothing else.
+- Phase 6.2 (terms + privacy, rewritten against the code) and the About page,
+  in commit `2075e16`.
 
-**Remaining:** phases 1–6 below.
+**Remaining:**
+
+- **6.1** — partly done. Copy was rewritten in every file phases 5 and 6
+  touched (all error states, empty states, auth, onboarding, import, the
+  collection pages, the share landing, About). Not swept: Settings, Profile,
+  Search and Home, whose copy was last touched in earlier phases and hasn't
+  been read against the 6.1 principles.
+- **6.3** — the CSS-module and API-shape passes are done; see the phase 6
+  commit for what was found. Deliberately not fixed: 18 pre-existing lint
+  errors in `src/components/PlayerContext.tsx` — refs read during render, four
+  cascading-render effects, seven `any`s. They are real correctness signals,
+  but each fix changes playback timing and needs runtime verification.
+
+Everything else in phases 1–6 has landed.
 
 ---
 
