@@ -156,12 +156,32 @@ export function TrackRow({
   const networkDown = useOffline();
 
   const liked = favoriteTrackIds?.has(track.id) || false;
-  const isActive =
+
+  /*
+   * Is this the row that's playing?
+   *
+   * Ids first. The title/artist comparison is a necessary fallback — the same
+   * song carries a different id on a search result, an album page and a library
+   * row, so playing from one and then opening another would otherwise show
+   * nothing as active — but on its own it matches *any* row with the same title
+   * and artist, so a single that also appears on an album lit up twice.
+   *
+   * Duration disambiguates those: two masters of the same song are rarely within
+   * a second of each other, and the tolerance absorbs the rounding difference
+   * between a provider's length and our own stored one.
+   */
+  const idMatch =
     currentTrack?.id === track.id ||
-    (currentTrack?.resolvedId && currentTrack.resolvedId === track.id) ||
-    (currentTrack &&
-      currentTrack.title.toLowerCase() === track.title.toLowerCase() &&
-      currentTrack.artist.toLowerCase() === track.artist.name.toLowerCase());
+    Boolean(currentTrack?.resolvedId && currentTrack.resolvedId === track.id);
+  const nameMatch =
+    !!currentTrack &&
+    currentTrack.title.toLowerCase() === track.title.toLowerCase() &&
+    currentTrack.artist.toLowerCase() === track.artist.name.toLowerCase() &&
+    // A missing duration on either side can't disprove a match, so it passes.
+    (!currentTrack.duration ||
+      !track.duration ||
+      Math.abs(currentTrack.duration - track.duration) <= 2);
+  const isActive = idMatch || nameMatch;
 
   const [offline, setOffline] = useState(false);
   const [resolving, setResolving] = useState(false);

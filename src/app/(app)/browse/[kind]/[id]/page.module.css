@@ -61,7 +61,15 @@
   object-fit: cover;
 }
 
-.eyebrow {
+/*
+ * These three were `.eyebrow`, `.desc` and a text-styled `.meta`, none of which
+ * the markup referenced any more — it asks for `.kind`, `.description` and
+ * `.byline`. CSS modules resolve a missing class to `undefined`, so the kind
+ * label, the description and the byline were rendering with no styling at all:
+ * the eyebrow at body size in body colour, and the byline's three facts running
+ * together with no separation because its flex row didn't exist.
+ */
+.kind {
   font-size: var(--t-2xs);
   font-weight: 700;
   letter-spacing: var(--track-caps);
@@ -79,18 +87,41 @@
   max-width: 22ch;
 }
 
+/* The wrapper around the whole text block, not a line of text. */
 .meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: var(--space-1);
-  font-size: var(--t-sm);
-  color: var(--text-2);
 }
 
-.desc {
+.description {
   margin-top: var(--space-2);
   max-width: 44ch;
+  font-family: var(--font-body);
   font-size: var(--t-sm);
   line-height: var(--lh-snug);
   color: var(--text-2);
+}
+
+/* Owner, followers, track count. Dot-separated via a pseudo-element so the
+ * markup stays a plain list of spans. */
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.byline > span + span::before {
+  content: "·";
+  margin-right: var(--space-2);
 }
 
 .actions {

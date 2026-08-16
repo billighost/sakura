@@ -1,334 +1,201 @@
-@keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(1.5rem, -1rem) scale(1.06); }
-}
+/* About.
+ *
+ * Migrated off the `--sakura-*` aliases — the last file in the app that used
+ * them — and off the decorative `.bloom` blob that sat behind the hero.
+ *
+ * Shares its measure and its heading scale with the terms and privacy pages, so
+ * the three static pages read as one set. What's different is that this one has
+ * structure rather than just prose: a capability list and a numbered sequence,
+ * both of which earn their form (see the notes in page.tsx).
+ */
 
 .page {
-  max-width: 40rem;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem) clamp(3rem, 6vw, 4rem);
+  padding: var(--space-6) var(--gutter) var(--space-7);
 }
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
 
 .hero {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: clamp(2.25rem, 6vw, 3.25rem);
-  text-align: center;
-  padding-top: 0.5rem;
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
 }
 
-.bloom {
-  position: absolute;
-  width: 20rem;
-  height: 20rem;
-  border-radius: 50%;
-  background: var(--sakura-accent-gradient);
-  filter: blur(80px);
-  opacity: 0.28;
-  top: -4rem;
-  z-index: 0;
-  animation: drift 18s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.iconWrapper {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 1.125rem;
-  padding: 0.625rem;
-  border-radius: 22px;
-  background: var(--sakura-glass);
-  border: 1px solid var(--sakura-glass-border);
-  box-shadow: 0 12px 32px var(--sakura-shadow);
-}
-
-.icon {
-  display: block;
-  border-radius: 16px;
+.mark {
+  display: inline-flex;
+  margin-bottom: var(--space-4);
+  color: var(--accent);
 }
 
 .title {
-  position: relative;
-  z-index: 1;
-  font-family: var(--sakura-font-display);
-  font-style: italic;
-  font-weight: 600;
-  font-size: clamp(2rem, 7vw, 2.75rem);
-  margin-bottom: 0.5rem;
-  background: var(--sakura-accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.badge {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  font-family: var(--sakura-font-body);
-  font-size: 0.6875rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-3xl);
   font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--sakura-accent);
-  background: var(--sakura-glass);
-  border: 1px solid var(--sakura-glass-border);
-  padding: 0.3rem 0.8rem;
-  border-radius: 10px;
-  margin-bottom: 0.875rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 
-.subtitle {
-  position: relative;
-  z-index: 1;
-  font-family: var(--sakura-font-body);
-  font-size: 0.9375rem;
-  line-height: 1.65;
-  color: var(--sakura-text-secondary);
-  max-width: 28rem;
+/* The one-sentence answer to "what is this". Display face at reading size, which
+ * is the treatment the share landing page gives the same sentence. */
+.lede {
+  max-width: 34ch;
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text-2);
 }
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
 
 .section {
-  margin-bottom: clamp(1.75rem, 4.5vw, 2.5rem);
+  padding-top: var(--space-6);
 }
 
 .heading {
-  font-family: var(--sakura-font-display);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
   font-weight: 600;
-  font-size: clamp(1.0625rem, 2.5vw, 1.25rem);
-  color: var(--sakura-text);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--sakura-border);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
 }
 
-.featuresGrid {
+.text {
+  max-width: 68ch;
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  line-height: var(--lh-loose);
+  color: var(--text-2);
+}
+
+.text:last-child {
+  margin-bottom: 0;
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Capabilities ─────────────────────────────────────────────────────────
+ *
+ * A list, not a grid of cards. Four bordered cards was the previous treatment and
+ * it makes four unrelated claims look like a pricing table; a list with a glyph
+ * per row reads as "here are four things", which is what it is. */
+
+.capabilities {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.featureCard {
+.capability {
   display: flex;
-  gap: 1rem;
-  padding: 1.125rem;
-  background: var(--sakura-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: var(--sakura-radius-lg);
-  border: 1px solid var(--sakura-glass-border);
-  transition: transform 0.15s, border-color 0.15s;
+  align-items: flex-start;
+  gap: var(--space-4);
+  max-width: 60ch;
 }
 
-.featureCard:hover {
-  transform: translateY(-2px);
-  border-color: var(--sakura-accent);
-}
-
-.featureIcon {
-  width: 2.625rem;
-  height: 2.625rem;
-  border-radius: 12px;
-  background: var(--sakura-accent-gradient);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.featureContent {
-  flex: 1;
-}
-
-.featureTitle {
-  font-family: var(--sakura-font-body);
-  font-size: 0.9375rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  color: var(--sakura-text);
-}
-
-.featureDesc {
-  font-family: var(--sakura-font-body);
-  font-size: 0.8125rem;
-  line-height: 1.55;
-  color: var(--sakura-text-secondary);
-}
-
-.techGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-}
-
-.techItem {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.875rem 0.5rem;
-  background: var(--sakura-glass);
-  border-radius: 12px;
-  border: 1px solid var(--sakura-glass-border);
-}
-
-.techIconBadge {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 8px;
-  background: var(--sakura-surface-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--sakura-accent);
-}
-
-.techName {
-  font-family: var(--sakura-font-body);
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-align: center;
-  color: var(--sakura-text);
-}
-
-.roadmapList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.roadmapItem {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--sakura-glass);
-  border-radius: 12px;
-  border: 1px solid var(--sakura-glass-border);
-}
-
-.roadmapDone {
-  opacity: 0.6;
-}
-
-.roadmapCheck {
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
+.capabilityIcon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-md);
+  background: var(--accent-softer);
+  color: var(--accent);
 }
 
-.roadmapDone .roadmapCheck {
-  background: var(--sakura-success);
-  color: #fff;
+.capabilityTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
 }
 
-.roadmapEmpty {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid var(--sakura-border);
+.capabilityBody {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
 }
 
-.roadmapText {
-  font-family: var(--sakura-font-body);
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--sakura-text);
-}
+/* ── Steps ────────────────────────────────────────────────────────────────
+ *
+ * Numbered, and the number is real information here — you can't save a song you
+ * haven't found, and the mixes need something to learn from. The counter is drawn
+ * from the ordered list's own semantics rather than a decorative badge. */
 
-.roadmapDone .roadmapText {
-  text-decoration: line-through;
-  color: var(--sakura-text-secondary);
-}
-
-.howItWorks {
+.steps {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
 }
 
 .step {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  padding: 1.125rem;
-  background: var(--sakura-glass);
-  border-radius: var(--sakura-radius-lg);
-  border: 1px solid var(--sakura-glass-border);
-  width: 100%;
+  gap: var(--space-4);
+  max-width: 60ch;
 }
 
 .stepNumber {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  background: var(--sakura-accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--sakura-font-body);
-  font-weight: 700;
-  color: #fff;
   flex-shrink: 0;
-}
-
-.stepConnector {
-  width: 2px;
-  height: 1.5rem;
-  background: var(--sakura-border);
-}
-
-.stepContent {
-  flex: 1;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
 }
 
 .stepTitle {
-  font-family: var(--sakura-font-body);
-  font-size: 0.9375rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  color: var(--sakura-text);
-}
-
-.stepDesc {
-  font-family: var(--sakura-font-body);
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  line-height: 1.5;
-}
-
-.text {
-  font-family: var(--sakura-font-body);
-  font-size: 0.875rem;
-  line-height: 1.7;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.text strong {
-  color: var(--sakura-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.125rem 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--t-base);
   font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
 }
 
-@media (max-width: 480px) {
-  .techGrid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+.stepIcon {
+  display: flex;
+  color: var(--accent);
+}
 
-  .techItem {
-    padding: 0.625rem 0.375rem;
-  }
-
-  .techName {
-    font-size: 0.6875rem;
-  }
+.stepBody {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
 }

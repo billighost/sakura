@@ -351,6 +351,13 @@
   color: var(--text-3);
 }
 
+/* The two outer clock readouts. They inherited `.trimHead`'s type, so the
+ * missing class was invisible — but it left `className="undefined"` on both, and
+ * there was no way to distinguish them from the centre figure. */
+.trimTime {
+  font-variant-numeric: tabular-nums;
+}
+
 .trimLength {
   font-weight: 700;
   color: var(--accent);
@@ -443,8 +450,9 @@
   top: 0;
   bottom: 0;
   width: 14px;
-  /* Centred on its position, so the grip lines up with the edge it sets. */
-  margin-left: -7px;
+  /* The offset lives on .handleStart / .handleEnd, not here: two single-class
+     selectors at the same specificity would leave the end handle's override
+     depending on source order. */
   border: none;
   border-radius: var(--r-xs);
   background: var(--accent);
@@ -473,6 +481,26 @@
   border-radius: 1px;
   background: var(--on-accent);
   opacity: 0.7;
+}
+
+/*
+ * Which end of the selection each handle marks, and where its grip sits relative
+ * to the cut.
+ *
+ * The start handle's grip goes to the left of its position and the end handle's
+ * to the right, so each 14px grip sits *outside* the selected region rather than
+ * covering the first and last moments of it. Neither class existed, so both
+ * handles took the base rule's single negative offset — the end handle sat 14px
+ * inboard of the point it actually cut, which on a 30-second clip in a
+ * phone-width rail is around a second and a half of visible error between where
+ * the handle is and what you hear.
+ */
+.handleStart {
+  margin-left: -14px;
+}
+
+.handleEnd {
+  margin-left: 0;
 }
 
 .handle:focus-visible {

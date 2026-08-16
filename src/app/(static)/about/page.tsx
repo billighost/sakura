@@ -1,214 +1,170 @@
 import { Metadata } from "next";
-import Image from "next/image";
+import Link from "next/link";
+import {
+  DownloadedIcon,
+  LyricsIcon,
+  PetalIcon,
+  SearchIcon,
+  ShareIcon,
+  SparklesIcon,
+} from "@/components/Icons";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "About — Sakura",
-  description: "About Sakura, your personal music library app.",
+  description: "What Sakura is and how to use it.",
 };
 
-const features = [
+/**
+ * About.
+ *
+ * Rewritten for the person the page is actually for. The previous version had
+ * three sections titled "Tech Stack", "Roadmap" and "How It Works", the last of
+ * which described the *ingestion pipeline* — "Send your music files to our
+ * Telegram bot" — which is not something a listener ever does and not how anyone
+ * uses the app. Someone arriving cold learnt that it was built with Next.js and
+ * nothing about what it would do for them.
+ *
+ * So: what it is, what it does that other players don't, the three steps you
+ * actually take, where the music comes from, and what it costs. The tech stack is
+ * gone; it belongs in the README, where it already is.
+ */
+
+/** The one thing each of these is for, in the order it matters to a listener. */
+const CAPABILITIES = [
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polygon points="5 3 19 12 5 21 5 3" />
-      </svg>
-    ),
-    title: "Stream Anywhere",
-    description: "Access your personal music library from any browser on desktop or mobile.",
+    Icon: DownloadedIcon,
+    title: "Music that works with no signal",
+    body: "Save any song, album or playlist to your phone. It plays on the underground, on a plane, and anywhere the bars run out — and it costs nothing.",
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-      </svg>
-    ),
-    title: "Telegram Import",
-    description: "Send music files directly through our Telegram bot for instant library updates.",
+    Icon: SparklesIcon,
+    title: "Mixes from what you actually play",
+    body: "Sakura watches what you finish and what you skip, and builds mixes from that. When a queue runs out it keeps going with music that fits.",
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="11" cy="11" r="8" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
-    ),
-    title: "Smart Search",
-    description: "Full-text search across your entire library to find any track instantly.",
+    Icon: LyricsIcon,
+    title: "Lyrics that keep up",
+    body: "Words scroll in time with the song. Where a translation or a romanisation exists you can put it underneath, line by line.",
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M9 18V5l12-2v13" />
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="16" r="3" />
-      </svg>
-    ),
-    title: "Playlist Management",
-    description: "Create, edit, and organize custom playlists to match your mood.",
-  },
-  {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 18v-6a9 9 0 0118 0v6" />
-        <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
-      </svg>
-    ),
-    title: "Audio Visualizer",
-    description: "Beautiful audio visualizations that react to your music during playback.",
-  },
-  {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 01-3.46 0" />
-      </svg>
-    ),
-    title: "Offline Support",
-    description: "Cache your music for listening without an internet connection.",
+    Icon: ShareIcon,
+    title: "Something worth sending",
+    body: "Turn a song or a line of a lyric into an image or a short video. The person you send it to gets something they can look at, not a bare link.",
   },
 ];
 
-const techStack = [
-  { name: "Next.js", icon: "N" },
-  { name: "React", icon: "R" },
-  { name: "TypeScript", icon: "TS" },
-  { name: "PostgreSQL", icon: "PG" },
-  { name: "Prisma", icon: "◆" },
-  { name: "Redis", icon: "R" },
-  { name: "Cloudinary", icon: "C" },
-  { name: "Telegram", icon: "T" },
-];
-
-const roadmap = [
-  { text: "Multi-user support", done: false },
-  { text: "Collaborative playlists", done: false },
-  { text: "Last.fm scrobbling", done: false },
-  { text: "Lyrics display", done: false },
-  { text: "Gapless playback", done: false },
-  { text: "Smart playlists", done: false },
-  { text: "Dark & light themes", done: true },
-  { text: "Keyboard shortcuts", done: true },
-  { text: "Offline caching", done: true },
+/**
+ * Three steps, numbered — and numbered because this genuinely is a sequence: you
+ * can't save a song you haven't found, and mixes need something to learn from.
+ */
+const STEPS = [
+  {
+    Icon: SearchIcon,
+    title: "Find something",
+    body: "Search a song, an artist or an album. Browse the charts, or pick a genre.",
+  },
+  {
+    Icon: DownloadedIcon,
+    title: "Save what you'll want later",
+    body: "Tap the save icon on a song, or Save all on an album. Downloads live on your device and work without a connection.",
+  },
+  {
+    Icon: SparklesIcon,
+    title: "Let it learn",
+    body: "Listen for a few days. Your home screen fills up with mixes built from what you kept playing.",
+  },
 ];
 
 export default function AboutPage() {
   return (
     <div className={styles.page}>
-      <div className={styles.hero}>
-        <div className={styles.bloom} aria-hidden="true" />
-        <div className={styles.iconWrapper}>
-          <Image
-            src="/icons/icon-transparent-192.png"
-            alt="Sakura icon"
-            width={72}
-            height={72}
-            className={styles.icon}
-            priority
-          />
-        </div>
+      <header className={styles.hero}>
+        <span className={styles.mark} aria-hidden="true">
+          <PetalIcon size={30} filled />
+        </span>
         <h1 className={styles.title}>Sakura</h1>
-        <div className={styles.badge}>v0.1.0</div>
-        <p className={styles.subtitle}>
-          Your personal music library. Stream, organize, and enjoy your legally-owned music collection without ads, algorithms, or data harvesting.
+        <p className={styles.lede}>
+          A music player that keeps your songs on your phone, so they play whether
+          or not you have signal.
         </p>
-      </div>
+      </header>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>Features</h2>
-        <div className={styles.featuresGrid}>
-          {features.map((feature, i) => (
-            <div key={i} className={styles.featureCard}>
-              <div className={styles.featureIcon}>{feature.icon}</div>
-              <div className={styles.featureContent}>
-                <h3 className={styles.featureTitle}>{feature.title}</h3>
-                <p className={styles.featureDesc}>{feature.description}</p>
+        <h2 className={styles.heading}>What it does</h2>
+        <ul className={styles.capabilities}>
+          {CAPABILITIES.map(({ Icon, title, body }) => (
+            <li key={title} className={styles.capability}>
+              <span className={styles.capabilityIcon} aria-hidden="true">
+                <Icon size={20} />
+              </span>
+              <div>
+                <h3 className={styles.capabilityTitle}>{title}</h3>
+                <p className={styles.capabilityBody}>{body}</p>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>Tech Stack</h2>
-        <div className={styles.techGrid}>
-          {techStack.map((tech, i) => (
-            <div key={i} className={styles.techItem}>
-              <span className={styles.techIconBadge}>{tech.icon}</span>
-              <span className={styles.techName}>{tech.name}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.heading}>Roadmap</h2>
-        <div className={styles.roadmapList}>
-          {roadmap.map((item, i) => (
-            <div key={i} className={`${styles.roadmapItem} ${item.done ? styles.roadmapDone : ""}`}>
-              <div className={styles.roadmapCheck}>
-                {item.done ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <div className={styles.roadmapEmpty} />
-                )}
+        <h2 className={styles.heading}>Getting started</h2>
+        <ol className={styles.steps}>
+          {STEPS.map(({ Icon, title, body }, i) => (
+            <li key={title} className={styles.step}>
+              <span className={styles.stepNumber} aria-hidden="true">
+                {i + 1}
+              </span>
+              <div>
+                <h3 className={styles.stepTitle}>
+                  <span className={styles.stepIcon} aria-hidden="true">
+                    <Icon size={16} />
+                  </span>
+                  {title}
+                </h3>
+                <p className={styles.stepBody}>{body}</p>
               </div>
-              <span className={styles.roadmapText}>{item.text}</span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>How It Works</h2>
-        <div className={styles.howItWorks}>
-          <div className={styles.step}>
-            <div className={styles.stepNumber}>1</div>
-            <div className={styles.stepContent}>
-              <h3 className={styles.stepTitle}>Send Music</h3>
-              <p className={styles.stepDesc}>Send your music files to our Telegram bot</p>
-            </div>
-          </div>
-          <div className={styles.stepConnector} />
-          <div className={styles.step}>
-            <div className={styles.stepNumber}>2</div>
-            <div className={styles.stepContent}>
-              <h3 className={styles.stepTitle}>Auto-Process</h3>
-              <p className={styles.stepDesc}>Metadata extracted, album art retrieved automatically</p>
-            </div>
-          </div>
-          <div className={styles.stepConnector} />
-          <div className={styles.step}>
-            <div className={styles.stepNumber}>3</div>
-            <div className={styles.stepContent}>
-              <h3 className={styles.stepTitle}>Listen</h3>
-              <p className={styles.stepDesc}>Stream from any device with a browser</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.heading}>Acknowledgments</h2>
+        <h2 className={styles.heading}>Where the music comes from</h2>
         <p className={styles.text}>
-          Sakura is built with Next.js, Prisma, PostgreSQL, and the Telegram Bot API.
-          Audio processing relies on browser-native Web Audio API capabilities. Album art
-          is sourced from public metadata providers.
+          Song and artist details come from Deezer. The recordings themselves are
+          found in public Telegram channels — Sakura doesn&apos;t licence them, and
+          in most cases the people who made them aren&apos;t paid for these plays.
         </p>
         <p className={styles.text}>
-          The name &quot;Sakura&quot; is inspired by the Japanese cherry blossom, symbolizing the
-          beauty of simplicity.
+          That&apos;s worth knowing before you decide to use it, so it&apos;s said
+          here rather than only in the small print. The{" "}
+          <Link href="/terms" className={styles.link}>
+            terms
+          </Link>{" "}
+          go into it properly, including how to get something taken down.
         </p>
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>Disclaimer</h2>
+        <h2 className={styles.heading}>What it costs</h2>
         <p className={styles.text}>
-          <strong>This is a personal project</strong> and is not affiliated with any commercial
-          music streaming service. All audio files processed through Sakura are owned by the
-          user. The developer assumes no responsibility for misuse of this application.
+          Nothing, and there&apos;s nothing to upgrade to. Sakura is a personal
+          project run by one person — no ads, no subscription, no company. Which
+          also means no support team, and no promise it&apos;ll still be here next
+          year, so{" "}
+          <Link href="/settings" className={styles.link}>
+            export your library
+          </Link>{" "}
+          now and then.
+        </p>
+        <p className={styles.text}>
+          What it does with your data is set out in{" "}
+          <Link href="/privacy" className={styles.link}>
+            Privacy
+          </Link>
+          . The short version: your listening record builds your mixes, and
+          nothing else.
         </p>
       </section>
     </div>

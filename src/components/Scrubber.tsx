@@ -146,7 +146,10 @@ export function Scrubber({
 
   return (
     <div
-      className={`${styles.hitArea} ${variant === "mini" ? styles.hitAreaMini : styles.hitAreaFull} ${pressed ? styles.pressed : ""} ${className}`}
+      /* No base `.hitArea` class exists — the two variants are complete on their
+         own — so referencing one put the literal string "undefined" into every
+         scrubber's class list. */
+      className={`${variant === "mini" ? styles.hitAreaMini : styles.hitAreaFull} ${pressed ? styles.pressed : ""} ${className}`}
       style={{ "--track-accent": accentColor || undefined } as React.CSSProperties}
       onClick={(e) => e.stopPropagation()}
     >

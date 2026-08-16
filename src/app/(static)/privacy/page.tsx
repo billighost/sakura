@@ -1,240 +1,456 @@
 import { Metadata } from "next";
-import styles from "./page.module.css";
+import Link from "next/link";
+import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Sakura",
-  description: "Privacy policy for Sakura music app.",
+  title: "Privacy — Sakura",
+  description: "What Sakura collects, why, and what you can do about it.",
 };
+
+/**
+ * Privacy policy.
+ *
+ * Written against the code rather than from a template. Every claim here was
+ * checked against `prisma/schema.prisma`, `src/lib/offline-db.ts`,
+ * `src/app/api/export/route.ts` and the outbound hosts in `src/lib`.
+ *
+ * ── Two things this page says that a template wouldn't ────────────────────
+ *
+ * 1. There is no self-service account deletion. There is no DELETE handler on
+ *    /api/profile and no `user.delete` call anywhere in the codebase. Claiming a
+ *    deletion right the product cannot honour would be worse than saying so, so
+ *    it says so, in a callout, with the manual route.
+ * 2. Where the audio comes from. It is fetched from Telegram channels by a bot
+ *    and cached to Cloudinary; the metadata comes from Deezer. That is a
+ *    material fact about what a listener is participating in and it is stated
+ *    plainly.
+ *
+ * ── Where a lawyer needs to look ──────────────────────────────────────────
+ *
+ * Flagged in the page itself as well, but for whoever edits this file: the
+ * controller identity, the legal basis claims, the governing law, the retention
+ * periods for anything other than ListeningHistory, and the whole of the
+ * content-source position are unreviewed. The last of those is not a drafting
+ * problem — it's a question about whether the service can operate as built.
+ */
+
+/* Sourced from HISTORY_RAW_DAYS in src/lib/historyRetention.ts. */
+const RAW_HISTORY_DAYS = 60;
 
 export default function PrivacyPage() {
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Privacy Policy</h1>
-      <p className={styles.lastUpdated}>Last updated: August 5, 2026</p>
+      <div className={styles.titleBlock}>
+        <h1 className={styles.title}>Privacy</h1>
+        <p className={styles.lastUpdated}>Last updated: 16 August 2026</p>
+      </div>
 
-      <nav className={styles.toc}>
-        <p className={styles.tocTitle}>Table of Contents</p>
-        <ol className={styles.tocList}>
-          <li><a href="#information-collected">Information We Collect</a></li>
-          <li><a href="#data-usage">How We Use Your Data</a></li>
-          <li><a href="#data-storage">Data Storage and Security</a></li>
-          <li><a href="#data-retention">Data Retention</a></li>
-          <li><a href="#cookies">Cookies and Local Storage</a></li>
-          <li><a href="#third-party">Third-Party Services</a></li>
-          <li><a href="#user-rights">Your Rights</a></li>
-          <li><a href="#children">Children&apos;s Privacy</a></li>
-          <li><a href="#changes">Changes to This Policy</a></li>
-          <li><a href="#breach">Data Breach Notification</a></li>
-          <li><a href="#contact">Contact Us</a></li>
-        </ol>
+      <section className={styles.summary} aria-label="Summary">
+        <h2 className={styles.summaryTitle}>The short version</h2>
+        <ul className={styles.summaryList}>
+          <li>
+            We keep your account details and a record of what you listen to. The
+            listening record is what builds your mixes — it isn&apos;t used for
+            anything else.
+          </li>
+          <li>
+            We don&apos;t run ads, we don&apos;t sell your data, and there are no
+            analytics or tracking scripts in the app.
+          </li>
+          <li>
+            Music you save for offline stays on your device. We can&apos;t see it
+            and it never leaves your phone.
+          </li>
+          <li>
+            You can download everything we hold about you at any time. Deleting
+            your account currently needs an email to us — see below.
+          </li>
+        </ul>
+      </section>
+
+      <nav className={styles.toc} aria-label="Table of contents">
+        <p className={styles.tocTitle}>Contents</p>
+        <ul className={styles.tocList}>
+          <li><a href="#who">Who runs Sakura</a></li>
+          <li><a href="#what">What we collect</a></li>
+          <li><a href="#why">Why we collect it</a></li>
+          <li><a href="#music">Where the music comes from</a></li>
+          <li><a href="#others">Other companies involved</a></li>
+          <li><a href="#device">What&apos;s stored on your device</a></li>
+          <li><a href="#keep">How long we keep it</a></li>
+          <li><a href="#rights">Your choices</a></li>
+          <li><a href="#security">Keeping it safe</a></li>
+          <li><a href="#children">Children</a></li>
+          <li><a href="#changes">Changes to this page</a></li>
+          <li><a href="#contact">Getting in touch</a></li>
+        </ul>
       </nav>
 
-      <section id="information-collected" className={styles.section}>
-        <h2 className={styles.heading}>1. Information We Collect</h2>
-        <p className={styles.text}>
-          Sakura is a personal, single-user music library application. We collect only the
-          information necessary to provide and improve the service.
-        </p>
-        <p className={styles.text}><strong>Account Information:</strong> When you create an
-          account, we collect your username, email address, and a securely hashed version of
-          your password. This data is required for authentication and account management.
-        </p>
-        <p className={styles.text}><strong>Library Data:</strong> Your music library metadata
-          — including tracks, albums, artists, playlists, and listening history — is stored
-          to power the application&apos;s core functionality.
-        </p>
-        <p className={styles.text}><strong>Profile Information:</strong> If you choose to
-          provide a display name or avatar, this information is stored and displayed within
-          the application.
-        </p>
-        <p className={styles.text}><strong>Usage Data:</strong> Sakura does not collect
-          analytics, telemetry, or behavioral data. No browsing patterns, device information,
-          or interaction metrics are tracked.
-        </p>
-      </section>
+      <div className={styles.content}>
+        <section id="who" className={styles.section}>
+          <h2 className={styles.heading}>Who runs Sakura</h2>
+          <p className={styles.text}>
+            Sakura is an independent project, not a company. It is run by one
+            person and it makes no money. That matters for two reasons: there is
+            no advertising business behind it that would benefit from knowing more
+            about you, and there is also no support team — questions come to one
+            inbox.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> the operator&apos;s legal
+              identity and country of establishment are not stated here because
+              they haven&apos;t been decided. Both are required in most places
+              before this page counts as a privacy notice.
+            </p>
+          </div>
+        </section>
 
-      <section id="data-usage" className={styles.section}>
-        <h2 className={styles.heading}>2. How We Use Your Data</h2>
-        <p className={styles.text}>
-          Your data is used exclusively to operate and maintain the Sakura service. We do not
-          sell, rent, license, or share your personal information with third parties for
-          marketing or advertising purposes. Specifically, your data is used to:
-        </p>
-        <ul className={styles.list}>
-          <li>Authenticate your sessions and manage your account</li>
-          <li>Store and serve your music library</li>
-          <li>Process audio files you import via Telegram</li>
-          <li>Enable playlist creation and management</li>
-          <li>Provide offline caching capabilities</li>
-        </ul>
-      </section>
+        <section id="what" className={styles.section}>
+          <h2 className={styles.heading}>What we collect</h2>
+          <p className={styles.text}>
+            Everything below is either something you typed in or something the app
+            recorded because you pressed play. There is no third party watching
+            you inside Sakura: no analytics, no advertising pixels, no session
+            recording.
+          </p>
 
-      <section id="data-storage" className={styles.section}>
-        <h2 className={styles.heading}>3. Data Storage and Security</h2>
-        <p className={styles.text}>
-          All application data is stored in a PostgreSQL database hosted on Neon, a managed
-          database platform with built-in encryption at rest. Audio files are stored on
-          Cloudinary&apos;s cloud infrastructure, which provides encrypted storage and
-          delivery via HTTPS.
-        </p>
-        <p className={styles.text}>
-          Passwords are hashed using bcrypt with a work factor appropriate for modern
-          hardware. Authentication sessions are managed by NextAuth.js and are transmitted
-          over encrypted HTTPS connections. No plaintext passwords are ever stored.
-        </p>
-        <p className={styles.text}>
-          We implement reasonable administrative, technical, and physical safeguards to
-          protect your data against unauthorized access, alteration, disclosure, or
-          destruction. However, no method of electronic transmission or storage is completely
-          secure, and we cannot guarantee absolute security.
-        </p>
-      </section>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">What</th>
+                  <th scope="col">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Your account</td>
+                  <td>
+                    Username, email address, and your password stored as a
+                    one-way hash we cannot reverse. Optionally a profile picture
+                    and a short bio if you add them.
+                  </td>
+                </tr>
+                <tr>
+                  <td>What you play</td>
+                  <td>
+                    For each play: the song, when it happened, how many seconds
+                    you actually heard, whether you finished it or skipped and how
+                    far in, where you started it from (a mix, a playlist, search),
+                    whether the app queued it rather than you, and the hour and
+                    day of the week.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Your taste profile</td>
+                  <td>
+                    Scores per artist and per genre, worked out from the above;
+                    the genres and artists you picked when you signed up; how
+                    adventurous you asked your mixes to be; and summary figures
+                    like your skip rate and the era of music you lean toward.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Your library</td>
+                  <td>
+                    Playlists and their contents, liked songs, songs you told us
+                    to stop playing, and the mixes we&apos;ve built for you.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Where you got to</td>
+                  <td>
+                    The current song, position and queue, so playback picks up on
+                    your other devices.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Things you share</td>
+                  <td>
+                    When you create a share link we store the link&apos;s public
+                    address, what it points at, any lyrics you selected, and a
+                    count of how many times it&apos;s been opened.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Spotify, if you connect it</td>
+                  <td>
+                    An access token for your Spotify account, used only to list
+                    and read the playlists you choose to import. It is not used
+                    to read anything else and we do not store your Spotify
+                    listening history.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <section id="data-retention" className={styles.section}>
-        <h2 className={styles.heading}>4. Data Retention</h2>
-        <p className={styles.text}>
-          Your account data and music library are retained for as long as your account
-          remains active. If you choose to delete your account, all associated data —
-          including your library, playlists, listening history, and account credentials —
-          will be permanently removed from our servers within 30 days.
-        </p>
-        <p className={styles.text}>
-          Audio files uploaded to Cloudinary may persist in CDN cache beyond this period.
-          Upon account deletion, we will make reasonable efforts to purge cached copies, but
-          CDN edge caching is managed by a third-party provider.
-        </p>
-        <p className={styles.text}>
-          Database backups are retained for up to 7 days for disaster recovery purposes.
-          Deleted account data will not be restored from backups after the 30-day window.
-        </p>
-      </section>
+          <p className={styles.text}>
+            We do not collect your location, your contacts, your device
+            identifiers for advertising, or anything from other apps.
+          </p>
+        </section>
 
-      <section id="cookies" className={styles.section}>
-        <h2 className={styles.heading}>5. Cookies and Local Storage</h2>
-        <p className={styles.text}>
-          Sakura uses only the cookies strictly necessary for the application to function.
-          These include:
-        </p>
-        <ul className={styles.list}>
-          <li><strong>Session Cookies:</strong> Required for authentication. These are
-            http-only, secure, and expire when you log out or your session times out.</li>
-          <li><strong>CSRF Tokens:</strong> Used to protect against cross-site request
-            forgery attacks.</li>
-        </ul>
-        <p className={styles.text}>
-          Sakura does not use analytics cookies, advertising cookies, or any third-party
-          tracking cookies. We do not use cookies for behavioral profiling.
-        </p>
-        <p className={styles.text}>
-          When offline caching is enabled, audio files and library metadata may be stored
-          locally in your browser&apos;s IndexedDB and Cache Storage. This data never
-          leaves your device and can be cleared at any time from the Settings page or
-          through your browser&apos;s storage management.
-        </p>
-      </section>
+        <section id="why" className={styles.section}>
+          <h2 className={styles.heading}>Why we collect it</h2>
+          <p className={styles.text}>
+            Your account details exist so you can sign in and so your library
+            follows you between devices. Your listening record exists to build
+            your mixes and to decide what plays when a queue runs out — that is
+            its only purpose, and it is the reason the record is as detailed as it
+            is. A bare list of songs played cannot tell a song you loved from one
+            you killed after two seconds.
+          </p>
+          <p className={styles.text}>
+            Nothing is used for advertising. Nothing is sold. Nothing is shared
+            with anyone for their own purposes.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> if Sakura has users in the UK
+              or the EU, each of the categories above needs a stated lawful basis
+              under the GDPR — most likely contract for the account and library,
+              and legitimate interests or consent for the listening record. That
+              determination hasn&apos;t been made, so this page describes purposes
+              honestly but does not claim a basis it can&apos;t defend.
+            </p>
+          </div>
+        </section>
 
-      <section id="third-party" className={styles.section}>
-        <h2 className={styles.heading}>6. Third-Party Services</h2>
-        <p className={styles.text}>
-          Sakura integrates with the following third-party services to provide
-          functionality:
-        </p>
-        <ul className={styles.list}>
-          <li><strong>Cloudinary:</strong> Audio file storage and CDN delivery.
-            Governed by Cloudinary&apos;s privacy policy.</li>
-          <li><strong>Neon:</strong> PostgreSQL database hosting. Governed by
-            Neon&apos;s privacy policy.</li>
-          <li><strong>Upstash:</strong> Redis caching. Governed by Upstash&apos;s
-            privacy policy.</li>
-          <li><strong>Telegram Bot API:</strong> Music file import. Governed by
-            Telegram&apos;s privacy policy.</li>
-        </ul>
-        <p className={styles.text}>
-          These services receive only the minimum data required to perform their functions.
-          We do not authorize them to use your data for any other purpose. We encourage you
-          to review the privacy policies of these providers.
-        </p>
-      </section>
+        <section id="music" className={styles.section}>
+          <h2 className={styles.heading}>Where the music comes from</h2>
+          <p className={styles.text}>
+            This belongs in a privacy page because it changes who else is involved
+            when you press play, and because you should know what you are taking
+            part in.
+          </p>
+          <p className={styles.text}>
+            Sakura does not licence music. Song and album information — titles,
+            artists, artwork, charts — comes from Deezer&apos;s public API. The
+            audio itself is located by searching public Telegram channels through
+            a Telegram bot, and a copy is then cached on Cloudinary so it plays
+            quickly the next time. Lyrics come from LRCLIB and a lyrics service
+            hosted on Hugging Face.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Be aware:</strong> that means the recordings Sakura plays
+              are not licensed by us, and in most cases the people who made them
+              are not being paid for these plays. If that isn&apos;t something
+              you want to take part in, this is the point to stop using it.
+            </p>
+            <p>
+              <strong>Needs legal review, urgently:</strong> this arrangement is
+              the single largest legal exposure in the project, and it is a
+              question about whether the service can lawfully operate as built —
+              not something better wording can fix.
+            </p>
+          </div>
+          <p className={styles.text}>
+            Practically: when you search or play, a request carrying the song and
+            artist you asked for goes to Deezer and to Telegram. Neither receives
+            your account details, your email or your listening history.
+          </p>
+        </section>
 
-      <section id="user-rights" className={styles.section}>
-        <h2 className={styles.heading}>7. Your Rights</h2>
-        <p className={styles.text}>
-          You have the following rights regarding your personal data:
-        </p>
-        <ul className={styles.list}>
-          <li><strong>Right to Access:</strong> You may request a copy of all personal data
-            we hold about you. This can be done through the Settings page or by contacting
-            us directly.</li>
-          <li><strong>Right to Rectification:</strong> You may update or correct inaccurate
-            personal information at any time through your account settings.</li>
-          <li><strong>Right to Deletion:</strong> You may request the permanent deletion of
-            your account and all associated data. This action is irreversible and will be
-            processed within 30 days.</li>
-          <li><strong>Right to Data Portability:</strong> You may export your music library
-            metadata and playlists in a structured, machine-readable format.</li>
-          <li><strong>Right to Restrict Processing:</strong> You may request that we limit
-            how we process your data, though this may affect the functionality of the
-            service.</li>
-        </ul>
-        <p className={styles.text}>
-          To exercise any of these rights, contact us at{" "}
-          <strong>sakura@example.com</strong>.
-        </p>
-      </section>
+        <section id="others" className={styles.section}>
+          <h2 className={styles.heading}>Other companies involved</h2>
+          <p className={styles.text}>
+            Sakura runs on other people&apos;s infrastructure. These companies
+            process data on our behalf and are not allowed to use it for their own
+            purposes.
+          </p>
+          <ul className={styles.list}>
+            <li>
+              <strong>Vercel</strong> — runs the app and serves it to your
+              browser. Sees your IP address and the requests you make, as any web
+              host does.
+            </li>
+            <li>
+              <strong>Neon</strong> — hosts the database, so it holds everything
+              in the table above.
+            </li>
+            <li>
+              <strong>Upstash</strong> — a short-lived cache and rate limiter.
+              Holds recent search results and provider responses for minutes to
+              hours.
+            </li>
+            <li>
+              <strong>Cloudinary</strong> — stores cached audio files and profile
+              pictures.
+            </li>
+          </ul>
+          <p className={styles.text}>
+            And these receive a query when you use the feature that needs them,
+            but never your identity:{" "}
+            <strong>Deezer</strong> (catalogue, charts, search),{" "}
+            <strong>Telegram</strong> (audio), <strong>LRCLIB</strong> and a{" "}
+            <strong>Hugging Face</strong>-hosted service (lyrics),{" "}
+            <strong>MusicBrainz</strong> and <strong>Apple</strong> (extra
+            metadata and chart data), and <strong>Spotify</strong> (only if you
+            connect it, and only for importing).
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> in the UK and the EU each of
+              the four processors above requires a data processing agreement, and
+              some of them store data outside the UK/EEA, which requires a
+              transfer mechanism. Neither has been put in place.
+            </p>
+          </div>
+        </section>
 
-      <section id="children" className={styles.section}>
-        <h2 className={styles.heading}>8. Children&apos;s Privacy</h2>
-        <p className={styles.text}>
-          Sakura is not intended for use by individuals under the age of 13 (or the
-          applicable age of digital consent in your jurisdiction). We do not knowingly
-          collect personal information from children. If we become aware that we have
-          collected data from a child, we will take steps to delete it promptly.
-        </p>
-      </section>
+        <section id="device" className={styles.section}>
+          <h2 className={styles.heading}>What&apos;s stored on your device</h2>
+          <p className={styles.text}>
+            Sakura is built to keep working with no signal, which means a lot of it
+            lives on your phone rather than on our servers. In a browser database
+            called <code className={styles.code}>sakura-offline</code> it keeps:
+            the audio files you saved for offline, the song and playlist details
+            that go with them, lyrics you&apos;ve viewed, and partly-finished
+            downloads so an interrupted one can resume.
+          </p>
+          <p className={styles.text}>
+            It also remembers small preferences — your theme, your sort order on
+            each list, recent searches, recent imports — in your browser&apos;s
+            local storage.
+          </p>
+          <p className={styles.text}>
+            <strong>None of that is sent to us.</strong> We do not know what
+            you&apos;ve downloaded. Clearing your browser&apos;s data for this
+            site, or removing downloads from Settings, deletes all of it.
+          </p>
+          <p className={styles.text}>
+            There are no advertising or analytics cookies. The only cookie Sakura
+            sets is the one that keeps you signed in.
+          </p>
+        </section>
 
-      <section id="changes" className={styles.section}>
-        <h2 className={styles.heading}>9. Changes to This Policy</h2>
-        <p className={styles.text}>
-          We may update this Privacy Policy from time to time to reflect changes in our
-          practices or applicable laws. When we make material changes, we will update the
-          &quot;Last updated&quot; date at the top of this page. Your continued use of Sakura
-          after changes are posted constitutes your acceptance of the updated policy.
-        </p>
-      </section>
+        <section id="keep" className={styles.section}>
+          <h2 className={styles.heading}>How long we keep it</h2>
+          <p className={styles.text}>
+            Individual plays are kept in full for{" "}
+            <strong>{RAW_HISTORY_DAYS} days</strong>. After that they are folded
+            into a running total per song — how many times, how long, how strong a
+            signal — and the individual rows are deleted. So your long-term taste
+            survives but the minute-by-minute record of what you played on a
+            particular evening last spring does not.
+          </p>
+          <p className={styles.text}>
+            Everything else — your account, playlists, liked songs, taste profile
+            — is kept until you ask us to delete it.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> {RAW_HISTORY_DAYS} days is
+              taken from the code, and it exists for a storage reason rather than
+              a privacy one. Whether it is also a defensible retention period, and
+              what period should apply to everything else, hasn&apos;t been
+              assessed.
+            </p>
+          </div>
+        </section>
 
-      <section id="breach" className={styles.section}>
-        <h2 className={styles.heading}>10. Data Breach Notification</h2>
-        <p className={styles.text}>
-          In the unlikely event of a data breach that affects your personal information, we
-          will take the following steps:
-        </p>
-        <ul className={styles.list}>
-          <li>Contain the breach and secure affected systems immediately</li>
-          <li>Assess the scope and impact of the breach</li>
-          <li>Notify affected users within 72 hours of discovery</li>
-          <li>Provide details of the breach, affected data types, and remediation steps</li>
-          <li>Report the breach to relevant supervisory authorities as required by
-            applicable law</li>
-        </ul>
-        <p className={styles.text}>
-          Given that Sakura is a single-user application with minimal data collection, the
-          risk surface for breaches is significantly reduced.
-        </p>
-      </section>
+        <section id="rights" className={styles.section}>
+          <h2 className={styles.heading}>Your choices</h2>
 
-      <section id="contact" className={styles.section}>
-        <h2 className={styles.heading}>11. Contact Us</h2>
-        <p className={styles.text}>
-          If you have questions about this Privacy Policy, wish to exercise your data
-          rights, or need to report a concern, please contact us at:
-        </p>
-        <p className={styles.text}>
-          <strong>Email:</strong>{" "}
-          <a href="mailto:sakura@example.com" className={styles.link}>
-            sakura@example.com
-          </a>
-        </p>
-      </section>
+          <h3 className={styles.subheading}>Get a copy of your data</h3>
+          <p className={styles.text}>
+            Settings → Export gives you a file containing your profile, your
+            playlists, your liked songs and your listening history. It arrives as
+            JSON, which is a plain text format any tool can read. History is
+            capped at the most recent 5,000 plays; ask us if you need more.
+          </p>
+
+          <h3 className={styles.subheading}>Correct something</h3>
+          <p className={styles.text}>
+            Your username, bio and picture are editable on your profile. For
+            anything else, email us.
+          </p>
+
+          <h3 className={styles.subheading}>Delete your account</h3>
+          <div className={styles.callout}>
+            <p>
+              <strong>There is no delete button yet.</strong> The app cannot
+              currently delete an account on its own — that has to be done by
+              hand. Email us from your account&apos;s address and we will remove
+              the account and everything attached to it: your library, your
+              history, your taste profile and any share links you made.
+            </p>
+            <p>
+              We&apos;d rather admit this than list a right the app can&apos;t
+              honour. Building it is on the list.
+            </p>
+          </div>
+
+          <h3 className={styles.subheading}>Stop the taste tracking</h3>
+          <p className={styles.text}>
+            You can&apos;t currently turn off the listening record while still
+            using the app — the mixes are built from it, and nothing else in
+            Sakura would work without it. If that isn&apos;t acceptable to you,
+            the honest answer is that Sakura isn&apos;t the right app for you.
+          </p>
+        </section>
+
+        <section id="security" className={styles.section}>
+          <h2 className={styles.heading}>Keeping it safe</h2>
+          <p className={styles.text}>
+            Passwords are stored as bcrypt hashes, so nobody — including us — can
+            read them. Everything travels over HTTPS. Access to the database is
+            limited to the app.
+          </p>
+          <p className={styles.text}>
+            That said: this is a personal project run by one person, not a company
+            with a security team. Please don&apos;t reuse a password here that
+            protects anything you care about, and assume the same level of
+            assurance you would give any small independent service.
+          </p>
+        </section>
+
+        <section id="children" className={styles.section}>
+          <h2 className={styles.heading}>Children</h2>
+          <p className={styles.text}>
+            Sakura isn&apos;t intended for children under 13, and we don&apos;t
+            knowingly collect anything from them. We also don&apos;t ask your age,
+            so we have no way to check. If you believe a child has an account,
+            email us and we&apos;ll remove it.
+          </p>
+        </section>
+
+        <section id="changes" className={styles.section}>
+          <h2 className={styles.heading}>Changes to this page</h2>
+          <p className={styles.text}>
+            If this changes in a way that affects you, we&apos;ll say so in the app
+            rather than quietly updating the date at the top. The date at the top
+            tells you when it last changed at all.
+          </p>
+        </section>
+
+        <section id="contact" className={styles.section}>
+          <h2 className={styles.heading}>Getting in touch</h2>
+          <p className={styles.text}>
+            For anything on this page — a copy of your data, a correction, a
+            deletion, or a question — email{" "}
+            <a href="mailto:privacy@sakura.app" className={styles.link}>
+              privacy@sakura.app
+            </a>
+            . One person reads it, so allow a few days.
+          </p>
+          <p className={styles.text}>
+            Our <Link href="/terms" className={styles.link}>terms</Link> cover
+            what you can and can&apos;t do with the app.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> the contact address above is a
+              placeholder and needs to be a real, monitored inbox. Where required,
+              a data protection contact and — if applicable — a representative in
+              the UK or EU must also be named.
+            </p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

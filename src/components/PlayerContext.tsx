@@ -742,15 +742,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return lyrics.lines[activeLyricIndex]?.text || null;
   }, [lyrics, activeLyricIndex]);
 
-  // Load favorites on mount
+  /*
+   * Load the set of liked track ids.
+   *
+   * The status check is the point. `fetch` doesn't throw on 4xx, so a 401 from an
+   * expired session parsed as `{ error: "Unauthorized" }` — not an array, no
+   * `.tracks` — and silently produced an empty set. Every heart in the app then
+   * rendered as unliked, and tapping one issued a POST that also 401'd and
+   * reverted, so the like button appeared to be broken rather than the session.
+   *
+   * There's still nothing to *show* the user here (this runs before any screen
+   * has an opinion about it), but a console error is the difference between a
+   * five-minute diagnosis and an hour of one.
+   */
   useEffect(() => {
-    fetch("/api/favorites")
-      .then((res) => res.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : data.tracks || [];
-        setFavoriteTrackIds(new Set(list.map((t: any) => t.id)));
-      })
-      .catch(() => {});
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/favorites");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: unknown = await res.json();
+        const list: { id?: unknown }[] = Array.isArray(data)
+          ? data
+          : Array.isArray((data as { tracks?: unknown })?.tracks)
+            ? ((data as { tracks: { id?: unknown }[] }).tracks)
+            : [];
+        const ids = list
+          .map((t) => t.id)
+          .filter((id): id is string => typeof id === "string");
+        if (!cancelled) setFavoriteTrackIds(new Set(ids));
+      } catch (err) {
+        if (!cancelled) console.error("Couldn't load liked songs", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const toggleLikeTrack = useCallback(async (trackId: string) => {

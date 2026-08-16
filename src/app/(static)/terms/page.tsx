@@ -1,251 +1,328 @@
 import { Metadata } from "next";
-import styles from "./page.module.css";
+import Link from "next/link";
+import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Sakura",
-  description: "Terms of service for Sakura music app.",
+  title: "Terms — Sakura",
+  description: "The rules for using Sakura, in plain English.",
 };
 
+/**
+ * Terms of use.
+ *
+ * Deliberately not a template. The previous version was a fourteen-section
+ * boilerplate that described a licensed streaming service with an intellectual
+ * property position it does not have — which is worse than no terms, because it
+ * asserts things that are untrue.
+ *
+ * The substantive change is the content-source section: Sakura locates audio in
+ * public Telegram channels and caches it, and it licenses nothing. A terms page
+ * cannot fix that, and pretending the service holds rights it doesn't hold would
+ * make this document actively misleading. It says what is true and flags the
+ * question for a lawyer.
+ *
+ * See the same flag in ../privacy/page.tsx. Between them, the unreviewed items
+ * are: the operator's legal identity, governing law and forum, the enforceability
+ * of the liability limits, and the entire content-source position.
+ */
 export default function TermsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.titleBlock}>
-        <h1 className={styles.title}>Terms of Service</h1>
-        <p className={styles.lastUpdated}>Last updated: August 5, 2026</p>
+        <h1 className={styles.title}>Terms</h1>
+        <p className={styles.lastUpdated}>Last updated: 16 August 2026</p>
       </div>
+
+      <section className={styles.summary} aria-label="Summary">
+        <h2 className={styles.summaryTitle}>The short version</h2>
+        <ul className={styles.summaryList}>
+          <li>
+            Sakura is a free personal project. It comes with no guarantees and it
+            might break or disappear.
+          </li>
+          <li>
+            It doesn&apos;t licence the music it plays. Recordings are found in
+            public Telegram channels, and rights to them belong to whoever made
+            them.
+          </li>
+          <li>
+            Your account, your playlists and your responsibility: keep your
+            password to yourself, and don&apos;t use Sakura to do anything
+            illegal.
+          </li>
+          <li>
+            We can suspend an account that&apos;s being used to abuse the service,
+            and you can stop using it whenever you like.
+          </li>
+        </ul>
+      </section>
 
       <nav className={styles.toc} aria-label="Table of contents">
         <p className={styles.tocTitle}>Contents</p>
         <ul className={styles.tocList}>
-          <li><a href="#acceptance">Acceptance of Terms</a></li>
-          <li><a href="#description">Description of Service</a></li>
-          <li><a href="#eligibility">Eligibility</a></li>
-          <li><a href="#account">Account Responsibilities</a></li>
-          <li><a href="#acceptable-use">Acceptable Use Policy</a></li>
-          <li><a href="#intellectual-property">Intellectual Property</a></li>
-          <li><a href="#user-content">User Content</a></li>
-          <li><a href="#disclaimer">Disclaimer of Warranties</a></li>
-          <li><a href="#limitation">Limitation of Liability</a></li>
-          <li><a href="#indemnification">Indemnification</a></li>
-          <li><a href="#termination">Termination</a></li>
-          <li><a href="#governing-law">Governing Law</a></li>
-          <li><a href="#changes">Changes to Terms</a></li>
-          <li><a href="#contact">Contact</a></li>
+          <li><a href="#what">What Sakura is</a></li>
+          <li><a href="#agreeing">Agreeing to these terms</a></li>
+          <li><a href="#account">Your account</a></li>
+          <li><a href="#music">The music</a></li>
+          <li><a href="#use">What you can and can&apos;t do</a></li>
+          <li><a href="#yours">Things you make</a></li>
+          <li><a href="#ours">Sakura itself</a></li>
+          <li><a href="#nogurantee">No guarantees</a></li>
+          <li><a href="#liability">Limits on liability</a></li>
+          <li><a href="#ending">Ending it</a></li>
+          <li><a href="#law">Which law applies</a></li>
+          <li><a href="#changes">Changes to these terms</a></li>
+          <li><a href="#contact">Getting in touch</a></li>
         </ul>
       </nav>
 
       <div className={styles.content}>
-        <section id="acceptance" className={styles.section}>
-          <h2 className={styles.heading}>1. Acceptance of Terms</h2>
+        <section id="what" className={styles.section}>
+          <h2 className={styles.heading}>What Sakura is</h2>
           <p className={styles.text}>
-            By accessing or using Sakura (&quot;the Service&quot;), you agree to be bound by
-            these Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms,
-            you must not access or use the Service. These Terms constitute a legally binding
-            agreement between you and the operator of Sakura.
+            Sakura is a music player, run as a personal project by one person, at
+            no charge. It finds recordings, plays them, lets you save them to your
+            phone so they work without a signal, and builds mixes from what you
+            listen to.
+          </p>
+          <p className={styles.text}>
+            It is not a company, it has no employees, and it earns nothing. Read
+            the rest of this page with that in mind — most of it follows from it.
           </p>
         </section>
 
-        <section id="description" className={styles.section}>
-          <h2 className={styles.heading}>2. Description of Service</h2>
+        <section id="agreeing" className={styles.section}>
+          <h2 className={styles.heading}>Agreeing to these terms</h2>
           <p className={styles.text}>
-            Sakura is a personal music library application that allows you to manage, organize,
-            and stream audio files that you legally own. The Service provides library
-            management, playlist creation, audio playback, and file import via Telegram bot
-            integration. Sakura is a single-user application and does not provide music
-            hosting, sharing, or distribution capabilities.
+            Making an account means you accept what&apos;s on this page. If you
+            don&apos;t, don&apos;t make one — and if you already have one, you can
+            stop using it at any time.
           </p>
-        </section>
-
-        <section id="eligibility" className={styles.section}>
-          <h2 className={styles.heading}>3. Eligibility</h2>
           <p className={styles.text}>
-            You must be at least 13 years of age (or the minimum age required in your
-            jurisdiction) to use Sakura. By using the Service, you represent and warrant that
-            you meet this age requirement and have the legal capacity to enter into these
-            Terms.
+            You need to be old enough to agree to terms where you live, and at
+            least 13.
           </p>
         </section>
 
         <section id="account" className={styles.section}>
-          <h2 className={styles.heading}>4. Account Responsibilities</h2>
+          <h2 className={styles.heading}>Your account</h2>
           <p className={styles.text}>
-            You are responsible for maintaining the confidentiality of your account credentials
-            and for all activity that occurs under your account. You agree to:
+            Keep your password to yourself. Anything done through your account is
+            treated as done by you, so tell us if you think someone else has got
+            in.
           </p>
+          <p className={styles.text}>
+            One account per person. Don&apos;t impersonate anyone, and don&apos;t
+            pick a username designed to make people think you&apos;re someone
+            else.
+          </p>
+          <p className={styles.text}>
+            Please don&apos;t reuse an important password here. See{" "}
+            <Link href="/privacy" className={styles.link}>
+              Privacy
+            </Link>{" "}
+            for why.
+          </p>
+        </section>
+
+        <section id="music" className={styles.section}>
+          <h2 className={styles.heading}>The music</h2>
+          <p className={styles.text}>
+            This is the part that matters most, so it&apos;s said plainly rather
+            than buried.
+          </p>
+          <p className={styles.text}>
+            <strong>Sakura does not licence any of the music it plays.</strong>{" "}
+            Song and artist information comes from Deezer&apos;s public API. The
+            recordings themselves are located by searching public Telegram
+            channels, and a copy is cached so it plays quickly next time. Lyrics
+            come from third-party lyric services.
+          </p>
+          <p className={styles.text}>
+            Everything Sakura plays belongs to the people who wrote, performed and
+            released it. Nothing on this page transfers any right in it to you or
+            to us. Playing a recording here is not a licence to copy it, upload it,
+            perform it, or use it in anything you make.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>If you hold rights in something Sakura is playing</strong>{" "}
+              and you want it removed, email the address at the bottom of this page
+              with enough detail to identify the recording. It will be removed from
+              the cache and blocked from being re-fetched.
+            </p>
+            <p>
+              <strong>Needs legal review, urgently:</strong> the arrangement
+              described above is the project&apos;s largest legal exposure. It is a
+              question about whether the service can lawfully operate as built, not
+              a drafting problem — no wording on this page resolves it, and a
+              notice-and-takedown process is not on its own a defence.
+            </p>
+          </div>
+        </section>
+
+        <section id="use" className={styles.section}>
+          <h2 className={styles.heading}>What you can and can&apos;t do</h2>
+          <p className={styles.text}>Use Sakura to listen to music. Please don&apos;t:</p>
           <ul className={styles.list}>
-            <li>Provide accurate and complete registration information</li>
-            <li>Maintain the security of your password and account</li>
-            <li>Notify us immediately of any unauthorized use of your account</li>
-            <li>Accept responsibility for all activities conducted through your account</li>
-          </ul>
-          <p className={styles.text}>
-            Sakura reserves the right to suspend or terminate accounts that are found to be
-            in violation of these Terms.
-          </p>
-        </section>
-
-        <section id="acceptable-use" className={styles.section}>
-          <h2 className={styles.heading}>5. Acceptable Use Policy</h2>
-          <p className={styles.text}>
-            You agree to use Sakura only for lawful purposes and in compliance with all
-            applicable laws and regulations. You must not:
-          </p>
-          <ul className={styles.list}>
-            <li>Upload, store, or distribute copyrighted music that you do not own or have
-              the legal right to possess</li>
-            <li>Use the Service to distribute, share, or make available copyrighted content
-              to others</li>
-            <li>Attempt to gain unauthorized access to any part of the Service, other accounts,
-              or connected systems</li>
-            <li>Interfere with or disrupt the Service, servers, or networks</li>
-            <li>Use automated tools (bots, scrapers) to access the Service without written
-              permission</li>
-            <li>Reverse engineer, decompile, or disassemble any part of the Service</li>
-            <li>Use the Service to transmit malware, viruses, or other harmful code</li>
-            <li>Impersonate another person or misrepresent your affiliation with any entity</li>
-          </ul>
-          <p className={styles.text}>
-            You are solely responsible for ensuring that your use of the Service complies with
-            all applicable laws regarding music ownership and file handling in your
-            jurisdiction.
-          </p>
-        </section>
-
-        <section id="intellectual-property" className={styles.section}>
-          <h2 className={styles.heading}>6. Intellectual Property</h2>
-          <p className={styles.text}>
-            All intellectual property rights in the Service — including its code, design, logo,
-            and interface — are owned by the developer of Sakura. These Terms do not grant you
-            any rights to use the Sakura name, logo, or branding without prior written
-            consent.
-          </p>
-          <p className={styles.text}>
-            The Service is provided as a personal tool for managing your own legally-owned
-            content. Nothing in these Terms should be interpreted as granting any license or
-            right to use copyrighted music through the Service beyond what you are legally
-            entitled to possess.
-          </p>
-        </section>
-
-        <section id="user-content" className={styles.section}>
-          <h2 className={styles.heading}>7. User Content</h2>
-          <p className={styles.text}>
-            You retain full ownership of all audio files and content you upload to or process
-            through Sakura. Sakura does not claim any ownership over your content. By using
-            the Service, you grant Sakura a limited, non-exclusive license to process,
-            store, and stream your content solely for the purpose of providing the Service to
-            you.
-          </p>
-          <p className={styles.text}>
-            You are responsible for ensuring that all content you upload is legally owned by
-            you or that you have the necessary rights to store and stream it. Sakura
-            disclaims any responsibility for the legality of content stored by users.
-          </p>
-        </section>
-
-        <section id="disclaimer" className={styles.section}>
-          <h2 className={styles.heading}>8. Disclaimer of Warranties</h2>
-          <p className={styles.text}>
-            The Service is provided on an &quot;as is&quot; and &quot;as available&quot; basis
-            without warranties of any kind, whether express, implied, or statutory. We do not
-            warrant that:
-          </p>
-          <ul className={styles.list}>
-            <li>The Service will be uninterrupted, timely, secure, or error-free</li>
-            <li>The results obtained from the Service will be accurate or reliable</li>
-            <li>The quality of the Service will meet your expectations</li>
-            <li>Any errors in the Service will be corrected</li>
-          </ul>
-          <p className={styles.text}>
-            To the fullest extent permitted by law, we disclaim all warranties, including but
-            not limited to implied warranties of merchantability, fitness for a particular
-            purpose, and non-infringement.
-          </p>
-        </section>
-
-        <section id="limitation" className={styles.section}>
-          <h2 className={styles.heading}>9. Limitation of Liability</h2>
-          <p className={styles.text}>
-            To the maximum extent permitted by applicable law, the developer of Sakura shall
-            not be liable for any indirect, incidental, special, consequential, or punitive
-            damages, including but not limited to loss of profits, data, use, or goodwill,
-            arising out of or related to your use of the Service, regardless of the theory of
-            liability.
-          </p>
-          <p className={styles.text}>
-            In no event shall our total aggregate liability exceed the amount you paid to us
-            for the Service in the twelve (12) months preceding the claim, or one hundred
-            dollars ($100), whichever is greater.
-          </p>
-        </section>
-
-        <section id="indemnification" className={styles.section}>
-          <h2 className={styles.heading}>10. Indemnification</h2>
-          <p className={styles.text}>
-            You agree to indemnify, defend, and hold harmless the developer of Sakura, its
-            affiliates, officers, directors, employees, and agents from and against any and
-            all claims, liabilities, damages, losses, costs, and expenses (including
-            reasonable attorneys&apos; fees) arising out of or in any way connected with:
-          </p>
-          <ul className={styles.list}>
-            <li>Your access to or use of the Service</li>
-            <li>Your violation of these Terms</li>
-            <li>Your violation of any applicable law or regulation</li>
-            <li>Any content you upload, store, or distribute through the Service</li>
-            <li>Your infringement or misappropriation of any third-party rights</li>
+            <li>
+              Redistribute what you download — the offline copies are for your own
+              listening, on your own devices.
+            </li>
+            <li>
+              Break into anything: other people&apos;s accounts, the database, the
+              servers, or parts of the app you weren&apos;t given access to.
+            </li>
+            <li>
+              Hammer it. Automated scraping, bulk downloading, or anything that
+              makes the service worse for everyone else.
+            </li>
+            <li>
+              Get around rate limits, or work around a suspension by making
+              another account.
+            </li>
+            <li>
+              Put anything illegal, hateful, or designed to harass someone into a
+              playlist name, description or share.
+            </li>
+            <li>Use Sakura to build a competing service, or resell access to it.</li>
           </ul>
         </section>
 
-        <section id="termination" className={styles.section}>
-          <h2 className={styles.heading}>11. Termination</h2>
+        <section id="yours" className={styles.section}>
+          <h2 className={styles.heading}>Things you make</h2>
           <p className={styles.text}>
-            We reserve the right to suspend or terminate your access to the Service at our
-            sole discretion, without notice, for conduct that we believe violates these Terms
-            or is harmful to other users, the Service, or third parties.
+            Your playlists, their names and descriptions, your profile and the
+            share cards you create are yours. You keep them.
           </p>
           <p className={styles.text}>
-            You may terminate your account at any time by using the account deletion feature
-            in Settings or by contacting us directly. Upon termination:
+            By making a playlist public, or by creating a share link, you&apos;re
+            asking us to show it to whoever has the link — so you&apos;re giving us
+            permission to store and display it for that purpose. That permission
+            ends when you make it private again or delete it.
           </p>
-          <ul className={styles.list}>
-            <li>Your right to access the Service immediately ceases</li>
-            <li>All data associated with your account will be deleted within 30 days</li>
-            <li>Any outstanding obligations under these Terms survive termination</li>
-          </ul>
+          <p className={styles.text}>
+            You&apos;re responsible for what you put in them. We can remove
+            anything that breaks the rules above.
+          </p>
         </section>
 
-        <section id="governing-law" className={styles.section}>
-          <h2 className={styles.heading}>12. Governing Law</h2>
+        <section id="ours" className={styles.section}>
+          <h2 className={styles.heading}>Sakura itself</h2>
           <p className={styles.text}>
-            These Terms shall be governed by and construed in accordance with the laws of the
-            jurisdiction in which the developer resides, without regard to its conflict of law
-            provisions. Any disputes arising under these Terms shall be resolved through good
-            faith negotiation before resorting to formal legal proceedings.
+            The app — its code, its design, its name and its blossom mark — belongs
+            to the project. Using Sakura doesn&apos;t give you any right to copy or
+            reuse those.
           </p>
+          <p className={styles.text}>
+            This is separate from the music, which belongs to other people
+            entirely. See above.
+          </p>
+        </section>
+
+        <section id="nogurantee" className={styles.section}>
+          <h2 className={styles.heading}>No guarantees</h2>
+          <p className={styles.text}>
+            Sakura is provided as it is. There&apos;s no promise that it will work,
+            that a particular song will be findable, that your downloads will
+            survive, or that the service will exist next month.
+          </p>
+          <p className={styles.text}>
+            In particular: <strong>keep your own copies of anything you care
+            about</strong>. Downloads live in your browser&apos;s storage, which
+            your phone can clear on its own when space runs low. The export in
+            Settings gives you your playlists and history as a file — use it.
+          </p>
+        </section>
+
+        <section id="liability" className={styles.section}>
+          <h2 className={styles.heading}>Limits on liability</h2>
+          <p className={styles.text}>
+            To the extent the law allows, the project and the person running it
+            aren&apos;t liable for anything you lose by using Sakura — data,
+            downloads, time, or anything that follows from the service being
+            unavailable or wrong.
+          </p>
+          <p className={styles.text}>
+            Nothing here tries to exclude liability that can&apos;t legally be
+            excluded, and where you have rights as a consumer, this page doesn&apos;t
+            take them away.
+          </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> how much of this limitation is
+              enforceable depends entirely on jurisdiction, and for a free service
+              with no company behind it the answer may be very little. The clause is
+              written to be honest about intent rather than to be maximally broad.
+            </p>
+          </div>
+        </section>
+
+        <section id="ending" className={styles.section}>
+          <h2 className={styles.heading}>Ending it</h2>
+          <p className={styles.text}>
+            You can stop using Sakura at any time. To have your account and
+            everything in it deleted, email us — the app can&apos;t do it on its own
+            yet, which is explained in{" "}
+            <Link href="/privacy" className={styles.link}>
+              Privacy
+            </Link>
+            .
+          </p>
+          <p className={styles.text}>
+            We may suspend or remove an account that&apos;s being used to break the
+            rules above, or where keeping it would put the project at risk.
+            Where it&apos;s reasonable to do so we&apos;ll say why first.
+          </p>
+          <p className={styles.text}>
+            The whole service may also stop. If it&apos;s a decision rather than a
+            failure, we&apos;ll give notice in the app so you can export your data
+            first.
+          </p>
+        </section>
+
+        <section id="law" className={styles.section}>
+          <h2 className={styles.heading}>Which law applies</h2>
+          <div className={styles.callout}>
+            <p>
+              <strong>Not decided.</strong> This page deliberately does not name a
+              governing law or a court, because the operator&apos;s country of
+              establishment hasn&apos;t been settled and choosing one at random
+              would be worse than leaving it open.
+            </p>
+            <p>
+              <strong>Needs legal review:</strong> governing law and forum, plus
+              whether a consumer in the UK or EU can be bound by them at all.
+            </p>
+          </div>
         </section>
 
         <section id="changes" className={styles.section}>
-          <h2 className={styles.heading}>13. Changes to Terms</h2>
+          <h2 className={styles.heading}>Changes to these terms</h2>
           <p className={styles.text}>
-            We reserve the right to modify these Terms at any time. When changes are made, we
-            will update the &quot;Last updated&quot; date at the top of this page. Material
-            changes will be communicated through the Service or by email when possible. Your
-            continued use of Sakura after changes are posted constitutes your acceptance of
-            the updated Terms.
+            These can change. If a change affects what you&apos;re allowed to do or
+            what you&apos;re agreeing to, we&apos;ll say so in the app rather than
+            silently updating the date at the top. Carrying on using Sakura after
+            that means you accept the new version.
           </p>
         </section>
 
         <section id="contact" className={styles.section}>
-          <h2 className={styles.heading}>14. Contact</h2>
+          <h2 className={styles.heading}>Getting in touch</h2>
           <p className={styles.text}>
-            If you have questions about these Terms of Service, please contact us at:
-          </p>
-          <p className={styles.text}>
-            <strong>Email:</strong>{" "}
-            <a href="mailto:sakura@example.com" className={styles.link}>
-              sakura@example.com
+            For anything on this page, including a rights complaint, email{" "}
+            <a href="mailto:hello@sakura.app" className={styles.link}>
+              hello@sakura.app
             </a>
+            . One person reads it, so allow a few days.
           </p>
+          <div className={styles.callout}>
+            <p>
+              <strong>Needs legal review:</strong> the address above is a
+              placeholder and needs to be a real, monitored inbox before this page
+              is published.
+            </p>
+          </div>
         </section>
       </div>
     </div>
