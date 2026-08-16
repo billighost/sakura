@@ -435,3 +435,28 @@
     animation-duration: 1.6s;
   }
 }
+
+/* ── Generic route placeholder ────────────────────────────────────────────── */
+
+.pageSkeleton {
+  padding-top: max(var(--space-4), env(safe-area-inset-top));
+}
+
+.pageSkeletonHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--gutter) var(--space-5);
+}
+
+.pageSkeletonTitle {
+  width: 8rem;
+  height: var(--t-2xl);
+  border-radius: var(--r-xs);
+}
+
+.pageSkeletonAvatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-full);
+}

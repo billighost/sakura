@@ -30,7 +30,18 @@ export async function GET() {
   // Return null-safe defaults when the row doesn't exist yet (first-time user)
   if (!settings) {
     return NextResponse.json({
-      theme: "dark",
+      /*
+       * Null, not "dark".
+       *
+       * A first-time user has expressed no preference, and saying "dark" here
+       * was indistinguishable from saying "this account chose dark" — so the
+       * settings page adopted it and repainted the app, overriding whatever the
+       * device was already showing. On a light-mode phone, opening Settings
+       * turned the app dark. Null is the honest answer to "what did they pick?",
+       * and the client leaves the device's own appearance alone when it sees one.
+       * See the reconciliation note in app/(app)/settings/page.tsx.
+       */
+      theme: null,
       audioQuality: "high",
       downloadQuality: "high",
       crossfadeSeconds: 0,

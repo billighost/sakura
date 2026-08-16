@@ -55,10 +55,10 @@ export default function SystemPlaylistClient({ id }: { id: string }) {
     };
   }, [id, reloadKey]);
 
-  const covers = useMemo(
-    () => (playlist?.coverUrl ? [playlist.coverUrl] : []),
-    [playlist?.coverUrl]
-  );
+  // See MixClient: an optional-chain dependency defeats the compiler's memo
+  // check, so the value is read out before the memo.
+  const coverUrl = playlist?.coverUrl;
+  const covers = useMemo(() => (coverUrl ? [coverUrl] : []), [coverUrl]);
 
   return (
     <CollectionDetail

@@ -320,6 +320,27 @@ export function CollectionHeroSkeleton({
   );
 }
 
+/**
+ * Generic route placeholder, for `loading.tsx` files whose page isn't a
+ * collection — a compact header line plus a list.
+ *
+ * Exists so no route file has to hand-roll another one. Every `loading.tsx` in
+ * the app built its own out of inline styles against the legacy
+ * `--sakura-skeleton` alias, which meant six placeholders matching neither each
+ * other nor the pages they stood in for.
+ */
+export function PageSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className={styles.pageSkeleton} aria-hidden="true">
+      <div className={styles.pageSkeletonHead}>
+        <div className={`${styles.pageSkeletonTitle} skeleton`} />
+        <div className={`${styles.pageSkeletonAvatar} skeleton`} />
+      </div>
+      <TrackListSkeleton rows={rows} />
+    </div>
+  );
+}
+
 /** Track-list placeholder, shaped like TrackRow so the swap doesn't reflow. */
 export function TrackListSkeleton({ rows = 6 }: { rows?: number }) {
   return (

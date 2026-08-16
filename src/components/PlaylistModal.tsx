@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import styles from "./PlaylistModal.module.css";
 import { usePlayer } from "./PlayerContext";
 import { Sheet } from "./Sheet";
+import { PlaylistIcon } from "./Icons";
 
 interface PlaylistModalProps {
   isOpen: boolean;
@@ -30,7 +31,11 @@ interface SpotifyPlaylist {
 
 type Step = "pick" | "manual" | "spotify" | "preview";
 
-// Spotify logo SVG as a component
+/**
+ * Spotify's own mark. Deliberately inline rather than added to Icons.tsx: that
+ * set is Sakura's icon language, and a third party's trademark isn't part of it —
+ * it also must not be restyled the way our glyphs are.
+ */
 function SpotifyLogoIcon({ size = 24 }: { size?: number }) {
   return (
     <svg
@@ -42,19 +47,6 @@ function SpotifyLogoIcon({ size = 24 }: { size?: number }) {
       aria-hidden="true"
     >
       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.312a.748.748 0 0 1-1.029.249c-2.817-1.721-6.362-2.11-10.535-1.157a.748.748 0 0 1-.356-1.452c4.566-1.043 8.483-.594 11.671 1.331a.748.748 0 0 1 .249 1.029zm1.47-3.27a.936.936 0 0 1-1.286.308c-3.225-1.982-8.14-2.556-11.957-1.399a.936.936 0 0 1-.55-1.79c4.358-1.342 9.775-.691 13.485 1.595a.936.936 0 0 1 .308 1.286zm.126-3.403c-3.867-2.297-10.244-2.509-13.932-1.388a1.123 1.123 0 1 1-.651-2.148c4.242-1.286 11.29-1.038 15.748 1.606a1.122 1.122 0 1 1-1.165 1.93z" />
-    </svg>
-  );
-}
-
-function PlaylistIcon({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
     </svg>
   );
 }
@@ -76,6 +68,17 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
   // ── Preview state ────────────────────────────────────────────────────────
   const [previewTracks, setPreviewTracks] = useState<PreviewTrack[]>([]);
   const [playlistName, setPlaylistName] = useState("");
+  /*
+   * The source's own playlist artwork, kept separately from the track covers.
+   *
+   * Conflating the two is what made every imported song show the playlist's
+   * tile: the resolvers used to hand the playlist cover to each track as a
+   * fallback, and the batch route wrote it into `Track.coverUrl`. Now the
+   * playlist cover travels as itself and the batch route uses it for the
+   * playlist only — falling back to a collage of real track covers when the
+   * source didn't have one.
+   */
+  const [sourceCoverUrl, setSourceCoverUrl] = useState<string>("");
   const [removedTrack, setRemovedTrack] = useState<{ track: PreviewTrack; index: number } | null>(null);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -91,6 +94,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       const t = setTimeout(() => {
         setStep("pick");
         setPreviewTracks([]);
+        setSourceCoverUrl("");
         setRemovedTrack(null);
         setName("");
         setDescription("");
@@ -202,6 +206,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
    */
   function goToPreview(data: {
     name?: string;
+    coverUrl?: string;
     tracks: { title: string; artist: string; duration?: number; coverUrl?: string }[];
   }) {
     const tracksWithIds: PreviewTrack[] = data.tracks.map((t) => ({
@@ -215,6 +220,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
     }));
     setPreviewTracks(tracksWithIds);
     setPlaylistName(data.name || "Imported Playlist");
+    setSourceCoverUrl(data.coverUrl ?? "");
     setStep("preview");
   }
 
@@ -261,7 +267,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       const batchRes = await fetch(`/api/playlists/${playlist.id}/tracks/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tracks: previewTracks }),
+        body: JSON.stringify({ tracks: previewTracks, coverUrl: sourceCoverUrl || undefined }),
       });
       if (!batchRes.ok) throw new Error("Failed to save tracks");
 

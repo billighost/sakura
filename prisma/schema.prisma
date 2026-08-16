@@ -35,7 +35,12 @@ model User {
 model UserSettings {
   id                   String   @id @default(uuid())
   userId               String   @unique @db.Uuid
-  theme                String   @default("dark")
+  // "system" | "light" | "dark". Defaults to "system" — *not* "dark", because a
+  // row created as a side effect of saving some unrelated setting must not look
+  // like the user chose a palette. It used to default to "dark", which made
+  // opening the settings page repaint the whole app dark for anyone who had
+  // never picked a theme. See lib/theme.ts's getStoredTheme().
+  theme                String   @default("system")
   audioQuality         String   @default("high")
   downloadQuality      String   @default("high")
   crossfadeSeconds     Int      @default(0)

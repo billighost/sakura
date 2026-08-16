@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DownloadedIcon, OfflineIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
 /**
@@ -20,29 +21,37 @@ export default function OfflinePage() {
     <div className={styles.wrap}>
       <div className={styles.card}>
         <div className={styles.glyph} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3l18 18" />
-            <path d="M6.8 11.4a9 9 0 0 1 3-1.9" />
-            <path d="M3.4 8.2A14 14 0 0 1 8 5.3" />
-            <path d="M14.4 9.8a9 9 0 0 1 2.8 1.6" />
-            <path d="M13 5.2a14 14 0 0 1 7.6 3" />
-            <path d="M9.8 14.6a4.4 4.4 0 0 1 4.6.6" />
-            <path d="M12 19.4h.01" />
-          </svg>
+          <OfflineIcon size={34} />
         </div>
 
         <h1 className={styles.title}>No connection</h1>
         <p className={styles.body}>
-          This page hasn&apos;t been saved to your device yet. Everything
-          you&apos;ve downloaded still plays — no connection needed.
+          This page isn&apos;t saved to your device, so it needs the internet.
         </p>
 
+        {/*
+          What still works, said plainly. This page can't count the downloads —
+          it's prerendered at install time and touches no data by design — but it
+          can name what the app is still good for, which is the whole reason
+          somebody bothered downloading anything.
+        */}
+        <ul className={styles.works}>
+          <li>
+            <DownloadedIcon size={15} />
+            Songs you saved for offline play as normal
+          </li>
+          <li>
+            <DownloadedIcon size={15} />
+            Your playlists and liked songs are on the device
+          </li>
+        </ul>
+
         <div className={styles.actions}>
-          <Link className={styles.primary} href="/library/downloaded">
-            Play downloads
+          <Link className={`${styles.primary} pressable`} href="/library/downloaded">
+            Play my downloads
           </Link>
-          <Link className={styles.secondary} href="/home">
-            Try home
+          <Link className={`${styles.secondary} pressable`} href="/home">
+            Try again
           </Link>
         </div>
       </div>

@@ -20,13 +20,13 @@ export const metadata: Metadata = {
  */
 export default function StaticLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ height: "100dvh", overflowY: "auto", background: "var(--sakura-bg)" }}>
+    <div style={{ height: "100dvh", overflowY: "auto", background: "var(--bg)" }}>
       <header style={{
         display: "flex",
         alignItems: "center",
         height: "clamp(2.75rem, 8vh, 3.5rem)",
         padding: "0 clamp(0.5rem, 2vw, 1rem)",
-        background: "var(--sakura-bg)",
+        background: "var(--bg)",
         position: "sticky",
         top: 0,
         zIndex: 40,
@@ -39,7 +39,7 @@ export default function StaticLayout({ children }: { children: React.ReactNode }
             gap: "0.375rem",
             padding: "0.375rem 0.75rem",
             borderRadius: "9999px",
-            color: "var(--sakura-text-secondary)",
+            color: "var(--text-2)",
             textDecoration: "none",
             fontSize: "0.8125rem",
             fontWeight: 500,

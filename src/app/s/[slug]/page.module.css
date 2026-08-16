@@ -1,102 +1,248 @@
+/* Public share landing page.
+ *
+ * Migrated off the `--sakura-*` aliases, and off the inline canvas styles that
+ * used to carry the artwork's size, radius and shadow.
+ *
+ * Composed as one column with the shared thing at the top and the pitch beneath
+ * it, rather than as a card floating in the middle of the viewport. The reason is
+ * the audience: this page is usually somebody's first sight of the product,
+ * arriving from a message, and a centred panel with a single button reads as a
+ * dead end. A column reads as a page you can scroll — so the reason to sign up
+ * has somewhere to live.
+ */
+
 .page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100dvh;
-  padding: var(--space-5) var(--space-4);
-  background: var(--sakura-bg);
-  color: var(--sakura-text);
+  padding: max(var(--space-5), env(safe-area-inset-top)) var(--gutter)
+    max(var(--space-6), env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow-y: auto;
 }
 
-.card {
+.inner {
   width: 100%;
-  max-width: 22rem;
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
+/* ── Brand ────────────────────────────────────────────────────────────────
+ *
+ * Small, at the top, in the display face. It's a signature rather than a
+ * headline: the shared song is the headline, and putting the product name at
+ * hero scale over somebody else's music would be the wrong emphasis. */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 700;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+}
+
+.mark {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+/* ── The shared thing ─────────────────────────────────────────────────────── */
+
+.shared {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
   text-align: center;
 }
 
-.art {
+.canvas {
   width: 100%;
-  display: flex;
-  justify-content: center;
+  max-width: 20rem;
+  aspect-ratio: 1;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-4);
 }
 
 .error {
   width: 100%;
-  max-width: 20rem;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sakura-danger);
-  background: var(--sakura-surface);
-  border-radius: 16px;
-  font-size: 0.875rem;
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface-1);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
 }
 
 .info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
+  margin-top: var(--space-5);
 }
 
+/* The quoted line. Display face at size — on a lyric share this is the thing
+ * that was actually sent, so it leads. */
 .lyric {
-  font-family: var(--sakura-font-display);
-  font-size: 1.125rem;
+  margin: 0 0 var(--space-4);
+  max-width: 24ch;
+  margin-inline: auto;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
   font-style: italic;
-  color: var(--sakura-accent);
-  line-height: 1.45;
-  margin-bottom: 0.25rem;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
 }
 
 .title {
-  font-family: var(--sakura-font-display);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .artist {
-  font-size: 1rem;
-  color: var(--sakura-text-secondary);
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  color: var(--text-2);
 }
 
 .sharedBy {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  opacity: 0.7;
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
 }
+
+/* ── Pitch ────────────────────────────────────────────────────────────────── */
+
+.pitch {
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+}
+
+.pitchTitle {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.pitchLede {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+}
+
+.features svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────────── */
 
 .actions {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  width: 100%;
-  margin-top: var(--space-2);
+  margin-top: var(--space-6);
 }
 
 .primary,
-.secondary {
-  flex: 1;
-  min-height: var(--tap-min);
-  border-radius: 999px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
+.secondary,
+.quiet,
+.cardAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 3rem;
+  padding: 0 var(--space-5);
   border: none;
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .primary {
-  background: var(--sakura-accent-gradient);
-  color: #fff;
-  box-shadow: 0 6px 20px -6px var(--sakura-accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .secondary {
+  border: 1px solid var(--line-strong);
   background: transparent;
-  color: var(--sakura-text);
-  border: 1px solid var(--sakura-border);
+  color: var(--text);
+}
+
+/* "I already have one" — the minority path, so it carries no fill and no border.
+ * A second outlined pill directly under the primary reads as an equal choice,
+ * which for sign-up versus sign-in on a first visit it isn't. */
+.quiet {
+  background: transparent;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+/* Saving the card needs no account, so it sits apart from the two doors — under
+ * them, quieter, and it must not compete with the invitation. */
+.cardAction {
+  width: 100%;
+  margin-top: var(--space-5);
+  min-height: var(--tap-min);
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover {
+    background: var(--accent-press);
+  }
+
+  .secondary:hover {
+    background: var(--surface-2);
+  }
+
+  .quiet:hover,
+  .cardAction:hover {
+    color: var(--text);
+  }
 }

@@ -1,331 +1,261 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import styles from "./page.module.css";
+import {
+  AuthError,
+  AuthField,
+  AuthFooter,
+  AuthShell,
+  AuthSubmit,
+} from "../AuthShell";
+import styles from "../AuthShell.module.css";
 
-function getPasswordStrength(pw: string): { score: number; label: string } {
-  let score = 0;
-  if (pw.length >= 6) score++;
-  if (pw.length >= 10) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[a-z]/.test(pw)) score++;
-  if (/\d/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
+/**
+ * Create an account.
+ *
+ * The validation is the substantive change. Before, every rule lived only on the
+ * server: you filled in four fields, pressed the button, waited for a round trip
+ * and got "Username must be 3-30 characters" in a banner at the top — with the
+ * offending field not marked, and the rule stated only after breaking it.
+ * Now each field says its own rule as a hint, checks on blur, and the server
+ * remains the authority for the two things only it can know (taken username,
+ * taken email).
+ *
+ * Rules are mirrored from /api/auth/register deliberately, and the comment there
+ * matters: if they drift, the client will accept something the server rejects.
+ */
 
-  if (score <= 2) return { score, label: "Weak" };
-  if (score <= 4) return { score, label: "Medium" };
-  return { score, label: "Strong" };
-}
+/** Mirrors /api/auth/register. */
+const USERNAME_MIN = 3;
+const USERNAME_MAX = 30;
+const PASSWORD_MIN = 6;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const STRENGTH_SEGMENTS = 4;
 
+/**
+ * A rough strength read, and honest about being rough — four buckets and a word,
+ * not a percentage. Length dominates because it genuinely dominates; character
+ * classes are worth less than people expect but they're what most users reach
+ * for, so they still move the needle.
+ */
+function strengthOf(pw: string): { filled: number; label: string; className: string } {
+  if (!pw) return { filled: 0, label: "", className: "" };
+
+  let score = 0;
+  if (pw.length >= PASSWORD_MIN) score++;
+  if (pw.length >= 10) score++;
+  if (pw.length >= 14) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const filled = Math.max(1, Math.round((score / 6) * STRENGTH_SEGMENTS));
+  if (score <= 2) return { filled, label: "Weak", className: styles.segWeak };
+  if (score <= 4) return { filled, label: "Getting there", className: styles.segFair };
+  return { filled, label: "Strong", className: styles.segStrong };
+}
+
 export default function RegisterPage() {
   const router = useRouter();
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [error, setError] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const strength = useMemo(() => getPasswordStrength(password), [password]);
-  const filledSegments = useMemo(
-    () => (password.length > 0 ? Math.max(1, Math.round((strength.score / 6) * STRENGTH_SEGMENTS)) : 0),
-    [password, strength.score]
-  );
-  const strengthClass =
-    strength.label === "Weak" ? styles.strengthWeak : strength.label === "Medium" ? styles.strengthMedium : styles.strengthStrong;
+  /*
+   * Which fields have been left. A rule shown while someone is still typing
+   * their third character tells them they're wrong before they've had a chance
+   * to be right, so messages wait for blur — and clear again as soon as the
+   * field becomes valid.
+   */
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
-  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const usernameProblem =
+    username.length > 0 && username.length < USERNAME_MIN
+      ? `${USERNAME_MIN} characters or more`
+      : null;
+  const emailProblem = email.length > 0 && !EMAIL_RE.test(email) ? "Doesn't look right" : null;
+  const passwordProblem =
+    password.length > 0 && password.length < PASSWORD_MIN
+      ? `${PASSWORD_MIN} characters or more`
+      : null;
+  const confirmProblem = confirm.length > 0 && confirm !== password ? "Doesn't match" : null;
+
+  const strength = useMemo(() => strengthOf(password), [password]);
+
+  const valid =
+    username.length >= USERNAME_MIN &&
+    username.length <= USERNAME_MAX &&
+    EMAIL_RE.test(email) &&
+    password.length >= PASSWORD_MIN &&
+    confirm === password &&
+    agreed;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    // Mark everything touched so any outstanding rule becomes visible, rather
+    // than the form simply refusing to submit with nothing explaining why.
+    setTouched({ username: true, email: true, password: true, confirm: true });
+    if (!valid) return;
 
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
-      return;
-    }
-
-    if (!agreedToTerms) {
-      setError("You must agree to the terms");
-      return;
-    }
-
+    setError(null);
     setLoading(true);
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || "Registration failed");
+        // 409 is the only server answer the client can't predict, and it's the
+        // most common one, so it's phrased as a next step rather than a verdict.
+        setError(
+          res.status === 409
+            ? `${data?.error ?? "That's already taken"}. Try another, or sign in if it's yours.`
+            : (data?.error ?? "We couldn't create your account. Try again in a moment.")
+        );
         return;
       }
 
       const signInRes = await signIn("credentials", {
-        identifier: username,
+        identifier: username.trim(),
         password,
         redirect: false,
       });
 
+      // The account exists either way — if the automatic sign-in fails, the
+      // right destination is the sign-in page, not an error.
       if (signInRes?.error) {
         router.push("/login");
-      } else {
-        router.push("/home");
-        router.refresh();
+        return;
       }
+      router.push("/onboarding");
+      router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("We couldn't reach Sakura. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className={styles.container}>
-      <div className={`${styles.bloom} ${styles.bloomOne}`} aria-hidden="true" />
-      <div className={`${styles.bloom} ${styles.bloomTwo}`} aria-hidden="true" />
+    <AuthShell eyebrow="Get started" heading="Make an account and start listening.">
+      {error && <AuthError>{error}</AuthError>}
 
-      <div className={styles.card}>
-        <div className={styles.iconWrap}>
-          <div className={styles.iconRing}>
-            <Image
-              src="/icons/icon-transparent-128.png"
-              alt="Sakura"
-              width={56}
-              height={56}
-              priority
-              className={styles.icon}
-            />
-          </div>
-        </div>
-        <span className={styles.eyebrow}>Get started</span>
-        <h1 className={styles.wordmark}>Sakura</h1>
-        <p className={styles.subtitle}>Create your account</p>
+      <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <AuthField
+          id="username"
+          label="Username"
+          value={username}
+          onChange={setUsername}
+          onBlur={() => touch("username")}
+          autoComplete="username"
+          autoFocus
+          placeholder="What should we call you?"
+          minLength={USERNAME_MIN}
+          maxLength={USERNAME_MAX}
+          required
+          problem={touched.username ? usernameProblem : null}
+        />
 
-        <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          {error && (
-            <div className={styles.errorBox} role="alert">
-              <svg className={styles.errorIcon} viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10 14a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-              </svg>
-              <span>{error}</span>
+        <AuthField
+          id="email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          onBlur={() => touch("email")}
+          autoComplete="email"
+          inputMode="email"
+          placeholder="you@example.com"
+          required
+          problem={touched.email ? emailProblem : null}
+        />
+
+        <AuthField
+          id="password"
+          label="Password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          onBlur={() => touch("password")}
+          autoComplete="new-password"
+          placeholder={`At least ${PASSWORD_MIN} characters`}
+          minLength={PASSWORD_MIN}
+          required
+          problem={touched.password ? passwordProblem : null}
+        >
+          {password.length > 0 && (
+            <div className={styles.strength}>
+              {/* Decorative: the label beside it carries the same information as
+                  text, so announcing the segments too would just be noise. */}
+              <div className={styles.strengthTrack} aria-hidden="true">
+                {Array.from({ length: STRENGTH_SEGMENTS }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`${styles.strengthSeg} ${
+                      i < strength.filled ? strength.className : ""
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className={styles.strengthLabel}>{strength.label}</span>
             </div>
           )}
+        </AuthField>
 
-          <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="username">
-              Username
-            </label>
-            <div className={styles.inputShell}>
-              <span className={styles.inputIcon} aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </span>
-              <input
-                id="username"
-                className={styles.input}
-                type="text"
-                autoComplete="username"
-                autoFocus
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                minLength={3}
-                maxLength={30}
-                required
-              />
-            </div>
-          </div>
+        <AuthField
+          id="confirm"
+          label="Password again"
+          type="password"
+          value={confirm}
+          onChange={setConfirm}
+          onBlur={() => touch("confirm")}
+          autoComplete="new-password"
+          placeholder="Type it once more"
+          required
+          problem={touched.confirm ? confirmProblem : null}
+        />
 
-          <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="email">
-              Email
-            </label>
-            <div className={styles.inputShell}>
-              <span className={styles.inputIcon} aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
-                  <rect x="3" y="5" width="18" height="14" rx="2" />
-                  <path d="M3 7l9 6 9-6" />
-                </svg>
-              </span>
-              <input
-                id="email"
-                className={styles.input}
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+        <label className={styles.terms}>
+          <input
+            type="checkbox"
+            className={styles.checkbox}
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+          />
+          <span className={styles.termsLabel}>
+            I&apos;ve read the{" "}
+            <Link href="/terms" className={styles.termsLink}>
+              terms
+            </Link>{" "}
+            and the{" "}
+            <Link href="/privacy" className={styles.termsLink}>
+              privacy policy
+            </Link>
+            .
+          </span>
+        </label>
 
-          <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="password">
-              Password
-            </label>
-            <div className={styles.inputShell}>
-              <span className={styles.inputIcon} aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
-                  <rect x="3" y="11" width="18" height="10" rx="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                </svg>
-              </span>
-              <input
-                id="password"
-                className={`${styles.input} ${styles.inputWithToggle}`}
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                required
-              />
-              <button
-                type="button"
-                className={styles.toggleBtn}
-                onClick={() => setShowPassword((v) => !v)}
-                tabIndex={-1}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
-                    <path d="M14.12 14.12a3 3 0 11-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {password.length > 0 && (
-              <div className={styles.strengthWrap}>
-                <div className={styles.strengthTrack}>
-                  {Array.from({ length: STRENGTH_SEGMENTS }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`${styles.strengthSeg} ${i < filledSegments ? `${styles.strengthSegFilled} ${strengthClass}` : ""}`}
-                    />
-                  ))}
-                </div>
-                <span className={styles.strengthLabel}>{strength.label}</span>
-              </div>
-            )}
-          </div>
+        <AuthSubmit busy={loading} busyLabel="Creating your account…" disabled={!valid}>
+          Create account
+        </AuthSubmit>
+      </form>
 
-          <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="confirmPassword">
-              Confirm password
-            </label>
-            <div className={styles.inputShell}>
-              <span className={styles.inputIcon} aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
-                  <rect x="3" y="11" width="18" height="10" rx="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                </svg>
-              </span>
-              <input
-                id="confirmPassword"
-                className={`${styles.input} ${styles.inputWithToggle} ${passwordsMismatch ? styles.inputError : ""}`}
-                type={showConfirm ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="Repeat your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={6}
-                aria-invalid={passwordsMismatch}
-                required
-              />
-              <button
-                type="button"
-                className={styles.toggleBtn}
-                onClick={() => setShowConfirm((v) => !v)}
-                tabIndex={-1}
-                aria-label={showConfirm ? "Hide password" : "Show password"}
-              >
-                {showConfirm ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
-                    <path d="M14.12 14.12a3 3 0 11-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {passwordsMismatch && <span className={styles.errorText}>Passwords don&apos;t match</span>}
-          </div>
-
-          <label className={styles.checkboxWrap}>
-            <input
-              type="checkbox"
-              className={styles.checkboxInput}
-              checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-            />
-            <span className={styles.checkboxCustom} />
-            <span className={styles.checkboxLabel}>
-              I agree to the{" "}
-              <Link href="/terms" className={styles.checkboxLink}>
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className={styles.checkboxLink}>
-                Privacy Policy
-              </Link>
-            </span>
-          </label>
-
-          <button
-            className={styles.submitBtn}
-            type="submit"
-            disabled={loading || !username || !email || !password || !confirmPassword || !agreedToTerms}
-          >
-            {loading && (
-              <svg className={styles.spinner} viewBox="0 0 24 24" fill="none" width="18" height="18">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.3" />
-                <path d="M12 2a10 10 0 019.5 6.75" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            )}
-            {loading ? "Creating account…" : "Create account"}
-          </button>
-        </form>
-
-        <p className={styles.footer}>
-          Already have an account?{" "}
-          <Link href="/login" className={styles.footerLink}>
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
+      <AuthFooter prompt="Already have an account?" href="/login" action="Sign in" />
+    </AuthShell>
   );
 }

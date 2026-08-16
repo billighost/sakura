@@ -64,7 +64,11 @@ export default function MixClient({ id }: { id: string }) {
     };
   }, [id, reloadKey]);
 
-  const covers = useMemo(() => (mix?.coverUrl ? [mix.coverUrl] : []), [mix?.coverUrl]);
+  // Read out first: the React Compiler can't preserve a memo whose dependency
+  // is an optional chain, because `mix?.coverUrl` narrows less specifically than
+  // the value the closure actually reads.
+  const coverUrl = mix?.coverUrl;
+  const covers = useMemo(() => (coverUrl ? [coverUrl] : []), [coverUrl]);
 
   return (
     <CollectionDetail

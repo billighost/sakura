@@ -1,29 +1,39 @@
+/* Offline / back-online banner.
+ *
+ * Migrated off the `--sakura-*` aliases and off hardcoded rems onto the token
+ * ladder. This is one of the few places blur is legitimate — the banner is app
+ * chrome that content genuinely scrolls beneath — so `--chrome` and
+ * `--chrome-line` are the right tokens rather than the old glass aliases, which
+ * pointed at the same thing under a name that implied decoration.
+ */
+
 .banner {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  top: calc(env(safe-area-inset-top, 0px) + var(--space-2));
   left: 50%;
-  transform: translateX(-50%);
   z-index: 400;
 
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  max-width: calc(100vw - 1.5rem);
-  padding: 0.4375rem 0.875rem;
-  border-radius: 999px;
+  gap: var(--space-2);
+  max-width: calc(100vw - var(--gutter) * 2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--r-full);
 
-  background: var(--sakura-glass-strong);
+  background: var(--chrome);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--sakura-glass-border);
-  box-shadow: 0 6px 24px -8px var(--sakura-shadow);
+  box-shadow: var(--shadow-2);
 
-  color: var(--sakura-text);
-  font-size: 0.75rem;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
   font-weight: 600;
   white-space: nowrap;
 
-  animation: dropIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  transform: translateX(-50%);
+  animation: bannerDrop var(--d-slow) var(--spring-soft) both;
 }
 
 .label {
@@ -32,22 +42,25 @@
 }
 
 .dot {
+  flex-shrink: 0;
   width: 0.4375rem;
   height: 0.4375rem;
-  border-radius: 50%;
-  flex-shrink: 0;
+  border-radius: var(--r-full);
 }
 
+/* Amber while there's no connection, green once it's back. Two states, two
+ * colours, and only the unresolved one animates — a pulsing green "restored"
+ * would keep drawing the eye to news that's already good. */
 .offline .dot {
-  background: var(--sakura-warning);
-  animation: breathe 1.8s ease-in-out infinite;
+  background: var(--warning);
+  animation: bannerBreathe 1.8s var(--ease-in-out) infinite;
 }
 
 .restored .dot {
-  background: var(--sakura-success);
+  background: var(--success);
 }
 
-@keyframes dropIn {
+@keyframes bannerDrop {
   from {
     opacity: 0;
     transform: translateX(-50%) translateY(-0.75rem);
@@ -58,7 +71,7 @@
   }
 }
 
-@keyframes breathe {
+@keyframes bannerBreathe {
   0%,
   100% {
     opacity: 1;
@@ -70,8 +83,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .banner {
-    animation: none;
+    animation: fadeIn var(--d-base) var(--ease) both;
   }
+
   .offline .dot {
     animation: none;
   }

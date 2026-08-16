@@ -1,0 +1,121 @@
+/*
+ * Tooltip — see the header of Tooltip.tsx for why this exists and why every
+ * visible rule lives inside the pointer-fine query.
+ */
+
+.wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The wrapper must never become the thing you hit — the control inside it is.
+   * Without this, a wrapper wider than its button swallows edge taps. */
+  flex-shrink: 0;
+}
+
+.bubble {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bubble {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    position: absolute;
+    left: 50%;
+    z-index: 3;
+
+    padding: 0.3125rem 0.5rem;
+    border-radius: var(--r-sm);
+    /* Solid, not translucent: this sits over artwork, and a see-through label
+     * over a photograph is exactly as hard to read as no label. */
+    background: var(--media-chrome-solid);
+    border: 1px solid var(--media-chrome-line);
+    box-shadow: var(--shadow-2);
+
+    color: var(--on-media);
+    font-family: var(--font-body);
+    font-size: var(--t-2xs);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: var(--track-snug);
+    white-space: nowrap;
+
+    opacity: 0;
+    pointer-events: none;
+    /* Delayed on entry so sweeping the pointer across the transport row doesn't
+     * flash five labels, immediate on exit so it never lingers over the control
+     * you're about to press. */
+    transition: opacity var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
+  }
+
+  .bubble[data-placement="top"] {
+    bottom: calc(100% + 0.375rem);
+    transform: translate(calc(-50% + var(--offset-x, 0px)), 3px);
+  }
+
+  .bubble[data-placement="bottom"] {
+    top: calc(100% + 0.375rem);
+    transform: translate(calc(-50% + var(--offset-x, 0px)), -3px);
+  }
+
+  /*
+   * `:has` on the wrapper rather than `.wrap:hover`: the wrapper is a shrink-to-
+   * fit span, so hovering it and hovering the control are *almost* the same
+   * region — but not quite, and the mismatch shows up as a label that appears
+   * just before the cursor reaches the button. Keying off the control's own
+   * state makes the tooltip and the button's hover style turn on together.
+   */
+  .wrap:has(> :hover) .bubble,
+  .wrap:has(> :focus-visible) .bubble {
+    opacity: 1;
+    transition-delay: 0.28s;
+  }
+
+  .wrap:has(> :hover) .bubble[data-placement="top"],
+  .wrap:has(> :focus-visible) .bubble[data-placement="top"],
+  .wrap:has(> :hover) .bubble[data-placement="bottom"],
+  .wrap:has(> :focus-visible) .bubble[data-placement="bottom"] {
+    transform: translate(calc(-50% + var(--offset-x, 0px)), 0);
+  }
+
+  /* A press means the user is done reading. */
+  .wrap:has(> :active) .bubble {
+    opacity: 0;
+    transition-delay: 0s;
+  }
+
+  /* Browsers without `:has` fall back to the wrapper's own hover — slightly
+   * eager, but a working tooltip beats none. */
+  @supports not selector(:has(> :hover)) {
+    .wrap:hover .bubble,
+    .wrap:focus-within .bubble {
+      opacity: 1;
+      transition-delay: 0.28s;
+      transform: translate(calc(-50% + var(--offset-x, 0px)), 0);
+    }
+  }
+
+  .key {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    /* Reads as a key cap without a border: a 1px outline at this size renders
+     * as a smudge on a non-integer-DPR display. */
+    background: var(--on-media-fill-strong);
+    color: var(--on-media);
+    padding: 0.125rem 0.25rem;
+    border-radius: 4px;
+    line-height: 1;
+    min-width: 1rem;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    transition: opacity var(--d-instant) linear;
+    transform: translate(calc(-50% + var(--offset-x, 0px)), 0) !important;
+  }
+}

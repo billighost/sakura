@@ -114,6 +114,21 @@
   --media-tint: 0.26;
   --media-tint-strong: 0.4;
 
+  /*
+   * Base the artwork tint is mixed *into*, and how much of the artwork's colour
+   * goes in. These exist because the lyrics card hardcoded `#16121a` as its mix
+   * base: in light mode that produced a dark panel carrying near-black
+   * `--on-media` text, so the lyric preview was unreadable and the "Show lyrics"
+   * pill — `--on-media` on `#14101b` — was black on black, invisible.
+   *
+   * Light mode needs both a pale base and a *weaker* mix: the same 28% of accent
+   * that reads as a subtle wash over ink reads as a saturated pastel over paper,
+   * and it drags the contrast of dark text down with it.
+   */
+  --media-tint-base: #16121a;
+  --media-tint-mix: 26%;
+  --media-tint-mix-hover: 34%;
+
   color-scheme: dark;
 }
 
@@ -188,6 +203,10 @@
   --media-tint: 0.2;
   --media-tint-strong: 0.3;
 
+  --media-tint-base: #f1e9f3;
+  --media-tint-mix: 15%;
+  --media-tint-mix-hover: 22%;
+
   color-scheme: light;
 }
 
@@ -244,6 +263,9 @@
     --on-media-dim-boost: 1.25;
     --media-tint: 0.2;
     --media-tint-strong: 0.3;
+    --media-tint-base: #f1e9f3;
+    --media-tint-mix: 15%;
+    --media-tint-mix-hover: 22%;
     color-scheme: light;
   }
 }

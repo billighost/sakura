@@ -1,6 +1,6 @@
 import { cachedWithStale, cacheKey, TTL } from "./cache";
 import { fetchJsonResilient } from "./resilience";
-import { searchDeezerTrack } from "./metadata";
+import { findTrackCover, searchDeezerTrack } from "./metadata";
 import {
   fetchSpotifyPlaylistWithToken,
   getSpotifyToken,
@@ -251,8 +251,26 @@ async function scrapeSpotifyEmbed(
   const entity = extractEmbedEntity(html);
   if (!entity) throw new Error("embed payload not recognised");
 
-  const albumCover =
+  const entityCover =
     entity.coverArt?.sources?.[0]?.url || entity.images?.[0]?.url || undefined;
+
+  /*
+   * Whether the entity's own cover may stand in for a track that didn't carry
+   * one — and this is the distinction the importer used to get wrong.
+   *
+   * For an album or a single track the entity cover *is* the track's cover, so
+   * inheriting it is correct. For a **playlist** it's the playlist's tile, and
+   * the embed's `trackList` entries are name/artist/duration only — no per-track
+   * art — so inheriting it stamped one image onto every song in the import.
+   * Every track in a 40-song playlist ended up showing the playlist's artwork,
+   * in the queue, the mini player and everywhere else that reads
+   * `Track.coverUrl`.
+   *
+   * Left undefined instead, so `enrichFromLibrary` below resolves each track's
+   * real album art from Deezer (then iTunes) — which is what "get it from Deezer
+   * instead" means in practice.
+   */
+  const trackCoverFallback = kind === "playlist" ? undefined : entityCover;
 
   const list = Array.isArray(entity.trackList) ? entity.trackList : [];
   const tracks: ResolvedTrack[] = [];
@@ -274,7 +292,7 @@ async function scrapeSpotifyEmbed(
       title,
       artist,
       duration: durationMs > 0 ? Math.round(durationMs / 1000) : 0,
-      coverUrl: pickTrackCover(track) || albumCover,
+      coverUrl: pickTrackCover(track) || trackCoverFallback,
       messageId: 0,
     });
   }
@@ -288,13 +306,13 @@ async function scrapeSpotifyEmbed(
     if (kind === "track" && name) {
       return {
         name,
-        coverUrl: albumCover,
+        coverUrl: entityCover,
         tracks: [
           {
             title: name,
             artist: String(entity.subtitle || "Unknown Artist").trim(),
             duration: entity.duration ? Math.round(entity.duration / 1000) : 0,
-            coverUrl: albumCover,
+            coverUrl: entityCover,
             messageId: 0,
           },
         ],
@@ -303,7 +321,7 @@ async function scrapeSpotifyEmbed(
     throw new Error("no tracks in embed payload");
   }
 
-  return { name: name || "Imported Playlist", coverUrl: albumCover, tracks };
+  return { name: name || "Imported Playlist", coverUrl: entityCover, tracks };
 }
 
 function pickTrackCover(track: Record<string, unknown>): string | undefined {
@@ -546,7 +564,18 @@ async function resolveDeezer(
             title: t.title,
             artist: t.artist?.name || "Unknown Artist",
             duration: t.duration ?? 0,
-            coverUrl: t.album?.cover_big || t.album?.cover_medium || cover,
+            /*
+             * A playlist's own picture is never a track's cover — see the note
+             * in `scrapeSpotifyEmbed`. Deezer usually does give per-track
+             * `album.cover_*` here, but when it doesn't, the enrichment pass
+             * finds the real album art rather than stamping the playlist tile
+             * onto every row. For an album, `cover` *is* every track's cover,
+             * so it stays as the fallback there.
+             */
+            coverUrl:
+              t.album?.cover_big ||
+              t.album?.cover_medium ||
+              (kind === "playlist" ? undefined : cover),
             messageId: 0,
           })),
         };
@@ -579,25 +608,35 @@ async function resolveDeezer(
 /**
  * Fill the gaps with our own catalogue.
  *
- * Whatever engine won, some fields are usually missing — the embed payload often
- * has no per-track duration, and a scraped playlist can come back with no
+ * Whatever engine won, some fields are usually missing — the embed payload has
+ * no per-track duration, and (since a playlist's tracks no longer inherit the
+ * playlist's tile, see `scrapeSpotifyEmbed`) a scraped playlist arrives with no
  * artwork at all. `searchDeezerTrack` is already the app's identity lookup
  * (cached, resilient, stale-tolerant), so the same call that powers playback
- * metadata fills these in.
+ * metadata fills these in, and `findTrackCover` adds iTunes behind it for the
+ * tracks Deezer can't identify or has no art for.
  *
- * Bounded to the first 40 tracks and run in small batches: a 300-track playlist
- * would otherwise fire 300 provider calls to decorate a preview list the user is
- * about to scroll past. Everything beyond the bound keeps what the engine gave
- * it, and playback enrichment fills the rest in later anyway.
+ * ── Two different bounds, because the two fields are worth different amounts ──
+ *
+ * `DURATION_LIMIT` covers what the user is about to look at: durations only
+ * matter in the preview list, and playback enrichment fills the rest in later
+ * anyway. Covers are different — they get *written to the database* by the batch
+ * import and then show up in the queue, the mini player and every track row from
+ * then on, so they're worth resolving further down the list. Past
+ * `COVER_LIMIT` the batch route picks up the remainder server-side.
  */
-const ENRICH_LIMIT = 40;
+const DURATION_LIMIT = 40;
+const COVER_LIMIT = 120;
 const ENRICH_BATCH = 6;
 
 async function enrichFromLibrary(tracks: ResolvedTrack[]): Promise<ResolvedTrack[]> {
   const needy = tracks
-    .slice(0, ENRICH_LIMIT)
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => !track.duration || !track.coverUrl);
+    .filter(
+      ({ track, index }) =>
+        (!track.duration && index < DURATION_LIMIT) ||
+        (!track.coverUrl && index < COVER_LIMIT)
+    );
 
   for (let i = 0; i < needy.length; i += ENRICH_BATCH) {
     const batch = needy.slice(i, i + ENRICH_BATCH);
@@ -605,12 +644,20 @@ async function enrichFromLibrary(tracks: ResolvedTrack[]): Promise<ResolvedTrack
       batch.map(async ({ track, index }) => {
         try {
           const match = await searchDeezerTrack(track.title, track.artist);
-          if (!match) return;
+          const cover =
+            track.coverUrl ||
+            match?.album?.cover_big ||
+            match?.album?.cover_medium ||
+            // Deezer had no match, or matched a release with no art. iTunes is
+            // the second opinion, and its artwork is the higher resolution of
+            // the two.
+            (await findTrackCover(track.title, track.artist)) ||
+            undefined;
+
           tracks[index] = {
             ...track,
-            duration: track.duration || match.duration || 0,
-            coverUrl:
-              track.coverUrl || match.album?.cover_big || match.album?.cover_medium || undefined,
+            duration: track.duration || match?.duration || 0,
+            coverUrl: cover,
           };
         } catch {
           // Enrichment is a nicety; the import works without it.

@@ -210,6 +210,34 @@ export function CheckIcon(p: IconProps) {
   );
 }
 
+/**
+ * Password visibility. Two glyphs rather than one rotated or crossed variant,
+ * because the lid is what actually differs: open is an almond with an iris,
+ * closed is a lowered lid with lashes. A slash through an open eye is the
+ * conventional drawing and it reads as "eye is forbidden" rather than "the
+ * password is hidden".
+ */
+export function EyeIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path data-part="lid" d="M2.4 12S6.3 5.9 12 5.9 21.6 12 21.6 12 17.7 18.1 12 18.1 2.4 12 2.4 12Z" />
+      <circle data-part="iris" cx="12" cy="12" r="2.7" />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      {/* A closed lid: the same curve as the open eye's lower edge, alone. */}
+      <path data-part="lid" d="M2.9 10.4c2.4 2.9 5.4 4.4 9.1 4.4s6.7-1.5 9.1-4.4" />
+      <path d="M5.2 13.6 3.9 15.7" />
+      <path d="M12 14.8v2.5" />
+      <path d="M18.8 13.6l1.3 2.1" />
+    </Svg>
+  );
+}
+
 export function CheckCircleIcon({ filled, ...p }: IconProps) {
   return (
     <Svg {...p} fill={filled ? "currentColor" : "none"}>

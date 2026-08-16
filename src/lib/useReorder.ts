@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { haptic } from "./haptics";
 import { prefersReducedMotion } from "./motion";
 
@@ -34,6 +34,13 @@ import { prefersReducedMotion } from "./motion";
  */
 
 export interface UseReorderOptions {
+  /**
+   * The element wrapping the rows. An input rather than something this hook
+   * hands back: a returned object that contains a ref is ref-tainted as a whole,
+   * so every property read on it during render — `itemProps(i)` inside a
+   * `.map`, for instance — reads as accessing a ref mid-render.
+   */
+  containerRef: React.RefObject<HTMLElement | null>;
   /** Number of items. Changing it mid-drag cancels the drag. */
   count: number;
   /** Committed move. Not called when the row lands where it started. */
@@ -64,12 +71,12 @@ const EDGE_PX = 72;
 const EDGE_SPEED = 12;
 
 export function useReorder({
+  containerRef,
   count,
   onReorder,
   enabled = true,
   scrollerRef,
 }: UseReorderOptions) {
-  const containerRef = useRef<HTMLElement | null>(null);
   const [state, setState] = useState<ReorderState>({ dragging: null, target: null });
 
   /*
@@ -104,7 +111,24 @@ export function useReorder({
     const el = containerRef.current;
     if (!el) return [];
     return Array.from(el.querySelectorAll<HTMLElement>("[data-reorder-item]"));
-  }, []);
+  }, [containerRef]);
+
+  /**
+   * Which row a grip belongs to, read off the DOM at gesture time.
+   *
+   * The alternative — a `handleProps(index)` factory called once per row during
+   * render — closes over refs inside functions the React Compiler sees being
+   * created in the render pass, which it (correctly) refuses to optimise. One
+   * delegated handler set plus a data attribute avoids that entirely, and it
+   * also means the returned props object is stable rather than a fresh closure
+   * per row per render.
+   */
+  const indexOf = useCallback((grip: HTMLElement): number | null => {
+    const item = grip.closest<HTMLElement>("[data-reorder-item]");
+    if (!item) return null;
+    const i = rows().indexOf(item);
+    return i === -1 ? null : i;
+  }, [rows]);
 
   /** Paint the drag directly. Transform and opacity only — stays on the compositor. */
   const paint = useCallback(
@@ -198,36 +222,50 @@ export function useReorder({
    * because a finger held still near the edge produces no move events — and
    * holding still at the edge is exactly the gesture that means "keep going".
    */
-  const tickScroll = useCallback(() => {
-    const g = gesture.current;
-    const scroller = scrollerRef?.current;
-    if (!g || !scroller) return;
+  const startEdgeScroll = useCallback(() => {
+    // A hoisted function declaration, so the loop can schedule itself by name.
+    // A `const` arrow at hook scope cannot reference its own binding.
+    function step() {
+      const g = gesture.current;
+      const scroller = scrollerRef?.current;
+      if (!g || !scroller) return;
 
-    const rect = scroller.getBoundingClientRect();
-    const fromTop = g.lastY - rect.top;
-    const fromBottom = rect.bottom - g.lastY;
+      const rect = scroller.getBoundingClientRect();
+      const fromTop = g.lastY - rect.top;
+      const fromBottom = rect.bottom - g.lastY;
 
-    let dy = 0;
-    if (fromTop < EDGE_PX) dy = -EDGE_SPEED * (1 - Math.max(0, fromTop) / EDGE_PX);
-    else if (fromBottom < EDGE_PX) dy = EDGE_SPEED * (1 - Math.max(0, fromBottom) / EDGE_PX);
+      let dy = 0;
+      if (fromTop < EDGE_PX) dy = -EDGE_SPEED * (1 - Math.max(0, fromTop) / EDGE_PX);
+      else if (fromBottom < EDGE_PX) dy = EDGE_SPEED * (1 - Math.max(0, fromBottom) / EDGE_PX);
 
-    if (dy !== 0) {
-      const before = scroller.scrollTop;
-      scroller.scrollTop += dy;
-      // Re-derive the offset so the row keeps tracking the finger while the
-      // list moves underneath it.
-      if (scroller.scrollTop !== before) updateFromPointer(g.lastY);
+      if (dy !== 0) {
+        const before = scroller.scrollTop;
+        // `scrollBy` rather than `scrollTop += dy`: assigning a property on a
+        // value read out of a hook argument's ref reads as mutating the
+        // argument, which the compiler rejects. A method call says the same
+        // thing and is clearer about intent.
+        scroller.scrollBy(0, dy);
+        // Re-derive the offset so the row keeps tracking the finger while the
+        // list moves underneath it.
+        if (scroller.scrollTop !== before) updateFromPointer(g.lastY);
+      }
+
+      g.raf = requestAnimationFrame(step);
     }
 
-    g.raf = requestAnimationFrame(tickScroll);
+    const g = gesture.current;
+    if (g) g.raf = requestAnimationFrame(step);
   }, [scrollerRef, updateFromPointer]);
 
   const onPointerDown = useCallback(
-    (index: number) => (e: React.PointerEvent) => {
+    (e: React.PointerEvent) => {
       if (!enabled || gesture.current) return;
       // Primary button / single touch only. A second finger landing mid-drag
       // would otherwise restart the gesture from the wrong origin.
       if (e.button !== 0 && e.pointerType === "mouse") return;
+
+      const index = indexOf(e.currentTarget as HTMLElement);
+      if (index === null) return;
 
       const items = rows();
       if (items.length !== count) return;
@@ -257,7 +295,7 @@ export function useReorder({
       // it does immediately, since the row moves out from under the finger.
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [enabled, rows, count, scrollerRef]
+    [enabled, rows, count, scrollerRef, indexOf, containerRef]
   );
 
   const onPointerMove = useCallback(
@@ -272,7 +310,7 @@ export function useReorder({
         g.started = true;
         haptic("impact");
         setState({ dragging: g.from, target: g.from });
-        if (scrollerRef?.current) g.raf = requestAnimationFrame(tickScroll);
+        if (scrollerRef?.current) startEdgeScroll();
       }
 
       // The grip has pointer capture, so the browser won't scroll the list from
@@ -281,7 +319,7 @@ export function useReorder({
       e.preventDefault();
       updateFromPointer(e.clientY);
     },
-    [updateFromPointer, tickScroll, scrollerRef]
+    [updateFromPointer, startEdgeScroll, scrollerRef]
   );
 
   const onPointerUp = useCallback(
@@ -308,10 +346,13 @@ export function useReorder({
    * arrow keys on it move the row one place.
    */
   const onKeyDown = useCallback(
-    (index: number) => (e: React.KeyboardEvent) => {
+    (e: React.KeyboardEvent) => {
       if (!enabled) return;
       const delta = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
       if (!delta) return;
+
+      const index = indexOf(e.currentTarget as HTMLElement);
+      if (index === null) return;
 
       const to = index + delta;
       if (to < 0 || to >= count) return;
@@ -320,7 +361,7 @@ export function useReorder({
       haptic("selection");
       onReorderRef.current(index, to);
     },
-    [enabled, count]
+    [enabled, count, indexOf]
   );
 
   // A drag left running across an unmount would keep its rAF loop alive.
@@ -330,9 +371,22 @@ export function useReorder({
 
   const reduced = prefersReducedMotion();
 
+  /* One handler set for every grip, delegated by `data-reorder-item`. Stable
+   * across renders, so spreading it per row allocates nothing. */
+  const gripProps = useMemo(
+    () => ({
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel,
+      onKeyDown,
+      // Claims the vertical gesture from the scroller for this element only.
+      style: { touchAction: "none" } as React.CSSProperties,
+    }),
+    [onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown]
+  );
+
   return {
-    /** Put on the element that wraps the rows. */
-    containerRef,
     /** Spread on each row. Marks it measurable and flags the dragged one. */
     itemProps: (index: number) => ({
       "data-reorder-item": "",
@@ -348,16 +402,8 @@ export function useReorder({
         ? undefined
         : ({ transition: "transform var(--d-fast) var(--ease)" } as React.CSSProperties),
     }),
-    /** Spread on the grip. */
-    handleProps: (index: number) => ({
-      onPointerDown: onPointerDown(index),
-      onPointerMove,
-      onPointerUp,
-      onPointerCancel,
-      onKeyDown: onKeyDown(index),
-      // Claims the vertical gesture from the scroller for this element only.
-      style: { touchAction: "none" } as React.CSSProperties,
-    }),
+    /** Spread on the grip inside each row. */
+    gripProps,
     /** For the caller's own styling — a lifted shadow, a dimmed list. */
     dragging: state.dragging,
     target: state.target,

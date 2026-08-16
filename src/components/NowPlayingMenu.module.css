@@ -1,0 +1,142 @@
+/*
+ * The now-playing overflow sheet. This is an app surface, not a media surface —
+ * Sheet paints its own background above the player — so it uses the ordinary
+ * `--surface-*` / `--text-*` tokens rather than the `--on-media-*` set the
+ * player itself lives on.
+ */
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.cover {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-3);
+}
+
+.cover[data-placeholder] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The song's name, so the display face — the house rule is that names get
+ * Fraunces and instructions get Inter. The rows below are instructions. */
+.identityTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--track-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identityArtist {
+  font-size: var(--t-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-size: var(--t-base);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
+}
+
+.row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row svg {
+  flex-shrink: 0;
+  color: var(--text-2);
+  transition: color var(--d-fast) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row:hover {
+    background: var(--surface-2);
+  }
+
+  .row:hover svg {
+    color: var(--accent);
+  }
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/*
+ * Disabled here only ever means "already done" or "in flight" — a row that can
+ * never apply isn't rendered at all (see the component). So it stays readable
+ * rather than dropping to a ghost: "Downloaded" is information, not a dead end.
+ */
+.row:disabled {
+  cursor: default;
+  color: var(--text-2);
+}
+
+.row:disabled svg {
+  color: var(--success);
+}
+
+.spin {
+  animation: nowPlayingSpin 0.9s linear infinite;
+}
+
+.row:disabled .spin {
+  color: var(--text-3);
+}
+
+@keyframes nowPlayingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 2.4s;
+  }
+}

@@ -109,6 +109,7 @@ export function CollectionDetail({
   const { play, downloadStates } = usePlayer();
   const { downloadAll } = useDownloadAll();
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const tint = useArtworkTint(coverUrls[0]);
 
@@ -211,6 +212,7 @@ export function CollectionDetail({
   );
 
   const reorder = useReorder({
+    containerRef: listRef,
     count: list.length,
     onReorder: handleMove,
     enabled: Boolean(onReorder),
@@ -299,10 +301,7 @@ export function CollectionDetail({
           action={empty?.action}
         />
       ) : (
-        <div
-          className={styles.tracks}
-          ref={reorder.containerRef as React.RefObject<HTMLDivElement>}
-        >
+        <div className={styles.tracks} ref={listRef}>
           {list.map((track, i) => (
             <div
               key={track.id}
@@ -321,7 +320,7 @@ export function CollectionDetail({
                       type="button"
                       className={styles.grip}
                       aria-label={`Move ${track.title}. Use the up and down arrow keys.`}
-                      {...reorder.handleProps(i)}
+                      {...reorder.gripProps}
                     >
                       <DragHandleIcon size={17} />
                     </button>

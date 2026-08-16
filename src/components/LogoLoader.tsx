@@ -64,25 +64,33 @@ export function LogoLoader({
   const finishedRef = useRef(false);
   const finishRef = useRef<() => void>(() => {});
 
-  // Synchronously hide before first paint if we've shown the splash before.
-  // useLayoutEffect is client-only and runs before the browser paints,
-  // so mounted flips to false before anything is drawn — zero flicker.
+  /*
+   * Hide before the first paint if the splash has already been shown this
+   * session.
+   *
+   * `mounted` starts true on both server and client so hydration matches — the
+   * server has no sessionStorage to consult — and this corrects it. The setState
+   * is synchronous inside a layout effect on purpose, which is exactly what the
+   * cascading-render rule warns about: here that one extra render before paint is
+   * the entire point, because the alternative is the splash flashing on every
+   * in-session navigation. Deferring it to a callback would guarantee the flash
+   * this exists to prevent.
+   */
+  const alreadyShown = useRef(false);
+
   useLayoutEffect(() => {
-    if (sessionStorage.getItem(SPLASH_SHOWN_KEY) === "1") {
-      setMounted(false);
-      onComplete?.();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (sessionStorage.getItem(SPLASH_SHOWN_KEY) !== "1") return;
+    alreadyShown.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(false);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
-    // Bail instantly on the client if we've already shown the splash in this
-    // session. Set mounted=false before any visual frame so nothing flickers.
-    if (sessionStorage.getItem(SPLASH_SHOWN_KEY) === "1") {
-      setMounted(false);
-      onComplete?.();
-      return;
-    }
+    // The layout effect above has already handled this case, including telling
+    // the caller. This used to repeat the sessionStorage check and the setState,
+    // which is where the second cascading render came from.
+    if (alreadyShown.current) return;
 
     const finish = () => {
       if (finishedRef.current) return;
@@ -125,24 +133,14 @@ export function LogoLoader({
       aria-label="Loading Sakura"
       onClick={skippable ? () => finishRef.current() : undefined}
     >
-      <div className={styles.glowA} aria-hidden="true" />
-      <div className={styles.glowB} aria-hidden="true" />
-
       <div className={styles.logoWrap}>
         <svg viewBox="0 0 200 200" className={styles.svg} aria-hidden="true">
-          <defs>
-            <radialGradient id="petalSheen" cx="35%" cy="20%" r="80%">
-              <stop offset="0%" stopColor="var(--sakura-gradient-end)" stopOpacity="0.55" />
-              <stop offset="100%" stopColor="var(--sakura-accent)" stopOpacity="1" />
-            </radialGradient>
-          </defs>
-
           <g transform="translate(100 100)">
             <circle
               className={styles.ripple}
               r="14"
               fill="none"
-              stroke="var(--sakura-accent)"
+              stroke="var(--accent)"
               strokeWidth="1.5"
             />
 
@@ -163,19 +161,19 @@ export function LogoLoader({
                     <path
                       d="M0,-2 C-18,-6 -22,-24 -14,-40 C-10,-48 -4,-50 0,-46
                          C4,-50 10,-48 14,-40 C22,-24 18,-6 0,-2 Z"
-                      fill="url(#petalSheen)"
+                      fill="var(--accent)"
                     />
                   </g>
                 </g>
               ))}
 
-              <circle className={styles.centerDot} r="10" fill="var(--sakura-accent-2)" />
+              <circle className={styles.centerDot} r="10" fill="var(--accent-press)" />
               {STAMEN_ANGLES.map((angle) => (
                 <circle
                   key={angle}
                   className={styles.stamenDot}
                   r="1.6"
-                  fill="var(--sakura-surface)"
+                  fill="var(--bg)"
                   transform={`rotate(${angle}) translate(0 -5)`}
                 />
               ))}
@@ -188,7 +186,7 @@ export function LogoLoader({
                   key={i}
                   className={styles.sparkle}
                   r="1.6"
-                  fill="var(--sakura-accent)"
+                  fill="var(--accent)"
                   cx={(Math.cos(rad) * radius).toFixed(1)}
                   cy={(Math.sin(rad) * radius).toFixed(1)}
                   style={{ "--sdelay": `${delay}ms` } as React.CSSProperties}

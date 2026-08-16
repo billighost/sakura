@@ -1,3 +1,4 @@
+import { SearchIcon } from "@/components/Icons";
 import styles from "./page.module.css";
 
 export default function Loading() {
@@ -6,10 +7,7 @@ export default function Loading() {
       <div className={styles.topRow}>
         <div className={styles.searchBox} style={{ opacity: 0.6 }}>
           <span className={styles.searchIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
+            <SearchIcon size={18} />
           </span>
         </div>
       </div>

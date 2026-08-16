@@ -2,11 +2,66 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useOffline } from "next/offline";
 import { usePlayer } from "./PlayerContext";
-import { isTrackDownloaded, saveTrackOffline, saveAudioBlob, removeDownloadedTrack, getCachedUserId, getDeviceId } from "@/lib/offline-db";
+import {
+  isTrackDownloaded,
+  removeDownloadedTrack,
+  getCachedUserId,
+  getDeviceId,
+} from "@/lib/offline-db";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import { AddToPlaylistModal } from "./AddToPlaylistModal";
+import {
+  DownloadedIcon,
+  HeartIcon,
+  MoreHorizontalIcon,
+  NowPlayingBars,
+  OfflineIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  QueueIcon,
+  ShareIcon,
+  CloseIcon,
+  TrashIcon,
+} from "./Icons";
+import { haptic } from "@/lib/haptics";
 import styles from "./TrackRow.module.css";
+
+/**
+ * The single most-repeated element in the app.
+ *
+ * ── What it now says that it didn't ───────────────────────────────────────
+ *
+ * The row knew four things about a track and showed one of them. It computed
+ * `offline` and used it only to decide whether a context-menu item appeared —
+ * so whether a song was saved to the device, which is the whole point of this
+ * app, was invisible until you opened a menu. And a track that *isn't* saved is
+ * unplayable with no connection, which the row also didn't mention: with no
+ * signal, tapping it just silently did nothing.
+ *
+ * Four states, each with one mark and no more:
+ *   playing/paused  NowPlayingBars — a live readout that dances and freezes,
+ *                   rather than the hand-rolled three-span `.eq` this replaces.
+ *   saved offline   a small filled arrow beside the artist.
+ *   downloading     a progress ring, using the real percentage. It used to fall
+ *                   back to a hardcoded 30% or 70% when no progress had arrived,
+ *                   which is an invented number presented as a measurement; now
+ *                   an unknown percentage spins instead of lying.
+ *   needs a signal  dimmed, with an offline glyph, when we're offline and this
+ *                   one isn't on the device.
+ *
+ * ── Why the row is no longer role="button" ────────────────────────────────
+ *
+ * It was a `role="button"` `tabIndex={0}` div containing two links and three
+ * buttons. Nested interactive content is invalid, it's why every child needed a
+ * `stopPropagation`, and it made the row a keyboard trap that announced itself as
+ * one control with five inside it. Tapping the row still plays — that's a pointer
+ * affordance and it stays — but the keyboard path is now the title link (go to
+ * the song) and the play button (play it), which is what the row already
+ * contained.
+ */
 
 interface TrackRowProps {
   track: {
@@ -15,7 +70,7 @@ interface TrackRowProps {
     artist: { name: string; id?: string };
     album?: { title: string; coverUrl?: string; id?: string } | null;
     coverUrl?: string;
-    audioUrl?: string; // It could be undefined if it's an online track that needs downloading
+    audioUrl?: string; // undefined for an online track that needs resolving
     duration: number;
     source?: "library" | "deezer";
   };
@@ -25,58 +80,81 @@ interface TrackRowProps {
   dragHandle?: React.ReactNode;
   onRemove?: (trackId: string) => void;
   hidePlayButton?: boolean;
+  /**
+   * Overrides what tapping the row does.
+   *
+   * The queue sheet needs this: its rows are already *in* the queue, so the
+   * default behaviour — `play(track)` with no queue — threw the queue away and
+   * started a one-song one in its place. Tapping a queued song now jumps to it.
+   */
+  onSelect?: () => void;
 }
 
-function CircularProgress({ progress, speed }: { progress: number; speed?: string }) {
+/**
+ * Download progress ring.
+ *
+ * `progress` is null while the transfer has started but reported nothing yet, and
+ * the ring spins in that state rather than showing a made-up figure. The speed
+ * readout that used to be drawn as 6px text inside the 28px SVG is gone: at that
+ * size it was illegible, and the ring already answers the only question the row
+ * needs to ("is this moving?").
+ */
+function ProgressRing({ progress }: { progress: number | null }) {
   const radius = 10;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" className={styles.circularLoader}>
-      <circle cx="14" cy="14" r={radius} stroke="rgba(255,255,255,0.2)" strokeWidth="2" fill="none" />
-      <circle 
-        cx="14" cy="14" r={radius} 
-        stroke="currentColor" strokeWidth="2" fill="none"
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 28 28"
+      className={`${styles.ring} ${progress === null ? styles.ringSpin : ""}`}
+      aria-hidden="true"
+    >
+      <circle cx="14" cy="14" r={radius} className={styles.ringTrack} />
+      <circle
+        cx="14"
+        cy="14"
+        r={radius}
+        className={styles.ringFill}
         strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
+        // Indeterminate: a quarter arc, spun by CSS.
+        strokeDashoffset={
+          progress === null ? circumference * 0.75 : circumference * (1 - progress / 100)
+        }
         transform="rotate(-90 14 14)"
-        style={{ transition: "stroke-dashoffset 0.3s ease" }}
       />
-      {speed && (
-        <text 
-          x="14" 
-          y="16.5" 
-          fill="currentColor" 
-          fontSize="6px" 
-          fontWeight="bold" 
-          textAnchor="middle"
-          style={{ letterSpacing: "-0.5px" }}
-        >
-          {speed.replace("/s", "")}
-        </text>
-      )}
     </svg>
   );
 }
 
-export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove, hidePlayButton }: TrackRowProps) {
-  const { 
-    currentTrack, 
-    isPlaying, 
-    play, 
-    togglePlay, 
-    addToQueue, 
-    favoriteTrackIds, 
-    toggleLikeTrack, 
+export function TrackRow({
+  track,
+  queue,
+  index,
+  showNumber,
+  dragHandle,
+  onRemove,
+  hidePlayButton,
+  onSelect,
+}: TrackRowProps) {
+  const {
+    currentTrack,
+    isPlaying,
+    play,
+    togglePlay,
+    addToQueue,
+    favoriteTrackIds,
+    toggleLikeTrack,
     showToast,
     downloadStates,
     downloadProgress,
-    downloadSpeed,
     addToDownloadQueue,
     removeFromDownloadQueue,
   } = usePlayer();
+
+  const networkDown = useOffline();
+
   const liked = favoriteTrackIds?.has(track.id) || false;
   const isActive =
     currentTrack?.id === track.id ||
@@ -86,95 +164,40 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
       currentTrack.artist.toLowerCase() === track.artist.name.toLowerCase());
 
   const [offline, setOffline] = useState(false);
-  const [localDownloadState, setLocalDownloadState] = useState<"idle" | "telegram" | "device">("idle");
+  const [resolving, setResolving] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [addPlaylistModalOpen, setAddPlaylistModalOpen] = useState(false);
 
   const cover = track.coverUrl || track.album?.coverUrl;
 
   const stateInQueue = downloadStates[track.id];
-  const effectiveDownloadState = stateInQueue === "queued" ? "telegram" : stateInQueue === "downloading" ? "device" : localDownloadState;
+  const transferring = stateInQueue === "queued" || stateInQueue === "downloading";
+  const busy = transferring || resolving;
+
+  /*
+   * Playable without a connection? Either it's on the device, or we're online.
+   * Anything else is a row that will fail if tapped, and saying so up front is
+   * better than a toast after the fact.
+   */
+  const unavailable = networkDown && !offline;
 
   useEffect(() => {
-    async function checkOffline() {
+    let active = true;
+    (async () => {
       try {
         const uId = getCachedUserId();
         const dId = getDeviceId();
         const cached = await isTrackDownloaded(track.id, uId, dId);
-        setOffline(cached);
-      } catch {}
-    }
-    checkOffline();
+        if (active) setOffline(cached);
+      } catch {
+        // An unreadable cache means "not saved" — the safe direction, since it
+        // offers the download rather than promising a file that isn't there.
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [track.id, stateInQueue]);
-
-  async function handlePlay(e: React.MouseEvent) {
-    e.stopPropagation();
-    
-    if (isActive) {
-      togglePlay();
-      return;
-    }
-
-    if (effectiveDownloadState !== "idle") return; // Prevent double clicks during download
-
-    const au = track.audioUrl || "";
-    const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
-
-    // If it's already downloaded or has a valid audioUrl from library, just play
-    if (offline || track.source === "library" || isAudioUsable) {
-      playTrack(track.id, track.audioUrl!);
-      return;
-    }
-
-    // Otherwise, we need to download/stream it
-    setLocalDownloadState("telegram");
-    try {
-      // 1. Resolve Stream/Track URL
-      const res = await fetch("/api/music/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: track.title,
-          artist: track.artist.name,
-          duration: track.duration,
-          albumId: track.album?.id
-        }),
-      });
-      const data = await res.json();
-      
-      if (!data.id) throw new Error("No track ID returned");
-
-      const newId = data.id;
-      const newAudioUrl = data.audioUrl;
-      const finalCoverUrl = data.coverUrl || cover;
-
-      setLocalDownloadState("idle");
-
-      // 2. Play the stream URL immediately
-      playTrack(newId, newAudioUrl, finalCoverUrl);
-
-      // 3. Queue download for offline storage in background
-      addToDownloadQueue([{
-        id: newId,
-        title: track.title,
-        artist: track.artist.name,
-        album: track.album?.title,
-        coverUrl: finalCoverUrl,
-        audioUrl: newAudioUrl,
-        duration: track.duration,
-        albumId: track.album?.id,
-      }], true); // Boost priority because they are playing it
-    } catch (err) {
-      console.error("Auto-download failed:", err);
-      showToast("Download failed. Please try again.", "error");
-      // BUG-4 FIX: Clear the queued state from the download queue so the
-      // spinner resets and the user can retry by tapping again. Without this,
-      // stateInQueue stays "queued" and effectiveDownloadState stays "telegram",
-      // making the row show an infinite spinner with no way to retry.
-      removeFromDownloadQueue(track.id);
-      setLocalDownloadState("idle");
-    }
-  }
 
   function playTrack(actualId: string, actualAudioUrl: string, actualCover?: string) {
     const q = queue?.map((t) => ({
@@ -206,18 +229,102 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
     );
   }
 
+  async function handlePlay() {
+    if (onSelect) {
+      onSelect();
+      return;
+    }
+
+    if (isActive) {
+      togglePlay();
+      return;
+    }
+
+    if (busy) return; // Already resolving; a second tap would start a second one.
+
+    if (unavailable) {
+      // Named rather than silent. The old row did nothing at all here.
+      haptic("warning");
+      showToast("You'll need a connection for this one — or save it for offline first", "error");
+      return;
+    }
+
+    const au = track.audioUrl || "";
+    const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
+
+    // Already on the device, or already carrying a usable stream URL.
+    if (offline || track.source === "library" || isAudioUsable) {
+      playTrack(track.id, track.audioUrl!);
+      return;
+    }
+
+    // Otherwise it has to be resolved and streamed first.
+    setResolving(true);
+    try {
+      const res = await fetch("/api/music/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: track.title,
+          artist: track.artist.name,
+          duration: track.duration,
+          albumId: track.album?.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.id) throw new Error(data?.error || "No track id returned");
+
+      const newId = data.id;
+      const newAudioUrl = data.audioUrl;
+      const finalCoverUrl = data.coverUrl || cover;
+
+      setResolving(false);
+      playTrack(newId, newAudioUrl, finalCoverUrl);
+
+      // Save it in the background, boosted — they're listening to it now.
+      addToDownloadQueue(
+        [
+          {
+            id: newId,
+            title: track.title,
+            artist: track.artist.name,
+            album: track.album?.title,
+            coverUrl: finalCoverUrl,
+            audioUrl: newAudioUrl,
+            duration: track.duration,
+            albumId: track.album?.id,
+          },
+        ],
+        true
+      );
+    } catch {
+      showToast("We couldn't get that song. Try again in a moment.", "error");
+      /*
+       * Clear the queued state as well as the local one. Without this,
+       * `downloadStates[id]` stays "queued", the row shows a spinner forever and
+       * tapping again is refused by the `busy` guard — so a single failure made
+       * the row permanently unplayable until a reload.
+       */
+      removeFromDownloadQueue(track.id);
+      setResolving(false);
+      haptic("error");
+    }
+  }
+
   async function handleRemoveOffline() {
     try {
-      const uId = getCachedUserId();
-      const dId = getDeviceId();
-      // Use the full removal path, not the bare metadata delete: a track whose
-      // audio landed under a resolved id (Deezer → Telegram) keeps its blob and
-      // any partial chunks otherwise, so "Removed from device" would free
-      // nothing while claiming to.
-      await removeDownloadedTrack(track.id, uId, dId);
+      // The full removal path, not the bare metadata delete: a track whose audio
+      // landed under a resolved id (Deezer → Telegram) keeps its blob and any
+      // partial chunks otherwise, so "Removed from device" would free nothing
+      // while claiming to.
+      await removeDownloadedTrack(track.id, getCachedUserId(), getDeviceId());
       setOffline(false);
-      showToast("Removed from device", "success");
-    } catch {}
+      showToast("Removed from this device", "success");
+    } catch {
+      // Was a silent catch. A failed delete that says nothing leaves the user
+      // believing they freed space they didn't.
+      showToast("Couldn't remove that download", "error");
+    }
   }
 
   function openMenuFromButton(e: React.MouseEvent) {
@@ -232,53 +339,42 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const isDownloading = stateInQueue === "queued" || stateInQueue === "downloading";
+  const rawProgress = downloadProgress[track.id];
+  const progress = typeof rawProgress === "number" ? rawProgress : null;
 
   return (
     <div
-      className={`${styles.root} ${isActive ? styles.active : ""} ${isDownloading ? styles.downloading : ""}`}
+      className={`${styles.root} ${isActive ? styles.active : ""} ${
+        busy ? styles.busy : ""
+      } ${unavailable ? styles.unavailable : ""}`}
       onClick={handlePlay}
       onContextMenu={(e) => {
         e.preventDefault();
         setMenuPos({ x: e.clientX, y: e.clientY });
       }}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handlePlay(e as any); }}
     >
       {dragHandle}
+
       {showNumber && index !== undefined ? (
-        <span className={`${styles.numberCell} ${isActive ? styles.numberActive : ""}`}>
-          {isActive && isPlaying ? (
-            <span className={styles.eq} aria-hidden="true"><span /><span /><span /></span>
-          ) : isActive ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          ) : (
-            index + 1
+        <span className={`${styles.number} ${isActive ? styles.numberActive : ""}`}>
+          {isActive ? <NowPlayingBars playing={isPlaying} size={13} /> : index + 1}
+        </span>
+      ) : null}
+
+      {cover ? (
+        <span className={styles.artWrap}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={cover} alt="" className={styles.art} referrerPolicy="no-referrer" />
+          {isActive && !showNumber && (
+            <span className={styles.artBadge}>
+              <NowPlayingBars playing={isPlaying} size={13} />
+            </span>
           )}
         </span>
       ) : null}
-      {cover ? (
-        <div className={styles.artWrap}>
-          <img src={cover} alt="" className={styles.art} referrerPolicy="no-referrer" />
-          {isActive && !showNumber && (
-            <div className={styles.artOverlay}>
-              {isPlaying ? (
-                <span className={styles.eq} aria-hidden="true"><span /><span /><span /></span>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </div>
-          )}
-        </div>
-      ) : null}
 
-      <div className={styles.info}>
-        <div className={styles.titleRow}>
+      <span className={styles.info}>
+        <span className={styles.titleRow}>
           <Link
             href={`/track/${track.id}`}
             onClick={(e) => e.stopPropagation()}
@@ -287,102 +383,120 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
             {track.title}
           </Link>
           {liked && (
-            <svg className={styles.likedIcon} width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
+            <span className={styles.likedMark} title="In your Liked songs">
+              <HeartIcon size={11} filled />
+            </span>
           )}
-        </div>
-        <div className={styles.meta}>
+        </span>
+
+        <span className={styles.meta}>
+          {/*
+            The offline marks lead the line rather than trailing it: they're the
+            answer to "can I play this right now", which is worth more than the
+            artist name you can already see from the title.
+          */}
+          {unavailable ? (
+            <span className={styles.stateMark} title="Not saved to this device">
+              <OfflineIcon size={12} />
+            </span>
+          ) : offline ? (
+            <span className={`${styles.stateMark} ${styles.stateSaved}`} title="Saved on this device">
+              <DownloadedIcon size={12} />
+            </span>
+          ) : null}
+
           {track.artist.id ? (
-            <Link href={`/artist/${track.artist.id}`} onClick={(e) => e.stopPropagation()} className={styles.metaLink}>
+            <Link
+              href={`/artist/${track.artist.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className={styles.metaLink}
+            >
               {track.artist.name}
             </Link>
           ) : (
             track.artist.name
           )}
+
           {track.album?.title ? (
             <>
-              {" · "}
+              <span aria-hidden="true"> · </span>
               {track.album.id ? (
-                <Link href={`/album/${track.album.id}`} onClick={(e) => e.stopPropagation()} className={styles.metaLink}>
+                <Link
+                  href={`/album/${track.album.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={styles.metaLink}
+                >
                   {track.album.title}
                 </Link>
               ) : (
                 track.album.title
               )}
             </>
-          ) : ""}
-        </div>
-      </div>
+          ) : null}
+        </span>
+      </span>
 
-      <div className={styles.actions}>
-        {track.duration > 0 && (
+      <span className={styles.actions}>
+        {track.duration > 0 && !busy && (
           <span className={styles.duration}>{formatDuration(track.duration)}</span>
         )}
 
-        {!hidePlayButton && (
-          <button
-            className={styles.playBtn}
-            onClick={handlePlay}
-            title="Play"
-            aria-label="Play"
-          >
-            {effectiveDownloadState === "telegram" ? (
-              <CircularProgress progress={downloadProgress[track.id] ?? 30} speed={downloadSpeed[track.id]} />
-            ) : effectiveDownloadState === "device" ? (
-              <CircularProgress progress={downloadProgress[track.id] ?? 70} speed={downloadSpeed[track.id]} />
-            ) : isActive && isPlaying ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
-        )}
-
-        {hidePlayButton && (effectiveDownloadState === "telegram" || effectiveDownloadState === "device") && (
-          <CircularProgress 
-            progress={downloadProgress[track.id] ?? (effectiveDownloadState === "telegram" ? 30 : 70)} 
-            speed={downloadSpeed[track.id]} 
-          />
+        {busy ? (
+          <span className={styles.ringWrap}>
+            <ProgressRing progress={progress} />
+          </span>
+        ) : (
+          !hidePlayButton && (
+            <button
+              type="button"
+              className={`${styles.playBtn} pressable`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePlay();
+              }}
+              aria-label={
+                unavailable
+                  ? `${track.title} needs a connection`
+                  : isActive && isPlaying
+                    ? `Pause ${track.title}`
+                    : `Play ${track.title}`
+              }
+            >
+              {isActive && isPlaying ? <PauseIcon size={19} /> : <PlayIcon size={19} />}
+            </button>
+          )
         )}
 
         {onRemove && (
           <button
+            type="button"
             data-no-drag
-            className={styles.removeBtn}
+            className={`${styles.iconBtn} pressable`}
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
               onRemove(track.id);
             }}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-            }}
-            onPointerUp={(e) => {
-              e.stopPropagation();
-            }}
-            title="Remove from queue"
+            // The reorder grip and the row both listen for pointer events; this
+            // control has to keep its own.
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             aria-label={`Remove ${track.title}`}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" width="14" height="14">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <CloseIcon size={15} />
           </button>
         )}
 
-        <button className={styles.iconBtn} onClick={openMenuFromButton} title="More options" aria-label="More options">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="2" />
-            <circle cx="12" cy="12" r="2" />
-            <circle cx="12" cy="19" r="2" />
-          </svg>
+        <button
+          type="button"
+          className={`${styles.iconBtn} pressable`}
+          onClick={openMenuFromButton}
+          aria-label={`More options for ${track.title}`}
+          aria-haspopup="menu"
+        >
+          <MoreHorizontalIcon size={18} />
         </button>
-      </div>
+      </span>
 
       {menuPos && (
         <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)}>
@@ -391,39 +505,21 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
               setMenuPos(null);
               toggleLikeTrack(track.id);
             }}
-            icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-            }
+            icon={<HeartIcon size={16} filled={liked} />}
           >
-            {liked ? "Remove from Liked Songs" : "Add to Liked Songs"}
+            {liked ? "Remove from Liked" : "Add to Liked"}
           </ContextMenuItem>
+
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
               setAddPlaylistModalOpen(true);
             }}
-            icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            }
+            icon={<PlusIcon size={16} />}
           >
-            Add to Playlist
+            Add to a playlist
           </ContextMenuItem>
-          {offline && (
-            <ContextMenuItem
-              onClick={() => {
-                setMenuPos(null);
-                handleRemoveOffline();
-              }}
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>}
-            >
-              Remove from Device
-            </ContextMenuItem>
-          )}
+
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
@@ -438,12 +534,54 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
                 audioUrl: track.audioUrl || "",
                 duration: track.duration,
               });
-              showToast("Added to queue", "success");
+              showToast("Added to the queue", "success");
             }}
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+            icon={<QueueIcon size={16} />}
           >
-            Add to Queue
+            Play next
           </ContextMenuItem>
+
+          {/*
+            Saving is offered here when the song isn't on the device — previously
+            the menu only ever showed the *remove* side, so the one action that
+            makes this app useful on a plane was reachable from a collection page
+            but not from an individual row.
+          */}
+          {offline ? (
+            <ContextMenuItem
+              onClick={() => {
+                setMenuPos(null);
+                handleRemoveOffline();
+              }}
+              icon={<TrashIcon size={16} />}
+            >
+              Remove download
+            </ContextMenuItem>
+          ) : (
+            !busy && (
+              <ContextMenuItem
+                onClick={() => {
+                  setMenuPos(null);
+                  addToDownloadQueue([
+                    {
+                      id: track.id,
+                      title: track.title,
+                      artist: track.artist.name,
+                      album: track.album?.title,
+                      coverUrl: cover,
+                      audioUrl: track.audioUrl,
+                      duration: track.duration,
+                      albumId: track.album?.id,
+                    },
+                  ]);
+                }}
+                icon={<DownloadedIcon size={16} />}
+              >
+                Save for offline
+              </ContextMenuItem>
+            )
+          )}
+
           <ContextMenuItem
             onClick={() => {
               setMenuPos(null);
@@ -469,7 +607,7 @@ export function TrackRow({ track, queue, index, showNumber, dragHandle, onRemove
                 })
               );
             }}
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
+            icon={<ShareIcon size={16} />}
           >
             Share
           </ContextMenuItem>

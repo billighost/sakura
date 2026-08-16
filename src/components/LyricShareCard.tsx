@@ -198,19 +198,22 @@ export function LyricShareCard({
               text: `"${lyric}" — ${track.title} by ${track.artist}`,
             });
             onClose();
-          } catch (e: any) {
-            if (e.name !== "AbortError") {
-              fallbackClipboardShare(file);
-            } else {
+          } catch (e) {
+            // A dismissed share sheet rejects with AbortError. That's the user
+            // deciding not to share, so it must not fall through to the
+            // clipboard path as though the share had failed.
+            if (e instanceof Error && e.name === "AbortError") {
               setSharing(false);
+            } else {
+              fallbackClipboardShare(file);
             }
           }
         } else {
           fallbackClipboardShare(file);
         }
       }, "image/png");
-    } catch (err: any) {
-      setErrorMsg("Share action failed.");
+    } catch {
+      setErrorMsg("We couldn't create that image. Try again in a moment.");
       setSharing(false);
     }
   };
@@ -254,8 +257,8 @@ export function LyricShareCard({
         style={{
           width: "100%",
           maxWidth: "420px",
-          background: "var(--sakura-surface)",
-          border: "1px solid var(--sakura-border)",
+          background: "var(--surface-1)",
+          border: "1px solid var(--line)",
           borderRadius: "20px",
           overflow: "hidden",
           boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
@@ -264,14 +267,14 @@ export function LyricShareCard({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "1.25rem", borderBottom: "1px solid var(--sakura-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "1.25rem", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>Lyric Share Card</h3>
           <button
             onClick={onClose}
             style={{
               all: "unset",
               cursor: "pointer",
-              color: "var(--sakura-text-secondary)",
+              color: "var(--text-2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -299,21 +302,21 @@ export function LyricShareCard({
         </div>
 
         {errorMsg && (
-          <div style={{ padding: "0 1.5rem", color: "var(--sakura-danger)", fontSize: "0.75rem", textAlign: "center" }}>
+          <div style={{ padding: "0 1.5rem", color: "var(--danger)", fontSize: "0.75rem", textAlign: "center" }}>
             {errorMsg}
           </div>
         )}
 
-        <div style={{ padding: "1.25rem", borderTop: "1px solid var(--sakura-border)", display: "flex", gap: "10px" }}>
+        <div style={{ padding: "1.25rem", borderTop: "1px solid var(--line)", display: "flex", gap: "10px" }}>
           <button
             onClick={onClose}
             style={{
               flex: 1,
               height: "44px",
               borderRadius: "10px",
-              border: "1px solid var(--sakura-border)",
+              border: "1px solid var(--line)",
               background: "transparent",
-              color: "var(--sakura-text)",
+              color: "var(--text)",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -328,7 +331,7 @@ export function LyricShareCard({
               height: "44px",
               borderRadius: "10px",
               border: "none",
-              background: accentColor || "var(--sakura-accent)",
+              background: accentColor || "var(--accent)",
               color: "#FFFFFF",
               fontWeight: 600,
               cursor: "pointer",

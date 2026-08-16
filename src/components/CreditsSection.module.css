@@ -218,7 +218,9 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 4, 8, 0.7);
+  /* The app's modal backdrop token, not a fixed near-black: in light mode a
+   * 0.7-alpha `rgba(6,4,8,…)` scrim put a dark wash over a pale app. */
+  background: var(--scrim);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   z-index: 100;
@@ -230,7 +232,14 @@
 }
 
 .modalContent {
-  background: #16121a;
+  /*
+   * A regular app surface with regular app text on it. This was `#16121a` while
+   * the text inside uses `--text`, so in light mode it was near-black type on a
+   * near-black panel — the bio was unreadable.
+   */
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: var(--r-xl);
   width: 100%;
   max-width: 28rem;
@@ -246,14 +255,14 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-4);
-  border-bottom: 1px solid var(--media-chrome-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .modalTitle {
   font-family: var(--font-display);
   font-size: var(--t-lg);
   font-weight: 600;
-  color: var(--on-media);
+  color: var(--text);
   margin: 0;
 }
 
@@ -265,15 +274,15 @@
   width: var(--tap-min);
   height: var(--tap-min);
   border-radius: var(--r-full);
-  background: var(--on-media-fill);
-  color: var(--on-media);
+  background: var(--surface-3);
+  color: var(--text);
   cursor: pointer;
   transition: background var(--d-fast) var(--ease);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .modalCloseBtn:hover {
-    background: var(--on-media-fill-strong);
+    background: var(--surface-4);
   }
 }
 
@@ -294,7 +303,7 @@
 .fullBio {
   font-size: var(--t-base);
   line-height: var(--lh-loose);
-  color: var(--on-media-secondary);
+  color: var(--text-2);
   margin: 0;
   white-space: pre-wrap;
 }

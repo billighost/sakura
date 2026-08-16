@@ -23,6 +23,7 @@ import { clearServiceWorkerCaches } from "@/components/SWRegister";
 import { clearPageState } from "@/lib/usePageState";
 import {
   getServerTheme,
+  getStoredTheme,
   getTheme,
   setTheme as applyThemeGlobally,
   subscribeTheme,
@@ -219,22 +220,56 @@ export default function SettingsPage() {
         /*
          * Reconcile the server's theme with what this device actually painted.
          *
-         * The boot script in the root layout paints from localStorage, which is
-         * per-device. If the theme was last changed on another device the two
-         * disagree, and the radio would show "Light" over a dark page. The
-         * store's own value is the local truth, so only a genuine mismatch does
-         * any work — and a choice the user made on this page in the last second
-         * wins over both, since it's newer than either.
+         * ── The bug this shape exists to prevent ────────────────────────────
+         *
+         * This used to adopt the server's value whenever it differed from
+         * `getTheme()`. `UserSettings.theme` defaulted to `"dark"` and the GET
+         * handler returned `"dark"` when the row didn't exist, while `getTheme()`
+         * reports `"system"` for a device that has stored nothing. Those differ,
+         * so merely *opening this page* repainted the app dark and persisted it —
+         * a theme change nobody asked for, from a value nobody had chosen. On a
+         * light-mode device it was plainly visible: the page changed colour a
+         * beat after it loaded.
+         *
+         * So the question is no longer "do these differ" but "has this device
+         * ever chosen?" — `getStoredTheme()` returns null when it hasn't.
+         *
+         *   - No local choice → adopt the account's, if it has one. This is what
+         *     makes a freshly-installed device pick up your preference.
+         *   - Local choice → it stands, and the server is brought into line with
+         *     it. Appearance is a per-device setting everywhere else (iOS,
+         *     Android, macOS all treat it that way), and a device silently
+         *     overriding the choice you made *on that device* is never right.
+         *
+         * A choice made on this page in the last second beats both, since it's
+         * newer than either.
          */
         const serverTheme: ThemeId | null =
           data.theme === "light" || data.theme === "dark" || data.theme === "system"
             ? data.theme
             : null;
 
-        if (serverTheme && !themeChosenLocally.current && serverTheme !== getTheme()) {
-          // No cross-fade: this is reconciliation on load, not a user action,
-          // and fading the whole page a beat after it appears reads as a fault.
-          applyThemeGlobally(serverTheme, { animate: false });
+        if (!themeChosenLocally.current) {
+          const localTheme = getStoredTheme();
+
+          if (localTheme === null) {
+            // No cross-fade: this is reconciliation on load, not a user action,
+            // and fading the whole page a beat after it appears reads as a fault.
+            if (serverTheme) applyThemeGlobally(serverTheme, { animate: false });
+          } else if (serverTheme !== localTheme) {
+            /*
+             * The device has decided. Tell the server, so the next device to
+             * sign in inherits something real instead of a column default.
+             *
+             * Queued straight into `pending` rather than through `save()`: the
+             * initial load hasn't resolved yet at this point, which is precisely
+             * the case `save` handles by recording and waiting — and calling it
+             * here would put a value that changes on every render into this
+             * effect's dependencies, re-running the fetch. The
+             * flush-when-loaded effect below sends it.
+             */
+            pending.current.theme = localTheme;
+          }
         }
 
         setQuality(data.audioQuality || "high");

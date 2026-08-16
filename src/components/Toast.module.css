@@ -1,35 +1,63 @@
+/* Toast.
+ *
+ * Migrated off the `--sakura-*` aliases, and off hardcoded radii and durations
+ * onto the token ladder — this is the one piece of UI that appears over every
+ * screen in the app, so a corner radius that matches nothing else is visible
+ * everywhere.
+ *
+ * The type variant is carried by a coloured leading edge rather than by tinting
+ * the whole surface: a full-width danger fill at the bottom of the screen reads
+ * as a system-level failure, which is too loud for "couldn't remove that
+ * download".
+ */
+
 .toast {
   position: fixed;
-  bottom: clamp(5rem, 14vh, 6rem);
+  /* Clear of the mini player and the tab bar, both of which it would otherwise
+   * cover — and it must never cover the transport controls. */
+  bottom: calc(var(--bottom-chrome) + var(--space-3));
   left: 50%;
-  transform: translateX(-50%) translateY(120%);
   z-index: 300;
-  background: var(--sakura-surface-2);
-  border: 1px solid var(--sakura-border);
-  border-radius: 12px;
-  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1rem);
-  box-shadow: 0 4px 20px var(--sakura-shadow);
-  font-size: 0.8125rem;
-  white-space: nowrap;
-  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease-out;
-  pointer-events: none;
+  max-width: calc(100vw - var(--gutter) * 2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  box-shadow: var(--shadow-3);
+  transform: translateX(-50%) translateY(140%);
   opacity: 0;
+  pointer-events: none;
+  transition: transform var(--d-base) var(--spring-soft), opacity var(--d-fast) var(--ease-out);
 }
 
 .visible {
   transform: translateX(-50%) translateY(0);
-  pointer-events: auto;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .accent {
-  border-color: var(--sakura-accent);
+  border-left-color: var(--accent);
 }
 
 .error {
-  border-color: var(--sakura-danger);
+  border-left-color: var(--danger);
 }
 
 .success {
-  border-color: var(--sakura-success);
+  border-left-color: var(--success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The slide-up is the vestibular part; the fade carries the same information
+   * and doesn't move anything. */
+  .toast {
+    transform: translateX(-50%) translateY(0);
+    transition: opacity var(--d-base) var(--ease);
+  }
 }

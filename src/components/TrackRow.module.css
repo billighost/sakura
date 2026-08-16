@@ -1,143 +1,159 @@
+/* Track row.
+ *
+ * The most-repeated element in the app, so it's also the one where a wasted
+ * pixel costs the most: at 3.5rem a phone shows about twelve, and everything
+ * here is sized against that budget rather than against how a single row looks
+ * in isolation.
+ *
+ * Migrated off the `--sakura-*` aliases. The state marks — saved offline, needs
+ * a signal, downloading — are new; see the note at the top of TrackRow.tsx for
+ * why the row was previously silent about all three. */
+
 .root {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  gap: clamp(0.625rem, 2vw, 0.875rem);
-  padding: clamp(0.5rem, 2vw, 0.625rem) clamp(0.5rem, 2vw, 0.75rem);
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--sakura-text);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  min-height: 3.5rem;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--d-fast) var(--ease), opacity var(--d-fast) var(--ease);
 }
 
-.root:hover {
-  background: var(--sakura-hover);
-}
-
+/* Pressed, not hovered: on touch there is no hover, and this is the only
+ * feedback that the tap registered before audio starts. */
 .root:active {
-  transform: scale(0.995);
+  background: var(--surface-2);
 }
 
-.active {
-  background: var(--sakura-active);
+@media (hover: hover) and (pointer: fine) {
+  .root:hover {
+    background: var(--surface-1);
+  }
 }
 
-.active .title {
-  color: var(--sakura-accent);
+/* The current track. Accent on the title only — the row background stays flat,
+ * because a filled row in a list of forty reads as a selected table cell. */
+.active .title,
+.titleActive {
+  color: var(--accent);
 }
 
-.numberCell {
-  position: relative;
-  width: clamp(1.25rem, 4vw, 1.5rem);
-  text-align: center;
+.busy {
+  /* Not disabled — the menu still works — just visibly occupied. */
+  cursor: default;
+}
+
+/*
+ * Offline and not saved. Dimmed rather than hidden: the song is still worth
+ * knowing about, and hiding rows would make a playlist appear to have lost
+ * tracks the moment the signal dropped.
+ */
+.unavailable {
+  opacity: 0.45;
+}
+
+/* ── Number column ────────────────────────────────────────────────────────── */
+
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
+  width: 1.5rem;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  /* Tabular so a list of 1–40 doesn't shift its left edge at 10. */
   font-variant-numeric: tabular-nums;
+  color: var(--text-3);
 }
 
 .numberActive {
-  color: var(--sakura-accent);
+  color: var(--accent);
 }
 
-.eq {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  height: 14px;
-}
-
-.eq span {
-  width: 2.5px;
-  border-radius: 2px;
-  background: var(--sakura-accent);
-  animation: eq 0.9s ease-in-out infinite;
-}
-.eq span:nth-child(1) { height: 6px; animation-delay: -0.6s; }
-.eq span:nth-child(2) { height: 12px; animation-delay: -0.3s; }
-.eq span:nth-child(3) { height: 8px; animation-delay: 0s; }
-
-@keyframes eq {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
-}
+/* ── Artwork ──────────────────────────────────────────────────────────────── */
 
 .artWrap {
   position: relative;
-  width: clamp(2.5rem, 8vw, 3rem);
-  height: clamp(2.5rem, 8vw, 3rem);
   flex-shrink: 0;
-  border-radius: 4px;
+  width: 2.75rem;
+  height: 2.75rem;
   overflow: hidden;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
 }
 
 .art {
-  position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
   object-fit: cover;
-  background: var(--sakura-skeleton);
-  display: block;
 }
 
-/* Active overlay on cover art */
-.artOverlay {
+/* The live readout over the cover, for lists with no number column. A scrim, not
+ * a tint: the bars have to stay legible over any artwork. */
+.artBadge {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--sakura-accent);
-  border-radius: 4px;
+  background: var(--scrim);
+  color: #fff;
 }
 
+/* ── Text ─────────────────────────────────────────────────────────────────── */
+
+/* `min-width: 0` is what lets the flex child shrink so `text-overflow` can act.
+ * Without it a long title pushes the duration and the menu off the right edge —
+ * which is exactly what the previous version did. */
 .info {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
+/* The name of a thing, so display face. */
 .title {
-  font-size: 0.875rem;
-  font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: inherit;
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
   text-decoration: none;
-}
-
-.title:hover {
-  text-decoration: underline;
-}
-
-.likedIcon {
-  color: var(--sakura-accent);
-  flex-shrink: 0;
-}
-
-.meta {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 2px;
+}
+
+.likedMark {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* Artist, album and the state marks. Body face — these are facts. */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metaLink {
@@ -145,94 +161,120 @@
   text-decoration: none;
 }
 
-.metaLink:hover {
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .metaLink:hover {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
-.duration {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
+/* One glyph, leading the meta line. Never both — a row is either saved or it
+ * isn't, and the offline case only shows when there's no connection. */
+.stateMark {
+  display: flex;
   flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.75;
-  margin-right: 2px;
+  color: var(--text-3);
 }
+
+.stateSaved {
+  color: var(--success);
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────────── */
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   flex-shrink: 0;
 }
 
-.playBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--sakura-text);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
+.duration {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
 }
 
-.playBtn:hover {
-  transform: scale(1.05);
-}
-
-.playBtn:active {
-  transform: scale(0.95);
-}
-
+.playBtn,
 .iconBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
+  width: 2.25rem;
+  height: 2.25rem;
+  /* Under the global 44px floor, and deliberately: twelve rows each reserving
+   * 44px for three controls would leave no room for the title. The hit area is
+   * restored by the row itself, which is 3.5rem tall and entirely tappable. */
+  min-width: 0;
+  min-height: 0;
   border: none;
-  background: transparent;
-  color: var(--sakura-text-secondary);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--text-2);
   cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
 }
 
-.iconBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--sakura-text);
+.playBtn {
+  color: var(--text);
 }
 
-.circularLoader {
-  color: var(--sakura-text);
+.active .playBtn {
+  color: var(--accent);
 }
 
-.removeBtn {
+@media (hover: hover) and (pointer: fine) {
+  .playBtn:hover,
+  .iconBtn:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+}
+
+/* ── Progress ring ────────────────────────────────────────────────────────── */
+
+.ringWrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--accent);
 }
 
-.removeBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ff4d4f;
+.ring {
+  overflow: visible;
 }
 
-.downloading {
-  opacity: 0.65;
-  transition: opacity 0.3s ease;
+.ringTrack {
+  fill: none;
+  stroke: var(--surface-4);
+  stroke-width: 2;
+}
+
+.ringFill {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--d-slow) var(--ease);
+}
+
+/* Indeterminate: the arc itself rotates, so "working" is legible without
+ * claiming a percentage we don't have. */
+.ringSpin {
+  animation: rowRingSpin 0.9s linear infinite;
+}
+
+@keyframes rowRingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringSpin {
+    animation-duration: 1.8s;
+  }
 }

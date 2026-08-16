@@ -47,7 +47,7 @@ export async function GET(
   }
 
   const playlist = await queryOne<{ userId: string; isPublic?: boolean }>(
-    `SELECT p.*, u.name AS "ownerName"
+    `SELECT p.*, u.username AS "ownerName"
        FROM "Playlist" p
        LEFT JOIN "User" u ON u.id = p."userId"
       WHERE p.id = $1`,

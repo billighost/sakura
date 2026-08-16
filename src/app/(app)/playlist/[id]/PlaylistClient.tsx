@@ -105,7 +105,11 @@ export default function PlaylistClient({ id }: { id: string }) {
     };
   }, [id, reloadKey]);
 
-  const covers = useMemo(() => parseCovers(playlist?.coverUrl), [playlist?.coverUrl]);
+  // Read out before the memo/callback: an optional-chain dependency defeats the
+  // React Compiler's memoization check.
+  const coverUrl = playlist?.coverUrl;
+  const playlistName = playlist?.name;
+  const covers = useMemo(() => parseCovers(coverUrl), [coverUrl]);
   const isOwner = playlist?.isOwner !== false;
 
   const handleReorder = useCallback(
@@ -173,7 +177,7 @@ export default function PlaylistClient({ id }: { id: string }) {
     const url = window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: playlist?.name, url });
+        await navigator.share({ title: playlistName, url });
         return;
       }
       await navigator.clipboard.writeText(url);
@@ -183,7 +187,7 @@ export default function PlaylistClient({ id }: { id: string }) {
       if (err instanceof Error && err.name === "AbortError") return;
       showToast("Couldn't share that link", "error");
     }
-  }, [playlist?.name, showToast]);
+  }, [playlistName, showToast]);
 
   function openEdit() {
     if (!playlist) return;

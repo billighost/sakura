@@ -37,7 +37,7 @@
   border-radius: var(--r-md);
   position: relative;
   width: 100%;
-  transition: transform var(--d-base) var(--ease), background-color var(--d-fast) var(--ease);
+  transition: background-color var(--d-fast) var(--ease);
 }
 
 .row {
@@ -65,24 +65,36 @@
   border-radius: var(--r-md);
 }
 
-.dragGrip {
+/* The reorder grip. A real button, so arrow keys move a row for anyone not
+ * using a pointer. `touch-action: none` comes from useReorder's `gripProps`
+ * rather than from here — it's part of the gesture contract, not the styling,
+ * and the sheet's scroller would otherwise claim the vertical drag before the
+ * reorder could start. */
+.grip {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 1.75rem;
   height: var(--tap-min);
+  min-width: 0;
+  min-height: 0;
   flex-shrink: 0;
+  border: none;
+  background: none;
   color: var(--text-3);
   cursor: grab;
-  /* Also set inline in QueueGrip — the scroller would otherwise claim the
-   * vertical drag before the reorder ever starts. */
-  touch-action: none;
   user-select: none;
 }
 
-.dragGrip:active {
+.grip:active {
   cursor: grabbing;
   color: var(--text-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grip:hover {
+    color: var(--text-2);
+  }
 }
 
 .emptyState {

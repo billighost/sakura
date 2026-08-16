@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useRef, useCallback, useLayoutEffect, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, useLayoutEffect, useMemo } from "react";
 import { usePlayer } from "./PlayerContext";
 import { Scrubber } from "./Scrubber";
-import { ShareIcon } from "./Icons";
+import {
+  ChevronDownIcon,
+  HeartIcon,
+  MoreIcon,
+  MusicNoteIcon,
+  NextIcon,
+  PauseIcon,
+  PlayIcon,
+  PrevIcon,
+  QueueIcon,
+  RepeatIcon,
+  RepeatOneIcon,
+  ShareIcon,
+  ShuffleIcon,
+  TimerIcon,
+  VolumeIcon,
+} from "./Icons";
 import { CreditsSection } from "./CreditsSection";
 import { LyricsPreviewCard } from "./LyricsPreviewCard";
 import { QueueModal } from "./QueueModal";
@@ -11,7 +27,6 @@ import { LyricsModal } from "./LyricsModal";
 import { useShare } from "./share/ShareContext";
 import { useDrag } from "@/lib/useDrag";
 import { readableOn } from "@/lib/color";
-import { haptic } from "@/lib/haptics";
 import type { LyricData } from "@/lib/lyrics";
 import styles from "./FullPlayer.module.css";
 
@@ -21,7 +36,6 @@ interface FullPlayerProps {
 }
 
 const PETAL_COUNT = 6;
-const ROW_HEIGHT = 62; // approx height of a queue row, used to compute reorder targets while dragging
 
 export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [showVolume, setShowVolume] = useState(false);
@@ -30,7 +44,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [burstKey, setBurstKey] = useState(0);
   const [artLoaded, setArtLoaded] = useState(false);
-  const [artFlipStyle, setArtFlipStyle] = useState<React.CSSProperties>({});
+
 
   const rootRef = useRef<HTMLDivElement>(null);
   const artShellRef = useRef<HTMLDivElement>(null);
@@ -42,7 +56,6 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     currentIndex,
     currentTrack,
     isPlaying,
-    isSeeking,
     progress,
     duration,
     volume,
@@ -139,10 +152,22 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     toggleLiked();
   }
 
-  useEffect(() => {
+  /*
+   * Reset per-track view state when the track changes.
+   *
+   * Adjusted during render rather than from an effect. An effect runs *after*
+   * the commit, so for one frame the new track was drawn with the previous
+   * track's artwork already marked loaded — a visible flash of the wrong cover
+   * at full opacity before the skeleton appeared. Setting state during render is
+   * React's documented answer to "a prop changed, derive from it": it re-renders
+   * immediately and never commits the stale pass.
+   */
+  const [renderedTrackId, setRenderedTrackId] = useState(currentTrack?.id);
+  if (currentTrack?.id !== renderedTrackId) {
+    setRenderedTrackId(currentTrack?.id);
     setArtLoaded(false);
     setLyricsExpanded(false);
-  }, [currentTrack?.id]);
+  }
 
   // The active synced-lyric line, shared by the preview card and the full
   // lyrics modal — uses the live drag-preview value while scrubbing so both
@@ -161,45 +186,64 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     return index;
   }, [lyrics, progress, seekDrag]);
 
-  // --- Shared-element "grow from the mini player" transition ---------------
+  /*
+   * --- Shared-element "grow from the mini player" transition ---------------
+   *
+   * Written straight to the element rather than through state.
+   *
+   * A FLIP is imperative by nature: the start frame is measured from live layout
+   * and has to be applied before the next paint, which is not something a render
+   * pass can express. Routing it through `useState` meant a synchronous setState
+   * inside a layout effect — a cascading render on every open — and the obvious
+   * repair, deriving the start style during render, is worse: it reads a ref that
+   * is still null on the first render, so the very first open had no origin to
+   * grow from and silently fell back to a fade.
+   *
+   * Both frames now go to `style` directly. Two of them, as ever: the element
+   * must exist at its start position *with a computed style* before the end state
+   * has anything to transition from. One frame and the browser collapses both
+   * into a single style recalculation, which skips the animation entirely.
+   */
   useLayoutEffect(() => {
-    if (!open || !artShellRef.current) {
-      return;
+    const shell = artShellRef.current;
+    if (!open || !shell) return;
+
+    if (miniArtRect) {
+      const artRect = shell.getBoundingClientRect();
+      const scaleX = miniArtRect.width / artRect.width;
+      const scaleY = miniArtRect.height / artRect.height;
+      const translateX =
+        miniArtRect.left + miniArtRect.width / 2 - (artRect.left + artRect.width / 2);
+      const translateY =
+        miniArtRect.top + miniArtRect.height / 2 - (artRect.top + artRect.height / 2);
+
+      shell.style.transition = "none";
+      shell.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`;
+      shell.style.borderRadius = "9px";
+    } else {
+      // No known origin — deep-linked straight in, or a cold PWA start. Nothing
+      // to grow from, so it fades.
+      shell.style.transition = "none";
+      shell.style.opacity = "0";
     }
-    if (!miniArtRect) {
-      // No known origin (e.g. deep-linked straight into the full player) — just fade in.
-      setArtFlipStyle({ opacity: 0, transition: "none" });
+
+    const raf = requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setArtFlipStyle({ opacity: 1, transition: "opacity 0.35s ease" });
-        });
-      });
-      return;
-    }
+        if (!artShellRef.current) return;
+        const el = artShellRef.current;
+        if (miniArtRect) {
+          el.style.transition =
+            "transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.45s cubic-bezier(0.32, 0.72, 0, 1)";
+          el.style.transform = "translate(0px, 0px) scale(1, 1)";
+          el.style.borderRadius = "16px";
+        } else {
+          el.style.transition = "opacity 0.35s ease";
+          el.style.opacity = "1";
+        }
+      })
+    );
 
-    const artRect = artShellRef.current.getBoundingClientRect();
-    const scaleX = miniArtRect.width / artRect.width;
-    const scaleY = miniArtRect.height / artRect.height;
-    const translateX = miniArtRect.left + miniArtRect.width / 2 - (artRect.left + artRect.width / 2);
-    const translateY = miniArtRect.top + miniArtRect.height / 2 - (artRect.top + artRect.height / 2);
-
-    // Snap instantly to the mini player's position/size (no transition)...
-    setArtFlipStyle({
-      transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
-      borderRadius: "9px",
-      transition: "none",
-    });
-
-    // ...then, next paint, animate to the full-size resting position.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setArtFlipStyle({
-          transform: "translate(0px, 0px) scale(1, 1)",
-          borderRadius: "16px",
-          transition: "transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.45s cubic-bezier(0.32, 0.72, 0, 1)",
-        });
-      });
-    });
+    return () => cancelAnimationFrame(raf);
   }, [open, miniArtRect]);
 
   // --- Real drag-to-dismiss / swipe-to-skip physics --------------------------
@@ -246,149 +290,15 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
     [playerDrag.bind]
   );
 
-  // --- Queue drag-to-reorder -------------------------------------------------
-  const LONG_PRESS_MS = 260;
-  const MOVE_CANCEL_THRESHOLD = 10;
-
-  const [dragQueueItem, setDragQueueItem] = useState<{
-    list: "upnext" | "tail";
-    index: number;
-    deltaY: number;
-    rowHeight: number;
-  } | null>(null);
-
-  const pressState = useRef<{
-    pointerId: number;
-    list: "upnext" | "tail";
-    index: number;
-    startY: number;
-    startX: number;
-    rowEl: HTMLElement;
-    longPressTimer: ReturnType<typeof setTimeout> | null;
-    active: boolean;
-  } | null>(null);
-
-  const finishQueueDrag = useCallback(
-    (finalDeltaY: number | null) => {
-      const ps = pressState.current;
-      if (ps?.longPressTimer) clearTimeout(ps.longPressTimer);
-      pressState.current = null;
-
-      setDragQueueItem((current) => {
-        if (!current) return null;
-        if (finalDeltaY !== null) {
-          const rowsMoved = Math.round(finalDeltaY / current.rowHeight);
-          if (rowsMoved !== 0) {
-            const listLength = current.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
-            const to = Math.min(Math.max(current.index + rowsMoved, 0), Math.max(0, listLength - 1));
-            if (to !== current.index) {
-              haptic("impact");
-              if (current.list === "upnext") reorderUpNext(current.index, to);
-              else reorderQueueTail(current.index, to);
-            }
-          }
-        }
-        return null;
-      });
-    },
-    [upNextQueue.length, queue.length, currentIndex, reorderUpNext, reorderQueueTail]
-  );
-
-  useEffect(() => {
-    if (!dragQueueItem) return;
-    function forceEnd() {
-      finishQueueDrag(null);
-    }
-    window.addEventListener("pointerup", forceEnd);
-    window.addEventListener("pointercancel", forceEnd);
-    window.addEventListener("blur", forceEnd);
-    return () => {
-      window.removeEventListener("pointerup", forceEnd);
-      window.removeEventListener("pointercancel", forceEnd);
-      window.removeEventListener("blur", forceEnd);
-    };
-  }, [dragQueueItem, finishQueueDrag]);
-
-  useEffect(() => {
-    if (!dragQueueItem) return;
-    const listLength = dragQueueItem.list === "upnext" ? upNextQueue.length : queue.length - currentIndex - 1;
-    if (dragQueueItem.index >= listLength) finishQueueDrag(null);
-  }, [upNextQueue.length, queue.length, currentIndex, dragQueueItem, finishQueueDrag]);
-
-  function handleRowPointerDown(list: "upnext" | "tail", index: number, e: React.PointerEvent) {
-    if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
-    if (e.button !== undefined && e.button !== 0) return;
-
-    e.stopPropagation();
-
-    const gripEl = e.currentTarget as HTMLElement;
-    const rowEl = (gripEl.closest("[data-queue-row]") as HTMLElement) || gripEl;
-
-    try {
-      gripEl.setPointerCapture?.(e.pointerId);
-    } catch {}
-
-    setDragQueueItem({
-      list,
-      index,
-      deltaY: 0,
-      rowHeight: rowEl.getBoundingClientRect().height || ROW_HEIGHT,
-    });
-
-    pressState.current = {
-      pointerId: e.pointerId,
-      list,
-      index,
-      startY: e.clientY,
-      startX: e.clientX,
-      rowEl,
-      longPressTimer: null,
-      active: true,
-    };
-  }
-
-  function handleRowPointerMove(e: React.PointerEvent) {
-    const ps = pressState.current;
-    if (!ps) return;
-
-    if (!ps.active) {
-      const dx = Math.abs(e.clientX - ps.startX);
-      const dy = Math.abs(e.clientY - ps.startY);
-      if (dx > MOVE_CANCEL_THRESHOLD || dy > MOVE_CANCEL_THRESHOLD) {
-        if (ps.longPressTimer) clearTimeout(ps.longPressTimer);
-        pressState.current = null;
-      }
-      return;
-    }
-
-    e.preventDefault();
-    const deltaY = e.clientY - ps.startY;
-    setDragQueueItem((prev) => {
-      if (!prev) return prev;
-      // Tick once per slot crossed. Without this the row slides silently and the
-      // only confirmation arrives on release, well after the decision is made.
-      const slot = Math.round(deltaY / prev.rowHeight);
-      if (slot !== Math.round(prev.deltaY / prev.rowHeight)) haptic("selection");
-      return { ...prev, deltaY };
-    });
-  }
-
-  function handleRowPointerUp(e: React.PointerEvent) {
-    const ps = pressState.current;
-    if (!ps) return;
-    if (!ps.active) {
-      if (ps.longPressTimer) clearTimeout(ps.longPressTimer);
-      pressState.current = null;
-      // Short tap = jump to that track
-      return; // click handler will fire naturally
-    }
-    const finalDeltaY = e.clientY - ps.startY;
-    finishQueueDrag(finalDeltaY);
-  }
-
-  function handleRowPointerCancel() {
-    finishQueueDrag(null);
-  }
+  /*
+   * Queue reordering used to live here: a long-press timer, a pointer-capture
+   * dance, a `dragQueueItem` state object and four handlers threaded into
+   * QueueModal through six props — about 140 lines, all of it to move one row
+   * while its neighbours stayed put, so there was no way to see where the row
+   * would land. It's now `useReorder` inside QueueModal itself (shared with the
+   * playlist page), and all this component has to hand over is the two reorder
+   * callbacks the player context already exposed.
+   */
 
   if (!currentTrack) return null;
 
@@ -434,20 +344,14 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
 
       <div className={styles.header}>
         <button className={styles.headerBtn} onClick={onClose} aria-label="Close player">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+<ChevronDownIcon size={24} />
         </button>
         <div className={styles.headerCenter}>
           <div className={styles.headerLabel}>Playing from album</div>
           <div className={styles.headerTitle}>{currentTrack.album || "Unknown Album"}</div>
         </div>
         <button className={styles.headerBtn} aria-label="More options">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <circle cx="12" cy="5" r="1.5" />
-            <circle cx="12" cy="12" r="1.5" />
-            <circle cx="12" cy="19" r="1.5" />
-          </svg>
+<MoreIcon size={24} />
         </button>
       </div>
 
@@ -459,8 +363,8 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               className={styles.artShell}
               style={
                 artDragOpacity !== undefined
-                  ? { ...artFlipStyle, opacity: artDragOpacity, transition: "none" }
-                  : artFlipStyle
+                  ? { opacity: artDragOpacity, transition: "none" }
+                  : undefined
               }
             >
               {currentTrack.coverUrl ? (
@@ -476,9 +380,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 </>
               ) : (
                 <div className={`${styles.art} ${styles.artFallback} ${styles.loaded}`}>
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                  </svg>
+<MusicNoteIcon size={48} />
                 </div>
               )}
             </div>
@@ -515,31 +417,19 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               onClick={toggleShuffle}
               aria-label="Shuffle"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-                <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-              </svg>
+<ShuffleIcon size={22} />
             </button>
 
             <button className={styles.transportBtn} onClick={prev} aria-label="Previous">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
-                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-              </svg>
+<PrevIcon size={28} />
             </button>
 
             <button className={styles.playPauseBtn} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
-                {isPlaying ? (
-                  <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
-                ) : (
-                  <path d="M8 5v14l11-7z" />
-                )}
-              </svg>
+{isPlaying ? <PauseIcon size={32} /> : <PlayIcon size={32} />}
             </button>
 
             <button className={styles.transportBtn} onClick={next} aria-label="Next">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
-                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-              </svg>
+<NextIcon size={28} />
             </button>
 
             <button
@@ -547,15 +437,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               onClick={toggleRepeat}
               aria-label="Repeat"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-                <path d="M17 1l4 4-4 4" />
-                <path d="M3 11V9a4 4 0 014-4h14" />
-                <path d="M7 23l-4-4 4-4" />
-                <path d="M21 13v2a4 4 0 01-4 4H3" />
-              </svg>
-              {repeat === "one" && (
-                <span className={styles.repeatOne}>1</span>
-              )}
+{repeat === "one" ? <RepeatOneIcon size={22} /> : <RepeatIcon size={22} />}
             </button>
           </div>
 
@@ -565,9 +447,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               onClick={handleLike}
               aria-label={isLiked ? "Unlike" : "Like"}
             >
-              <svg viewBox="0 0 24 24" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-              </svg>
+<HeartIcon size={22} filled={isLiked} />
               {burstKey > 0 && Array.from({ length: PETAL_COUNT }).map((_, i) => (
                 <span
                   key={`${burstKey}-${i}`}
@@ -584,15 +464,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
                 aria-label="Volume"
                 aria-expanded={showVolume}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  {volume > 0.5 && (
-                    <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" />
-                  )}
-                  {volume > 0 && volume <= 0.5 && (
-                    <path d="M15.54 8.46a5 5 0 010 7.07" />
-                  )}
-                </svg>
+<VolumeIcon size={20} level={volume} />
               </button>
               <div className={`${styles.volumeSliderWrap} ${showVolume ? styles.volumeOpen : ""}`}>
                 <input
@@ -641,10 +513,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               aria-label={sleepTimerMinutes ? `Sleep timer: ${sleepTimerMinutes}m` : "Set sleep timer"}
               title={sleepTimerMinutes ? `Sleep timer: ${sleepTimerMinutes}m` : "Set sleep timer"}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
+<TimerIcon size={20} />
               {sleepTimerMinutes && (
                 <span className={styles.sleepTimerBadge}>{sleepTimerMinutes}</span>
               )}
@@ -655,14 +524,7 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
               onClick={() => setShowQueue(!showQueue)}
               aria-label="Queue"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <line x1="8" y1="6" x2="21" y2="6" />
-                <line x1="8" y1="12" x2="21" y2="12" />
-                <line x1="8" y1="18" x2="21" y2="18" />
-                <line x1="3" y1="6" x2="3.01" y2="6" />
-                <line x1="3" y1="12" x2="3.01" y2="12" />
-                <line x1="3" y1="18" x2="3.01" y2="18" />
-              </svg>
+<QueueIcon size={20} />
             </button>
           </div>
 
@@ -685,16 +547,12 @@ export function FullPlayer({ open, onClose }: FullPlayerProps) {
         open={showQueue}
         onClose={() => setShowQueue(false)}
         currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        albumLabel={currentTrack.album || "Playlist"}
+        albumLabel={currentTrack.album || "this playlist"}
         currentIndex={currentIndex}
         upNextQueue={upNextQueue}
         tailQueue={tailQueue}
-        dragQueueItem={dragQueueItem}
-        onRowPointerDown={handleRowPointerDown}
-        onRowPointerMove={handleRowPointerMove}
-        onRowPointerUp={handleRowPointerUp}
-        onRowPointerCancel={handleRowPointerCancel}
+        onReorderUpNext={reorderUpNext}
+        onReorderTail={reorderQueueTail}
         onGoToQueueItem={goToQueueItem}
         onRemoveFromUpNext={removeFromUpNext}
         onRemoveTrack={removeTrack}

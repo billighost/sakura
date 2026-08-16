@@ -18,32 +18,10 @@
   pointer-events: none;
 }
 
-/* ---------- ambient glow (static — no animation, no compositing cost) ---------- */
-
-.glowA,
-.glowB {
-  position: absolute;
-  width: 55vmax;
-  height: 55vmax;
-  border-radius: 50%;
-  opacity: 0.18;
-  pointer-events: none;
-  /* No animation — these are purely decorative background tints */
-}
-
-.glowA {
-  background: var(--sakura-gradient-start);
-  top: -20%;
-  left: -15%;
-  filter: blur(70px);
-}
-
-.glowB {
-  background: var(--sakura-gradient-end);
-  bottom: -20%;
-  right: -15%;
-  filter: blur(70px);
-}
+/* The two blurred radial blobs that used to sit behind the mark are gone. Their
+ * own comment described them as "purely decorative background tints", which is
+ * exactly the thing the design language removes — the splash is now the blossom
+ * on a flat surface, and the mark's own bloom animation is the whole event. */
 
 /* ---------- logo ---------- */
 
@@ -168,10 +146,10 @@
 /* ---------- wordmark ---------- */
 
 .wordmark {
-  font-family: var(--sakura-font-display);
+  font-family: var(--font-display);
   font-size: clamp(1.1rem, 4vw, 1.5rem);
   font-weight: 500;
-  color: var(--sakura-text);
+  color: var(--text);
   opacity: 0;
   transform: translateY(5px);
   letter-spacing: 0.02em;
@@ -192,8 +170,8 @@
   z-index: 1;
   background: none;
   border: none;
-  color: var(--sakura-text-secondary);
-  font-family: var(--sakura-font-body);
+  color: var(--text-2);
+  font-family: var(--font-body);
   font-size: 0.8125rem;
   letter-spacing: 0.04em;
   padding: 8px 16px;
@@ -204,7 +182,7 @@
 
 .skipButton:hover,
 .skipButton:focus-visible {
-  color: var(--sakura-accent);
+  color: var(--accent);
 }
 
 @keyframes fadeIn {

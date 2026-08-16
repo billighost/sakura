@@ -1,0 +1,405 @@
+/* Sign-in and sign-up.
+ *
+ * No card, no shadow, no decorative blobs. The two pages each had a shadowed
+ * panel floating over a pair of absolutely-positioned gradient orbs, which is
+ * both the thing the design brief bans and a solution to a problem this screen
+ * doesn't have: there is nothing behind the panel for it to be separated from.
+ *
+ * What's here instead is one stepped surface with the fields set edge-to-edge and
+ * divided by hairlines, the way a form is set on paper. That puts the whole
+ * weight of the page on type — a display-face wordmark at the top of the scale
+ * with the blossom as a single piece of punctuation — and lets the accent mean
+ * something, because it appears exactly twice: the focused field and the submit
+ * button. */
+
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: max(var(--space-6), env(safe-area-inset-top)) var(--gutter)
+    max(var(--space-6), env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.inner {
+  width: 100%;
+  max-width: 24rem;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.hero {
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/*
+ * The largest type in the app, and the only place the product's name is set at
+ * this size. The blossom rides on the baseline beside it rather than sitting
+ * above in a ring — a mark that punctuates the word reads as a logotype; a mark
+ * in a circle above centred text reads as a template.
+ */
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-3xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.mark {
+  display: inline-flex;
+  /* Optical, not metric: the petal's visual centre sits above its box centre,
+   * so aligning boxes leaves it floating. */
+  transform: translateY(-0.12em);
+  color: var(--accent);
+}
+
+/*
+ * The five petals settle in once on load. This is the app's own mark assembling
+ * itself, using the per-petal delays PetalIcon already carries on
+ * `data-part="petal"` — not an ambient loop. `data-part` is a plain attribute,
+ * so a CSS module can target it across the component boundary.
+ */
+.mark [data-part="petal"] {
+  animation: petalSettle 0.5s var(--spring-soft) both;
+  transform-origin: 12px 12px;
+}
+
+@keyframes petalSettle {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(calc(var(--petal-rot, 0deg) - 40deg));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(var(--petal-rot, 0deg));
+  }
+}
+
+.heading {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  color: var(--text-2);
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Fields are stacked with a shared hairline, so the group reads as one object.
+ * The last one loses its border and the submit button follows after a real gap,
+ * which is what keeps "the form" and "the action" from looking like one list.
+ */
+.field {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* Beside the label, not under the input — under the input it reflows the rest
+ * of the form every time validation state changes mid-typing. */
+.problem {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  color: var(--danger);
+  text-align: right;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  /* 1rem minimum: iOS Safari zooms the viewport when focusing anything smaller
+   * and never zooms back out. */
+  font-size: 1rem;
+  letter-spacing: var(--track-snug);
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+/*
+ * The focus ring goes on the row's bottom border rather than around the input.
+ * A borderless input inside a bordered row can't take the global focus outline
+ * without drawing a box that contradicts the layout, and the accent hairline is
+ * a stronger signal anyway — it's the only accent on screen until you submit.
+ */
+.field:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+.field:focus-within .label {
+  color: var(--accent);
+}
+
+.inputRowBad ~ * {
+  color: var(--danger);
+}
+
+/* Autofill in WebKit repaints the field with its own yellow. Overriding the
+ * fill via an inset shadow is the only thing that reliably wins. */
+.input:-webkit-autofill,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  box-shadow: inset 0 0 0 100px var(--bg);
+  caret-color: var(--text);
+}
+
+.reveal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-right: calc(var(--space-2) * -1);
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reveal:hover {
+    color: var(--text);
+  }
+}
+
+/* ── Password strength ────────────────────────────────────────────────────
+ *
+ * Four segments and a word. The word is what people read; the segments give it
+ * a shape you can take in without reading. Deliberately not a single bar with a
+ * colour ramp — a continuous bar implies a precision this heuristic doesn't
+ * have. */
+
+.strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.strengthTrack {
+  display: flex;
+  flex: 1;
+  gap: 3px;
+}
+
+.strengthSeg {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  transition: background-color var(--d-base) var(--ease);
+}
+
+.segWeak {
+  background: var(--danger);
+}
+
+.segFair {
+  background: var(--warning);
+}
+
+.segStrong {
+  background: var(--success);
+}
+
+.strengthLabel {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  color: var(--text-2);
+}
+
+.hint {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+}
+
+/* ── Terms ────────────────────────────────────────────────────────────────── */
+
+.terms {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 0;
+  cursor: pointer;
+}
+
+/* The native box, made visible rather than replaced. A hidden input plus a
+ * styled span is how the previous version did it, and it loses the platform's
+ * own focus ring, its keyboard behaviour and its accessibility mapping. */
+.checkbox {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0.1875rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.termsLabel {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+.termsLink {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Submit ───────────────────────────────────────────────────────────────── */
+
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 3rem;
+  margin-top: var(--space-6);
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 700;
+  letter-spacing: var(--track-snug);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.spin {
+  animation: authSpin 0.9s linear infinite;
+}
+
+@keyframes authSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .submit:hover:not(:disabled) {
+    background: var(--accent-press);
+  }
+}
+
+/* ── Error ────────────────────────────────────────────────────────────────── */
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  animation: slideDown var(--d-base) var(--ease) both;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.footer {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  text-align: center;
+}
+
+.footerLink {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .footerLink:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The petals appear rather than settling; the fade is kept because popping in
+   * with no transition at all is more jarring, not less. */
+  .mark [data-part="petal"] {
+    animation: fadeIn var(--d-base) var(--ease) both;
+  }
+
+  .spin {
+    animation-duration: 1.6s;
+  }
+}

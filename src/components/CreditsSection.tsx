@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Sheet } from "./Sheet";
+import { UserIcon } from "./Icons";
 import styles from "./CreditsSection.module.css";
 
 interface CreditsSectionProps {
@@ -19,6 +21,22 @@ interface SampleEntry {
   artistName?: string;
 }
 
+/** What /api/tracks/[id]/credits returns, narrowed to what's read here. */
+interface CreditsPayload {
+  credits?: CreditEntry[];
+  samples?: SampleEntry[];
+  sampledBy?: SampleEntry[];
+}
+
+/**
+ * The artist, from /api/artists/[id] or from a name search fallback. Only the
+ * two fields this component displays.
+ */
+interface ArtistPayload {
+  imageUrl?: string | null;
+  bio?: string | null;
+}
+
 /**
  * Sits directly below LyricsPreviewCard and deliberately shares its visual
  * grammar — same `.card` radius/fill/border/padding, same `.header` label
@@ -31,8 +49,8 @@ interface SampleEntry {
  * avatar rows for anything with a real credits list.
  */
 export function CreditsSection({ trackId, artistName, artistId }: CreditsSectionProps) {
-  const [creditsData, setCreditsData] = useState<any>(null);
-  const [artistData, setArtistData] = useState<any>(null);
+  const [creditsData, setCreditsData] = useState<CreditsPayload | null>(null);
+  const [artistData, setArtistData] = useState<ArtistPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBioModal, setShowBioModal] = useState(false);
 
@@ -47,8 +65,8 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
           artistId ? fetch(`/api/artists/${artistId}`) : Promise.resolve(null),
         ]);
 
-        const cData = creditsRes.ok ? await creditsRes.json() : null;
-        let aData = null;
+        const cData: CreditsPayload | null = creditsRes.ok ? await creditsRes.json() : null;
+        let aData: ArtistPayload | null = null;
 
         if (artistRes && artistRes.ok) {
           aData = await artistRes.json();
@@ -60,10 +78,11 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
             const searchRes = await fetch(`/api/search?q=${encodeURIComponent(artistName)}&limit=5`);
             if (searchRes.ok) {
               const searchJson = await searchRes.json();
+              const candidates: { name: string; imageUrl?: string | null; description?: string | null }[] =
+                searchJson.artists ?? [];
               const match =
-                (searchJson.artists || []).find(
-                  (a: any) => a.name.toLowerCase() === artistName.toLowerCase()
-                ) || searchJson.artists?.[0];
+                candidates.find((a) => a.name?.toLowerCase() === artistName.toLowerCase()) ??
+                candidates[0];
 
               if (match) {
                 aData = {
@@ -136,9 +155,7 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
               />
             ) : (
               <div className={`${styles.artistAvatar} ${styles.artistAvatarFallback}`}>
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
+                <UserIcon size={20} />
               </div>
             )}
             <div className={styles.artistMeta}>
@@ -205,46 +222,26 @@ export function CreditsSection({ trackId, artistName, artistId }: CreditsSection
         </div>
       )}
 
-      {showBioModal && artistData?.bio && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>About {artistName}</h2>
-              <button
-                type="button"
-                className={`${styles.modalCloseBtn} pressable`}
-                onClick={() => setShowBioModal(false)}
-                aria-label="Close bio"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  width="20"
-                  height="20"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <div className={styles.modalBody} data-lenis-prevent>
-              {artistData.imageUrl && (
-                <img
-                  src={artistData.imageUrl}
-                  alt={artistName}
-                  className={styles.modalImage}
-                  referrerPolicy="no-referrer"
-                />
-              )}
-              <p className={styles.fullBio}>{artistData.bio}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* <Sheet> rather than a hand-rolled overlay. The previous one trapped no
+          focus, ignored Escape, never restored focus on close and unmounted
+          instantly so its exit animation had nothing left to animate. */}
+      <Sheet
+        open={showBioModal && Boolean(artistData?.bio)}
+        onClose={() => setShowBioModal(false)}
+        title={`About ${artistName}`}
+        variant="sheet"
+      >
+        {artistData?.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={artistData.imageUrl}
+            alt=""
+            className={styles.modalImage}
+            referrerPolicy="no-referrer"
+          />
+        )}
+        <p className={styles.fullBio}>{artistData?.bio}</p>
+      </Sheet>
     </div>
   );
 }

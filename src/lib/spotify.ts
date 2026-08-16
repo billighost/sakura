@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import path from "path";
+import { fillMissingCovers } from "./metadata";
 
 export async function getSpotifyToken(): Promise<string> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -66,7 +67,20 @@ export async function scrapePublicSpotifyPlaylist(playlistId: string) {
     const title = item.title || item.name || "Unknown Track";
     const artist = item.subtitle || (Array.isArray(item.artists) ? item.artists.map((a: any) => a.name).join(", ") : "Unknown Artist");
     const durationMs = item.duration || item.duration_ms || 0;
-    const coverUrl = item.images?.[0]?.url || item.coverArt?.sources?.[0]?.url || item.album?.images?.[0]?.url || item.album?.coverArt?.sources?.[0]?.url || entity.coverArt?.sources?.[0]?.url || "";
+    /*
+     * Per-track art only. This deliberately does NOT fall back to
+     * `entity.coverArt` — that's the *playlist's* tile, and the embed's
+     * trackList carries no per-track art, so falling back to it wrote one image
+     * onto every song in the import. Leave it empty; `fillMissingCovers` (see
+     * lib/metadata.ts) resolves the real album art per track from Deezer, then
+     * iTunes.
+     */
+    const coverUrl =
+      item.images?.[0]?.url ||
+      item.coverArt?.sources?.[0]?.url ||
+      item.album?.images?.[0]?.url ||
+      item.album?.coverArt?.sources?.[0]?.url ||
+      "";
 
     tracks.push({
       title,
@@ -76,6 +90,8 @@ export async function scrapePublicSpotifyPlaylist(playlistId: string) {
       messageId: 0,
     });
   }
+
+  await fillMissingCovers(tracks);
 
   return {
     name: entity.name || entity.title || "Imported Playlist",
@@ -175,6 +191,11 @@ export async function fetchSpotifyPlaylist(url: string, userAccessToken?: string
   );
   const details = await detailsRes.json().catch(() => ({}));
 
+  // Spotify occasionally returns a track with no album images at all. Rather
+  // than leave those rows blank (or, worse, inherit the playlist's tile), look
+  // the artwork up in Deezer/iTunes.
+  await fillMissingCovers(tracks);
+
   return {
     name: details.name ?? "Imported Playlist",
     coverUrl: details.images?.[0]?.url ?? "",
@@ -246,6 +267,8 @@ export async function fetchSpotifyPlaylistWithToken(playlistId: string, accessTo
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const details = await detailsRes.json().catch(() => ({}));
+
+  await fillMissingCovers(tracks);
 
   return {
     name: details.name ?? "Imported Playlist",

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { GENRES } from "@/lib/genres";
+import { CheckIcon, SpinnerIcon, UserIcon } from "@/components/Icons";
+import { haptic } from "@/lib/haptics";
 import styles from "./page.module.css";
 
 /**
@@ -18,6 +19,19 @@ import styles from "./page.module.css";
  * Skippable at every step. A skipped onboarding still leaves a usable profile
  * — the engine falls back to popularity and learns from behaviour instead.
  *
+ * ── Why the genre step looks like this ──────────────────────────────────────
+ *
+ * The genre registry carries a drawn scene per genre — a DJ over a turntable, a
+ * pianist at a keyboard, a flame — each with its own tone. This step used to
+ * render them at 18px beside a label in a text chip, which is the one place in
+ * the app those illustrations appear and the one place they were too small to
+ * see. They're the tile now, and the label sits under them.
+ *
+ * Selection is still marked in accent pink rather than in each genre's own tone.
+ * Tinting the tile by genre was the first idea and it's wrong twice: it spends
+ * the accent's exclusive job on decoration, and across thirty different hues you
+ * can no longer tell at a glance which ones you picked.
+ *
  * ── Why the genre list isn't fetched ────────────────────────────────────────
  *
  * It used to come from `/api/taste/seeds`, which intersected a curated list
@@ -26,10 +40,6 @@ import styles from "./page.module.css";
  * down to a handful, which is the wrong answer twice over: it made the app look
  * empty, and the filter was pointless anyway now that both the artist picker and
  * the mix pools are provider-backed. A genre we hold nothing for works fine.
- *
- * That endpoint also sent `{ id, label, icon }` while this page rendered
- * `g.emoji`, so every chip drew an empty span. Importing the registry directly
- * fixes that by construction — the icons are components, and there is one list.
  */
 
 type Artist = {
@@ -41,9 +51,9 @@ type Artist = {
 };
 
 const MIN_GENRES = 3;
+const STEPS = ["Sounds", "Artists", "Taste"] as const;
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const [step, setStep] = useState(0);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
@@ -54,17 +64,21 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
 
   const toggleGenre = useCallback((id: string) => {
+    haptic("selection");
     setSelectedGenres((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
 
   const toggleArtist = useCallback((id: string) => {
+    haptic("selection");
     setSelectedArtists((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
@@ -149,7 +163,7 @@ export default function OnboardingPage() {
 
       if (!res.ok && !skipped) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || "We couldn't save your picks.");
       }
 
       // Kick mixes off now so the home page has something waiting.
@@ -170,141 +184,209 @@ export default function OnboardingPage() {
        * race, and the cached entry can still win. A full document load is the
        * only thing guaranteed to discard the client Router Cache, and it costs
        * one navigation on a once-per-account flow.
+       *
+       * The lint rule recommending router.push is right in general and wrong
+       * here — push is precisely what caused the loop.
        */
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/home");
-    } catch (e: any) {
-      setError(e.message || "Something went wrong");
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? `${e.message} Check your connection and try again.`
+          : "Something went wrong. Try again in a moment."
+      );
       setSubmitting(false);
     }
   }
 
-  return (
-    <div className={styles.container}>
-      <div className={styles.bloom} aria-hidden="true" />
+  const remaining = MIN_GENRES - selectedGenres.size;
+  const artistCount = selectedArtists.size;
 
-      <div className={styles.card}>
-        <div className={styles.progressTrack} aria-hidden="true">
-          <div className={styles.progressFill} style={{ width: `${((step + 1) / 3) * 100}%` }} />
-        </div>
+  const discoveryLabel = useMemo(
+    () =>
+      discovery < 0.3
+        ? "Mostly artists and songs you already love."
+        : discovery < 0.6
+          ? "A steady mix of favourites and new finds."
+          : "Heavy on music you've never heard before.",
+    [discovery]
+  );
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.inner}>
+        {/*
+          The step is named, not just counted. "Step 2 of 3" tells you how much
+          is left; "Artists" tells you what you're about to be asked, which is
+          the part that makes a three-step flow feel short rather than open-ended.
+        */}
+        <nav className={styles.progress} aria-label="Progress">
+          {STEPS.map((label, i) => (
+            <div
+              key={label}
+              className={`${styles.tick} ${i <= step ? styles.tickDone : ""}`}
+              aria-current={i === step ? "step" : undefined}
+            >
+              <span className={styles.tickBar} />
+              <span className={styles.tickLabel}>{label}</span>
+            </div>
+          ))}
+        </nav>
 
         {step === 0 && (
           <section className={styles.step}>
-            <h1 className={styles.title}>What do you listen to?</h1>
-            <p className={styles.subtitle}>
-              Pick at least {MIN_GENRES}. This shapes your mixes and what plays when a queue runs out.
-            </p>
+            <header className={styles.head}>
+              <h1 className={styles.title}>What do you listen to?</h1>
+              <p className={styles.sub}>
+                Pick at least {MIN_GENRES}. This shapes your mixes and what plays when a
+                queue runs out.
+              </p>
+            </header>
 
-            <div className={styles.grid} data-lenis-prevent>
-              {GENRES.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={`${styles.chip} ${selectedGenres.has(g.id) ? styles.chipActive : ""}`}
-                  onClick={() => toggleGenre(g.id)}
-                  aria-pressed={selectedGenres.has(g.id)}
-                >
-                  <span className={styles.chipIcon} aria-hidden="true">
-                    <g.Icon size={18} tone={g.tone} />
-                  </span>
-                  {g.label}
-                </button>
-              ))}
+            <div className={styles.genreGrid} data-lenis-prevent>
+              {GENRES.map((g) => {
+                const on = selectedGenres.has(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`${styles.genre} ${on ? styles.genreOn : ""} pressable`}
+                    onClick={() => toggleGenre(g.id)}
+                    aria-pressed={on}
+                  >
+                    {/* `data-anim` is what Icons.module.css keys its per-part
+                        keyframes off, so a selected tile's scene comes alive —
+                        the turntable spins, the flame flickers. */}
+                    <span className={styles.genreArt} data-anim={on ? "" : undefined}>
+                      <g.Icon size={40} tone={g.tone} />
+                    </span>
+                    <span className={styles.genreLabel}>{g.label}</span>
+                    {on && (
+                      <span className={styles.genreCheck} aria-hidden="true">
+                        <CheckIcon size={12} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className={styles.actions}>
-              <button type="button" className={styles.skip} onClick={() => submit(true)} disabled={submitting}>
-                Skip for now
+            <footer className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.quiet} pressable`}
+                onClick={() => submit(true)}
+                disabled={submitting}
+              >
+                Skip
               </button>
               <button
                 type="button"
-                className={styles.primary}
+                className={`${styles.primary} pressable`}
                 onClick={() => {
                   // Usually already warmed by the prefetch effect; this covers
                   // the case where Continue is hit inside the debounce window.
                   loadArtists(selectedGenres);
                   setStep(1);
                 }}
-                disabled={selectedGenres.size < MIN_GENRES}
+                disabled={remaining > 0}
               >
-                {selectedGenres.size < MIN_GENRES
-                  ? `Pick ${MIN_GENRES - selectedGenres.size} more`
-                  : "Continue"}
+                {remaining > 0 ? `Pick ${remaining} more` : "Next"}
               </button>
-            </div>
+            </footer>
           </section>
         )}
 
         {step === 1 && (
           <section className={styles.step}>
-            <h1 className={styles.title}>Any of these?</h1>
-            <p className={styles.subtitle}>
-              Optional — but picking a few gives your first mixes a real head start.
-            </p>
+            <header className={styles.head}>
+              <h1 className={styles.title}>Anyone you love?</h1>
+              <p className={styles.sub}>
+                Optional — but a few picks give your first mixes a real head start.
+              </p>
+            </header>
 
-            {loadingArtists ? (
-              <div className={styles.artistGrid} data-lenis-prevent>
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className={styles.artistCard}>
-                    <div className={styles.artistAvatarWrap}>
-                      <div className={`${styles.artistAvatar} skeleton`} />
+            <div className={styles.artistGrid} data-lenis-prevent>
+              {loadingArtists
+                ? Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className={styles.artist} aria-hidden="true">
+                      <span className={`${styles.artistArt} skeleton`} />
+                      <span className={`${styles.artistNameSkeleton} skeleton`} />
                     </div>
-                    <span className={`${styles.artistName} skeleton`}>&nbsp;</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.artistGrid} data-lenis-prevent>
-                {artists.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={`${styles.artistCard} ${selectedArtists.has(a.id) ? styles.artistActive : ""}`}
-                    onClick={() => toggleArtist(a.id)}
-                    aria-pressed={selectedArtists.has(a.id)}
-                  >
-                    <div className={styles.artistAvatarWrap}>
-                      {a.imageUrl ? (
-                        <img src={a.imageUrl} alt="" className={styles.artistAvatar} referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className={styles.artistFallback}>{a.name.slice(0, 1).toUpperCase()}</div>
-                      )}
-                      {selectedArtists.has(a.id) && (
-                        <span className={styles.check} aria-hidden="true">
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
+                  ))
+                : artists.map((a) => {
+                    const on = selectedArtists.has(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={`${styles.artist} ${on ? styles.artistOn : ""} pressable`}
+                        onClick={() => toggleArtist(a.id)}
+                        aria-pressed={on}
+                      >
+                        <span className={styles.artistArt}>
+                          {a.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={a.imageUrl}
+                              alt=""
+                              className={styles.artistImg}
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className={styles.artistFallback}>
+                              <UserIcon size={22} />
+                            </span>
+                          )}
+                          {on && (
+                            <span className={styles.artistCheck} aria-hidden="true">
+                              <CheckIcon size={13} />
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </div>
-                    <span className={styles.artistName}>{a.name}</span>
-                  </button>
-                ))}
-                {artists.length === 0 && (
-                  <p className={styles.empty}>
-                    Couldn’t reach our music source just now — we’ll learn from what
-                    you play instead.
-                  </p>
-                )}
-              </div>
+                        <span className={styles.artistName}>{a.name}</span>
+                      </button>
+                    );
+                  })}
+            </div>
+
+            {!loadingArtists && artists.length === 0 && (
+              <p className={styles.empty}>
+                We couldn&apos;t reach our music source just now. Skip ahead — Sakura
+                will learn from what you play instead.
+              </p>
             )}
 
-            <div className={styles.actions}>
-              <button type="button" className={styles.skip} onClick={() => setStep(0)}>
+            <footer className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.quiet} pressable`}
+                onClick={() => setStep(0)}
+              >
                 Back
               </button>
-              <button type="button" className={styles.primary} onClick={() => setStep(2)}>
-                Continue
+              <button
+                type="button"
+                className={`${styles.primary} pressable`}
+                onClick={() => setStep(2)}
+              >
+                {/* Says what you've done, not just what's next. */}
+                {artistCount > 0 ? `Next with ${artistCount}` : "Skip this bit"}
               </button>
-            </div>
+            </footer>
           </section>
         )}
 
         {step === 2 && (
           <section className={styles.step}>
-            <h1 className={styles.title}>How adventurous?</h1>
-            <p className={styles.subtitle}>
-              When a queue runs dry, we keep playing. This sets how far we'll stray from what you know.
-            </p>
+            <header className={styles.head}>
+              <h1 className={styles.title}>How adventurous?</h1>
+              <p className={styles.sub}>
+                When a queue runs dry, Sakura keeps playing. This sets how far it strays
+                from what you know.
+              </p>
+            </header>
 
             <div className={styles.sliderBlock}>
               <input
@@ -314,39 +396,48 @@ export default function OnboardingPage() {
                 value={Math.round(discovery * 100)}
                 onChange={(e) => setDiscovery(Number(e.target.value) / 100)}
                 className={styles.slider}
-                aria-label="Discovery level"
+                aria-label="How much new music to mix in"
+                aria-valuetext={discoveryLabel}
               />
-              <div className={styles.sliderLabels}>
+              <div className={styles.sliderEnds}>
                 <span>Familiar</span>
                 <span>Surprise me</span>
               </div>
-              <p className={styles.sliderHint}>
-                {discovery < 0.3
-                  ? "Mostly artists and songs you already love."
-                  : discovery < 0.6
-                    ? "A steady mix of favourites and new finds."
-                    : "Heavy on music you've never heard before."}
+              {/* aria-live so a change is announced: the visual feedback for
+                  moving this slider is entirely in this sentence. */}
+              <p className={styles.sliderHint} aria-live="polite">
+                {discoveryLabel}
               </p>
             </div>
 
-            {error && <p className={styles.error}>{error}</p>}
+            {error && (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            )}
 
-            <div className={styles.actions}>
-              <button type="button" className={styles.skip} onClick={() => setStep(1)} disabled={submitting}>
+            <footer className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.quiet} pressable`}
+                onClick={() => setStep(1)}
+                disabled={submitting}
+              >
                 Back
               </button>
               <button
                 type="button"
-                className={styles.primary}
+                className={`${styles.primary} pressable`}
                 onClick={() => submit(false)}
                 disabled={submitting}
               >
-                {submitting ? "Building your mixes…" : "Finish"}
+                {submitting && <SpinnerIcon size={16} className={styles.spin} />}
+                {submitting ? "Building your mixes…" : "Start listening"}
               </button>
-            </div>
+            </footer>
           </section>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -64,6 +64,40 @@ export function getTheme(): ThemeId {
 }
 
 /**
+ * The stored preference, or null when this device has never chosen one.
+ *
+ * ── Why this is separate from `getTheme` ────────────────────────────────────
+ *
+ * `getTheme()` collapses "the user chose System" and "nothing has ever been
+ * stored" into the same value, because for *painting* they mean the same thing:
+ * no override. For *reconciling against the server* they mean opposite things,
+ * and conflating them was a real bug.
+ *
+ * The settings page adopts the server's theme when it differs from the local
+ * one. `UserSettings.theme` used to default to `"dark"`, and `/api/settings`
+ * returned `"dark"` when the row didn't exist at all — so for anyone who had
+ * never explicitly picked a theme, the server said "dark" purely as a column
+ * default while `getTheme()` said "system". Those differ, so every visit to the
+ * settings page silently repainted the app dark and wrote that to localStorage.
+ * On a light-mode phone you watched the page change colour for no reason you
+ * asked for. It looked like the page was "fetching the theme from the server",
+ * which is exactly what it was doing — with a value nobody had chosen.
+ *
+ * With this, the page can ask the question that actually matters: has this
+ * device made a choice? If it has, that choice stands and the server is brought
+ * into line with it. If it hasn't, adopting the account's value is right.
+ */
+export function getStoredTheme(): ThemeId | null {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  return isTheme(stored) ? stored : null;
+}
+
+/**
  * Server snapshot for `useSyncExternalStore`. There is no storage on the
  * server, and guessing a palette would produce a hydration mismatch on every
  * light-mode device, so the honest answer is the preference that means

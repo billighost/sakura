@@ -4,7 +4,28 @@ import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { renderShareCard, canvasToBlob, type CardTrack } from "@/lib/shareCard";
 import { deliverShare, shareFilename } from "@/lib/shareDelivery";
+import { DownloadedIcon, LyricsIcon, PetalIcon, ShareIcon, SparklesIcon } from "@/components/Icons";
 import styles from "./page.module.css";
+
+/**
+ * The public share landing page.
+ *
+ * This is the only screen in the app most of its visitors will ever see: a share
+ * link is sent to someone else by definition, so the typical arrival here has no
+ * account and no idea what Sakura is.
+ *
+ * It used to treat them as a lapsed user — a card, a title, and one button
+ * reading "Log in to listen". Two problems with that. Someone with no account
+ * can't log in, so the primary action was the wrong one; and nothing on the page
+ * said what they'd be logging into, so there was no reason to.
+ *
+ * Now it answers both: the shared thing is still the hero, and under it a
+ * signed-out visitor gets a one-line statement of what the app is, three things
+ * it does, and an invitation to sign up — with signing in kept as the quieter
+ * option for the minority who already have an account. The card can still be
+ * saved and passed on without signing up at all, which is the honest way to be
+ * useful to someone who's never going to.
+ */
 
 interface Props {
   kind: string;
@@ -13,17 +34,11 @@ interface Props {
   lyricTime?: number;
   theme: string;
   sharedBy: string;
-  /**
-   * Whether the viewer has an account and is signed in.
-   *
-   * A share link is the one page in the app built to be opened by someone who
-   * isn't a user yet, so it has to tell them the truth about what the button
-   * does — see the CTA below.
-   */
+  /** Whether the viewer has an account and is signed in. */
   isSignedIn: boolean;
 }
 
-export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy, isSignedIn }: Props) {
+export function ShareClientPage({ kind, track, lines, theme, sharedBy, isSignedIn }: Props) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
@@ -52,42 +67,31 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
         const blob = await canvasToBlob(canvasRef.current!);
         if (blob && !cancelled) setImageBlob(blob);
       } catch {
-        if (!cancelled) setError("Couldn't render the card.");
+        if (!cancelled) setError("We couldn't draw the card, but the song details are below.");
       }
     })();
 
     return () => {
       cancelled = true;
     };
+    // Keyed on the track's identity, not the object's: `track` is rebuilt by the
+    // server component on every render, so depending on it would redraw a
+    // 1080×1080 canvas continuously.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track.id, kind, theme, lines]);
 
-  /**
-   * Where the primary button goes, and what it admits to.
-   *
-   * This used to be an unconditional "Open Sakura" that pushed `/home`. For a
-   * signed-in viewer that's right, but a share link is deliberately public — the
-   * whole point is that it's sent to someone else — so the typical visitor here
-   * is *not* signed in, and for them the proxy turned that tap into a silent
-   * bounce to a login screen they hadn't asked for and weren't told about.
-   *
-   * Signed out, the button now says so and carries `next`, so signing in lands
-   * them on the track that was shared with them rather than a generic home feed.
-   * That's the difference between a share link that recruits someone and one
-   * that loses them at an unexplained login wall.
+  /*
+   * Where the buttons go. `next` carries the shared track through sign-up and
+   * sign-in, so whichever door they come through they land on the thing that was
+   * shared with them rather than a generic home feed.
    */
   const destination = track.id ? `/track/${track.id}` : "/home";
+  const withNext = (path: string) => `${path}?next=${encodeURIComponent(destination)}`;
 
-  const handleGoToApp = () => {
-    router.push(
-      isSignedIn ? destination : `/login?next=${encodeURIComponent(destination)}`
-    );
-  };
-
-  const handleShare = async () => {
+  const handleSaveCard = async () => {
     if (!imageBlob) return;
     // Through the shared delivery layer so this page gets the same
     // cancelled-is-not-an-error handling and download fallback as the studio.
-    // Previously an unsupported target silently did nothing at all.
     const outcome = await deliverShare({
       blob: imageBlob,
       filename: shareFilename(track, "png"),
@@ -98,47 +102,107 @@ export function ShareClientPage({ kind, track, lines, lyricTime, theme, sharedBy
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.card}>
-        <div className={styles.art}>
+    <main className={styles.page}>
+      <div className={styles.inner}>
+        <header className={styles.brand}>
+          <span className={styles.mark} aria-hidden="true">
+            <PetalIcon size={18} filled />
+          </span>
+          Sakura
+        </header>
+
+        <section className={styles.shared}>
           {error ? (
-            <div className={styles.error}>{error}</div>
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
           ) : (
-            <canvas
-              ref={canvasRef}
-              width={1080}
-              height={1080}
-              style={{
-                width: "100%",
-                maxWidth: "20rem",
-                aspectRatio: "1",
-                borderRadius: "16px",
-                boxShadow: "0 10px 40px rgba(0,0,0,0.3)",
-              }}
-            />
+            <canvas ref={canvasRef} width={1080} height={1080} className={styles.canvas} />
           )}
-        </div>
 
-        <div className={styles.info}>
-          {kind === "lyric" && lines.length > 0 && (
-            <p className={styles.lyric}>"{lines[0]}"</p>
-          )}
-          <h1 className={styles.title}>{track.title}</h1>
-          <p className={styles.artist}>{track.artist}</p>
-          <p className={styles.sharedBy}>Shared by {sharedBy} · Sakura</p>
-        </div>
+          <div className={styles.info}>
+            {kind === "lyric" && lines.length > 0 && (
+              <p className={styles.lyric}>&ldquo;{lines[0]}&rdquo;</p>
+            )}
+            <h1 className={styles.title}>{track.title}</h1>
+            <p className={styles.artist}>{track.artist}</p>
+            <p className={styles.sharedBy}>Shared by {sharedBy}</p>
+          </div>
+        </section>
 
-        <div className={styles.actions}>
-          <button className={styles.primary} onClick={handleGoToApp}>
-            {isSignedIn ? "Open Sakura" : "Log in to listen"}
-          </button>
-          {imageBlob && (
-            <button className={styles.secondary} onClick={handleShare}>
-              Share
+        {isSignedIn ? (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={`${styles.primary} pressable`}
+              onClick={() => router.push(destination)}
+            >
+              Play it
             </button>
-          )}
-        </div>
+            {imageBlob && (
+              <button
+                type="button"
+                className={`${styles.secondary} pressable`}
+                onClick={handleSaveCard}
+              >
+                <ShareIcon size={16} />
+                Pass it on
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/*
+              The pitch. Three things, each one a real capability rather than a
+              slogan — and the offline one first, because it's the one thing here
+              that the big streaming apps make you pay for.
+            */}
+            <section className={styles.pitch}>
+              <h2 className={styles.pitchTitle}>What Sakura is</h2>
+              <p className={styles.pitchLede}>
+                A music player that keeps your songs on your phone, so they play
+                whether or not you have signal.
+              </p>
+              <ul className={styles.features}>
+                <li>
+                  <DownloadedIcon size={16} />
+                  Save anything for offline — free
+                </li>
+                <li>
+                  <LyricsIcon size={16} />
+                  Lyrics that follow along, line by line
+                </li>
+                <li>
+                  <SparklesIcon size={16} />
+                  Mixes built from what you actually play
+                </li>
+              </ul>
+            </section>
+
+            <div className={styles.actions}>
+              <a href={withNext("/register")} className={`${styles.primary} pressable`}>
+                Create a free account
+              </a>
+              <a href={withNext("/login")} className={`${styles.quiet} pressable`}>
+                I already have one
+              </a>
+            </div>
+
+            {/* Useful without an account. Saving the card needs no sign-up, and
+                offering it makes the page worth opening either way. */}
+            {imageBlob && (
+              <button
+                type="button"
+                className={`${styles.cardAction} pressable`}
+                onClick={handleSaveCard}
+              >
+                <ShareIcon size={15} />
+                Save or pass on this card
+              </button>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

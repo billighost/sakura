@@ -41,11 +41,20 @@
   /*
    * Tinted with the track's own accent — extracted from the artwork, see
    * color.ts — rather than a flat neutral fill, so the card carries this
-   * song's mood instead of reading as a generic panel. Mixed down to ~28%
-   * into a dark base, not shown at full saturation, so the on-media text
-   * tokens stay legible regardless of how bright the source photo is.
+   * song's mood instead of reading as a generic panel.
+   *
+   * Both the base and the mix strength are theme tokens. They used to be a
+   * hardcoded `#16121a` at a fixed 28%, which meant light mode drew a *dark*
+   * panel and then put light mode's near-black `--on-media` text on it — the
+   * lyric preview was effectively unreadable. Light mode now mixes less accent
+   * into a pale base, so the relationship (quiet tinted surface, high-contrast
+   * type) survives the theme instead of inverting.
    */
-  background: color-mix(in srgb, var(--track-accent, var(--accent)) 28%, #16121a 72%);
+  background: color-mix(
+    in srgb,
+    var(--track-accent, var(--accent)) var(--media-tint-mix),
+    var(--media-tint-base)
+  );
   border: 1px solid var(--media-chrome-line);
   cursor: pointer;
   box-sizing: border-box;
@@ -62,7 +71,11 @@
 
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    background: color-mix(in srgb, var(--track-accent, var(--accent)) 36%, #16121a 64%);
+    background: color-mix(
+      in srgb,
+      var(--track-accent, var(--accent)) var(--media-tint-mix-hover),
+      var(--media-tint-base)
+    );
   }
 }
 
@@ -134,6 +147,24 @@
   font-size: 1.1875rem;
 }
 
+/*
+ * The invitation into the full lyrics view.
+ *
+ * ── Why this isn't `--on-media` any more ────────────────────────────────────
+ *
+ * It was `background: var(--on-media); color: #14101b`. In dark mode that's a
+ * white pill with near-black text, which is fine. In light mode `--on-media` is
+ * `#17111d` — so it was near-black text on a near-black pill: the button
+ * disappeared completely, and the only way into the lyrics was to guess that the
+ * card was tappable.
+ *
+ * Now it's the accent, which is the app's one signal for "this is the action" and
+ * is defined per theme with a foreground guaranteed to read against it
+ * (`--on-accent`: near-black on dark mode's pink, white on light mode's deeper
+ * pink). `--track-accent` is deliberately *not* used here: it comes from a
+ * photograph and can land anywhere, and this is the one control on the card that
+ * has to be findable on every cover.
+ */
 .showBtn {
   align-self: flex-start;
   display: inline-flex;
@@ -141,8 +172,21 @@
   gap: 6px;
   padding: 0.4375rem 0.875rem;
   border-radius: var(--r-full);
-  background: var(--on-media);
-  color: #14101b;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: var(--t-xs);
   font-weight: 700;
+  letter-spacing: var(--track-snug);
+  box-shadow: var(--shadow-1);
+  transition: background var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover .showBtn {
+    background: var(--accent-press);
+  }
+}
+
+.card:active .showBtn {
+  transform: scale(0.96);
 }

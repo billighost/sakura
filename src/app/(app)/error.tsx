@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { useOffline } from "next/offline";
+import { AlertIcon, OfflineIcon } from "@/components/Icons";
 import styles from "./error.module.css";
 
 /**
@@ -22,45 +24,44 @@ export default function AppError({
     console.error("[route error]", error);
   }, [error]);
 
-  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  /*
+   * `useOffline` rather than reading `navigator.onLine` once during render.
+   * `navigator.onLine` is only trustworthy when false, and reading it in render
+   * means the answer is fixed at mount — so a connection that comes back while
+   * this screen is up left it still claiming to be offline.
+   */
+  const offline = useOffline();
 
   return (
     <div className={styles.wrap} role="alert">
       <div className={styles.card}>
         <div className={styles.glyph} aria-hidden="true">
-          <svg viewBox="0 0 48 48" width="56" height="56" fill="none">
-            <circle cx="24" cy="24" r="21" stroke="currentColor" strokeWidth="2" opacity="0.18" />
-            <path
-              d="M24 14v12"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-            <circle cx="24" cy="33" r="2.2" fill="currentColor" />
-          </svg>
+          {offline ? <OfflineIcon size={30} /> : <AlertIcon size={30} />}
         </div>
 
         <h1 className={styles.title}>
-          {offline ? "You're offline" : "Something broke"}
+          {offline ? "No connection" : "This page didn't load"}
         </h1>
         <p className={styles.body}>
           {offline
-            ? "This page needs a connection. Your downloads still play — everything you've saved is available offline."
-            : "This page hit an unexpected error. Your music and library are safe."}
+            ? "This page needs the internet. Everything you've saved for offline still plays."
+            : "Something went wrong on our side. Nothing has happened to your music or your playlists."}
         </p>
 
         <div className={styles.actions}>
-          <button className={styles.primary} onClick={reset}>
+          <button type="button" className={`${styles.primary} pressable`} onClick={reset}>
             Try again
           </button>
-          <a className={styles.secondary} href="/library/downloaded">
-            Go to downloads
+          {/* A real navigation, not a Link: the router may be part of what
+              failed, and this is the one route the service worker guarantees. */}
+          <a className={`${styles.secondary} pressable`} href="/library/downloaded">
+            Play my downloads
           </a>
         </div>
 
         {error.digest && (
           <p className={styles.digest}>
-            Reference <code>{error.digest}</code>
+            If you report this, quote <code>{error.digest}</code>.
           </p>
         )}
       </div>

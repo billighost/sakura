@@ -1,40 +1,88 @@
+/* Offline fallback, served by the service worker on a cold navigation with no
+ * network and no cached copy of the target route.
+ *
+ * Migrated off the `--sakura-*` aliases. Shares its composition with the route
+ * error boundary — both are "this page isn't here" screens, and they should read
+ * as the same kind of moment rather than two unrelated designs.
+ */
+
 .wrap {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100dvh;
-  padding: var(--space-5) var(--space-4);
-  background: var(--sakura-bg);
-  color: var(--sakura-text);
+  padding: var(--space-7) var(--gutter);
+  background: var(--bg);
 }
 
 .card {
   width: 100%;
-  max-width: 22rem;
+  max-width: 26rem;
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .glyph {
-  color: var(--sakura-accent);
-  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-3);
 }
 
 .title {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.375rem, 6vw, 1.75rem);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--t-xl);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--text);
 }
 
 .body {
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--sakura-text-secondary);
-  text-wrap: pretty;
+  margin: 0 auto var(--space-5);
+  max-width: 32ch;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+}
+
+/* ── What still works ─────────────────────────────────────────────────────
+ *
+ * Left-aligned inside the centred card, deliberately. A centred list of two
+ * different-length lines has no edge for the eye to follow, and this is the part
+ * of the page that's actually reassuring rather than apologetic. */
+
+.works {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4);
+  border-radius: var(--r-md);
+  background: var(--success-soft);
+  list-style: none;
+  text-align: left;
+}
+
+.works li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--text);
+}
+
+.works svg {
+  flex-shrink: 0;
+  color: var(--success);
 }
 
 .actions {
@@ -42,36 +90,38 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
-  width: 100%;
 }
 
 .primary,
 .secondary {
-  flex: 1 1 9rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: var(--tap-min);
-  padding: 0 var(--space-4);
-  border-radius: 999px;
-  font-size: 0.875rem;
+  padding: 0 var(--space-5);
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
   font-weight: 600;
   text-decoration: none;
-  border: 1px solid transparent;
 }
 
 .primary {
-  background: var(--sakura-accent-gradient);
-  color: #fff;
-  box-shadow: 0 6px 20px -6px var(--sakura-accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .secondary {
-  color: var(--sakura-text);
-  border-color: var(--sakura-border);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
 }
 
-.secondary:hover {
-  background: var(--sakura-hover);
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover {
+    background: var(--accent-press);
+  }
+
+  .secondary:hover {
+    background: var(--surface-2);
+  }
 }

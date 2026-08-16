@@ -200,6 +200,97 @@ export async function searchDeezerTrack(
   );
 }
 
+/**
+ * Find artwork for one track, by identifying it in a provider catalogue.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * Spotify's embed payload — the keyless engine every public import goes through
+ * first — carries per-track artwork for an *album* but not for a *playlist*: its
+ * `trackList` entries are name/artist/duration only. The importer used to paper
+ * over that by falling back to the entity's own cover, which for a playlist link
+ * is the **playlist artwork**. So a 40-track import wrote one image onto all 40
+ * `Track.coverUrl` rows and every song in the app showed the playlist's tile.
+ *
+ * The honest fix is to leave the cover absent at that point and resolve it per
+ * track from a catalogue that actually has album art, which is what this does:
+ * Deezer first (it's the catalogue the rest of the app is built on and its
+ * search is already cached/circuit-broken), then iTunes, whose artwork is higher
+ * resolution and whose `100x100` URL rewrites to any size.
+ *
+ * Returns null when neither provider can identify the track — a missing cover is
+ * a placeholder in the UI, which is correct, and infinitely better than the
+ * wrong cover, which is a lie.
+ */
+export async function findTrackCover(
+  title: string,
+  artist: string,
+): Promise<string | null> {
+  try {
+    const dz = await searchDeezerTrack(title, artist);
+    const dzCover = dz?.album?.cover_big || dz?.album?.cover_medium;
+    if (dzCover) return dzCover;
+  } catch {
+    // Fall through to iTunes.
+  }
+
+  try {
+    const it = await searchItunesTrack(title, artist);
+    const itCover = itunesArtwork(it?.artworkUrl100, 1000);
+    if (itCover) return itCover;
+  } catch {
+    // No cover is a valid answer.
+  }
+
+  return null;
+}
+
+/**
+ * Fill in `coverUrl` for the entries that don't have one, in place.
+ *
+ * Bounded and batched on purpose. An unbounded pass over a 300-track playlist
+ * would fire 300 provider lookups inside one request; a fully serial pass would
+ * take minutes. `limit` caps the work and `concurrency` keeps the provider's
+ * rate limit intact — the searches are cached, so a re-import or a second
+ * playlist sharing tracks costs nothing.
+ *
+ * Anything past `limit` keeps whatever it arrived with (usually nothing), and
+ * the UI shows a placeholder rather than someone else's artwork.
+ */
+export async function fillMissingCovers<T extends { title: string; artist: string; coverUrl?: string | null }>(
+  tracks: T[],
+  { limit = 120, concurrency = 6 }: { limit?: number; concurrency?: number } = {},
+): Promise<{ filled: number; skipped: number }> {
+  const needy: T[] = [];
+  let skipped = 0;
+
+  for (const track of tracks) {
+    if (track.coverUrl || !track.title) continue;
+    if (needy.length >= limit) {
+      skipped += 1;
+      continue;
+    }
+    needy.push(track);
+  }
+
+  let filled = 0;
+
+  for (let i = 0; i < needy.length; i += concurrency) {
+    const batch = needy.slice(i, i + concurrency);
+    await Promise.all(
+      batch.map(async (track) => {
+        const cover = await findTrackCover(track.title, track.artist);
+        if (cover) {
+          track.coverUrl = cover;
+          filled += 1;
+        }
+      }),
+    );
+  }
+
+  return { filled, skipped };
+}
+
 /** Fallback identification when Deezer is down or has no match. */
 export async function searchItunesTrack(
   title: string,

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, execute } from "@/lib/sql";
 import { auth } from "@/lib/auth";
-import { enrichMusicBrainzAndSave } from "@/lib/metadata";
+import { enrichMusicBrainzAndSave, fillMissingCovers } from "@/lib/metadata";
 import { getDeterministicTrackId } from "@/lib/deterministic";
+
+interface IncomingTrack {
+  title: string;
+  artist: string;
+  duration?: number;
+  coverUrl?: string | null;
+}
 
 export async function POST(
   req: NextRequest,
@@ -14,13 +21,13 @@ export async function POST(
   }
 
   const { id } = await params;
-  const { tracks } = await req.json();
+  const { tracks, coverUrl: sourceCoverUrl } = await req.json();
 
   if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
     return NextResponse.json({ error: "Invalid tracks array" }, { status: 400 });
   }
 
-  const playlist = await queryOne(
+  const playlist = await queryOne<{ id: string; coverUrl: string | null }>(
     `SELECT id, "coverUrl" FROM "Playlist" WHERE id = $1 AND "userId" = $2`,
     [id, session.user.id!]
   );
@@ -30,27 +37,69 @@ export async function POST(
   }
 
   try {
-    let maxRow = await queryOne<{ maxPos: number | null }>(
+    const maxRow = await queryOne<{ maxPos: number | null }>(
       `SELECT MAX(position) as "maxPos" FROM "PlaylistTrack" WHERE "playlistId" = $1`,
       [id]
     );
     let pos = (maxRow?.maxPos ?? -1) + 1;
 
+    const incoming = tracks as IncomingTrack[];
+
+    /*
+     * Resolve the covers the source didn't supply, before any of them is written.
+     *
+     * This is the backstop for the bug this route used to help cause. Spotify's
+     * embed payload has no per-track art for a playlist, and the importer papered
+     * over that by handing every track the *playlist's* tile — which this route
+     * then wrote into `Track.coverUrl`, so every song in the import showed the
+     * playlist's artwork everywhere in the app. The resolvers no longer do that
+     * (see lib/importLink.ts), which means covers arrive genuinely absent here,
+     * and absent is what gets looked up: Deezer first, then iTunes.
+     *
+     * Awaited rather than fired and forgotten — this is a serverless handler, so
+     * work started after the response is not guaranteed to run, and a cover
+     * written nowhere is the same as no cover at all. The lookups are cached and
+     * run six at a time, so a typical import adds a couple of seconds to a
+     * request the user is already waiting on a spinner for.
+     */
+    const { filled, skipped } = await fillMissingCovers(incoming);
+    if (skipped > 0) {
+      console.log(
+        `[batch import] resolved ${filled} covers; ${skipped} past the lookup bound left for playback enrichment`
+      );
+    }
+
     // Process all tracks
     const importedIds = [];
-    
-    // Set the playlist cover URL to a JSON array of the first 4 track covers (if it doesn't have a cover yet)
-    // The frontend will parse this JSON array to render a 2x2 collage!
+
+    /*
+     * Playlist artwork.
+     *
+     * The source's own cover is the right answer when there is one — it's the
+     * image the user recognises the playlist by. Only when the import didn't
+     * carry one does this fall back to a 2×2 collage of the first four track
+     * covers, stored as a JSON array the frontend unpacks (see
+     * /api/playlists' GET mapping).
+     */
     if (!playlist.coverUrl) {
-      const covers = tracks.map(t => t.coverUrl).filter(Boolean).slice(0, 4);
-      if (covers.length > 0) {
-        // If it's only 1 cover, just store the string. If multiple, store JSON array.
-        const coverStr = covers.length === 1 ? covers[0] : JSON.stringify(covers);
+      let coverStr: string | null =
+        typeof sourceCoverUrl === "string" && sourceCoverUrl.trim()
+          ? sourceCoverUrl.trim()
+          : null;
+
+      if (!coverStr) {
+        const covers = [...new Set(incoming.map((t) => t.coverUrl).filter(Boolean))].slice(0, 4);
+        if (covers.length > 0) {
+          coverStr = covers.length === 1 ? (covers[0] as string) : JSON.stringify(covers);
+        }
+      }
+
+      if (coverStr) {
         await execute(`UPDATE "Playlist" SET "coverUrl" = $1 WHERE id = $2`, [coverStr, id]);
       }
     }
 
-    for (const track of tracks) {
+    for (const track of incoming) {
       // Create Artist
       const artistId = (await queryOne<{ id: string }>(
         `INSERT INTO "Artist" (id, name, "createdAt")
