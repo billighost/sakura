@@ -10,6 +10,18 @@ import {
   TTL,
 } from "@/lib/cache";
 
+/**
+ * Read a playlist.
+ *
+ * Now readable by someone who doesn't own it, provided it's public. It used to
+ * filter `WHERE id = $1 AND "userId" = $2` unconditionally, which meant
+ * `Playlist.isPublic` — a column, a migration and a toggle on the profile page —
+ * could be switched on and change nothing observable: the only person who could
+ * ever load the playlist was the one person who didn't need permission.
+ *
+ * `isOwner` is computed outside the cache and the cached payload is identical for
+ * everyone, so one viewer's cache entry can't leak an edit affordance to another.
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,37 +35,48 @@ export async function GET(
   const userId = session.user.id!;
   const key = cacheKey("playlist", id);
 
-  const cached = await cacheGet(key);
+  const cached = await cacheGet<{ userId: string; isPublic?: boolean }>(key);
   if (cached) {
-    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+    if (cached.userId !== userId && !cached.isPublic) {
+      return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
+    }
+    return NextResponse.json(
+      { ...cached, isOwner: cached.userId === userId },
+      { headers: { "X-Cache": "HIT" } }
+    );
   }
 
-  const playlist = await queryOne(
-    `SELECT * FROM "Playlist" WHERE id = $1 AND "userId" = $2`,
-    [id, userId]
+  const playlist = await queryOne<{ userId: string; isPublic?: boolean }>(
+    `SELECT p.*, u.name AS "ownerName"
+       FROM "Playlist" p
+       LEFT JOIN "User" u ON u.id = p."userId"
+      WHERE p.id = $1`,
+    [id]
   );
 
-  if (!playlist) {
+  // Same 404 for "doesn't exist" and "not yours and not public": telling the
+  // difference would confirm the existence of private playlists by id.
+  if (!playlist || (playlist.userId !== userId && !playlist.isPublic)) {
     return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
   }
 
   const tracks = await query(
-    `SELECT t.id, t.title, t.duration, t."audioUrl", t."coverUrl", 
-       json_build_object('name', a.name) as artist, 
-       json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album, 
-       pt.position 
-     FROM "PlaylistTrack" pt 
-     JOIN "Track" t ON pt."trackId" = t.id 
-     LEFT JOIN "Artist" a ON t."artistId" = a.id 
-     LEFT JOIN "Album" al ON t."albumId" = al.id 
-     WHERE pt."playlistId" = $1 
+    `SELECT t.id, t.title, t.duration, t."audioUrl", t."coverUrl",
+       json_build_object('name', a.name) as artist,
+       json_build_object('title', al.title, 'coverUrl', al."coverUrl") as album,
+       pt.position
+     FROM "PlaylistTrack" pt
+     JOIN "Track" t ON pt."trackId" = t.id
+     LEFT JOIN "Artist" a ON t."artistId" = a.id
+     LEFT JOIN "Album" al ON t."albumId" = al.id
+     WHERE pt."playlistId" = $1
      ORDER BY pt.position ASC`,
     [id]
   );
 
   const result = { ...playlist, tracks };
   await cacheSet(key, result, TTL.PLAYLIST);
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, isOwner: playlist.userId === userId });
 }
 
 export async function PATCH(

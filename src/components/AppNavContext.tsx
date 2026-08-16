@@ -405,6 +405,15 @@ export function AppNavProvider({ children }: { children: React.ReactNode }) {
       const transition = document.startViewTransition(() => held);
       activeTransition.current = transition;
 
+      /*
+       * `ready` rejects with an AbortError whenever the animation phase is
+       * abandoned — which the timeout above does deliberately, so this is an
+       * expected outcome rather than a fault. It still needs a handler: nothing
+       * else observes this promise, so without one every skipped transition
+       * surfaced as `Uncaught (in promise) AbortError: Transition was skipped`.
+       */
+      transition.ready.catch(() => {});
+
       transition.finished
         .catch(() => {
           // A transition skipped by the browser (another one started, the tab

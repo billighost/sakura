@@ -1,0 +1,194 @@
+/* The one collection-detail page: playlist, system playlist and mix.
+ *
+ * Replaces three identical 555-line stylesheets. Almost all of the geometry now
+ * comes from CollectionHero.module.css; what's left here is the reorder
+ * affordance, the provenance line and the ownership controls — the parts that
+ * are specific to *this* page rather than to every collection hero. */
+
+.page {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-bottom: calc(var(--bottom-chrome) + var(--space-5));
+  background: var(--bg);
+}
+
+/* ── Provenance ───────────────────────────────────────────────────────────
+ *
+ * "Made for you, refreshed every morning" / "Curated by Sakura" / "42 songs you
+ * added". The line that tells the three kinds of collection apart. Accent-tinted
+ * because it is genuinely the most useful sentence in the hero, and there's
+ * nothing else in the block competing for the accent. */
+
+.provenance {
+  display: inline-block;
+  margin: var(--space-3) 0 0;
+  padding: 0.1875rem var(--space-3);
+  border-radius: var(--r-full);
+  background: var(--accent-softer);
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  color: var(--accent);
+}
+
+/* ── Track list ──────────────────────────────────────────────────────────── */
+
+.tracks {
+  padding: 0 var(--gutter);
+}
+
+/*
+ * `position: relative` and a z-index only while dragging. A permanent stacking
+ * context on every row in a long list is a compositor layer per row.
+ */
+.row {
+  position: relative;
+}
+
+.rowDragging {
+  z-index: 2;
+  /* Lifted, so it reads as being held above the list rather than swapped into
+   * it. The shadow is the only thing that changes: scaling the row would make
+   * the midpoint arithmetic that picks the drop target disagree with what the
+   * user sees. */
+  box-shadow: var(--shadow-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+/* The grip. A real button, so the reorder is reachable by keyboard — arrow keys
+ * on it move the row. `touch-action: none` is set inline by the hook, since it
+ * is part of the gesture contract rather than the styling. */
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: grab;
+}
+
+.grip:active {
+  cursor: grabbing;
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grip:hover {
+    color: var(--text-2);
+  }
+}
+
+/* ── Retry ───────────────────────────────────────────────────────────────── */
+
+.retryRow {
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--gutter) var(--space-5);
+}
+
+.retry {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Visibility ───────────────────────────────────────────────────────────
+ *
+ * The button label is the state, not the verb: "Only you" / "Anyone with the
+ * link". A verb ("Make public") reads as the current state to about half of
+ * people, which for a sharing control is the wrong half to get wrong. The hint
+ * underneath carries the consequence. */
+
+.visibility {
+  margin-top: var(--space-4);
+}
+
+.visibilityBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.visibilityOn {
+  border-color: transparent;
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.visibilityHint {
+  max-width: 34ch;
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .visibilityBtn:hover {
+    color: var(--text);
+    border-color: var(--text-3);
+  }
+
+  .visibilityOn:hover {
+    color: var(--success);
+    border-color: transparent;
+  }
+
+  .retry:hover {
+    background: var(--surface-2);
+  }
+}
+
+/* ── Owner ───────────────────────────────────────────────────────────────── */
+
+.owner {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-2);
+}
+
+.ownerLabel {
+  color: var(--text-3);
+}
+
+/* A person's name, so display face — the same rule track titles follow. */
+.ownerName {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  a.ownerName:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}

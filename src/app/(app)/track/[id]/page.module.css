@@ -131,14 +131,15 @@
   }
 }
 
-/* ── Actions ─────────────────────────────────────────────────────────────── */
+/* ── Actions ─────────────────────────────────────────────────────────────────
+ *
+ * Play alone, then a labelled row. Same two-weight structure as the artist page,
+ * for the same reason: one strip of equal circles made Share look as important
+ * as Play and left four glyphs to be decoded. */
 
-.actions {
+.primaryActions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   justify-content: center;
-  gap: var(--space-2);
   margin-top: var(--space-5);
 }
 
@@ -147,42 +148,57 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 2.5rem;
-  min-width: 0;
-  padding: 0 var(--space-5);
+  min-height: 2.875rem;
+  min-width: 9rem;
+  padding: 0 var(--space-6);
   border: none;
   border-radius: var(--r-full);
   background: var(--accent);
   color: var(--on-accent);
   font-family: var(--font-body);
-  font-size: var(--t-sm);
+  font-size: var(--t-base);
   font-weight: 700;
   cursor: pointer;
 }
 
-.iconBtn {
-  display: inline-flex;
+/*
+ * Four labelled controls. On a narrow screen they wrap to two rows of two,
+ * which is why they're centred rather than justified — a justified pair on the
+ * second row would leave a gap the eye reads as a missing item.
+ */
+.secondaryActions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  border: 1px solid var(--line-strong);
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: none;
   border-radius: var(--r-full);
   background: transparent;
   color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.iconBtnOn {
-  border-color: transparent;
-  background: var(--accent-soft);
+.ghostOn {
   color: var(--accent);
 }
 
 .play:disabled,
-.iconBtn:disabled {
+.ghost:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -191,13 +207,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 2.5rem;
+  min-height: 2rem;
   padding: 0 var(--space-3);
   border-radius: var(--r-full);
   background: var(--success-soft);
   color: var(--success);
   font-family: var(--font-body);
-  font-size: var(--t-xs);
+  font-size: var(--t-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -217,14 +233,13 @@
     background: var(--accent-press);
   }
 
-  .iconBtn:hover:not(:disabled) {
+  .ghost:hover:not(:disabled) {
+    background: var(--surface-2);
     color: var(--text);
-    border-color: var(--text-3);
   }
 
-  .iconBtnOn:hover:not(:disabled) {
+  .ghostOn:hover:not(:disabled) {
     color: var(--accent);
-    border-color: transparent;
   }
 }
 

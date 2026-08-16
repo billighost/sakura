@@ -87,51 +87,72 @@ export function resolveTheme(theme: ThemeId): "light" | "dark" {
  *
  * The root layout declares theme-color through prefers-color-scheme media
  * queries, so when a user overrides the system theme the *page* switches while
- * the status bar keeps following the OS. For an explicit choice we collapse to
- * a single unscoped tag — per spec the browser uses the first tag whose media
- * matches, so leaving the media-scoped pair in place lets the OS win again. For
- * "system" the pair is restored, which is what keeps Auto tracking a change to
- * the system appearance while the app is open.
+ * the status bar keeps following the OS. Per spec the browser uses the first
+ * `theme-color` tag whose media matches, so an explicit choice needs a single
+ * unscoped tag ahead of that pair.
+ *
+ * ── Why this owns exactly one tag and never touches the others ──────────────
+ *
+ * It used to `.remove()` the media-scoped pair and re-create it. Those tags come
+ * from `viewport.themeColor`, which means **React created them** — Next renders
+ * route metadata into `<head>` as part of the tree. Detaching a node React owns
+ * leaves React holding a reference whose `parentNode` is now null, and the next
+ * commit that touches it dies in the mutation phase:
+ *
+ *     Cannot read properties of null (reading 'removeChild')
+ *
+ * That throw aborts the commit. Since this ran on every route change, every
+ * navigation destroyed the metas React was about to reconcile: the URL updated,
+ * the RSC payload arrived, and the new tree never landed — then every subsequent
+ * update threw too, because the root was left inconsistent, so the page went
+ * dead until the router gave up and hard-navigated. It presented as "the URL
+ * changes but the page doesn't", which is nothing like a theming bug, which is
+ * why it survived so long here.
+ *
+ * So: this function creates, updates and removes exactly one tag — its own,
+ * marked with `data-sakura-theme-color` — and treats everything else in `<head>`
+ * as somebody else's property. Ours is kept at the front of `<head>` because
+ * first-match-wins is the only reason it outranks the pair.
  */
+const OWN_TAG = "data-sakura-theme-color";
+
+function ownTag(): HTMLMetaElement | null {
+  return document.querySelector<HTMLMetaElement>(`meta[${OWN_TAG}]`);
+}
+
 export function syncThemeColor(theme: ThemeId): void {
   if (typeof document === "undefined") return;
 
-  const existing = Array.from(
-    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
-  );
+  const ours = ownTag();
 
+  /*
+   * "System" means the layout's media-scoped pair should govern, so our
+   * override is withdrawn. Removing *this* node is safe in a way that removing
+   * React's is not: we created it, nothing else holds a reference to it.
+   */
   if (theme === "system") {
-    const wanted: [string, string][] = [
-      ["(prefers-color-scheme: dark)", CHROME_DARK],
-      ["(prefers-color-scheme: light)", CHROME_LIGHT],
-    ];
-    // Already correct — bail rather than churning <head> on every route change.
-    const matches =
-      existing.length === wanted.length &&
-      wanted.every(
-        ([media, color], i) =>
-          existing[i].media === media && existing[i].content === color
-      );
-    if (matches) return;
-
-    for (const meta of existing) meta.remove();
-    for (const [media, color] of wanted) {
-      const meta = document.createElement("meta");
-      meta.name = "theme-color";
-      meta.media = media;
-      meta.content = color;
-      document.head.appendChild(meta);
-    }
+    ours?.remove();
     return;
   }
 
   const color = theme === "light" ? CHROME_LIGHT : CHROME_DARK;
-  for (const meta of existing.slice(1)) meta.remove();
-  const meta = existing[0] ?? document.createElement("meta");
-  meta.name = "theme-color";
-  meta.removeAttribute("media");
-  meta.content = color;
-  if (!meta.parentNode) document.head.appendChild(meta);
+  const meta = ours ?? document.createElement("meta");
+  if (!ours) {
+    meta.setAttribute(OWN_TAG, "");
+    meta.name = "theme-color";
+  }
+  // Guarded so a no-op re-assert doesn't dirty <head> on every navigation.
+  if (meta.content !== color) meta.content = color;
+
+  /*
+   * First in `<head>`, re-checked rather than assumed: Next re-applies route
+   * metadata on navigation and can insert its own tags ahead of ours, which
+   * would silently hand the match back to the media-scoped pair. Moving a node
+   * we own is free of the hazard described above.
+   */
+  if (document.head.firstChild !== meta) {
+    document.head.insertBefore(meta, document.head.firstChild);
+  }
 }
 
 /** Reflect a preference onto <html>, without touching storage. */

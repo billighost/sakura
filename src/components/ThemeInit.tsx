@@ -33,10 +33,14 @@ export function ThemeInit() {
   }, []);
 
   /*
-   * Next owns the theme-color metas from `viewport.themeColor`, and re-inserts
-   * them when route metadata is applied. An explicit theme needs a single
-   * unscoped tag to outrank them, so it has to be re-asserted after a
-   * navigation rather than only at boot.
+   * Next re-applies `viewport.themeColor` when route metadata lands, and can
+   * insert those tags ahead of the override `syncThemeColor` owns — which would
+   * hand the first-match back to the media-scoped pair. So the override is
+   * re-asserted per navigation.
+   *
+   * This deliberately does not touch Next's tags. React created them, and
+   * detaching them here is what used to abort React's commit phase on every
+   * navigation and leave the page dead. See the header of `lib/theme.ts`.
    */
   useEffect(() => {
     syncThemeColor(getTheme());

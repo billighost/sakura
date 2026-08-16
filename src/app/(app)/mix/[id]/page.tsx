@@ -1,16 +1,11 @@
-import { Suspense } from "react";
-import MixClient, { MixLoadingState } from "./MixClient";
+import MixClient from "./MixClient";
 
-export default function MixPage({
+/** `loading.tsx` covers awaiting params; MixClient owns its own placeholder. */
+export default async function MixPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return (
-    <Suspense fallback={<MixLoadingState />}>
-      {params.then(({ id }) => (
-        <MixClient id={id} />
-      ))}
-    </Suspense>
-  );
+  const { id } = await params;
+  return <MixClient id={id} />;
 }

@@ -1,16 +1,10 @@
-import { Suspense } from "react";
-import SystemPlaylistClient, { SystemPlaylistLoadingState } from "./SystemPlaylistClient";
+import SystemPlaylistClient from "./SystemPlaylistClient";
 
-export default function PlaylistPage({
+export default async function SystemPlaylistPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return (
-    <Suspense fallback={<SystemPlaylistLoadingState />}>
-      {params.then(({ id }) => (
-        <SystemPlaylistClient id={id} />
-      ))}
-    </Suspense>
-  );
+  const { id } = await params;
+  return <SystemPlaylistClient id={id} />;
 }
