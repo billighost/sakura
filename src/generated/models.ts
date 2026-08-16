@@ -9,6 +9,7 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/User'
+export type * from './models/SpotifyConnection'
 export type * from './models/UserSettings'
 export type * from './models/Artist'
 export type * from './models/Album'

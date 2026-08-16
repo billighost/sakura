@@ -398,6 +398,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  SpotifyConnection: 'SpotifyConnection',
   UserSettings: 'UserSettings',
   Artist: 'Artist',
   Album: 'Album',
@@ -435,7 +436,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist" | "playbackState" | "share" | "playAggregate"
+    modelProps: "user" | "spotifyConnection" | "userSettings" | "artist" | "album" | "track" | "trackArtist" | "playlist" | "playlistFolder" | "playlistTrack" | "trackCredit" | "sampledTrack" | "favorite" | "snoozedTrack" | "listeningHistory" | "tasteProfile" | "artistAffinity" | "genreAffinity" | "tasteFeedback" | "userMix" | "systemPlaylist" | "playbackState" | "share" | "playAggregate"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -510,6 +511,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    SpotifyConnection: {
+      payload: Prisma.$SpotifyConnectionPayload<ExtArgs>
+      fields: Prisma.SpotifyConnectionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SpotifyConnectionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SpotifyConnectionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        findFirst: {
+          args: Prisma.SpotifyConnectionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SpotifyConnectionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        findMany: {
+          args: Prisma.SpotifyConnectionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>[]
+        }
+        create: {
+          args: Prisma.SpotifyConnectionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        createMany: {
+          args: Prisma.SpotifyConnectionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SpotifyConnectionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>[]
+        }
+        delete: {
+          args: Prisma.SpotifyConnectionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        update: {
+          args: Prisma.SpotifyConnectionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        deleteMany: {
+          args: Prisma.SpotifyConnectionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SpotifyConnectionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SpotifyConnectionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>[]
+        }
+        upsert: {
+          args: Prisma.SpotifyConnectionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SpotifyConnectionPayload>
+        }
+        aggregate: {
+          args: Prisma.SpotifyConnectionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSpotifyConnection>
+        }
+        groupBy: {
+          args: Prisma.SpotifyConnectionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SpotifyConnectionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SpotifyConnectionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SpotifyConnectionCountAggregateOutputType> | number
         }
       }
     }
@@ -2193,6 +2268,19 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const SpotifyConnectionScalarFieldEnum = {
+  userId: 'userId',
+  refreshToken: 'refreshToken',
+  accessToken: 'accessToken',
+  expiresAt: 'expiresAt',
+  scope: 'scope',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SpotifyConnectionScalarFieldEnum = (typeof SpotifyConnectionScalarFieldEnum)[keyof typeof SpotifyConnectionScalarFieldEnum]
+
+
 export const UserSettingsScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -2284,6 +2372,7 @@ export const PlaylistScalarFieldEnum = {
   description: 'description',
   coverUrl: 'coverUrl',
   folderId: 'folderId',
+  isPublic: 'isPublic',
   createdAt: 'createdAt'
 } as const
 
@@ -2812,6 +2901,7 @@ export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions 
 export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  spotifyConnection?: Prisma.SpotifyConnectionOmit
   userSettings?: Prisma.UserSettingsOmit
   artist?: Prisma.ArtistOmit
   album?: Prisma.AlbumOmit

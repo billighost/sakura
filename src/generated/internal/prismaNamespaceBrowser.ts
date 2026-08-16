@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  SpotifyConnection: 'SpotifyConnection',
   UserSettings: 'UserSettings',
   Artist: 'Artist',
   Album: 'Album',
@@ -103,6 +104,19 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const SpotifyConnectionScalarFieldEnum = {
+  userId: 'userId',
+  refreshToken: 'refreshToken',
+  accessToken: 'accessToken',
+  expiresAt: 'expiresAt',
+  scope: 'scope',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SpotifyConnectionScalarFieldEnum = (typeof SpotifyConnectionScalarFieldEnum)[keyof typeof SpotifyConnectionScalarFieldEnum]
 
 
 export const UserSettingsScalarFieldEnum = {
@@ -196,6 +210,7 @@ export const PlaylistScalarFieldEnum = {
   description: 'description',
   coverUrl: 'coverUrl',
   folderId: 'folderId',
+  isPublic: 'isPublic',
   createdAt: 'createdAt'
 } as const
 

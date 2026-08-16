@@ -23,6 +23,19 @@ export * from './enums';
  */
 export type User = Prisma.UserModel
 /**
+ * Model SpotifyConnection
+ * A connected Spotify account. At most one per user, so `userId` is the key.
+ * 
+ * `refreshToken` is the durable half and the reason this table exists — the
+ * OAuth callback used to discard it and keep only a one-hour access-token
+ * cookie, so the app forgot every connection hourly. `accessToken`/`expiresAt`
+ * are a cache: safe to drop, re-minted from the refresh token on next use.
+ * 
+ * Both token columns hold AES-256-GCM ciphertext, not the tokens themselves.
+ * See lib/spotifyAuth.ts.
+ */
+export type SpotifyConnection = Prisma.SpotifyConnectionModel
+/**
  * Model UserSettings
  * 
  */
