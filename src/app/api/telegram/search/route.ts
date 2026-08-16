@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getTelegramClient } from "@/lib/telegram";
+import { getTelegramClient, type TelegramMusicClient } from "@/lib/telegram";
 
 export const maxDuration = 60;
 
@@ -17,10 +17,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Query is required" }, { status: 400 });
   }
 
-  const client = getTelegramClient();
-  await client.acquire();
+  // Inside the try: getTelegramClient() throws when the worker isn't configured,
+  // and outside it that became a 500 with an empty body instead of a message
+  // saying what to set.
+  let client: TelegramMusicClient | null = null;
 
   try {
+    client = getTelegramClient();
+    await client.acquire();
+
     // Step 1: Send query and wait for bot's button response
     const { buttonMessageId, buttons } = await client.searchMusic(q, 25000);
 
@@ -31,11 +36,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("[Telegram Search]", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to search music via Telegram. Make sure TELEGRAM_SESSION_STRING is configured." },
+      { error: `Failed to search music via Telegram: ${message}` },
       { status: 500 }
     );
   } finally {
-    await client.release();
+    await client?.release();
   }
 }

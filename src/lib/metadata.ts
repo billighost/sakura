@@ -1,4 +1,11 @@
-import { fetchJsonResilient } from './resilience';
+import { after } from 'next/server';
+import {
+  callProvider,
+  fetchJsonResilient,
+  HttpError,
+  PacerOverflowError,
+  RequestPacer,
+} from './resilience';
 import { cachedWithStale, cacheKey, TTL } from './cache';
 import { execute, query } from './sql';
 
@@ -86,7 +93,45 @@ interface EnrichedMetadata {
 const DEEZER_BASE = 'https://api.deezer.com';
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
 const ITUNES_BASE = 'https://itunes.apple.com';
-const USER_AGENT = 'SakuraMusic/1.0 (https://github.com/sakura-music)';
+
+/**
+ * MusicBrainz requires a User-Agent that identifies the application *and* gives
+ * them a way to reach whoever runs it; clients that don't get blocked, and the
+ * block is applied by UA string, so it outlives the deploy that earned it.
+ *
+ * The previous value was `SakuraMusic/1.0 (https://github.com/sakura-music)` —
+ * a URL that does not exist. That satisfies the format check and fails the
+ * actual purpose: when this client misbehaves (and it did — see the pacer),
+ * MusicBrainz had no way to say so except by returning errors.
+ *
+ * `MUSICBRAINZ_CONTACT` should be an email or a real project URL. Without it we
+ * fall back to the deployment's own hostname, which is at least reachable, and
+ * warn once so the gap is visible rather than silently shipped.
+ */
+function buildUserAgent(): string {
+  const contact = (process.env.MUSICBRAINZ_CONTACT || '').trim();
+  if (contact) return `SakuraMusic/1.0 ( ${contact} )`;
+
+  const host =
+    (process.env.NEXTAUTH_URL || '').trim() ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '');
+
+  if (host) {
+    console.warn(
+      '[metadata] MUSICBRAINZ_CONTACT is unset; using the deployment URL in the ' +
+        'MusicBrainz User-Agent. Set it to an email or project URL they can reach.',
+    );
+    return `SakuraMusic/1.0 ( ${host} )`;
+  }
+
+  console.warn(
+    '[metadata] MUSICBRAINZ_CONTACT is unset and no deployment URL is available — ' +
+      'MusicBrainz may refuse requests from this User-Agent.',
+  );
+  return 'SakuraMusic/1.0';
+}
+
+const USER_AGENT = buildUserAgent();
 
 /**
  * Per-provider request timeout.
@@ -100,12 +145,108 @@ const USER_AGENT = 'SakuraMusic/1.0 (https://github.com/sakura-music)';
 const PROVIDER_TIMEOUT_MS = 6000;
 
 /**
- * MusicBrainz asks for ~1 request/second per client and enforces it. It is
- * also the slowest provider here by a wide margin, so it gets a longer
- * timeout, fewer retries, and a twitchier breaker than Deezer: when MB is
+ * MusicBrainz asks for ~1 request/second per client and enforces it with 503s.
+ * It is also the slowest provider here by a wide margin, so it gets a longer
+ * timeout, no retries, and a twitchier breaker than Deezer: when MB is
  * struggling the right move is to stop asking, not to try harder.
  */
 const MB_TIMEOUT_MS = 8000;
+
+/**
+ * The gate that makes the sentence above true.
+ *
+ * It was a comment describing an intention, not a mechanism — `enrichMusicBrainz`
+ * fans out with `Promise.all`, so a single track enrichment fired six requests
+ * inside 40ms, MusicBrainz answered 503, and the breaker opened on a provider
+ * that was perfectly healthy. Nothing was wrong except our own pacing.
+ *
+ * 1100ms rather than 1000ms because the limit is measured at their end, where
+ * our clock skew and the network's jitter both count against us; the extra 10%
+ * is cheaper than a block.
+ *
+ * Honest about its limits: this is per-process, so N concurrent Vercel instances
+ * can still exceed 1 rps in aggregate. It fixes the burst that was actually
+ * observed (one request's own fan-out), and `Retry-After` plus the breaker
+ * handle the residual. A cross-instance limiter would need a Redis round trip
+ * per call — real money, on the hot download path, to solve a problem that
+ * shows up only under concurrency this app doesn't yet see.
+ */
+const mbPacer = new RequestPacer('musicbrainz', 1100);
+
+/**
+ * Paced MusicBrainz GET.
+ *
+ * Two details that look like style and are not:
+ *
+ * 1. The pacer wraps `callProvider`, not the other way round. Inside, the
+ *    8s `AbortSignal.timeout` would start ticking while the call sat in the
+ *    queue — six queued calls means the last one has spent 6.6s of its budget
+ *    before the request is even sent, and it fails as a "timeout" against a
+ *    provider that never saw it. That trips the breaker on our own queue.
+ *
+ * 2. It uses `callProvider` directly rather than `fetchJsonResilient`, because
+ *    it needs the response's status and headers to honour `Retry-After`.
+ *    `fetchJsonResilient` throws `HttpError` and drops the headers.
+ */
+async function fetchMusicBrainz<T>(endpoint: string, op: string): Promise<T | null> {
+  const url = `${MUSICBRAINZ_BASE}${endpoint}`;
+
+  try {
+    return await mbPacer.run(() =>
+      callProvider<T>(
+        async (signal) => {
+          const res = await fetch(url, {
+            headers: { 'User-Agent': USER_AGENT },
+            signal,
+            next: { revalidate: 86400 },
+          });
+
+          if (res.status === 429 || res.status === 503) {
+            // They have told us the interval we picked is too tight. Believe
+            // them: hold the whole pacer, not just this call, or the next
+            // queued request walks into the same wall.
+            mbPacer.penalise(parseRetryAfter(res.headers.get('retry-after')));
+          }
+
+          if (!res.ok) throw new HttpError(res.status, url);
+          return (await res.json()) as T;
+        },
+        {
+          provider: 'musicbrainz',
+          op,
+          timeoutMs: MB_TIMEOUT_MS,
+          // One attempt. A retry inside the same pacer slot is the exact
+          // violation this whole mechanism exists to prevent, and every result
+          // here is cached for 24h — the cost of a miss is one track enriched a
+          // little less, not a failed request.
+          attempts: 1,
+        },
+      ),
+    );
+  } catch (err) {
+    // Overflow only: `callProvider` returns null instead of throwing.
+    if (err instanceof PacerOverflowError) return null;
+    throw err;
+  }
+}
+
+/**
+ * `Retry-After` is either a delay in seconds or an HTTP date. Clamped to
+ * [1s, 60s]: a provider asking us to wait five minutes on the download path is
+ * asking for a stalled download, and the breaker is the better tool for an
+ * outage that long.
+ */
+function parseRetryAfter(header: string | null, fallbackMs = 5000): number {
+  if (!header) return fallbackMs;
+
+  const seconds = Number(header.trim());
+  const ms = Number.isFinite(seconds)
+    ? seconds * 1000
+    : Date.parse(header) - Date.now();
+
+  if (!Number.isFinite(ms) || ms <= 0) return fallbackMs;
+  return Math.min(Math.max(ms, 1000), 60_000);
+}
 
 async function fetchDeezer<T>(endpoint: string, op: string): Promise<T | null> {
   return fetchJsonResilient<T>(`${DEEZER_BASE}${endpoint}`, {
@@ -115,17 +256,6 @@ async function fetchDeezer<T>(endpoint: string, op: string): Promise<T | null> {
     revalidate: 3600,
     timeoutMs: PROVIDER_TIMEOUT_MS,
     attempts: 3,
-  });
-}
-
-async function fetchMusicBrainz<T>(endpoint: string, op: string): Promise<T | null> {
-  return fetchJsonResilient<T>(`${MUSICBRAINZ_BASE}${endpoint}`, {
-    provider: 'musicbrainz',
-    op,
-    headers: { 'User-Agent': USER_AGENT },
-    revalidate: 86400,
-    timeoutMs: MB_TIMEOUT_MS,
-    attempts: 2,
   });
 }
 
@@ -533,7 +663,41 @@ export async function enrichAlbumTracks(
   }));
 }
 
-export async function enrichMusicBrainzAndSave(
+/**
+ * Enrich a track from MusicBrainz, after the response has been sent.
+ *
+ * All three call sites invoked the old function without awaiting it, with a
+ * comment saying "in the background". On a serverless platform there is no
+ * background: the instance is frozen the moment the response is flushed, so the
+ * pending `fetch` and every `UPDATE` behind it were abandoned mid-flight — the
+ * work usually never happened, and when it did it was luck. Silent, because the
+ * function catches its own errors, so nothing ever pointed at it.
+ *
+ * The pacer added in this file makes the old shape indefensible rather than just
+ * wrong: enrichment now *deliberately* waits between requests, and un-awaited
+ * waiting is a guaranteed loss. `after()` is Next's supported answer — it holds
+ * the invocation open (via `waitUntil`) and shares the route's `maxDuration`.
+ *
+ * Still fire-and-forget from the caller's point of view, so no call site
+ * changes. `after` throws outside a request scope, which is where a seed script
+ * or a test would call this from; that case runs inline instead.
+ */
+export function enrichMusicBrainzAndSave(
+  trackId: string,
+  title: string,
+  artistName: string,
+  artistId: string,
+): void {
+  const run = () => runMusicBrainzEnrichment(trackId, title, artistName, artistId);
+
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
+
+async function runMusicBrainzEnrichment(
   trackId: string,
   title: string,
   artistName: string,

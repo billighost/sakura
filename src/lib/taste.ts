@@ -1,5 +1,5 @@
 import { query, queryOne, execute, softFail } from "@/lib/sql";
-import { cacheDel, cacheKey } from "@/lib/cache";
+import { cacheDel, cacheGet, cacheKey, cacheSet } from "@/lib/cache";
 
 /**
  * The taste engine.
@@ -236,12 +236,57 @@ export async function ensureTasteProfile(userId: string): Promise<TasteProfile> 
   };
 }
 
+/**
+ * Cache key for the onboarding gate. Separate from `taste:<id>` because the two
+ * have opposite lifetimes — the profile is recomputed constantly, this flag
+ * changes once ever.
+ */
+function onboardedKey(userId: string): string {
+  return cacheKey("onboarded", userId);
+}
+
+/*
+ * Asymmetric TTLs, and the asymmetry is the whole point.
+ *
+ * `true` is a permanent fact: nothing in the codebase sets `onboarded` back to
+ * false, so once it's true it can be cached for a day with no risk.
+ *
+ * `false` is cached for seconds. The failure mode is not a stale flag, it's a
+ * redirect loop: /home sends an un-onboarded user to /onboarding, and if a cached
+ * `false` outlives the moment they finish, /home bounces them straight back to
+ * the page they just completed. This app has already shipped that loop once (see
+ * the note in app/(app)/onboarding/page.tsx). It is invalidated explicitly on
+ * completion, so this short TTL should never be load-bearing — it's there so
+ * that if the invalidation is ever missed the user waits half a minute instead
+ * of a day.
+ */
+const ONBOARDED_TRUE_TTL = 24 * 60 * 60;
+const ONBOARDED_FALSE_TTL = 30;
+
+/**
+ * Whether the user has completed onboarding.
+ *
+ * Read on every /home render, before anything is streamed, so its latency is the
+ * page's time-to-first-byte. `userId` is the primary key of `TasteProfile`, so
+ * the query itself is a single index lookup — the 12-second samples in the logs
+ * were Neon's free tier waking a suspended compute, which no index can help. A
+ * cache can: it moves the cold start from "every visit that happens to land on a
+ * cold pool" to at most once a day per user.
+ */
 export async function isOnboarded(userId: string): Promise<boolean> {
+  const key = onboardedKey(userId);
+
+  const hit = await cacheGet<boolean>(key);
+  if (typeof hit === "boolean") return hit;
+
   const row = await queryOne<{ onboarded: boolean }>(
     `SELECT onboarded FROM "TasteProfile" WHERE "userId" = $1`,
     [userId]
   );
-  return row?.onboarded ?? false;
+  const onboarded = row?.onboarded ?? false;
+
+  await cacheSet(key, onboarded, onboarded ? ONBOARDED_TRUE_TTL : ONBOARDED_FALSE_TTL);
+  return onboarded;
 }
 
 // ── Signal ingestion ────────────────────────────────────────────────────────
@@ -897,6 +942,17 @@ export async function saveOnboarding(
      WHERE "userId" = $1`,
     [userId, artistIds, artistNames, genres, discovery]
   );
+
+  /*
+   * Before the recompute, not after.
+   *
+   * `recomputeTaste` is the slow part, and the user is being redirected to /home
+   * the moment this call returns. /home's first act is to read the onboarding
+   * gate — so if the cached `false` is still there when they arrive, they get
+   * bounced back to /onboarding having just finished it. Dropping the key first
+   * closes that window entirely rather than making it small.
+   */
+  await cacheDel(onboardedKey(userId)).catch(() => {});
 
   await recomputeTaste(userId);
 }

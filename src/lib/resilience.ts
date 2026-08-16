@@ -52,6 +52,12 @@ export function logProvider(entry: ProviderLog): void {
     // Only the slow successes are worth a line in steady state; logging every
     // cache-warm Deezer hit buries the failures we actually care about.
     if (entry.ms > 1500 || entry.attempt > 1) console.warn(line);
+  } else if (entry.outcome === "open") {
+    // A short-circuit is the breaker working, not a failure. It used to land on
+    // console.error, so one MusicBrainz outage produced hundreds of error lines
+    // describing calls that were never made — the loudest thing in the log was
+    // the mitigation rather than the problem.
+    console.warn(line);
   } else {
     console.error(line);
   }
@@ -81,6 +87,8 @@ export class CircuitBreaker {
   private failures = 0;
   private successes = 0;
   private openedAt = 0;
+  /** Calls short-circuited since the breaker last opened. */
+  private rejected = 0;
 
   private readonly threshold: number;
   private readonly cooldownMs: number;
@@ -113,6 +121,20 @@ export class CircuitBreaker {
     return false;
   }
 
+  /**
+   * Count a short-circuited call; returns its position in the current open
+   * window.
+   *
+   * Exists so the caller can log the *first* rejection and stay quiet for the
+   * rest. Every rejection carries identical information — "this provider is
+   * still down" — and the count is more useful reported once, on recovery, than
+   * repeated per call.
+   */
+  noteRejected(): number {
+    this.rejected += 1;
+    return this.rejected;
+  }
+
   recordSuccess(): void {
     if (this.state === "half-open") {
       this.successes += 1;
@@ -139,6 +161,7 @@ export class CircuitBreaker {
         `[breaker:${this.name}] OPEN after ${this.failures} failures — ` +
           `short-circuiting for ${Math.round(this.cooldownMs / 1000)}s`,
       );
+      this.rejected = 0;
     }
     this.state = "open";
     this.openedAt = now;
@@ -147,15 +170,22 @@ export class CircuitBreaker {
 
   private close(): void {
     if (this.state !== "closed") {
-      console.warn(`[breaker:${this.name}] CLOSED — provider recovered`);
+      const skipped = this.rejected > 0 ? ` (${this.rejected} calls short-circuited)` : "";
+      console.warn(`[breaker:${this.name}] CLOSED — provider recovered${skipped}`);
     }
     this.state = "closed";
     this.failures = 0;
     this.successes = 0;
+    this.rejected = 0;
   }
 
-  snapshot(): { name: string; state: BreakerState; failures: number } {
-    return { name: this.name, state: this.state, failures: this.failures };
+  snapshot(): { name: string; state: BreakerState; failures: number; rejected: number } {
+    return {
+      name: this.name,
+      state: this.state,
+      failures: this.failures,
+      rejected: this.rejected,
+    };
   }
 }
 
@@ -225,6 +255,96 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ── Pacing ──────────────────────────────────────────────────────────────────
+
+export class PacerOverflowError extends Error {
+  constructor(name: string, depth: number) {
+    super(`${name} pacer queue is full (${depth} waiting) — call skipped`);
+    this.name = "PacerOverflowError";
+  }
+}
+
+/**
+ * Serialise calls to a provider with a minimum gap between them.
+ *
+ * This is not a rate *limiter* — it doesn't count or reject on a budget. It is a
+ * spacer, for providers that publish a request-per-second figure and enforce it
+ * with 503s. MusicBrainz is the case that forced it: the code had a comment
+ * claiming a 1 rps limit was respected, but nothing implemented it, and a single
+ * enrichment fans out with `Promise.all` — so six requests left in 40ms, MB
+ * returned 503s, and the breaker opened on a provider that was working fine.
+ *
+ * Serial rather than a token bucket on purpose. A bucket permits a burst by
+ * design, and a burst is exactly what gets a client throttled here.
+ *
+ * The queue is bounded. Overflow throws rather than waiting, because on a
+ * serverless platform work queued behind a long wait is work that dies when the
+ * function is frozen — a bounded queue that admits failure is more honest than
+ * an unbounded one that pretends to have succeeded.
+ */
+export class RequestPacer {
+  private tail: Promise<unknown> = Promise.resolve();
+  private nextAllowedAt = 0;
+  private depth = 0;
+  private overflowed = 0;
+
+  constructor(
+    public readonly name: string,
+    private readonly minIntervalMs: number,
+    private readonly maxQueue = 24,
+  ) {}
+
+  /**
+   * Push the next slot out — for when the provider has explicitly asked us to
+   * back off (`Retry-After` on a 429/503). Never brings the slot closer.
+   */
+  penalise(ms: number): void {
+    const until = Date.now() + ms;
+    if (until > this.nextAllowedAt) {
+      this.nextAllowedAt = until;
+      console.warn(`[pacer:${this.name}] backing off ${Math.round(ms)}ms at the provider's request`);
+    }
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.depth >= this.maxQueue) {
+      this.overflowed += 1;
+      // Once per 25, so a sustained overflow is visible without being the log.
+      if (this.overflowed % 25 === 1) {
+        console.warn(
+          `[pacer:${this.name}] queue full (${this.depth} waiting), ${this.overflowed} calls skipped so far`,
+        );
+      }
+      throw new PacerOverflowError(this.name, this.depth);
+    }
+
+    this.depth += 1;
+
+    // Chain onto the tail so slots are handed out in arrival order, then hold
+    // the tail until this call's *slot* opens — not until the call finishes, so
+    // a slow response doesn't compound into the next caller's wait beyond the
+    // interval we promised.
+    const slot = this.tail.then(async () => {
+      const wait = this.nextAllowedAt - Date.now();
+      if (wait > 0) await sleep(wait);
+      this.nextAllowedAt = Date.now() + this.minIntervalMs;
+    });
+
+    this.tail = slot.catch(() => {});
+
+    try {
+      await slot;
+      return await fn();
+    } finally {
+      this.depth -= 1;
+    }
+  }
+
+  snapshot(): { name: string; depth: number; overflowed: number } {
+    return { name: this.name, depth: this.depth, overflowed: this.overflowed };
+  }
+}
+
 // ── HTTP errors ─────────────────────────────────────────────────────────────
 
 export class HttpError extends Error {
@@ -287,7 +407,13 @@ export async function callProvider<T>(
   const fallback = opts.fallback ?? (() => null);
 
   if (breaker.shouldReject()) {
-    logProvider({ provider, op, outcome: "open", ms: 0, attempt: 0 });
+    // One line per open window, not one per rejected call. The breaker's own
+    // OPEN line already reported the outage; repeating it for every subsequent
+    // caller is what turned a 30-second MusicBrainz blip into several hundred
+    // log entries, and the total is reported on recovery instead.
+    if (breaker.noteRejected() === 1) {
+      logProvider({ provider, op, outcome: "open", ms: 0, attempt: 0 });
+    }
     return fallback();
   }
 

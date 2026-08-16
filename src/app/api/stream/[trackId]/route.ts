@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/sql";
 import { auth } from "@/lib/auth";
 import { cached, cacheKey } from "@/lib/cache";
+import { isPlayableAudioUrl } from "@/lib/audioUrl";
 
 /**
  * Resolve a track to its playable URL.
@@ -54,6 +55,16 @@ export async function GET(
   }
 
   if (cachedUrl === PENDING_SENTINEL) {
+    return NextResponse.json({ error: "Track has no audio yet" }, { status: 409 });
+  }
+
+  /*
+   * `/api/stream/telegram/0` is stored for a known track whose Telegram message
+   * has not been resolved yet. Redirecting to it turns one request into two and
+   * ends in a 400 the client cannot act on; 409 says the same thing as the
+   * pending case, which is what this actually is.
+   */
+  if (!isPlayableAudioUrl(cachedUrl)) {
     return NextResponse.json({ error: "Track has no audio yet" }, { status: 409 });
   }
 

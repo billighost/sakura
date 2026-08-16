@@ -1,4 +1,5 @@
 import { redis } from "./redis";
+import { deployEnv } from "./deployEnv";
 
 /**
  * Redis-backed fixed-window rate limiting, with a local pre-filter.
@@ -71,7 +72,10 @@ export async function rateLimit(
 ): Promise<RateLimitResult> {
   const nowMs = Date.now();
   const bucket = Math.floor(nowMs / 1000 / windowSeconds);
-  const redisKey = `rl:${key}:${bucket}`;
+  // Namespaced per deployment: production, preview and every laptop share one
+  // Upstash database, and an unprefixed counter means a dev run spends
+  // production users' download budget (and vice versa).
+  const redisKey = `${deployEnv()}:rl:${key}:${bucket}`;
   const resetInSeconds = windowSeconds - (Math.floor(nowMs / 1000) % windowSeconds);
 
   let entry = local.get(redisKey);

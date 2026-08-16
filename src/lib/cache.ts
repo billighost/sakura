@@ -1,4 +1,5 @@
 import { redis } from "./redis";
+import { deployEnv } from "./deployEnv";
 
 /**
  * Two-layer cache: an in-process L1 in front of Upstash as L2.
@@ -12,6 +13,23 @@ import { redis } from "./redis";
  * All Redis errors are swallowed. Cache is best-effort by construction: if
  * Upstash is unreachable the app serves correctly, just more expensively.
  */
+
+/**
+ * Every deployment — production, preview, and each developer's laptop — shares
+ * one Upstash database, so an unprefixed key is a key three environments fight
+ * over. This project has already been bitten by that twice: a shared Telegram
+ * session key got the auth key revoked, and a dev run's negative cache entry
+ * blocked a download in production.
+ *
+ * The prefix is applied here, at the one place keys reach Redis, rather than at
+ * the hundred places they are constructed — a rule enforced in one function
+ * cannot be forgotten at a call site. L1 keys stay unprefixed: that map lives
+ * inside a single process, which is by definition a single environment.
+ */
+function rk(key: string): string {
+  return `${deployEnv()}:${key}`;
+}
+
 
 const globalForMemoryCache = globalThis as unknown as {
   memoryCache?: Map<string, { value: any; expiresAt: number }>;
@@ -151,7 +169,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   stats.l1Misses += 1;
 
   try {
-    const val = await redis.get<T>(key);
+    const val = await redis.get<T>(rk(key));
     if (val !== null && val !== undefined) {
       stats.l2Hits += 1;
 
@@ -179,7 +197,7 @@ export async function cacheSet(
 ): Promise<void> {
   try {
     l1Set(key, value, l1TtlFor(ttlSeconds));
-    await redis.set(key, value, { ex: ttlSeconds });
+    await redis.set(rk(key), value, { ex: ttlSeconds });
   } catch {
     // non-critical
   }
@@ -197,9 +215,9 @@ export async function cacheDel(...keys: string[]): Promise<void> {
     // and invalidation runs on every write path, so this is the difference
     // between a like costing 1 command and costing 3.
     if (keys.length === 1) {
-      await redis.del(keys[0]);
+      await redis.del(rk(keys[0]));
     } else if (keys.length > 1) {
-      await redis.del(...keys);
+      await redis.del(...keys.map(rk));
     }
   } catch {
     // non-critical
@@ -240,7 +258,7 @@ export async function versionedKey(
 
   let v = 0;
   try {
-    v = Number((await redis.get<number>(`ns:${namespace}`)) ?? 0);
+    v = Number((await redis.get<number>(rk(`ns:${namespace}`))) ?? 0);
   } catch {
     // Redis unavailable — fall back to v0. Worst case is a stale read, which
     // is what a cache miss would have produced anyway.
@@ -251,7 +269,7 @@ export async function versionedKey(
 
 export async function bumpNamespace(namespace: string): Promise<void> {
   try {
-    const next = await redis.incr(`ns:${namespace}`);
+    const next = await redis.incr(rk(`ns:${namespace}`));
     nsVersions.set(namespace, { v: Number(next), readAt: Date.now() });
   } catch {
     // non-critical
@@ -430,7 +448,7 @@ export async function cached<T>(
  */
 export async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
   try {
-    const res = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
+    const res = await redis.set(rk(key), "1", { nx: true, ex: ttlSeconds });
     return res === "OK";
   } catch {
     return false;
@@ -439,7 +457,7 @@ export async function acquireLock(key: string, ttlSeconds: number): Promise<bool
 
 export async function releaseLock(key: string): Promise<void> {
   try {
-    await redis.del(key);
+    await redis.del(rk(key));
   } catch {
     // The TTL will clear it.
   }

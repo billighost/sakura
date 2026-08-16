@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getTelegramClient } from "@/lib/telegram";
+import { getTelegramClient, type TelegramMusicClient } from "@/lib/telegram";
 import { queryOne, execute } from "@/lib/sql";
 import { getDeterministicTrackId } from "@/lib/deterministic";
 
@@ -22,10 +22,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const client = getTelegramClient();
-  await client.acquire();
+  // Inside the try, so a missing worker config produces the actionable message
+  // it throws rather than an unhandled rejection.
+  let client: TelegramMusicClient | null = null;
 
   try {
+    client = getTelegramClient();
+    await client.acquire();
+
     // Step 2: Click the button to trigger the audio download
     const track = await client.selectResult(
       Number(buttonMessageId),
@@ -86,11 +90,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("[Telegram Select]", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to download selected track" },
+      { error: `Failed to download selected track: ${message}` },
       { status: 500 }
     );
   } finally {
-    await client.release();
+    await client?.release();
   }
 }

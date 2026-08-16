@@ -1,0 +1,63 @@
+# Fly.io config for the Sakura Telegram worker.
+#
+# The critical settings are the ones that keep this a SINGLE instance:
+#
+#   auto_stop_machines = false   — a stopped machine that restarts mid-request
+#                                  would briefly overlap with itself.
+#   min_machines_running = 1     — always exactly one.
+#   max_machines_running = 1     — never two. Telegram revokes the auth key the
+#                                  moment it sees it on two connections, so this
+#                                  is a correctness setting, not a cost one.
+#
+# Never run `fly scale count 2` against this app.
+
+app = "sakura-telegram-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  SESSION_FILE = "/data/session.json"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  max_machines_running = 1
+  processes = ["app"]
+
+  # Audio streams are long-lived; the default concurrency limits would shed
+  # connections mid-song. A few dozen simultaneous listeners is well within what
+  # one small machine can pipe.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 60
+    hard_limit = 100
+
+# Boot refuses to listen until Telegram is connected, so "listening" already
+# means "healthy". This check catches the case where the session is revoked while
+# running — /health returns 503 and Fly surfaces it.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "45s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# Optional but recommended: persists the post-DC-migration session so a restart
+# doesn't repeat the migration handshake.
+#
+#   fly volumes create tg_data --size 1 --region iad
+#
+# [mounts]
+#   source = "tg_data"
+#   destination = "/data"

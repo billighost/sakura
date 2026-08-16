@@ -6,7 +6,9 @@ import { enrichTrackMetadata, enrichMusicBrainzAndSave, searchDeezerTrack } from
 import { getDeterministicTrackId } from "@/lib/deterministic";
 import { rateLimit, rateLimitResponse, LIMITS } from "@/lib/rateLimit";
 import { cacheGet, cacheSet } from "@/lib/cache";
-import { Redis } from "@upstash/redis";
+import { redis } from "@/lib/redis";
+import { envKey } from "@/lib/deployEnv";
+import { isPlayableAudioUrl, isTelegramStreamUrl } from "@/lib/audioUrl";
 
 // Telegram search + download can take up to ~2 minutes with retries.
 // Without this Vercel kills the function at 10s (default) with no status code.
@@ -21,12 +23,12 @@ export const maxDuration = 300;
  */
 const ALIAS_TTL_SECONDS = 30 * 24 * 60 * 60;
 
-const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-  ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-  : null;
+/*
+ * This route used to construct its own Upstash client. That bypassed the
+ * command-counting Proxy in `lib/redis`, so the single heaviest endpoint in the
+ * app was invisible in `/api/health?stats=1` — the exact number the free-tier
+ * capacity work depends on. Same database, same credentials, now counted.
+ */
 
 const globalForPendingDownloads = globalThis as unknown as {
   pendingDownloads?: Map<string, Promise<any>>;
@@ -91,14 +93,12 @@ export async function POST(req: NextRequest) {
 
     if (existingTrack) {
       /**
-       * Guard against returning a useless audioUrl:
-       *  - null/empty  → track was inserted as a Deezer stub with no audio
-       *  - dzcdn.net   → Deezer 30-second preview; not a real audio stream
-       *  - /api/stream/telegram/0 → broken telegram stream (messageId=0)
-       * In all these cases fall through to Telegram to get a real file.
+       * Guard against returning a useless audioUrl. See `lib/audioUrl` for the
+       * three truthy-but-unplayable values; in all of them fall through to
+       * Telegram and fetch a real file.
        */
       const au = existingTrack.audioUrl || "";
-      const isAudioUsable = au.length > 0 && au !== "pending" && !au.includes("dzcdn.net") && !au.endsWith("/0");
+      const isAudioUsable = isPlayableAudioUrl(au);
 
       if (isAudioUsable) {
         console.log(`[Telegram AutoDownload] Cache hit for "${artist} - ${title}". Returning DB track.`);
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
         [aliasId]
       );
       const aliasUrl = aliased?.audioUrl || "";
-      if (aliased && aliasUrl.startsWith("/api/stream/telegram/") && !aliasUrl.endsWith("/0")) {
+      if (aliased && isTelegramStreamUrl(aliasUrl)) {
         console.log(`[Telegram AutoDownload] Alias hit for "${artist} - ${title}" → "${aliased.title}".`);
         return NextResponse.json({
           id: aliased.id,
@@ -168,16 +168,16 @@ export async function POST(req: NextRequest) {
 
   const cacheKey = requestKey;
   const searchQuery = `${artist} - ${title}`;
-  const negativeCacheKey = `download:failed:${cacheKey}`;
+  // Namespaced: a failed download on a laptop must not 404 the same track in
+  // production for the next 30 seconds, which is what the shared key did.
+  const negativeCacheKey = envKey(`download:failed:${cacheKey}`);
 
-  if (redis) {
-    const isFailed = await redis.get(negativeCacheKey);
-    if (isFailed) {
-      return NextResponse.json(
-        { error: "Track currently unavailable (cached failure)" },
-        { status: 404 }
-      );
-    }
+  const isFailed = await redis.get(negativeCacheKey).catch(() => null);
+  if (isFailed) {
+    return NextResponse.json(
+      { error: "Track currently unavailable (cached failure)" },
+      { status: 404 }
+    );
   }
 
   if (pendingDownloads.has(cacheKey)) {
@@ -598,7 +598,7 @@ export async function POST(req: NextRequest) {
     const isNoResults = msg.includes("Bot responded:") || msg.includes("No results found");
 
     // Don't negative-cache rate limits — the bot will work again tomorrow.
-    if (redis && !isRateLimited) {
+    if (!isRateLimited) {
       await redis.set(negativeCacheKey, "1", { ex: 30 }).catch(console.error);
     }
 

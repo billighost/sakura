@@ -5,6 +5,7 @@ import { getAudioBlob, getCachedUserId, getDeviceId, isTrackDownloaded, saveTrac
 import { extractDominantColor } from "@/lib/color";
 import { getLyrics, LyricData } from "@/lib/lyrics";
 import { signalTracker } from "@/lib/signals";
+import { isPlayableAudioUrl, isTelegramStreamUrl } from "@/lib/audioUrl";
 import { recordSignal as recordInstallSignal } from "@/lib/installPrompt";
 import {
   pushPlaybackState,
@@ -456,8 +457,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         let finalId = item.id;
         let finalCoverUrl = item.coverUrl;
 
-        // If it's a Deezer track that needs Telegram downloading first
-        if (!finalAudioUrl || finalId.startsWith("deezer-")) {
+        // A queue row can carry `/api/stream/telegram/0` — truthy, right prefix,
+        // and not playable. Trusting it here is what sent ~50 doomed requests at
+        // the stream route per session; `isPlayableAudioUrl` is the same check
+        // the player and TrackRow already make.
+        if (!isPlayableAudioUrl(finalAudioUrl) || finalId.startsWith("deezer-")) {
           const res = await fetch("/api/music/download", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1664,7 +1668,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // empty src and stall silently. Resolve it here — on demand, once, for
       // whichever track is about to play.
       const au = src || "";
-      const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
+      const isAudioUsable = isTelegramStreamUrl(au);
 
       if (!objectUrl && !isAudioUsable) {
         try {

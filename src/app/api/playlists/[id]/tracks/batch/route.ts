@@ -72,6 +72,14 @@ export async function POST(
     // Process all tracks
     const importedIds = [];
 
+    /**
+     * How many tracks per import get MusicBrainz enrichment. See the call site
+     * below for why this is a small number and not `incoming.length`.
+     */
+    const MB_ENRICH_PER_IMPORT = 5;
+    let enrichmentsQueued = 0;
+    let enrichmentsDeferred = 0;
+
     /*
      * Playlist artwork.
      *
@@ -147,8 +155,29 @@ export async function POST(
       pos++;
       importedIds.push(dbTrack!.id);
 
-      // Trigger background MusicBrainz metadata fetch
-      enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
+      /*
+       * MusicBrainz enrichment, after the response, for the first few tracks only.
+       *
+       * MB allows ~1 request/second and enrichment costs 2-3 requests per track,
+       * so a 50-track import wants ~150 seconds of paced requests — an order of
+       * magnitude past this function's lifetime. The pacer would shed the excess
+       * on its own, but silently, and a queue overflow reads like a bug rather
+       * than arithmetic. Bounding it here makes the tradeoff visible and leaves
+       * the rest to be enriched on first play, which is when the data is wanted.
+       */
+      if (enrichmentsQueued < MB_ENRICH_PER_IMPORT) {
+        enrichMusicBrainzAndSave(dbTrack!.id, track.title, track.artist, artistId);
+        enrichmentsQueued++;
+      } else {
+        enrichmentsDeferred++;
+      }
+    }
+
+    if (enrichmentsDeferred > 0) {
+      console.log(
+        `[batch import] queued ${enrichmentsQueued} MusicBrainz enrichments; ` +
+          `${enrichmentsDeferred} deferred to first play (1 rps limit)`
+      );
     }
 
     return NextResponse.json({ ok: true, imported: importedIds.length });

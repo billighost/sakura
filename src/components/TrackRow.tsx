@@ -11,6 +11,7 @@ import {
   getDeviceId,
 } from "@/lib/offline-db";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
+import { isTelegramStreamUrl } from "@/lib/audioUrl";
 import { AddToPlaylistModal } from "./AddToPlaylistModal";
 import {
   DownloadedIcon,
@@ -269,8 +270,7 @@ export function TrackRow({
       return;
     }
 
-    const au = track.audioUrl || "";
-    const isAudioUsable = au.startsWith("/api/stream/telegram/") && !au.endsWith("/0");
+    const isAudioUsable = isTelegramStreamUrl(track.audioUrl);
 
     // Already on the device, or already carrying a usable stream URL.
     if (offline || track.source === "library" || isAudioUsable) {
