@@ -40,7 +40,42 @@ export function SWRegister() {
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    if (process.env.NODE_ENV === "development") return;
+
+    /*
+     * In development, actively tear down any worker that is still controlling
+     * this origin — don't just decline to register a new one.
+     *
+     * Returning early was not enough. A worker installed by `next build && next
+     * start`, a deployed build opened on the same host, or simply an earlier
+     * session before this guard existed, stays registered and keeps controlling
+     * `localhost` indefinitely. It then answers `/_next/static/**` from
+     * `cacheFirst`, which is correct in production (those filenames are content
+     * hashed) and actively harmful under `next dev`, where Turbopack reuses chunk
+     * URLs across recompiles. The router fetches the route it is navigating to,
+     * receives a stale module for it out of the cache, and the navigation lands
+     * on code that no longer matches the page — the URL changes, the payload
+     * arrives, and nothing renders.
+     *
+     * Unregistering alone leaves the caches behind, so drop those too.
+     */
+    if (process.env.NODE_ENV === "development") {
+      void (async () => {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        if (registrations.length === 0) return;
+
+        await Promise.all(registrations.map((r) => r.unregister()));
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter((k) => k.startsWith("sakura-")).map((k) => caches.delete(k))
+        );
+
+        console.warn(
+          "[SW] Unregistered a leftover service worker and cleared its caches. " +
+            "Reload once to finish detaching it from this page."
+        );
+      })();
+      return;
+    }
 
     /*
      * Read before registering. Once `register()` resolves and the worker

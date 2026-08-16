@@ -1,8 +1,21 @@
 import NextAuth from "next-auth";
+import { NextResponse } from "next/server";
 import { authConfig } from "./lib/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
+/**
+ * Redirects go through `NextResponse.redirect`, not the bare `Response.redirect`
+ * this used to call. Two reasons, and the second one is a real bug:
+ *
+ *  1. `Response.redirect` defaults to 302, which allows a client to downgrade
+ *     the method; `NextResponse.redirect` defaults to 307, which preserves it.
+ *  2. Per the fetch spec, a response from `Response.redirect` has its headers
+ *     guard set to *immutable*. `auth()` wraps this handler and attaches the
+ *     rotated session cookie to whatever it returns — and against an immutable
+ *     header set that `Set-Cookie` goes nowhere. Sessions silently stopped
+ *     refreshing across every redirect this function performed.
+ */
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const { nextUrl } = req;
@@ -30,12 +43,12 @@ export const proxy = auth((req) => {
     const loginUrl = new URL("/login", nextUrl);
     const target = nextUrl.pathname + nextUrl.search;
     if (target && target !== "/") loginUrl.searchParams.set("next", target);
-    return Response.redirect(loginUrl);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Redirect to home if trying to access login/register while authenticated
   if (isLoggedIn && isAuthPage) {
-    return Response.redirect(new URL("/home", nextUrl));
+    return NextResponse.redirect(new URL("/home", nextUrl));
   }
 });
 

@@ -381,6 +381,51 @@
   border-radius: var(--r-xs);
 }
 
+/* Hero placeholder parts. These reuse `.hero`, `.top`, `.art`, `.meta` and
+ * `.transport` for their geometry, so only the pieces with no real counterpart
+ * — a title that has no text to size itself from — need explicit dimensions. */
+
+.skeletonBack {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--r-full);
+}
+
+.skeletonArtRound {
+  border-radius: var(--r-full);
+}
+
+.skeletonEyebrow {
+  width: 3.25rem;
+  height: 0.6875rem;
+  margin-bottom: var(--space-2);
+  border-radius: var(--r-xs);
+}
+
+.skeletonTitle {
+  width: min(60%, 13rem);
+  height: var(--t-2xl);
+  border-radius: var(--r-xs);
+}
+
+.skeletonPlay {
+  width: 6rem;
+  height: 2.5rem;
+  border-radius: var(--r-full);
+}
+
+.skeletonPill {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-full);
+}
+
+.skeletonChip {
+  width: 5.5rem;
+  height: 2rem;
+  border-radius: var(--r-full);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .empty {
     animation: fadeIn var(--d-base) var(--ease) both;

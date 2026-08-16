@@ -1,7 +1,35 @@
+/* ── Mini player ────────────────────────────────────────────────────────────
+ *
+ * Design thesis: **quiet until touched.**
+ *
+ * This bar is on screen more than any other component in the app. That is the
+ * whole design constraint. Its job is to be legible at a glance and reachable in
+ * one thumb move, then get out of the way of the page above it — so nothing here
+ * moves unless the user moved it, and the one accent marks one thing.
+ *
+ * What that replaced, and why each went:
+ *
+ *  - Three infinite ambient loops (an accent wash breathing across the whole
+ *    bar, the artwork scaling 3.5%, and the equaliser badge) all ran at once,
+ *    permanently. Layered over a page the user is trying to read, that isn't
+ *    ambience, it's restlessness. The equaliser survives alone because it
+ *    carries state — "this is playing" — rather than decorating.
+ *  - A dedicated 14px scrub strip above the content spent a fifth of a 4rem bar
+ *    on a rail, which is what left the title, artist and lyric cramped into what
+ *    was left. Progress is now the bar's top edge (see `.scrubRow`) and those
+ *    14px went back to the content.
+ *  - The artwork bled flush to the left edge with no radius, stretched to the
+ *    bar's full height, so it read as a photo cropped into a corner while every
+ *    other surface in the app is a rounded object. It's inset and rounded now.
+ *  - The accent appeared on the top hairline, the ambient wash, the lyric, the
+ *    liked heart, the play fill, both swipe hints and the scrub fill — seven
+ *    places, so "accented" meant nothing. It now marks progress and the primary
+ *    action, and the track's own colour is confined to the line that reports
+ *    where you are in it.
+ */
+
 .root {
   position: relative;
-  display: flex;
-  flex-direction: column;
   /*
    * Height is *definite*, and it has to be.
    *
@@ -19,12 +47,15 @@
    * content's share.
    */
   --mini-h: var(--miniplayer-h);
+  /* Inset shared by the artwork's left edge and the progress rule's left end,
+   * so the two line up on a single vertical. */
+  --mini-gutter: 10px;
+
   height: calc(var(--mini-h) + env(safe-area-inset-bottom, 0px));
   background: var(--chrome);
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border-top: 1px solid var(--chrome-line);
-  border-radius: 0;
   cursor: pointer;
   flex-shrink: 0;
   z-index: 49;
@@ -34,10 +65,15 @@
     height var(--d-base) var(--ease);
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
-  /* The art now sits edge-to-edge and the artwork can gently scale while
-   * playing (see .artWrap.playing) — this keeps that scale, and the ambient
-   * wash below, clipped to the bar's own bounds instead of poking past them. */
-  overflow: hidden;
+  /*
+   * Deliberately NOT `overflow: hidden`.
+   *
+   * It was, to clip the ambient wash and the artwork's scale — both now gone, so
+   * it has nothing left to contain and two things it was silently breaking: the
+   * scrubber's time tooltip sits at `top: -2.25rem`, entirely outside this box,
+   * so it has never once been visible; and the like button's petal burst travels
+   * upward, which reads better escaping the bar than shaved off at its edge.
+   */
 }
 
 /* Room for the third line. Set by the component whenever it renders a lyric. */
@@ -45,92 +81,73 @@
   --mini-h: calc(var(--miniplayer-h) + 1rem);
 }
 
-/* A hairline of the track's accent along the very top edge. One pixel of
- * colour ties the bar to the artwork without tinting the whole surface. */
-.root::before {
-  content: "";
+/* ── Progress as the bar's top edge ────────────────────────────────────────
+ *
+ * The signature, and the one place the track's own colour is allowed: the line
+ * along the top of the bar *is* the playback position. It replaced a decorative
+ * accent hairline that reported nothing and a 14px rail that cost a fifth of the
+ * bar's height, so a structural element now encodes something true.
+ *
+ * Pulled up by half its own height so the visible 2px rail lands exactly on the
+ * bar's top border rather than 8px inside it. The row stays 16px tall because
+ * that is what makes a 2px line grabbable — the visible rail is thin, the target
+ * is not. `useDrag`'s `blockSelector` names this row, so a scrub is never
+ * mistaken for a swipe on the bar.
+ */
+.scrubRow {
   position: absolute;
-  top: -1px;
+  top: -8px;
   left: 0;
   right: 0;
-  height: 1px;
-  background: var(--track-accent, var(--accent));
-  opacity: 0.5;
-  pointer-events: none;
+  height: 16px;
   z-index: 3;
+
+  /* The Scrubber's geometry is driven by these, which is the only way into it
+   * from here — its internals are hashed by CSS Modules. */
+  --scrub-track-height: 2px;
+  --scrub-track-bg: var(--chrome-line);
+  --scrub-thumb-size: 9px;
 }
 
-/*
- * The "now playing" cue for the bar as a whole: a flat wash of the track's
- * accent that breathes in opacity — not a gradient. The house style reserves
- * gradients for the scrim and progress fill (see globals.css design brief),
- * so this stays a single flat colour and only its opacity moves.
- */
-.root::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--track-accent, var(--accent));
-  opacity: 0;
-  pointer-events: none;
-  z-index: 0;
-}
+/* ── Row: artwork, text, controls ─────────────────────────────────────────── */
 
-.root.isPlaying::after {
-  animation: ambientBreathe 3.2s var(--ease-in-out) infinite;
-}
-
-@keyframes ambientBreathe {
-  0%,
-  100% {
-    opacity: 0.04;
-  }
-  50% {
-    opacity: 0.11;
-  }
-}
-
-.scrubRow {
-  flex-shrink: 0;
-  height: 14px;
-  padding-top: 1px;
-  /* Sits above .content so the thin scrub strip is reliably grabbable. */
-  position: relative;
-  z-index: 2;
-}
-
-/*
- * Cover art, title/artist and controls. `align-items: stretch` is what lets
- * .artWrap claim the row's full height below — everything else opts back
- * out with its own fixed size or `align-self: center`.
- *
- * No left padding: the art sits flush against the bar's left edge. The
- * right side keeps its padding for the like/play buttons.
- */
 .content {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: stretch;
-  gap: 0.625rem;
-  padding: 0 clamp(0.5rem, 2.5vw, 0.75rem) 0 0;
-  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+  /* No left padding — the artwork carries the gutter itself, so the text column
+   * starts from the art's right edge and the row has one inset, not two. */
+  padding: 0 clamp(0.625rem, 2.5vw, 0.875rem) 0 0;
+  height: 100%;
   min-height: 0;
+  transition: opacity var(--d-fast) var(--ease);
+}
+
+/* While a swipe is armed the hint at the edge is the thing to read, so the row
+ * recedes rather than competing with it. */
+.contentArmed {
+  opacity: 0.32;
 }
 
 /*
- * Full-height, edge-to-edge, square. `aspect-ratio` derives the width from
- * whatever height `.content` resolves to at any breakpoint, so this tracks
- * `--miniplayer-h` (and its short-viewport steps) without a media query of
- * its own — the old fixed clamp() needed one for every step this covers for
- * free.
+ * Square, inset, rounded — an object on a surface. `aspect-ratio` derives the
+ * width from the resolved height, so this tracks `--miniplayer-h` and its
+ * short-viewport steps without a media query of its own.
  */
 .artWrap {
   position: relative;
-  align-self: stretch;
+  align-self: center;
+  height: calc(100% - 16px);
   aspect-ratio: 1 / 1;
+  margin-left: var(--mini-gutter);
   flex-shrink: 0;
+  border-radius: var(--r-sm);
   overflow: hidden;
+  background: var(--surface-2);
+  /* A hairline keeps pale artwork from dissolving into the chrome behind it. */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28), inset 0 0 0 1px var(--chrome-line);
   /* Belt and braces against the intrinsic-size blowup described on `.root`:
    * even if the row's height ever goes indefinite again, the artwork can never
    * be taller than the space it was given. */
@@ -146,28 +163,10 @@
   background: var(--skeleton);
   opacity: 0;
   transition: opacity var(--d-base) var(--ease);
-  transform-origin: center;
 }
 
 .art.loaded {
   opacity: 1;
-}
-
-/* Replaces the old static ring: the art itself breathes gently while a
- * track is playing, in step with the bar's ambient wash. Lightweight —
- * transform only, no repaint. */
-.artWrap.playing .art {
-  animation: artBreathe 3.2s var(--ease-in-out) infinite;
-}
-
-@keyframes artBreathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.035);
-  }
 }
 
 .artFallback {
@@ -179,22 +178,22 @@
 }
 
 /*
- * Tiny equalizer badge, bottom-left corner of the art. Fixed white-on-black
- * rather than theme tokens — like the Full Player's `--on-media` tokens,
- * this sits on unpredictable artwork, not on an app surface, so it needs to
- * read the same regardless of theme or cover colour.
+ * The one animated thing, kept because it reports state rather than decorating.
+ * Fixed white-on-black rather than theme tokens — like the Full Player's
+ * `--on-media` set, this sits on unpredictable artwork, not on an app surface,
+ * so it needs to read the same regardless of theme or cover colour.
  */
 .eqBadge {
   position: absolute;
-  left: 5px;
-  bottom: 5px;
+  left: 4px;
+  bottom: 4px;
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: 11px;
+  height: 10px;
   padding: 2px 3px;
   border-radius: var(--r-xs);
-  background: rgba(0, 0, 0, 0.42);
+  background: rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
 
@@ -222,14 +221,14 @@
     height: 3px;
   }
   50% {
-    height: 10px;
+    height: 9px;
   }
 }
 
 @keyframes eqBar2 {
   0%,
   100% {
-    height: 7px;
+    height: 6px;
   }
   50% {
     height: 2px;
@@ -239,12 +238,14 @@
 @keyframes eqBar3 {
   0%,
   100% {
-    height: 5px;
+    height: 4px;
   }
   50% {
-    height: 11px;
+    height: 10px;
   }
 }
+
+/* ── Text column ──────────────────────────────────────────────────────────── */
 
 .info {
   flex: 1;
@@ -253,38 +254,25 @@
   flex-direction: column;
   justify-content: center;
   /*
-   * Explicit line boxes, and a little vertical breathing room. Everything in
-   * this column inherits the body's 1.55 line-height otherwise, which at three
-   * lines came to more than the bar was tall — the reason the lyric ended up
-   * cropped. Each line now declares its own tighter leading (see below) and
-   * this padding keeps the block off the bar's edges.
+   * Explicit line boxes. Everything in this column inherits the body's 1.55
+   * line-height otherwise, which at three lines came to more than the bar was
+   * tall — the reason the lyric ended up cropped. Each line declares its own
+   * tighter leading below.
    */
   gap: 1px;
-  padding: 0.125rem 0;
-  /* The tap-to-expand affordance lives here, so it must not swallow the
-   * buttons' hit areas — it's a sibling, not an overlay. */
 }
 
-.lyricLine {
-  font-size: var(--t-2xs);
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: var(--track-snug);
-  color: var(--track-accent, var(--accent));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* Descenders and CJK glyphs sit below the 1.3 line box; a hair of padding
-   * stops `overflow: hidden` shaving them off. */
-  padding-bottom: 1px;
-  opacity: 0.95;
-  cursor: pointer;
-  animation: fadeIn var(--d-base) var(--ease);
-}
-
+/*
+ * The title is set in the *body* face, not `--font-display`.
+ *
+ * A display face at 14px has none of the room it needs to show why it was
+ * chosen — the character that makes it worth having on the Full Player's large
+ * heading reads at this size as a body face rendered slightly wrong. The body
+ * face at 600 reads as a deliberate weight instead. The display face stays where
+ * it has the size to earn its keep.
+ */
 .title {
-  font-family: var(--font-display);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.25;
   font-weight: 600;
   letter-spacing: var(--track-snug);
@@ -303,25 +291,45 @@
   white-space: nowrap;
 }
 
+/*
+ * The synced lyric sits above the title and is the only text tinted by the
+ * track, which is what marks it as coming from the music rather than from the
+ * app's own metadata.
+ */
+.lyricLine {
+  font-size: var(--t-2xs);
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--track-accent, var(--accent));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Descenders and CJK glyphs sit below the 1.3 line box; a hair of padding
+   * stops `overflow: hidden` shaving them off. */
+  padding-bottom: 1px;
+  cursor: pointer;
+  animation: fadeIn var(--d-base) var(--ease);
+}
+
 /* ── Controls ──────────────────────────────────────────────────────────────
  *
- * Two things were wrong here and together they made the bar nearly unusable.
+ * Two things were wrong here once and together they made the bar nearly
+ * unusable. Both fixes are load-bearing, so the reasoning stays:
  *
  * 1. Both buttons used `all: unset`, which resets `position` to `static`.
  *    `.likeBtn` re-declared `position: relative`; `.playBtn` did not. Its
  *    44px-minimum `::before` hit area therefore anchored to `.root` — and
  *    `max(100%, 44px)` resolved against the *bar*, not the button. The result
  *    was an invisible full-width, full-height shield belonging to the play
- *    button, painted above everything, over the entire mini player. Every tap
- *    anywhere — the artwork, the title, the like button — hit play/pause. That
- *    is the "I have to click twice" and "like triggers pause" report.
- *
- * 2. Even with that fixed, the two 44px hit areas overlapped: centres sat
- *    43px apart while each pseudo-element reached 22px either side. The gap is
- *    now explicit and the areas are sized so they cannot intersect.
+ *    button, painted above everything. Every tap anywhere — the artwork, the
+ *    title, the like button — hit play/pause.
+ * 2. Even with that fixed, the two 44px hit areas overlapped: centres sat 43px
+ *    apart while each pseudo-element reached 22px either side.
  *
  * Both buttons are now `position: relative` on the same rule that defines the
- * pseudo-element, so the anchor can't be lost again.
+ * pseudo-element, so the anchor can't be lost again, and the areas are sized and
+ * spaced so they cannot intersect.
  */
 .likeBtn,
 .playBtn {
@@ -342,9 +350,8 @@
   top: 50%;
   left: 50%;
   /* Fixed 40px, not `max(100%, 44px)`. A percentage here is what allowed the
-   * area to inflate to the container's width. 40px with a 6px gap between the
-   * two buttons keeps every tap unambiguous while still clearing a
-   * comfortable target. */
+   * area to inflate to the container's width. 40px with the gap below keeps
+   * every tap unambiguous while still clearing a comfortable target. */
   width: 40px;
   height: 40px;
   transform: translate(-50%, -50%);
@@ -354,11 +361,12 @@
 .likeBtn {
   width: 1.875rem;
   height: 1.875rem;
+  /* App state, not track state, so this is the app's accent when set — the
+   * track's colour is reserved for progress and the lyric. */
   color: var(--text-2);
   border-radius: var(--r-full);
   transition: color var(--d-fast) var(--ease), transform var(--d-base) var(--spring);
-  /* Explicit separation from the play button. */
-  margin-right: 0.375rem;
+  margin-right: 0.25rem;
 }
 
 .likeBtn:active {
@@ -367,7 +375,7 @@
 }
 
 .likedBtn {
-  color: var(--track-accent, var(--accent));
+  color: var(--accent);
 }
 
 .likeBtn svg {
@@ -383,14 +391,13 @@
   width: 7px;
   height: 10px;
   border-radius: 60% 60% 60% 0;
-  background: var(--track-accent, var(--accent));
+  background: var(--accent);
   opacity: 0;
   pointer-events: none;
   animation: petalBurst 0.66s var(--ease-out) forwards;
 }
 
 .petal:nth-child(2n) {
-  background: var(--accent);
   opacity: 0.7;
 }
 
@@ -430,7 +437,7 @@
     color: var(--text);
   }
   .likedBtn:hover {
-    color: var(--track-accent, var(--accent));
+    color: var(--accent);
   }
 }
 
@@ -440,14 +447,17 @@
 }
 
 /* ── Swipe affordances ─────────────────────────────────────────────────────
- * A hint of the action being committed to, revealed as the bar is dragged.
- * Without it a horizontal swipe is a guess.
+ *
+ * A hint of the action being committed to. These used to be painted on top of
+ * the artwork and title at all times, waiting to appear over content they
+ * overlapped; they now sit in the bar's own edge gutters and the row dims behind
+ * them (`.contentArmed`), so at the moment they matter they are the only thing
+ * competing for the eye.
  */
 .swipeHint {
   position: absolute;
   z-index: 2;
   top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -455,20 +465,33 @@
   font-weight: 700;
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  color: var(--track-accent, var(--accent));
+  color: var(--accent);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--d-fast) var(--ease);
+  transition: opacity var(--d-fast) var(--ease), transform var(--d-base) var(--spring);
 }
 
 .swipeHintPrev {
-  left: 0.75rem;
+  left: var(--mini-gutter);
+  transform: translateY(-50%) translateX(-4px);
 }
 
 .swipeHintNext {
-  right: 0.75rem;
+  right: var(--mini-gutter);
+  transform: translateY(-50%) translateX(4px);
 }
 
 .swipeHintArmed {
   opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eqBar {
+    animation: none;
+    height: 6px;
+  }
+  .petal {
+    animation: none;
+  }
 }

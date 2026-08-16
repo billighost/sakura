@@ -6,6 +6,72 @@ import { callProvider, HttpError } from "@/lib/resilience";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Deezer's shapes, narrowed to the fields this route reads.
+ *
+ * Deliberately loose — every field is optional and the provider is free to add
+ * or drop others. The point isn't to model their API, it's to stop a typo in a
+ * field name compiling silently, which is what the `any`s here allowed.
+ */
+interface DeezerArtist {
+  id: number;
+  name: string;
+  picture_big?: string;
+  picture_medium?: string;
+  nb_fan?: number;
+  error?: unknown;
+}
+
+interface DeezerAlbum {
+  id: number;
+  title: string;
+  cover_big?: string;
+  cover_medium?: string;
+  release_date?: string;
+  track_total?: number;
+}
+
+interface DeezerTopTrack {
+  id: number;
+  title: string;
+  duration: number;
+  preview?: string;
+  artist: { id: number; name: string };
+  album: { id: number; title: string; cover_big?: string; cover_medium?: string };
+}
+
+interface DeezerList<T> {
+  data?: T[];
+  error?: unknown;
+}
+
+/**
+ * The merged artist record. Rows come out of `query()` untyped and the Deezer
+ * legs contribute a different subset of fields each, so this is the union of
+ * both rather than a mirror of either.
+ */
+interface ArtistRecord {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  bio?: string | null;
+  genres?: string[];
+  deezerId?: string | null;
+  fans?: number;
+  trackCount?: number;
+  albumCount?: number;
+  [key: string]: unknown;
+}
+
+type AlbumRecord = Record<string, unknown> & { id: string; title: string; deezerId?: string };
+type TrackRecord = Record<string, unknown> & {
+  id: string;
+  title: string;
+  duration: number;
+  deezerId?: string;
+  artist?: { name?: string; id?: string };
+};
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -46,7 +112,7 @@ async function buildArtist(id: string) {
   {
     let deezerId: string | null = null;
     let localArtist = null;
-    let isUuid = UUID_REGEX.test(id);
+    const isUuid = UUID_REGEX.test(id);
 
     if (isUuid) {
       localArtist = await queryOne(
@@ -71,9 +137,10 @@ async function buildArtist(id: string) {
       deezerId = id.startsWith("deezer-") ? id.replace("deezer-", "") : id;
     }
 
-    let finalArtist: any = null;
-    let finalAlbums: any[] = [];
-    let finalTracks: any[] = [];
+    let finalArtist: ArtistRecord | null = null;
+    let finalAlbums: AlbumRecord[] = [];
+    let finalTracks: TrackRecord[] = [];
+    let finalRelated: { id: string; name: string; imageUrl: string | null }[] = [];
 
     if (localArtist) {
       finalArtist = localArtist;
@@ -114,14 +181,14 @@ async function buildArtist(id: string) {
     }
 
     if (deezerId) {
-      // Artist, albums and top tracks in parallel, each independently
-      // resilient. Previously these were three bare fetches inside a
+      // Artist, albums, top tracks and related artists in parallel, each
+      // independently resilient. Previously these were bare fetches inside a
       // Promise.all, so a single network blip rejected the whole thing and the
       // artist page 500'd even when the local DB had everything needed to
       // render it. Now a failed leg is simply absent and the page degrades to
       // whatever is in the library.
-      const [dArtist, dTop, dAlbums] = await Promise.all([
-        callProvider<any>(
+      const [dArtist, dTop, dAlbums, dRelated] = await Promise.all([
+        callProvider<DeezerArtist>(
           async (signal) => {
             const url = `https://api.deezer.com/artist/${deezerId}`;
             const res = await fetch(url, { signal });
@@ -130,7 +197,7 @@ async function buildArtist(id: string) {
           },
           { provider: "deezer", op: "artist", timeoutMs: 5000, attempts: 2 },
         ),
-        callProvider<any>(
+        callProvider<DeezerList<DeezerTopTrack>>(
           async (signal) => {
             const url = `https://api.deezer.com/artist/${deezerId}/top?limit=50`;
             const res = await fetch(url, { signal });
@@ -139,7 +206,7 @@ async function buildArtist(id: string) {
           },
           { provider: "deezer", op: "artist.top", timeoutMs: 5000, attempts: 2 },
         ),
-        callProvider<any>(
+        callProvider<DeezerList<DeezerAlbum>>(
           async (signal) => {
             const url = `https://api.deezer.com/artist/${deezerId}/albums`;
             const res = await fetch(url, { signal });
@@ -147,6 +214,22 @@ async function buildArtist(id: string) {
             return res.json();
           },
           { provider: "deezer", op: "artist.albums", timeoutMs: 5000, attempts: 2 },
+        ),
+        /*
+         * Related artists. One attempt rather than two, and it's the only leg
+         * that's purely additive — the page renders a rail if this lands and
+         * omits the section if it doesn't, so retrying a flaky call to fill an
+         * optional shelf isn't worth the latency it adds to every cold artist
+         * view.
+         */
+        callProvider<DeezerList<DeezerArtist>>(
+          async (signal) => {
+            const url = `https://api.deezer.com/artist/${deezerId}/related?limit=12`;
+            const res = await fetch(url, { signal });
+            if (!res.ok) throw new HttpError(res.status, url);
+            return res.json();
+          },
+          { provider: "deezer", op: "artist.related", timeoutMs: 4000, attempts: 1 },
         ),
       ]);
 
@@ -157,14 +240,17 @@ async function buildArtist(id: string) {
               id: `deezer-${dArtist.id}`,
               name: dArtist.name,
               imageUrl: dArtist.picture_big || dArtist.picture_medium,
-              trackCount: dArtist.nb_fan, // rough proxy
-              albumCount: dArtist.nb_album,
               deezerId: dArtist.id.toString()
             };
           } else {
             // update missing fields
             finalArtist.imageUrl = finalArtist.imageUrl || dArtist.picture_big || dArtist.picture_medium;
           }
+          // Deezer's follower count, reported as what it is. It used to be
+          // assigned to `trackCount` as a "rough proxy", which the final
+          // return then overwrote — so the artist page had no follower figure
+          // and the field it was stored in meant something else entirely.
+          if (typeof dArtist.nb_fan === "number") finalArtist.fans = dArtist.nb_fan;
         }
       }
 
@@ -215,6 +301,19 @@ async function buildArtist(id: string) {
           finalTracks = mergedTracks;
         }
       }
+
+      if (dRelated?.data) {
+        finalRelated = dRelated.data
+          // Deezer occasionally lists the artist among their own related
+          // artists, which renders as a card that navigates to the page you're
+          // already on.
+          .filter((da) => da?.id && da.id.toString() !== deezerId)
+          .map((da) => ({
+            id: `deezer-${da.id}`,
+            name: da.name,
+            imageUrl: da.picture_big || da.picture_medium || null,
+          }));
+      }
     }
 
     if (!finalArtist) return null;
@@ -223,6 +322,7 @@ async function buildArtist(id: string) {
       ...finalArtist,
       albums: finalAlbums,
       tracks: finalTracks,
+      related: finalRelated,
       trackCount: finalTracks.length,
       albumCount: finalAlbums.length
     };

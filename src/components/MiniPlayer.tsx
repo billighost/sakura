@@ -146,6 +146,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   // too — the old distance-only check left quick swipes with no feedback at all.
   const armedNext = drag.axis === "x" && drag.direction === "left" && drag.armed;
   const armedPrev = drag.axis === "x" && drag.direction === "right" && drag.armed;
+  const armed = armedNext || armedPrev;
 
   const lyricSeek = () => {
     if (lyrics?.lines && activeLyricIndex >= 0) {
@@ -156,7 +157,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
 
   return (
     <div
-      className={`${styles.root} ${isPlaying ? styles.isPlaying : ""}`}
+      className={styles.root}
       // The bar is one line taller while a lyric is showing — see the height
       // note in MiniPlayer.module.css. Attribute rather than a class because it
       // states a fact about the content, not a variant.
@@ -204,11 +205,8 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         Next <NextIcon size={12} />
       </span>
 
-      <div className={styles.content}>
-        <div
-          ref={artWrapRef}
-          className={`${styles.artWrap} ${isPlaying ? styles.playing : ""}`}
-        >
+      <div className={`${styles.content} ${armed ? styles.contentArmed : ""}`}>
+        <div ref={artWrapRef} className={styles.artWrap}>
           {currentTrack.coverUrl ? (
             <>
               {!artLoaded && (

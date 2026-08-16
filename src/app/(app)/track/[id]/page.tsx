@@ -1,10 +1,13 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { queryOne, query } from "@/lib/sql";
 import { getDeezerTrack } from "@/lib/metadata";
-import Link from "next/link";
-import { PlayButton } from "./PlayButton";
+import { TrackActions } from "./TrackActions";
 import { BackButton } from "@/components/BackButton";
-import { MusicNoteIcon } from "@/components/Icons";
+import { ArtworkTint } from "@/components/ArtworkTint";
+import { MusicNoteIcon, MusicNotesIcon } from "@/components/Icons";
+import Loading from "./loading";
 import styles from "./page.module.css";
 
 interface TrackDetail {
@@ -55,7 +58,7 @@ async function resolveVirtualTrack(id: string): Promise<TrackDetail | null> {
     id,
     title: dt.title,
     duration: dt.duration ?? 0,
-    // No stored audio yet: PlayButton resolves playback through the normal
+    // No stored audio yet: TrackActions resolves playback through the normal
     // download path, the same way a search result row does.
     audioUrl: "",
     coverUrl: dt.album?.cover_big || dt.album?.cover_medium || undefined,
@@ -162,20 +165,53 @@ async function getTrackCredits(id: string): Promise<{ credits: Credit[]; samples
   }
 }
 
-function NoteIcon() {
+/**
+ * One credit row per role rather than one per person.
+ *
+ * Most tracks with real credits have several writers and several producers, and
+ * a row each turned the section into a wall of near-identical lines. Grouping
+ * matches how CreditsSection renders the same data inside the player, so the two
+ * places this information appears agree with each other.
+ */
+function groupCredits(credits: Credit[]): { role: string; names: string[] }[] {
+  const byRole = new Map<string, string[]>();
+  for (const c of credits) {
+    if (!c.name) continue;
+    const role = c.role || "Credit";
+    if (!byRole.has(role)) byRole.set(role, []);
+    byRole.get(role)!.push(c.name);
+  }
+  return Array.from(byRole, ([role, names]) => ({ role, names }));
+}
+
+/** A sample is a link when we have the track, plain text when we don't. */
+function SampleRow({ sample }: { sample: Sample }) {
+  const body = (
+    <>
+      <span className={styles.sampleGlyph} aria-hidden="true">
+        <MusicNotesIcon size={15} />
+      </span>
+      <span className={styles.sampleText}>
+        <span className={styles.sampleTitle}>{sample.trackTitle}</span>
+        <span className={styles.sampleMeta}>
+          {sample.artistName || "Unknown artist"} · {sample.sampleType}
+        </span>
+      </span>
+    </>
+  );
+
+  if (!sample.trackId) {
+    return <div className={styles.sampleRow}>{body}</div>;
+  }
+
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
-    </svg>
+    <Link href={`/track/${sample.trackId}`} className={`${styles.sampleRow} ${styles.sampleLink} pressable`}>
+      {body}
+    </Link>
   );
 }
 
-import { Suspense } from "react";
-import Loading from "./loading";
-
-async function TrackDetail({ id }: { id: string }) {
+async function TrackDetailView({ id }: { id: string }) {
   const [track, { credits, samples, sampledBy }] = await Promise.all([
     getTrack(id),
     getTrackCredits(id),
@@ -184,25 +220,35 @@ async function TrackDetail({ id }: { id: string }) {
   if (!track) notFound();
 
   const coverUrl = track.album?.coverUrl || track.coverUrl;
-  const duration = track.duration ? `${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, "0")}` : "0:00";
-  const addedDate = new Date(track.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const duration = track.duration
+    ? `${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, "0")}`
+    : null;
+  const addedDate = new Date(track.createdAt).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const groupedCredits = groupCredits(credits);
+  const hasDna = groupedCredits.length > 0 || samples.length > 0 || sampledBy.length > 0;
 
   return (
-    <div className={styles.page}>
-      {/* Deep-linkable from a share, so back needs somewhere to go when there
-          is no history to pop. */}
-      <BackButton className={styles.backBtn} fallback="/home" />
+    <div className={styles.page} data-page-scroll>
+      {/* The tint has to be applied on the client, since it's read out of the
+          artwork's pixels. Only this wrapper is a client component; everything
+          inside stays server-rendered. */}
+      <ArtworkTint src={coverUrl} className={styles.heroTint}>
+        <header className={styles.hero}>
+          <div className={styles.backRow}>
+            {/* Deep-linkable from a share, so back needs somewhere to go when
+                there is no history to pop. */}
+            <BackButton fallback="/home" />
+          </div>
 
-      <div className={styles.heroSection}>
-        {coverUrl ? (
-          <img className={styles.heroBleed} src={coverUrl} alt="" aria-hidden="true" />
-        ) : (
-          <div className={styles.heroBleedFallback} />
-        )}
-        <div className={styles.hero}>
-          <div className={styles.coverWrap}>
+          <div className={styles.cover}>
             {coverUrl ? (
-              <img src={coverUrl} alt={track.title} className={styles.coverImg} />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coverUrl} alt="" className={styles.coverImg} />
             ) : (
               <span className={styles.coverFallback} aria-hidden="true">
                 <MusicNoteIcon size={40} />
@@ -210,116 +256,122 @@ async function TrackDetail({ id }: { id: string }) {
             )}
           </div>
 
-          <div className={styles.heroInfo}>
-            <div className={styles.eyebrow}>Track</div>
-            <h1 className={styles.title}>{track.title}</h1>
-            <div className={styles.byline}>
-              <Link href={`/artist/${track.artist.id}`} className={styles.artistLink}>
-                {track.artist.name}
-              </Link>
-              {track.otherArtists.length > 0 && track.otherArtists.map((a) => (
-                <span key={a.id}>
-                  {a.role === "featured" ? "ft. " : a.role === "main" ? "& " : ""}
-                  <Link href={`/artist/${a.id}`} className={styles.artistLink}>
-                    {a.name}
-                  </Link>
-                </span>
-              ))}
-              {track.album && (
-                <>
-                  <span className={styles.dot}>·</span>
-                  <Link href={`/album/${track.album.id}`} className={styles.artistLink}>
-                    {track.album.title}
-                  </Link>
-                </>
-              )}
-            </div>
-            <div className={styles.duration}>{duration}</div>
+          <p className={styles.eyebrow}>Song</p>
+          <h1 className={styles.title}>{track.title}</h1>
 
-            <div className={styles.playRow}>
-              <PlayButton trackId={track.id} audioUrl={track.audioUrl} title={track.title} artistName={track.artist.name} coverUrl={coverUrl} duration={track.duration} />
-            </div>
-          </div>
-        </div>
-      </div>
+          <p className={styles.byline}>
+            <Link href={`/artist/${track.artist.id}`} className={styles.link}>
+              {track.artist.name}
+            </Link>
+            {track.otherArtists.map((a) => (
+              <span key={a.id}>
+                {a.role === "featured" ? " ft. " : a.role === "main" ? " & " : " "}
+                <Link href={`/artist/${a.id}`} className={styles.link}>
+                  {a.name}
+                </Link>
+              </span>
+            ))}
+          </p>
 
-      <div className={styles.container}>
-        {(credits.length > 0 || samples.length > 0 || sampledBy.length > 0) && (
-          <div className={`${styles.section} anim-fade-in`}>
-            <div className={styles.sectionTitle}>Song DNA</div>
+          <p className={styles.meta}>
+            {track.album && (
+              <>
+                <Link href={`/album/${track.album.id}`} className={styles.link}>
+                  {track.album.title}
+                </Link>
+                {duration && <span aria-hidden="true"> · </span>}
+              </>
+            )}
+            {duration}
+          </p>
 
-            {credits.length > 0 && (
-              <div className={styles.subSection}>
-                <div className={styles.subTitle}>Credits</div>
-                <div className={styles.creditChips}>
-                  {credits.map((c) => (
-                    <div key={c.id} className={styles.creditChip}>
-                      <span className={styles.creditName}>{c.name}</span>
-                      <span className={styles.creditRole}>· {c.role}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <TrackActions
+            trackId={track.id}
+            audioUrl={track.audioUrl}
+            title={track.title}
+            artistName={track.artist.name}
+            album={track.album?.title}
+            coverUrl={coverUrl}
+            duration={track.duration}
+          />
+        </header>
+      </ArtworkTint>
+
+      <div className={styles.body}>
+        {hasDna && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Song DNA</h2>
+
+            {groupedCredits.length > 0 && (
+              <dl className={styles.creditList}>
+                {groupedCredits.map((g) => (
+                  <div key={g.role} className={styles.creditRow}>
+                    <dt className={styles.creditRole}>{g.role}</dt>
+                    <dd className={styles.creditNames}>{g.names.join(", ")}</dd>
+                  </div>
+                ))}
+              </dl>
             )}
 
             {samples.length > 0 && (
               <div className={styles.subSection}>
-                <div className={styles.subTitle}>Samples</div>
+                <h3 className={styles.subTitle}>Samples</h3>
                 {samples.map((s, i) => (
-                  <div key={i} className={styles.sampleRow}>
-                    <div className={styles.sampleIcon}><NoteIcon /></div>
-                    <div>
-                      <p className={styles.sampleTitle}>{s.trackTitle}</p>
-                      <p className={styles.sampleMeta}>{s.artistName} · {s.sampleType}</p>
-                    </div>
-                  </div>
+                  <SampleRow key={`sample-${i}`} sample={s} />
                 ))}
               </div>
             )}
 
             {sampledBy.length > 0 && (
               <div className={styles.subSection}>
-                <div className={styles.subTitle}>Sampled by</div>
+                <h3 className={styles.subTitle}>Sampled in</h3>
                 {sampledBy.map((s, i) => (
-                  <div key={i} className={styles.sampleRow}>
-                    <div className={styles.sampleIcon}><NoteIcon /></div>
-                    <div>
-                      <p className={styles.sampleTitle}>{s.trackTitle}</p>
-                      <p className={styles.sampleMeta}>{s.artistName} · {s.sampleType}</p>
-                    </div>
-                  </div>
+                  <SampleRow key={`sampled-${i}`} sample={s} />
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {track.isrc && (
-          <div className={`${styles.section} anim-fade-in`}>
-            <div className={styles.sectionTitle}>Track info</div>
-            <div className={styles.infoCard}>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>ISRC</span>
-                <span className={styles.infoValue}>{track.isrc}</span>
-              </div>
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Added</span>
-                <span className={styles.infoValue} style={{ fontFamily: "inherit" }}>{addedDate}</span>
-              </div>
+        {/*
+          Was gated on `track.isrc`, which hid the added date for every track
+          without one — most of them. The date is always known, so the section
+          always has something to say.
+        */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Details</h2>
+          <dl className={styles.infoCard}>
+            <div className={styles.infoRow}>
+              <dt className={styles.infoLabel}>Added to Sakura</dt>
+              <dd className={styles.infoValue}>{addedDate}</dd>
             </div>
-          </div>
-        )}
+            {duration && (
+              <div className={styles.infoRow}>
+                <dt className={styles.infoLabel}>Length</dt>
+                <dd className={`${styles.infoValue} ${styles.mono}`}>{duration}</dd>
+              </div>
+            )}
+            {track.isrc && (
+              <div className={styles.infoRow}>
+                {/* The recording's international ID. Expanded because "ISRC"
+                    means nothing to anyone who hasn't worked in music. */}
+                <dt className={styles.infoLabel}>Recording code</dt>
+                <dd className={`${styles.infoValue} ${styles.mono}`}>{track.isrc}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
       </div>
     </div>
   );
 }
 
-export default function TrackDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TrackDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   return (
     <Suspense fallback={<Loading />}>
-      {params.then(({ id }) => (
-        <TrackDetail id={id} />
-      ))}
+      <TrackDetailView id={id} />
     </Suspense>
   );
 }

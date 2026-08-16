@@ -273,6 +273,53 @@ export function EmptyState({
 
 /* ── Skeletons ───────────────────────────────────────────────────────────── */
 
+/**
+ * Hero placeholder, shaped like the real hero above.
+ *
+ * Every route's `loading.tsx` used to hand-roll this out of inline styles — six
+ * copies, each with its own hardcoded rem values and its own `--sakura-skeleton`
+ * fill, and none of them matching the header they were standing in for. Sharing
+ * the component means the placeholder and the thing it replaces can't drift, and
+ * a route-level loading file becomes three lines.
+ *
+ * `round` covers the artist shape, where the tile is an avatar.
+ */
+export function CollectionHeroSkeleton({
+  round = false,
+  transport = true,
+}: {
+  round?: boolean;
+  /** Set false for a hero with no play row beneath it. */
+  transport?: boolean;
+}) {
+  return (
+    <div aria-hidden="true">
+      <div className={styles.hero}>
+        <div className={styles.backRow}>
+          <div className={`${styles.skeletonBack} skeleton`} />
+        </div>
+        <div className={styles.top}>
+          <div className={`${styles.art} ${round ? styles.skeletonArtRound : ""} skeleton`} />
+        </div>
+        <div className={`${styles.skeletonEyebrow} skeleton`} />
+        <div className={`${styles.skeletonTitle} skeleton`} />
+        <div className={styles.meta}>
+          <span className={`${styles.metaSkeleton} skeleton`} />
+        </div>
+      </div>
+
+      {transport && (
+        <div className={styles.transport}>
+          <div className={`${styles.skeletonPlay} skeleton`} />
+          <div className={`${styles.skeletonPill} skeleton`} />
+          <div className={styles.spacer} />
+          <div className={`${styles.skeletonChip} skeleton`} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Track-list placeholder, shaped like TrackRow so the swap doesn't reflow. */
 export function TrackListSkeleton({ rows = 6 }: { rows?: number }) {
   return (

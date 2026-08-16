@@ -1,13 +1,36 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { TrackRow } from "@/components/TrackRow";
 import { usePlayer } from "@/components/PlayerContext";
-import { useAppNav } from "@/components/AppNavContext";
+import {
+  CollectionHero,
+  CollectionTransport,
+  EmptyState,
+  TrackListSkeleton,
+} from "@/components/CollectionHero";
+import { Grid } from "@/components/Rail";
+import { MediaCard } from "@/components/MediaCard";
+import { useArtworkTint } from "@/components/ArtworkTint";
 import { useDownloadAll } from "@/lib/useDownloadAll";
-import { isTrackDownloaded, getCachedLibraryData, setCachedLibraryData, getCachedUserId } from "@/lib/offline-db";
+import { haptic } from "@/lib/haptics";
+import { AlertIcon, DiscIcon, HeartIcon } from "@/components/Icons";
+import {
+  isTrackDownloaded,
+  getCachedLibraryData,
+  setCachedLibraryData,
+  getCachedUserId,
+} from "@/lib/offline-db";
 import styles from "./page.module.css";
+
+/**
+ * An album is a collection, so it uses the same hero, transport row and empty
+ * state as Liked, Downloaded, Playlist and Mix rather than a fourth private copy
+ * of all three. What used to be album-specific — the year/track-count/runtime
+ * line, the genre chips, the "more by this artist" grid — is what's left in this
+ * file, which is the right split.
+ */
 
 interface AlbumTrack {
   id: string;
@@ -33,14 +56,14 @@ interface AlbumDetail {
   coverUrl?: string;
   year?: number;
   genres?: string[];
-  accentColor?: string;
   liked?: boolean;
   tracks: AlbumTrack[];
   relatedAlbums?: RelatedAlbum[];
   copyright?: string;
 }
 
-function formatDuration(totalSec: number): string {
+/** "1 hr 12 min" reads better than "72 min" past the hour. */
+function formatRuntime(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   if (h > 0) return `${h} hr ${m} min`;
@@ -56,55 +79,26 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-export function AlbumLoadingState() {
-  return (
-    <div style={{ padding: "clamp(0.75rem, 3vw, 1.25rem)" }}>
-      <div style={{ margin: "clamp(-0.75rem, -3vw, -1.25rem) clamp(-0.75rem, -3vw, -1.25rem) clamp(0.75rem, 3vw, 1.25rem)", background: "var(--sakura-skeleton)", padding: "clamp(1rem, 4vw, 1.5rem)", borderRadius: "0 0 16px 16px", opacity: 0.5 }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "clamp(0.75rem, 3vw, 1rem)" }}>
-          <div style={{ width: "clamp(6rem, 25vw, 10rem)", height: "clamp(6rem, 25vw, 10rem)", borderRadius: "14px", background: "var(--sakura-skeleton)", flexShrink: 0 }} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem", paddingBottom: "0.5rem" }}>
-            <div style={{ width: "3rem", height: "0.6875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-            <div style={{ width: "10rem", height: "1.5rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-            <div style={{ width: "6rem", height: "0.75rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-          </div>
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <div style={{ width: "6rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
-        <div style={{ width: "2.75rem", height: "2.25rem", borderRadius: "9999px", background: "var(--sakura-skeleton)" }} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem" }}>
-        {[...Array(5)].map((_, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0" }}>
-            <div style={{ width: "0.8125rem", height: "0.875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-            <div style={{ width: "3rem", height: "3rem", borderRadius: "8px", background: "var(--sakura-skeleton)", flexShrink: 0 }} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ width: "60%", height: "0.875rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-              <div style={{ width: "40%", height: "0.75rem", borderRadius: "4px", background: "var(--sakura-skeleton)" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function AlbumClient({ id }: { id: string }) {
   const { play, downloadStates } = usePlayer();
   const { downloadAll } = useDownloadAll();
-  const { back } = useAppNav();
 
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [allDownloaded, setAllDownloaded] = useState(false);
-  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
 
-  const downloading = useMemo(() => {
-    if (!album) return false;
-    return album.tracks.some(t => downloadStates[t.id] === "queued" || downloadStates[t.id] === "downloading");
-  }, [album, downloadStates]);
+  const tint = useArtworkTint(album?.coverUrl);
+
+  const downloading = useMemo(
+    () =>
+      album
+        ? album.tracks.some(
+            (t) => downloadStates[t.id] === "queued" || downloadStates[t.id] === "downloading"
+          )
+        : false,
+    [album, downloadStates]
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -114,7 +108,10 @@ export default function AlbumClient({ id }: { id: string }) {
 
     async function load() {
       setLoading(true);
+      setFailed(false);
 
+      // Cached copy first so an album opened before renders instantly and
+      // offline; the network result replaces it when it lands.
       const cached = await getCachedLibraryData<AlbumDetail>(cacheKey, uId);
       if (cancelled) return;
       if (cached) {
@@ -125,45 +122,53 @@ export default function AlbumClient({ id }: { id: string }) {
 
       try {
         const res = await fetch(`/api/albums/${id}`);
-        if (!res.ok) throw new Error("fetch failed");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: AlbumDetail = await res.json();
         if (cancelled) return;
         setAlbum(data);
         setLiked(!!data.liked);
         setCachedLibraryData(cacheKey, data, uId);
       } catch {
-        if (!cached && !cancelled) setAlbum(null);
+        // A failed refresh with a cached copy on screen is not a failure the
+        // user needs to see; a failure with nothing on screen is.
+        if (!cancelled && !cached) setFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     load();
-
     return () => {
       cancelled = true;
     };
   }, [id]);
 
-  useEffect(() => {
-    let active = true;
-    if (!album || album.tracks.length === 0) {
-      if (active) setAllDownloaded(true);
-      return;
-    }
+  /*
+   * How many tracks are already on the device. A count rather than the old
+   * all-or-nothing boolean, because the transport row reports "Save 4" when
+   * you're partway through — which is the state most albums are actually in.
+   *
+   * Stored against the album id and matched during render rather than reset by
+   * the effect: resetting synchronously is a cascading render, and it would also
+   * let one album's count show briefly under another album's title when you
+   * navigate between two of them.
+   */
+  const [savedCount, setSavedCount] = useState<{ albumId: string; count: number } | null>(null);
+  const downloadedCount = album && savedCount?.albumId === album.id ? savedCount.count : 0;
 
-    async function checkDownloads() {
-      let allDl = true;
-      for (const t of album!.tracks) {
-        if (!(await isTrackDownloaded(t.id))) {
-          allDl = false;
-          break;
-        }
-      }
-      if (active) setAllDownloaded(allDl);
-    }
-    checkDownloads();
-    return () => { active = false; };
+  useEffect(() => {
+    if (!album || album.tracks.length === 0) return;
+
+    let active = true;
+    const albumId = album.id;
+    (async () => {
+      const flags = await Promise.all(album.tracks.map((t) => isTrackDownloaded(t.id)));
+      if (active) setSavedCount({ albumId, count: flags.filter(Boolean).length });
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [album, downloadStates]);
 
   const playerQueue = useMemo(() => {
@@ -192,34 +197,36 @@ export default function AlbumClient({ id }: { id: string }) {
     }));
   }, [album]);
 
-  function handlePlay() {
-    if (playerQueue.length === 0) return;
-    play(playerQueue[0], playerQueue);
-  }
+  const handlePlay = useCallback(() => {
+    if (playerQueue.length) play(playerQueue[0], playerQueue);
+  }, [playerQueue, play]);
 
-  function handleShuffle() {
-    if (playerQueue.length === 0) return;
+  const handleShuffle = useCallback(() => {
+    if (!playerQueue.length) return;
     const shuffled = shuffleArray(playerQueue);
     play(shuffled[0], shuffled);
-  }
+  }, [playerQueue, play]);
 
-  async function handleToggleLike() {
+  const handleToggleLike = useCallback(async () => {
     if (!album) return;
     const next = !liked;
     setLiked(next);
+    haptic(next ? "success" : "selection");
     try {
-      const trackIds = album.tracks.map(t => t.id);
-      await fetch(`/api/favorites/batch`, {
+      const res = await fetch(`/api/favorites/batch`, {
         method: next ? "POST" : "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackIds }),
+        body: JSON.stringify({ trackIds: album.tracks.map((t) => t.id) }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch {
+      // Roll back rather than leaving the heart lying about server state.
       setLiked(!next);
+      haptic("error");
     }
-  }
+  }, [album, liked]);
 
-  async function handleDownloadAll() {
+  const handleDownloadAll = useCallback(async () => {
     if (!album) return;
     await downloadAll(
       album.tracks.map((track) => ({
@@ -232,173 +239,135 @@ export default function AlbumClient({ id }: { id: string }) {
         duration: track.duration,
         albumId: album.id,
       })),
-      "tracks from this album"
+      album.title
     );
-  }
+  }, [album, downloadAll]);
 
-  async function handleRemoveFromLibrary() {
-    if (!album) return;
-    try {
-      await fetch(`/api/albums/${album.id}/library`, { method: "DELETE" });
-    } catch {
-      /* ignore */
-    } finally {
-      setConfirmRemoveOpen(false);
-      back("/library");
-    }
-  }
-
-  if (loading) {
-    return <AlbumLoadingState />;
+  if (loading && !album) {
+    return (
+      <div className={styles.page} data-page-scroll>
+        <TrackListSkeleton rows={8} />
+      </div>
+    );
   }
 
   if (!album) {
     return (
-      <div style={{ padding: "clamp(2rem, 8vh, 4rem) 1.5rem", textAlign: "center", color: "var(--sakura-text-secondary)" }}>
-        Couldn&apos;t load this album.
+      <div className={styles.page} data-page-scroll>
+        <EmptyState
+          icon={<AlertIcon size={26} />}
+          title={failed ? "Couldn't open this album" : "Album not found"}
+          body={
+            failed
+              ? "Check your connection and try again. Anything you've saved for offline is still in your library."
+              : "This album isn't available any more. It may have been removed."
+          }
+          action={{ href: "/library", label: "Go to library" }}
+          secondaryAction={{ href: "/search", label: "Search" }}
+        />
       </div>
     );
   }
 
-  const heroStyle = { "--bg": album.accentColor || "var(--sakura-accent-2)" } as React.CSSProperties;
+  const runtime = album.tracks.reduce((s, t) => s + (t.duration || 0), 0);
 
   return (
-    <div className={styles.page}>
-      <div className={styles.heroGradient} style={heroStyle}>
-        <button className={styles.backBtn} onClick={() => back("/library")} aria-label="Go back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <div className={styles.hero}>
-          {album.coverUrl ? (
-            <img src={album.coverUrl} alt="" className={styles.coverArt} />
-          ) : (
-            <div className={styles.coverArt} />
-          )}
-          <div className={styles.heroInfo}>
-            <div className={styles.heroLabel}>Album</div>
-            <h1 className={styles.heroTitle}>{album.title}</h1>
+    <div className={styles.page} data-page-scroll>
+      <CollectionHero
+        eyebrow="Album"
+        title={album.title}
+        coverUrl={album.coverUrl}
+        fallbackIcon={<DiscIcon size={34} />}
+        tint={tint}
+        backFallback="/library"
+        meta={
+          <>
             <Link href={`/artist/${album.artist.id}`} className={styles.artistLink}>
               {album.artist.name}
             </Link>
-            <div className={styles.heroMeta}>
-              {album.year && <span>{album.year}</span>}
-              {album.year && <span>·</span>}
-              <span>{album.tracks.length} song{album.tracks.length !== 1 ? "s" : ""}</span>
-              <span>·</span>
-              <span>{formatDuration(album.tracks.reduce((s, t) => s + (t.duration || 0), 0))}</span>
-            </div>
+            {album.year ? <span aria-hidden="true">·</span> : null}
+            {album.year ? <span>{album.year}</span> : null}
+            <span aria-hidden="true">·</span>
+            <span>
+              {album.tracks.length} song{album.tracks.length === 1 ? "" : "s"}
+            </span>
+            {runtime > 0 && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{formatRuntime(runtime)}</span>
+              </>
+            )}
+            {/* Genre belongs in the fact line, with the year and the runtime.
+                It used to render as bordered pills below, which is the visual
+                CollectionControls uses for a filter you can tap — these aren't
+                tappable, because there's no genre destination to link to. */}
             {album.genres && album.genres.length > 0 && (
-              <div className={styles.genreTags}>
-                {album.genres.map((g) => (
-                  <span key={g} className={styles.genreTag}>{g}</span>
-                ))}
-              </div>
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{album.genres.slice(0, 2).join(", ")}</span>
+              </>
             )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className={styles.actions}>
-        <button className={styles.playBtn} onClick={handlePlay}>
-          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          Play
-        </button>
-        <button className={styles.shuffleBtn} onClick={handleShuffle} aria-label="Shuffle play">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-            <polyline points="16 3 21 3 21 8" />
-            <line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" />
-            <line x1="15" y1="15" x2="21" y2="21" />
-            <line x1="4" y1="4" x2="9" y2="9" />
-          </svg>
-        </button>
+      <CollectionTransport
+        onPlay={handlePlay}
+        onShuffle={handleShuffle}
+        disabled={album.tracks.length === 0}
+        downloaded={downloadedCount}
+        total={album.tracks.length}
+        onDownloadAll={handleDownloadAll}
+        downloading={downloading}
+      >
         <button
-          className={`${styles.iconBtn} ${liked ? styles.iconBtnActive : ""}`}
+          type="button"
+          className={`${styles.likeBtn} ${liked ? styles.likeBtnOn : ""} pressable`}
           onClick={handleToggleLike}
-          aria-label={liked ? "Unlike album" : "Like album"}
           aria-pressed={liked}
+          aria-label={liked ? "Remove these songs from Liked" : "Add every song to Liked"}
         >
-          <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-          </svg>
+          <HeartIcon size={16} filled={liked} />
         </button>
-        {!allDownloaded && (
-          <button className={styles.iconBtn} onClick={handleDownloadAll} aria-label="Download album for offline" title={downloading ? "Downloading…" : "Download for offline"}>
-            {downloading ? (
-              <svg viewBox="0 0 24 24" width="18" height="18" style={{ animation: "spin 0.8s linear infinite" }}>
-                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="42" strokeDashoffset="14" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            )}
-          </button>
-        )}
-        <div className={styles.spacer} />
-        <div style={{ position: "relative" }}>
-          <button className={styles.iconBtn} onClick={() => setMoreOpen((v) => !v)} aria-label="More options" aria-haspopup="menu" aria-expanded={moreOpen}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-              <circle cx="12" cy="5" r="1.75" />
-              <circle cx="12" cy="12" r="1.75" />
-              <circle cx="12" cy="19" r="1.75" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      </CollectionTransport>
 
-      <div className={styles.trackList}>
-        {displayTracks.map((track, i) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            queue={displayTracks}
-            index={i}
-            showNumber
-          />
-        ))}
-      </div>
+      {album.tracks.length === 0 ? (
+        <EmptyState
+          icon={<DiscIcon size={26} />}
+          title="No songs listed"
+          body="We couldn't get this album's track list. Searching for the album name usually finds the songs individually."
+          action={{ href: `/search?q=${encodeURIComponent(album.title)}`, label: "Search for it" }}
+        />
+      ) : (
+        <div className={styles.tracks}>
+          {displayTracks.map((track, i) => (
+            <TrackRow
+              key={track.id}
+              track={track}
+              queue={displayTracks}
+              index={i}
+              showNumber
+            />
+          ))}
+        </div>
+      )}
 
       {album.copyright && <p className={styles.copyright}>{album.copyright}</p>}
 
       {album.relatedAlbums && album.relatedAlbums.length > 0 && (
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>More by {album.artist.name}</h2>
-          <div className={styles.albumGrid}>
-            {album.relatedAlbums.map((rel) => (
-              <Link key={rel.id} href={`/album/${rel.id}`} className={styles.albumCard}>
-                {rel.coverUrl ? (
-                  <img src={rel.coverUrl} alt="" className={styles.albumArt} />
-                ) : (
-                  <div className={styles.albumArt} />
-                )}
-                <div className={styles.albumTitle}>{rel.title}</div>
-                {rel.year && <div className={styles.albumYear}>{rel.year}</div>}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {confirmRemoveOpen && (
-        <div className={styles.modalOverlay} onClick={() => setConfirmRemoveOpen(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Remove from Your Library?</div>
-            <p className={styles.modalText}>
-              &ldquo;{album.title}&rdquo; will be removed from your saved albums. You can add it back anytime.
-            </p>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setConfirmRemoveOpen(false)}>Cancel</button>
-              <button className={styles.modalConfirm} onClick={handleRemoveFromLibrary}>Remove</button>
-            </div>
-          </div>
-        </div>
+        <Grid title={`More by ${album.artist.name}`} href={`/artist/${album.artist.id}`}>
+          {album.relatedAlbums.map((rel, i) => (
+            <MediaCard
+              key={rel.id}
+              href={`/album/${rel.id}`}
+              title={rel.title}
+              subtitle={rel.year ? String(rel.year) : undefined}
+              coverUrl={rel.coverUrl}
+              fallbackIcon={<DiscIcon size={22} />}
+              index={i}
+            />
+          ))}
+        </Grid>
       )}
     </div>
   );

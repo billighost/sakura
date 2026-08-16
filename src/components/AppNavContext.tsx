@@ -29,9 +29,9 @@ import { resolveScroller } from "@/lib/appScroll";
  *
  * That means the screen is frozen on the old snapshot until the route lands,
  * which is fine at 50ms and unacceptable at 3s on a slow connection. Hence the
- * timeout below: past it the transition is released and the navigation simply
- * finishes without an animation. A missing flourish is a much smaller failure
- * than a UI that appears to have hung.
+ * timeout below: past it the transition is abandoned and the navigation finishes
+ * with no animation at all. A missing flourish is a much smaller failure than a
+ * UI that appears to have hung.
  */
 
 /**
@@ -39,9 +39,15 @@ import { resolveScroller } from "@/lib/appScroll";
  *
  * This was 450ms, which is roughly four times the point where a tap stops
  * feeling connected to what it did. Anything slower than this budget is better
- * served by releasing the hold and letting the route's `loading.tsx` skeleton
- * paint — the transition then animates old frame → skeleton, which reads as
- * progress, where continuing to hold reads as a dead tap.
+ * served by dropping the transition and letting the route's own `loading.tsx`
+ * skeleton paint directly, where continuing to hold reads as a dead tap.
+ *
+ * Note what happens at the budget matters as much as its length: the timeout
+ * *skips* the transition rather than resolving the hold. Resolving it asks the
+ * browser to snapshot a route that hasn't arrived, and those snapshots then sit
+ * over the live document for the animation's whole duration — which is how a
+ * navigation that had already committed could still be showing the previous
+ * page. See the timeout in `runWithTransition`.
  *
  * With the resolver race below fixed, a prefetched route resolves this hold on
  * commit in well under the budget, so the timeout now only governs genuinely
@@ -148,6 +154,18 @@ export function AppNavProvider({ children }: { children: React.ReactNode }) {
   // Resolves the in-flight transition's promise once the new route commits.
   const releaseTransition = useRef<(() => void) | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * The transition currently owning the screen, and a token identifying it.
+   *
+   * Both exist to stop two transitions treading on each other. Starting a second
+   * one skips the first, whose `finished` promise then rejects and runs its
+   * cleanup — which used to delete the `data-nav` the *second* one had just set,
+   * leaving the live transition with no animation to apply. The token means only
+   * the transition that still owns the attribute may clear it.
+   */
+  const activeTransition = useRef<ViewTransition | null>(null);
+  const transitionToken = useRef(0);
 
   /*
    * Scroll offsets per path. A Map rather than sessionStorage: these are only
@@ -356,13 +374,36 @@ export function AppNavProvider({ children }: { children: React.ReactNode }) {
         release = resolve;
       });
       releaseTransition.current = release;
+
+      const token = ++transitionToken.current;
+
+      /*
+       * Past the budget the transition is *abandoned*, not released.
+       *
+       * Releasing was the bug. `release()` alone tells the browser "the DOM is
+       * ready, snapshot it" — so on a route that hadn't committed yet it captured
+       * a new frame identical to the old one and spent `--d-slow` animating a
+       * page onto itself. Worse, those snapshots are static images painted over
+       * the live document, so when the route *did* commit a moment later the new
+       * page was rendered underneath them and stayed invisible until the
+       * animation ended. The URL had changed, the payload had arrived, and the
+       * screen still showed the previous page — with taps landing on the new
+       * one it couldn't see.
+       *
+       * `skipTransition()` drops the animation and reveals the live DOM
+       * immediately; the callback promise still has to settle, so `release()`
+       * follows it. A slow route now simply navigates without a flourish, which
+       * is what the budget was always meant to buy.
+       */
       holdTimer.current = setTimeout(() => {
         releaseTransition.current = null;
         holdTimer.current = null;
+        activeTransition.current?.skipTransition();
         release();
       }, MAX_HOLD_MS);
 
       const transition = document.startViewTransition(() => held);
+      activeTransition.current = transition;
 
       transition.finished
         .catch(() => {
@@ -371,6 +412,10 @@ export function AppNavProvider({ children }: { children: React.ReactNode }) {
           // unaffected.
         })
         .finally(() => {
+          // Only the transition still owning the attribute may clear it — a
+          // newer one has already set its own kind. See `transitionToken`.
+          if (transitionToken.current !== token) return;
+          activeTransition.current = null;
           delete document.documentElement.dataset.nav;
         });
 

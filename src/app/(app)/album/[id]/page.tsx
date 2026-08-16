@@ -1,17 +1,16 @@
-import { Suspense } from "react";
-import Loading from "./loading";
 import AlbumClient from "./AlbumClient";
 
-export default function AlbumPage({
+/**
+ * `loading.tsx` is the boundary that covers awaiting `params` here, so there is
+ * no inner Suspense: AlbumClient is a client component that fetches its own data
+ * and renders its own placeholder, and wrapping it in a second boundary only
+ * added a fallback that never showed.
+ */
+export default async function AlbumPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return (
-    <Suspense fallback={<Loading />}>
-      {params.then(({ id }) => (
-        <AlbumClient id={id} />
-      ))}
-    </Suspense>
-  );
+  const { id } = await params;
+  return <AlbumClient id={id} />;
 }

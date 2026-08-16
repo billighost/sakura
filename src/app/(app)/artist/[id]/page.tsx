@@ -1,17 +1,11 @@
-import { Suspense } from "react";
-import Loading from "./loading";
 import ArtistClient from "./ArtistClient";
 
-export default function ArtistPage({
+/** See the note in ../album/[id]/page.tsx on why there's no inner Suspense. */
+export default async function ArtistPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return (
-    <Suspense fallback={<Loading />}>
-      {params.then(({ id }) => (
-        <ArtistClient id={id} />
-      ))}
-    </Suspense>
-  );
+  const { id } = await params;
+  return <ArtistClient id={id} />;
 }

@@ -1,406 +1,310 @@
+/* Artist detail.
+ *
+ * Centred, round-avatar hero — deliberately the same composition as the
+ * external-artist page at /browse/artist/[id], so a Deezer artist and a library
+ * artist read as the same kind of page rather than two unrelated designs. The
+ * album grid, the related-artist rail and the song list all come from shared
+ * components; what's here is the hero and the section furniture. */
+
 .page {
-  padding: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-bottom: calc(var(--bottom-chrome) + var(--space-5));
+  background: var(--bg);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.hero {
   position: relative;
-}
-
-/* ---------- Back button ---------- */
-
-.backBtn {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 1rem);
-  left: 1rem;
-  z-index: 100;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--sakura-glass-border);
-  background: var(--sakura-glass-strong);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  color: var(--sakura-text);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 16px var(--sakura-shadow);
-  transition: transform 0.15s, background 0.15s;
-}
-
-.backBtn:hover {
-  background: var(--sakura-hover);
-}
-
-.backBtn:active {
-  transform: scale(0.92);
-}
-
-/* ---------- Sticky compact header ---------- */
-
-.stickyHeader {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: calc(env(safe-area-inset-top, 0px) + 0.625rem) 1rem 0.625rem calc(3.25rem);
-  background: var(--sakura-glass-strong);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border-bottom: 1px solid var(--sakura-glass-border);
-  transform: translateY(-100%);
-  opacity: 0;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  pointer-events: none;
-}
-
-.stickyHeader.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.stickyAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--sakura-surface-2);
-}
-
-.stickyName {
-  flex: 1;
-  min-width: 0;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stickyPlayBtn {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--sakura-accent-gradient);
-  color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: transform 0.1s;
-}
-
-.stickyPlayBtn:active {
-  transform: scale(0.9);
-}
-
-/* ---------- Hero ---------- */
-
-.heroSection {
-  position: relative;
-  overflow: hidden;
+  text-align: center;
+  padding: max(var(--space-3), env(safe-area-inset-top)) var(--gutter) var(--space-5);
+  border-bottom: 1px solid var(--line);
   isolation: isolate;
-  padding: clamp(3.5rem, 12vw, 4.5rem) clamp(1.25rem, 5vw, 2rem) clamp(1.75rem, 5vw, 2.25rem);
 }
 
-.heroBleed {
-  position: absolute;
-  inset: -15%;
-  width: 130%;
-  height: 130%;
-  object-fit: cover;
-  filter: blur(70px) saturate(1.6) brightness(0.85);
-  transform: scale(1.1);
-  opacity: 0.65;
-  z-index: -2;
-}
-
-.heroBleedFallback {
-  position: absolute;
-  inset: 0;
-  background: var(--sakura-accent-gradient);
-  opacity: 0.5;
-  z-index: -2;
-}
-
-.heroSection::after {
+/*
+ * The artwork tint. One extracted colour ramping to transparent — the only
+ * gradient permitted behind text — held well back from full strength because
+ * the extracted colour can be arbitrarily saturated and the artist's name sits
+ * directly on top of it.
+ */
+.hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, var(--hero-tint, transparent), var(--bg) 88%);
   z-index: -1;
+  background: linear-gradient(to bottom, var(--hero-tint, transparent), transparent);
+  opacity: 0.45;
+  pointer-events: none;
 }
 
-.hero {
-  text-align: center;
+/* Back sits at the leading edge while everything else is centred, so it needs
+ * to break out of the column rather than participate in it. */
+.backRow {
+  align-self: flex-start;
+  display: flex;
+  margin-left: -0.6875rem;
+}
+
+.avatarWrap {
+  margin-bottom: var(--space-4);
 }
 
 .avatar {
-  width: clamp(6.5rem, 26vw, 9.5rem);
-  height: clamp(6.5rem, 26vw, 9.5rem);
-  border-radius: 50%;
+  width: clamp(6.5rem, 32vw, 9.5rem);
+  aspect-ratio: 1;
+  border-radius: var(--r-full);
   object-fit: cover;
-  background: var(--sakura-skeleton);
-  margin: 0 auto clamp(1rem, 3vw, 1.25rem);
-  box-shadow: 0 20px 50px -12px var(--sakura-shadow), 0 0 0 4px var(--sakura-glass-border);
-  display: block;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-3);
 }
 
 .avatarFallback {
-  background: var(--sakura-accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.75rem, 6vw, 2.5rem);
-  font-weight: 600;
-  color: #fff;
+  background: var(--accent-softer);
+  color: var(--accent);
 }
 
 .eyebrow {
-  font-size: 0.75rem;
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
   font-weight: 700;
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.25rem;
+  color: var(--text-3);
 }
 
+/* The name of a person: display face, largest type on the page. */
 .name {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.75rem, 6.5vw, 3rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+  margin: 0;
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
+/* Counts and genre, in one line. Body face with tabular figures — these are
+ * numbers and labels, not names. */
 .stats {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 0.5rem;
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
 }
 
-.genreTags {
+/* ── Actions ──────────────────────────────────────────────────────────────
+ *
+ * Two rows with different weights, replacing a flat strip of five identical
+ * 2.5rem circles. That strip gave Share the same visual authority as "like every
+ * song by this artist", and left four of the five controls as glyphs you had to
+ * recognise. Starting playback is the reason anyone opens this page, so it owns
+ * the first row; everything else is quieter and carries a word. */
+
+.primaryActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  min-width: 0;
+  padding: 0 var(--space-6);
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shuffle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/*
+ * Secondary row. No borders and no fill at rest: three outlined pills would
+ * compete with the play button directly above them. They read as a group because
+ * they share a baseline and a colour, not because they're boxed.
+ */
+.secondaryActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-  margin-top: 0.875rem;
-}
-
-.genreTag {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.3rem 0.8rem;
-  border-radius: 9999px;
-  background: var(--sakura-glass);
-  color: var(--sakura-text);
-  border: 1px solid var(--sakura-glass-border);
-  backdrop-filter: blur(8px);
-}
-
-.heroActions {
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.625rem;
-  margin-top: clamp(1.25rem, 4vw, 1.75rem);
+  gap: var(--space-1);
+  margin-top: var(--space-3);
 }
 
-/* ---------- Shared buttons ---------- */
-
-.playBtn {
-  all: unset;
+.ghost {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  height: clamp(2.625rem, 7vw, 2.875rem);
-  padding: 0 clamp(1.25rem, 4vw, 1.75rem);
-  border-radius: 9999px;
-  background: var(--sakura-accent-gradient);
-  color: #fff;
-  font-size: 0.875rem;
-  font-weight: 700;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 8px 24px -8px var(--sakura-accent);
-  transition: transform 0.12s, filter 0.15s, box-shadow 0.15s;
 }
 
-.playBtn:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 10px 28px -6px var(--sakura-accent);
+.ghostOn {
+  color: var(--accent);
 }
 
-.playBtn:active {
-  transform: scale(0.96);
-}
-
-.shuffleBtn,
-.iconBtn {
-  all: unset;
+/* Not a button — everything is already on the device, so there's nothing to
+ * press. Same treatment as the collection transport row's badge. */
+.savedBadge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: clamp(2.625rem, 7vw, 2.875rem);
-  width: clamp(2.625rem, 7vw, 2.875rem);
-  border-radius: 9999px;
-  background: var(--sakura-glass);
-  color: var(--sakura-text);
-  border: 1px solid var(--sakura-glass-border);
-  backdrop-filter: blur(10px);
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s, color 0.15s;
-}
-
-.iconBtn {
-  height: clamp(2.375rem, 6vw, 2.625rem);
-  width: clamp(2.375rem, 6vw, 2.625rem);
-  color: var(--sakura-text-secondary);
-}
-
-.shuffleBtn:hover,
-.iconBtn:hover {
-  background: var(--sakura-hover);
-  color: var(--sakura-text);
-}
-
-.shuffleBtn:active,
-.iconBtn:active {
-  transform: scale(0.94);
-}
-
-.followBtn {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  height: clamp(2.625rem, 7vw, 2.875rem);
-  padding: 0 clamp(0.875rem, 3vw, 1.125rem);
-  border-radius: 9999px;
-  background: var(--sakura-glass);
-  color: var(--sakura-text);
-  border: 1px solid var(--sakura-glass-border);
-  backdrop-filter: blur(10px);
-  font-size: 0.8125rem;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--r-full);
+  background: var(--success-soft);
+  color: var(--success);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s, border-color 0.15s;
-}
-
-.followBtn.following {
-  background: var(--sakura-active);
-  border-color: var(--sakura-accent);
-  color: var(--sakura-accent);
-}
-
-.followBtn:hover {
-  background: var(--sakura-hover);
-}
-
-.followBtn:active {
-  transform: scale(0.96);
-}
-
-/* ---------- Sections ---------- */
-
-.section {
-  padding: clamp(1.5rem, 4vw, 2rem) clamp(1.25rem, 5vw, 2rem);
-}
-
-.sectionTitle {
-  font-family: var(--sakura-font-display);
-  font-size: clamp(1.125rem, 3vw, 1.375rem);
-  font-weight: 600;
-  margin-bottom: clamp(0.875rem, 2.5vw, 1.125rem);
-}
-
-.bio {
-  font-size: 0.875rem;
-  color: var(--sakura-text-secondary);
-  line-height: 1.65;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.bioExpanded {
-  -webkit-line-clamp: unset;
-  display: block;
-}
-
-.bioToggle {
-  all: unset;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--sakura-accent);
-  cursor: pointer;
-  margin-top: 0.625rem;
-  display: inline-block;
-  transition: opacity 0.15s;
-}
-
-.bioToggle:hover {
-  opacity: 0.75;
-}
-
-.albumGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(7.5rem, 30vw, 10.5rem), 1fr));
-  gap: clamp(1rem, 3vw, 1.5rem);
-}
-
-.albumCard {
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.2s ease;
-}
-
-.albumCard:hover {
-  transform: translateY(-4px);
-}
-
-.albumCard:hover .albumArt {
-  box-shadow: 0 16px 32px -8px var(--sakura-shadow);
-}
-
-.albumArt {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: var(--sakura-radius-lg);
-  object-fit: cover;
-  background: var(--sakura-skeleton);
-  margin-bottom: 0.625rem;
-  box-shadow: 0 4px 16px var(--sakura-shadow);
-  transition: box-shadow 0.2s ease;
-}
-
-.albumTitle {
-  font-size: 0.8438rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.albumMeta {
-  display: flex;
-  gap: 0.375rem;
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 0.1875rem;
+.play:disabled,
+.shuffle:disabled,
+.ghost:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
-.divider {
-  height: 1px;
-  background: var(--sakura-border);
-  margin: 0 clamp(1.25rem, 5vw, 2rem);
-  opacity: 0.7;
+.spin {
+  animation: artistSpin 0.9s linear infinite;
+}
+
+@keyframes artistSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .play:hover:not(:disabled) {
+    background: var(--accent-press);
+  }
+
+  .shuffle:hover:not(:disabled) {
+    color: var(--text);
+    border-color: var(--text-3);
+  }
+
+  .ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .ghostOn:hover:not(:disabled) {
+    color: var(--accent);
+  }
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+
+.section {
+  padding: var(--space-5) var(--gutter) 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+}
+
+/* Expand / collapse for both the song list and the bio. Text, not a chip:
+ * it's an instruction rather than a named thing. */
+.showAll {
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+  /* Overrides the global 44px minimum: this is inline text beside a heading,
+   * and a 44px box would push the baselines apart. The vertical padding above
+   * keeps the real target comfortable. */
+  min-height: 0;
+  min-width: 0;
+}
+
+.bio {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-loose);
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.bioOpen {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 1.6s;
+  }
 }
