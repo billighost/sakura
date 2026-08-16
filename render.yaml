@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Render blueprint for the Telegram worker.
+#
+# The worker exists because Telegram permanently revokes an MTProto auth key the
+# moment it sees that key on two live connections. Every setting below that looks
+# over-cautious is holding that one invariant: exactly one process, anywhere, may
+# hold the session at a time. Read DEPLOY-WORKER.md before changing any of them.
+#
+# The app on Vercel is NOT in this file. Vercel deploys itself; the only thing it
+# needs is TELEGRAM_WORKER_URL and a WORKER_SECRET matching the one here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: sakura-tg-worker
+    runtime: docker
+
+    # Docker paths are resolved from the repository root even when rootDir is
+    # set, so both of these keep the ./worker prefix. rootDir also scopes
+    # auto-deploy: a commit that touches nothing under worker/ does not rebuild,
+    # which matters here because every rebuild is a short outage (see disk).
+    rootDir: ./worker
+    dockerfilePath: ./worker/Dockerfile
+    dockerContext: ./worker
+
+    # iad — the same region Vercel defaults to, so the app-to-worker hop stays
+    # short. Region is fixed at creation; changing it later means a new service.
+    region: virginia
+
+    # Must be a paid plan. Not for the CPU — for the disk, which free instances
+    # cannot have, and which is the only documented way to stop Render running
+    # two copies of this process at once. 512MB/0.5 CPU is ample: the worker
+    # streams bytes through, it does not buffer files.
+    plan: starter
+
+    # THE LOAD-BEARING LINE.
+    #
+    # Render's docs: "Adding a disk to a service prevents zero-downtime deploys.
+    # When you redeploy your service, Render stops the existing instance BEFORE
+    # bringing up the new instance."
+    #
+    # That is normally a drawback and here it is the entire point. A zero-
+    # downtime deploy would run the new instance alongside the old one for ~60s,
+    # both holding the same auth key from different IPs — the precise condition
+    # that revokes it. Remove this disk and the first redeploy kills the session.
+    #
+    # The stored file itself is only a cache of the post-DC-migration session;
+    # losing it costs one extra handshake. 1GB because that is small and the
+    # size can be increased later but never decreased.
+    disk:
+      name: tg-session
+      mountPath: /var/data
+      sizeGB: 1
+
+    # One instance. A disk already forbids scaling out, and this is the second
+    # lock on the same door: two instances would be two live sessions.
+    numInstances: 1
+
+    healthCheckPath: /health
+
+    # The process connects to Telegram before it starts listening, so by the
+    # time this probe can succeed the session is genuinely held. /health answers
+    # 503 while disconnected, which means a revoked key fails the deploy loudly
+    # instead of leaving a worker up that 500s on every request.
+
+    autoDeployTrigger: commit
+
+    # SIGTERM makes the worker log out of Telegram so the key is released before
+    # the replacement claims it; it force-exits after 8s if that hangs. 60s of
+    # headroom costs nothing on a clean stop and prevents a SIGKILL mid-logout,
+    # which would leave Telegram believing the old connection is still alive.
+    maxShutdownDelaySeconds: 60
+
+    envVars:
+      # Prompted for in the dashboard, never stored in git. Values are in
+      # worker/.env.render (gitignored) — paste that file into
+      # Environment → "Add from .env" instead of typing these one at a time.
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_SESSION_STRING
+        sync: false
+      - key: WORKER_SECRET
+        sync: false
+
+      # A bot's @username is public and already in .env.example.
+      - key: TELEGRAM_BOT_USERNAME
+        value: musicshuntersbot
+
+      # Must sit inside mountPath above, or the cache dies with the container
+      # and every boot repeats the DC-migration handshake.
+      - key: SESSION_FILE
+        value: /var/data/session.json
+
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"

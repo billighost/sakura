@@ -38,6 +38,15 @@ It prints a `TELEGRAM_SESSION_STRING`. **That string goes in exactly one place.*
 
 ### 2. Deploy
 
+**On Render:** follow [`../DEPLOY-WORKER.md`](../DEPLOY-WORKER.md). Render needs
+two things Fly doesn't, and both cost money: a **paid** instance and an attached
+**disk**. The disk isn't for storage — it's the only documented way to stop
+Render's zero-downtime deploy running the old and new instance side by side,
+which would hold one auth key on two IPs and revoke it. `render.yaml` at the repo
+root encodes the whole configuration.
+
+**On Fly:**
+
 ```bash
 fly launch --no-deploy       # first time only; keeps the fly.toml in this dir
 fly volumes create tg_data --size 1 --region iad   # optional, see below
@@ -52,16 +61,19 @@ fly secrets set \
 fly deploy
 ```
 
-Render and Railway work the same way — Docker image, one instance, same env vars.
-Whatever the platform, the non-negotiable setting is **max 1 instance**.
+Whatever the platform, two settings are non-negotiable: **max 1 instance**, and
+**no overlap between the old and new instance during a deploy**. Check how your
+platform rolls deploys before trusting it — the sensible default everywhere else
+is the dangerous one here.
 
 ### 3. Point the app at it
 
 In Vercel (all three environments):
 
 ```
-TELEGRAM_WORKER_URL=https://sakura-telegram-worker.fly.dev
+TELEGRAM_WORKER_URL=https://sakura-tg-worker.onrender.com
 WORKER_SECRET=<the same secret>
+TELEGRAM_WORKER_DIRECT_AUDIO=1
 ```
 
 ### 4. Remove the session from everywhere else
@@ -118,24 +130,28 @@ Errors are mapped so the caller can tell retriable from terminal:
 
 ## Operations
 
-**Logs:** `fly logs`. Everything is prefixed — `[boot]`, `[tg]`, `[http]`,
-`[shutdown]`.
+**Logs:** `fly logs`, or Render's Logs tab. Everything is prefixed — `[boot]`,
+`[tg]`, `[http]`, `[shutdown]`. `[tg] connected as … — this process now owns the
+session` is the line that says the invariant holds.
 
-**Health:** `curl https://<app>.fly.dev/health`. `ok: false` with a `fatal`
-message means the session was revoked; a new one is the only fix.
+**Health:** `curl https://<host>/health`. `ok: false` with a `fatal` message means
+the session was revoked; a new one is the only fix.
 
 **Never scale past one machine.** `fly scale count 2` revokes the session on the
-spot. `fly.toml` pins `max_machines_running = 1`.
+spot. `fly.toml` pins `max_machines_running = 1`; `render.yaml` pins
+`numInstances: 1`, and an attached disk makes Render refuse to scale out anyway.
 
 **Restarts are safe.** `SIGTERM` disconnects cleanly first, so Telegram sees the
 key released before the replacement container claims it.
 
-**The volume is optional.** A DC migration mutates the session; caching it at
-`SESSION_FILE` means a restart skips that handshake. Without a volume the
-migration just repeats on boot, which is harmless. The cache is keyed by a
-fingerprint of `TELEGRAM_SESSION_STRING`, so rotating the secret automatically
-invalidates it — a stale cached session can never resurrect a key you've
-replaced.
+**The disk is optional on Fly, mandatory on Render.** A DC migration mutates the
+session; caching it at `SESSION_FILE` means a restart skips that handshake.
+Without a volume the migration just repeats on boot, which is harmless — so on Fly
+it's a small optimisation. On Render the disk is load-bearing for a completely
+different reason: attaching one is what disables zero-downtime deploys. Either
+way the cache is keyed by a fingerprint of `TELEGRAM_SESSION_STRING`, so rotating
+the secret automatically invalidates it — a stale cached session can never
+resurrect a key you've replaced.
 
 ## If AUTH_KEY_DUPLICATED happens anyway
 
