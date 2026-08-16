@@ -32,7 +32,26 @@ export async function GET(req: NextRequest) {
     redirect_uri: redirectUri,
     code_challenge_method: "S256",
     code_challenge: challenge,
-    scope: "playlist-read-private playlist-read-collaborative",
+    /*
+     * Read-only, and only what the import modal actually shows:
+     *   playlist-read-private / -collaborative — the playlist list, including
+     *     private ones, which is the whole point of connecting rather than
+     *     pasting a public link.
+     *   user-library-read — Liked Songs. The modal offers it as a source
+     *     alongside playlists, and there is no other way to read it.
+     *   user-read-private — display name and avatar, so the modal can say
+     *     *which* account is connected instead of just "connected".
+     *
+     * Deliberately absent: anything with `-modify-`. This app imports from
+     * Spotify and never writes to it, and a scope we don't need is a scope we
+     * have to justify on the consent screen.
+     */
+    scope: [
+      "playlist-read-private",
+      "playlist-read-collaborative",
+      "user-library-read",
+      "user-read-private",
+    ].join(" "),
     // Pass redirectBack so callback can send user back to origin page
     state: req.nextUrl.searchParams.get("redirectBack") ?? "/library",
   });

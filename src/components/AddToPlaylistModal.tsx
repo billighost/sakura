@@ -99,6 +99,10 @@ export function AddToPlaylistModal({ isOpen, onClose, trackId }: AddToPlaylistMo
           handleAddToPlaylist(playlistId);
           setShowNewPlaylist(false);
         }}
+        /* Straight to the naming form. Someone who tapped "New Playlist" while
+           adding a song wants to name a playlist, not browse Spotify — landing
+           them on the import sources would be a detour with a back button. */
+        startAt="manual"
       />
     );
   }

@@ -205,6 +205,96 @@ export async function fetchSpotifyPlaylist(url: string, userAccessToken?: string
 
 // ─── User-authenticated Spotify API ───────────────────────────────────────────
 
+export interface SpotifyProfile {
+  id: string;
+  displayName: string;
+  avatarUrl: string;
+}
+
+/**
+ * The connected account's own identity, for the import modal's header.
+ *
+ * "Connected" on its own is a weak thing to show someone — they can't tell
+ * *which* account, and if they have a personal and a shared one that matters.
+ * Needs the `user-read-private` scope.
+ *
+ * Returns null instead of throwing: a missing display name must not be able to
+ * stop an import that would otherwise work.
+ */
+export async function fetchSpotifyProfile(
+  accessToken: string,
+): Promise<SpotifyProfile | null> {
+  try {
+    const res = await fetch("https://api.spotify.com/v1/me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+
+    const me: any = await res.json();
+    return {
+      id: me.id ?? "",
+      displayName: me.display_name || me.id || "Spotify user",
+      avatarUrl: me.images?.[0]?.url ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Liked Songs, newest first.
+ *
+ * Bounded, unlike the playlist fetchers below. A Liked Songs library can hold
+ * tens of thousands of tracks — 50 per page means hundreds of sequential
+ * requests, which no serverless invocation lives long enough to finish and no
+ * modal can usefully display. `limit` is what the caller can actually show;
+ * `total` is returned so the UI can say what it is showing a slice of rather
+ * than implying it has everything.
+ *
+ * Needs the `user-library-read` scope.
+ */
+export async function fetchSpotifySavedTracks(
+  accessToken: string,
+  limit = 200,
+): Promise<{ tracks: any[]; total: number }> {
+  const tracks: any[] = [];
+  let total = 0;
+  let nextUrl: string | null = `https://api.spotify.com/v1/me/tracks?limit=50`;
+
+  while (nextUrl && tracks.length < limit) {
+    const response: Response = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Spotify API error ${response.status}: ${body}`);
+    }
+    const data: any = await response.json();
+    total = data.total ?? total;
+
+    for (const item of data.items ?? []) {
+      if (!item?.track) continue;
+      const track = item.track;
+      tracks.push({
+        id: track.id,
+        title: track.name,
+        artist: track.artists?.map((a: any) => a.name).join(", ") ?? "Unknown",
+        duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : 0,
+        coverUrl: track.album?.images?.[0]?.url ?? "",
+        album: track.album?.name ?? "",
+        addedAt: item.added_at ?? null,
+        messageId: 0,
+      });
+    }
+    nextUrl = data.next ?? null;
+  }
+
+  return { tracks: tracks.slice(0, limit), total: total || tracks.length };
+}
+
 export async function fetchSpotifyUserPlaylists(accessToken: string) {
   let playlists: any[] = [];
   let nextUrl: string | null = "https://api.spotify.com/v1/me/playlists?limit=50";

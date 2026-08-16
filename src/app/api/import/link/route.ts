@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { LinkError, resolveMusicLink } from "@/lib/importLink";
+import { getSpotifyAccessToken } from "@/lib/spotifyAuth";
 
 /**
  * POST /api/import/link — resolve a pasted Spotify or Deezer link into tracks.
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
    * *private* playlist, but for everything else the keyless engine is both faster
    * and immune to the Development-Mode allowlist that 403s most accounts.
    */
-  const spotifyToken = req.cookies.get("spotify_access_token")?.value ?? undefined;
+  const spotifyToken = (await getSpotifyAccessToken(session.user.id!)) ?? undefined;
 
   try {
     const resolved = await resolveMusicLink(url, { spotifyToken });

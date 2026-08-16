@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { LinkError, resolveMusicLink } from "@/lib/importLink";
+import { getSpotifyAccessToken } from "@/lib/spotifyAuth";
 
 /**
  * POST /api/import/spotify/preview
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Provide a valid URL" }, { status: 400 });
   }
 
-  const spotifyToken = req.cookies.get("spotify_access_token")?.value ?? undefined;
+  const spotifyToken = (await getSpotifyAccessToken(session.user.id!)) ?? undefined;
 
   try {
     const resolved = await resolveMusicLink(url, { spotifyToken });

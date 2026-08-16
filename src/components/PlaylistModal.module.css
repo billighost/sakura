@@ -1,111 +1,676 @@
-/* PlaylistModal — Create Manually or Import from Spotify
+/*
+ * PlaylistModal — the import surface, and the "add to playlist" picker that
+ * shares this stylesheet.
  *
- * Shell, header, close button and animations come from <Sheet>.
- * This file owns: pick step, manual form, Spotify import flow,
- * preview track list, and all shared action buttons.
+ * Everything here is derived from globals.css: the four stepped surfaces, the
+ * one accent, the five motion curves, and the semantic type split (Fraunces for
+ * the *names of things* — playlists, accounts, songs; Inter for the words that
+ * instruct, label and count). No gradients: the brief allows them only for the
+ * player's scrim ramp and progress fills, and neither is here.
+ *
+ * Spotify green (#1ed760) appears once per screen, on Spotify's own mark and its
+ * connect button. It used to appear three times — a badge, a wash behind an icon
+ * and a button — and at that density a third party's colour started to read as
+ * Sakura's second accent, which is exactly what "one accent" forbids.
+ *
+ * The classes at the bottom (.pickList and friends) belong to
+ * AddToPlaylistModal, which imports this module. They are not dead.
  */
 
-/* ── Pick step: two option cards ─────────────────────────────────────────── */
+/* ── Sources ──────────────────────────────────────────────────────────────── */
 
-.pickStep {
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.group {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-bottom: var(--space-2);
 }
 
-.pickTitle {
-  font-family: var(--font-display);
-  font-size: var(--t-lg);
-  font-weight: 600;
+/* Local rather than the global `.eyebrow`, because CSS Modules can't compose a
+ * plain global class — same values, one place to change them if the global does. */
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/*
+ * A hairline, not an "or" pill. "or" would frame these as two equal,
+ * mutually exclusive routes; they aren't — a link is the only way in without an
+ * account, and an account is the only way to reach private playlists and Liked
+ * Songs. The rule separates without arbitrating.
+ */
+.rule {
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--line);
+}
+
+/* ── Paste a link ─────────────────────────────────────────────────────────── */
+
+.linkRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
   color: var(--text);
-  text-align: center;
-  letter-spacing: var(--track-snug);
-  margin-bottom: var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  transition: border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
 }
 
-.pickSubtitle {
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.input:focus {
+  outline: none;
+  background: var(--surface-3);
+  border-color: var(--line-strong);
+}
+
+/* The accent marks the field the user is in, which is the active thing. */
+.input:focus-visible {
+  border-color: var(--accent);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.pasteBtn {
+  flex-shrink: 0;
+  padding: 0 var(--space-4);
   font-family: var(--font-body);
   font-size: var(--t-sm);
+  font-weight: 600;
   color: var(--text-2);
-  text-align: center;
-  margin-top: calc(var(--space-2) * -1);
-  margin-bottom: var(--space-3);
-  line-height: var(--lh-normal);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
 }
 
-.optionCards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.pasteBtn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-4);
+}
+
+.pasteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fieldHint {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+.fieldError {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--danger);
+}
+
+/* ── The connected account ────────────────────────────────────────────────── */
+
+.account {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
 }
 
-.optionCard {
+.accountAvatar {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: cover;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+}
+
+.accountAvatarFallback {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+}
+
+.accountText {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* A person's account name is the name of a thing — display face. */
+.accountName {
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountMeta {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Text, not a button shape. Disconnecting is rare and mildly destructive; giving
+ * it a filled control would put it in visual competition with the rows the user
+ * actually came for.
+ */
+.disconnectBtn {
+  flex-shrink: 0;
+  padding: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease);
+}
+
+.disconnectBtn:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.disconnectBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.accountSkeleton {
+  display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-3);
+  padding: var(--space-3);
   background: var(--surface-2);
-  border: 1.5px solid var(--line);
-  border-radius: var(--r-lg);
-  cursor: pointer;
-  transition: background-color var(--d-fast) var(--ease),
-    border-color var(--d-fast) var(--ease),
-    transform var(--d-fast) var(--spring);
-  text-align: center;
-  min-height: 130px;
-  justify-content: center;
+  border-radius: var(--r-md);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .optionCard:hover {
-    background: var(--surface-3);
-    border-color: var(--line-strong);
-    transform: translateY(-2px);
-  }
+.accountSkeletonLines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
 }
 
-.optionCard:active {
-  transform: scale(0.97);
+.skelLine {
+  height: 0.75rem;
+  width: 45%;
 }
 
-.optionCardIcon {
+.skelLineShort {
+  height: 0.625rem;
+  width: 25%;
+}
+
+/* ── Not connected ────────────────────────────────────────────────────────── */
+
+.connectBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.connectCopy {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+/* The one place Spotify's colour is spent. */
+.connectBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--r-md);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: #000;
+  text-decoration: none;
+  background: #1ed760;
+  border: 0;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: filter var(--d-fast) var(--ease);
+}
+
+.connectBtn:hover {
+  filter: brightness(1.08);
+}
+
+.spotifyLogo {
   flex-shrink: 0;
 }
 
-.optionCardIconManual {
+/* ── A source row: Liked Songs, or one playlist ───────────────────────────── */
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  /*
+   * The body already scrolls. Capping this list too would nest a second
+   * scroller inside the first, which is how the old preview list ended up
+   * impossible to reach the bottom of on a short viewport.
+   */
+}
+
+.sourceRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.sourceRow:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.sourceRow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sourceArt {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  color: var(--text-3);
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+}
+
+/*
+ * Liked Songs has no artwork and no shareable URL — connecting an account is the
+ * only way to reach it, which makes it the strongest reason this section exists.
+ * It gets the accent instead of a picture: the accent marks the one thing on
+ * this screen that nothing else can stand in for.
+ */
+.sourceArtLiked {
+  color: var(--accent);
   background: var(--accent-soft);
+}
+
+.sourceText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* A playlist's name is a name. */
+.sourceName {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceMeta {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceChevron {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: transform var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
+}
+
+.sourceRow:hover:not(:disabled) .sourceChevron {
+  color: var(--text-2);
+  transform: translateX(2px);
+}
+
+/*
+ * Shown in place of the chevron on the row being read, so the feedback is on the
+ * thing that was tapped. A status line at the foot of a long list is below the
+ * fold, and a tap with no visible consequence reads as a tap that missed.
+ */
+.rowSpinner {
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: var(--r-full);
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── A recoverable problem, with the action that recovers from it ─────────── */
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.notice p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.retryBtn {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--accent-soft);
+  border: 0;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.retryBtn:hover {
+  background: var(--accent-softer);
+}
+
+/* ── The proof sheet ──────────────────────────────────────────────────────── */
+
+.proof {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.proofHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.proofArt {
+  flex-shrink: 0;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+}
+
+.proofArtFallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  background: var(--surface-3);
+  box-shadow: none;
+}
+
+.proofHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+/*
+ * The name field, which reads as a heading until you touch it. The old confirm
+ * step showed the source's title as static text and there was no way to change
+ * it — the code even read a `name` that only the create form could set.
+ */
+.proofName {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  margin-left: calc(var(--space-2) * -1);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  transition: background-color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease);
+}
+
+.proofName:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+.proofName:focus {
+  outline: none;
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.proofName::placeholder {
+  color: var(--text-3);
+}
+
+/* No inset: the name input above is pulled left by its own padding so its text
+ * starts at x=0, and this line has to start there too or the pair looks broken. */
+.proofMeta {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.proofList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.proofRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--r-sm);
+  transition: background-color var(--d-base) var(--ease),
+    opacity var(--d-base) var(--ease);
+  /* An import can be 200 rows. Skipping layout for the off-screen ones is free
+   * here because every row is the same height: 2.5rem of artwork plus padding. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.5rem;
+}
+
+/*
+ * Struck out, not removed.
+ *
+ * This is the one bold move on the screen. The old flow deleted the row and
+ * floated a five-second undo toast over the list: the change was invisible
+ * unless you happened to be looking at the toast, the toast covered the thing
+ * you were editing, and the undo expired. Here the row stays, dims, and rules
+ * itself through — so the list is a record of every decision, the footer's
+ * count is the live truth, and putting something back has no deadline.
+ *
+ * Only colour, opacity and background animate; the strike itself is a state,
+ * not a flourish, so it holds under reduced motion.
+ */
+.proofRow[data-struck] {
+  background: var(--surface-1);
+  opacity: 0.5;
+}
+
+.proofRow[data-struck] .proofRowTitle {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--text-3);
+}
+
+.proofRow[data-struck] .proofRowArt {
+  filter: saturate(0.15);
+}
+
+.proofRowArt {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  background: var(--surface-3);
+  border-radius: var(--r-xs);
+  transition: filter var(--d-base) var(--ease);
+}
+
+.proofRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* A song title is a name too — the display face is what makes this list read
+ * like a record sleeve rather than a spreadsheet of rows to be processed. */
+.proofRowTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
+  font-weight: 500;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proofRowArtist {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proofRowTime {
+  flex-shrink: 0;
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.strikeBtn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--text-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+.strikeBtn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+/* Putting a song back is the affirmative action, so it gets the accent. */
+.proofRow[data-struck] .strikeBtn {
   color: var(--accent);
 }
 
-.optionCardIconSpotify {
-  background: rgba(30, 215, 96, 0.12);
-  color: #1ed760;
+.strikeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.optionCardLabel {
-  font-family: var(--font-display);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: var(--track-snug);
-}
+/* ── Create form ──────────────────────────────────────────────────────────── */
 
-.optionCardDesc {
-  font-family: var(--font-body);
-  font-size: var(--t-xs);
-  color: var(--text-3);
-  line-height: var(--lh-snug);
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
-
-/* ── Manual form ─────────────────────────────────────────────────────────── */
 
 .inputGroup {
   display: flex;
@@ -115,511 +680,116 @@
 
 .label {
   font-family: var(--font-body);
-  font-size: var(--t-sm);
-  font-weight: 500;
+  font-size: var(--t-xs);
+  font-weight: 600;
   color: var(--text-2);
 }
 
-.input {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--r-md);
-  /* 16px minimum, or iOS Safari zooms the viewport on focus. */
-  font-size: 1rem;
-  outline: none;
-  font-family: inherit;
-  transition: border-color var(--d-fast) var(--ease), background-color var(--d-fast) var(--ease);
-}
-
-.input:focus {
-  background: var(--surface-1);
-  border-color: var(--accent);
-}
-
-.input::placeholder {
+.labelOptional {
+  font-weight: 400;
   color: var(--text-3);
 }
 
-.textarea {
-  resize: vertical;
-  min-height: 5rem;
-}
-
-/* ── Spotify import step ─────────────────────────────────────────────────── */
-
-.spotifyStep {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.spotifySection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.sectionHeading {
-  font-family: var(--font-body);
-  font-size: var(--t-xs);
-  font-weight: 700;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: var(--text-3);
-  font-size: var(--t-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--track-caps);
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid var(--line);
-}
-
-.divider:not(:empty)::before {
-  margin-right: var(--space-3);
-}
-
-.divider:not(:empty)::after {
-  margin-left: var(--space-3);
-}
-
-.urlInputRow {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.urlInputRow .input {
-  flex: 1;
-  /* Without this a long pasted URL sets the flex item's base size from its
-   * content and pushes the Paste button off the sheet's right edge. */
-  min-width: 0;
-}
-
-/* Field-level messages, under the field they belong to. */
-.fieldHint,
-.fieldError {
-  font-family: var(--font-body);
-  font-size: var(--t-xs);
-  line-height: var(--lh-snug);
-  margin: 0;
-  text-wrap: pretty;
-}
-
-.fieldHint {
-  color: var(--text-3);
-}
-
-.fieldError {
-  color: var(--danger);
-}
-
-.pasteBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--tap-min);
-  min-width: var(--tap-min);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text-2);
-  cursor: pointer;
-  font-size: var(--t-xs);
-  font-weight: 600;
-  font-family: var(--font-body);
-  flex-shrink: 0;
-  transition: background-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .pasteBtn:hover {
-    background: var(--surface-3);
-    color: var(--text);
-  }
-}
-
-/* Spotify connect button */
-.connectSpotifyBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--space-3) var(--space-4);
-  background: #1ed760;
-  color: #000;
-  border: none;
-  border-radius: var(--r-full);
-  font-family: var(--font-body);
-  font-size: var(--t-base);
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color var(--d-fast) var(--ease), transform var(--d-fast) var(--spring);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .connectSpotifyBtn:hover {
-    background: #1fdf64;
-    transform: translateY(-1px);
-  }
-}
-
-.connectSpotifyBtn:active {
-  transform: scale(0.98);
-}
-
-.spotifyLogo {
-  flex-shrink: 0;
-}
-
-/* User playlists list */
-.userPlaylistList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: 280px;
-  overflow-y: auto;
-  padding-right: var(--space-1);
-}
-
-.userPlaylistList::-webkit-scrollbar {
-  width: 6px;
-}
-
-.userPlaylistList::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
-  border-radius: var(--r-full);
-}
-
-.userPlaylistRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background-color var(--d-fast) var(--ease);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .userPlaylistRow:hover {
-    background: var(--surface-3);
-  }
-}
-
-.userPlaylistCover {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
-  background: var(--surface-3);
-  flex-shrink: 0;
-}
-
-.userPlaylistCoverPlaceholder {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  background: var(--surface-3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--text-3);
-}
-
-.userPlaylistInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.userPlaylistName {
-  font-family: var(--font-display);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: var(--track-snug);
-}
-
-.userPlaylistMeta {
-  font-family: var(--font-body);
-  font-size: var(--t-xs);
-  color: var(--text-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Spotify connected badge */
-.connectedBadge {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: rgba(30, 215, 96, 0.1);
-  border: 1px solid rgba(30, 215, 96, 0.2);
-  border-radius: var(--r-md);
-  font-size: var(--t-xs);
-  color: #1ed760;
-  font-weight: 600;
-  font-family: var(--font-body);
-}
-
-.connectedDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1ed760;
-  flex-shrink: 0;
-}
-
-/* ── Preview step ─────────────────────────────────────────────────────────── */
-
-/*
- * The preview lives inside <Sheet>'s own scrolling body, so it must not declare
- * a second full-height scroller of its own: a `max-height: 70vh` here plus the
- * sheet's cap meant two nested scroll regions, and on a short screen the Import
- * button ended up below the fold of the inner one — reachable only by scrolling
- * a container that didn't look scrollable.
- *
- * Now the container is free-height and only the *list* is bounded, so the header
- * and the actions are always on screen. `dvh` rather than `vh` because the
- * visual viewport shrinks when the keyboard is open.
- */
-.previewContainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-height: 0;
-}
-
-.previewHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.previewTitle {
-  font-family: var(--font-display);
-  font-size: var(--t-lg);
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
-  /* Ellipsis rather than bare nowrap: a 90-character playlist name would
-   * otherwise run out past the count beside it. */
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.previewCount {
-  font-size: var(--t-sm);
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-
-.trackList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  /* The only bounded scroller in the preview — see .previewContainer. */
-  max-height: min(46dvh, 26rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding-right: var(--space-2);
-}
-
-.trackList::-webkit-scrollbar {
-  width: 6px;
-}
-
-.trackList::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
-  border-radius: var(--r-full);
-}
-
-.trackRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  transition: background-color 0.2s ease;
-}
-
-.trackRow:hover {
-  background: var(--surface-3);
-}
-
-.trackCover {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
-  background: var(--surface-1);
-}
-
-.trackCoverPlaceholder {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  background: var(--surface-3);
-  flex-shrink: 0;
-}
-
-.trackInfo {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.trackTitle {
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--t-sm);
-}
-
-.trackArtist {
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--t-xs);
-}
-
-.removeBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-3);
-  cursor: pointer;
-  padding: var(--space-2);
-  border-radius: var(--r-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-
-.removeBtn:hover:not(:disabled) {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
-
-.removeBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ── Actions ──────────────────────────────────────────────────────────────── */
-
-.actions {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-}
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
 
 .btn {
-  flex: 1;
-  min-height: var(--tap-min);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--r-full);
-  font-family: var(--font-body);
-  font-size: var(--t-base);
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  border: 0;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease), opacity var(--d-fast) var(--ease);
 }
 
-.btnCancel {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .btnCancel:hover {
-    background: var(--surface-3);
-  }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btnSubmit {
-  background: var(--accent);
   color: var(--on-accent);
+  background: var(--accent);
 }
 
-.btnSubmit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btnSubmit:hover:not(:disabled) {
+  background: var(--accent-press);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .btnSubmit:hover:not(:disabled) {
-    background: var(--accent-press);
-  }
+.btnCancel {
+  color: var(--text-2);
+  background: var(--surface-3);
 }
 
-/* ── Progress / spinner ───────────────────────────────────────────────────── */
+.btnCancel:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-4);
+}
+
+/* "Start an empty playlist" — always reachable, never competing with the
+ * sources above it. */
+.btnQuiet {
+  color: var(--text-2);
+  background: none;
+}
+
+.btnQuiet:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* ── Progress ─────────────────────────────────────────────────────────────── */
+
+/*
+ * The two-phase import narrates itself: "Creating the playlist", then "Finding 24
+ * songs on Sakura". No determinate bar — the batch import is a single POST, so any
+ * percentage would be invented, and an invented bar that jumps from 40% to done
+ * teaches people not to trust the real ones.
+ *
+ * Height is reserved rather than collapsed, and the element is never removed: a
+ * live region that isn't in the accessibility tree at the moment it changes
+ * announces nothing, and a line that appears from nowhere shifts the list above it.
+ */
+.busyLine {
+  margin: 0;
+  min-height: 1.125rem;
+  font-size: var(--t-xs);
+  color: var(--text-3);
+}
 
 .progressContainer {
-  margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
 }
 
-.progressText {
-  font-size: var(--t-sm);
-  color: var(--text-2);
-  text-align: center;
-}
-
+/* The larger ring, for a panel that has nothing in it yet. */
 .spinner {
   width: 1.5rem;
   height: 1.5rem;
-  border: 3px solid var(--line);
-  border-radius: var(--r-full);
+  border: 2px solid var(--line-strong);
   border-top-color: var(--accent);
-  animation: spin 1s var(--ease-in-out) infinite;
-  margin: 0 auto;
+  border-radius: var(--r-full);
+  animation: spin 0.7s linear infinite;
 }
 
+/* Sits inside a button, so it takes the button's own colour rather than the
+ * accent — on the filled submit button an accent ring would be invisible. */
 .spinnerSmall {
-  width: 1rem;
-  height: 1rem;
-  border-width: 2px;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
 }
 
 @keyframes spin {
@@ -628,20 +798,17 @@
   }
 }
 
-/* ── Shared utilities ─────────────────────────────────────────────────────── */
-
-.formStack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-/* ── Playlist picker (AddToPlaylistModal) ──────────────────────────────────  */
+/* ── AddToPlaylistModal's picker ───────────────────────────────────────────
+ *
+ * A different component imports this module for the list of playlists a song can
+ * be added to. Same visual language, different job — keep these in step with the
+ * source rows above.
+ */
 
 .pickList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .pickRow {
@@ -650,19 +817,30 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--space-3) var(--space-4);
-  border: none;
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text);
+  padding: var(--space-3);
   text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
   cursor: pointer;
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.pickRow:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.pickRow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pickName {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -671,76 +849,28 @@
 .pickCount {
   flex-shrink: 0;
   font-size: var(--t-xs);
-  color: var(--text-2);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .pickEmpty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-2);
+  padding: var(--space-5) var(--space-4);
   text-align: center;
   font-size: var(--t-sm);
-  color: var(--text-2);
-}
-
-.retryBtn {
-  min-height: var(--tap-min);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--r-full);
-  background: transparent;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  cursor: pointer;
+  line-height: 1.55;
+  color: var(--text-3);
 }
 
 .newPlaylistBtn {
   width: 100%;
-  margin-top: var(--space-4);
 }
 
-/* ── Undo toast ───────────────────────────────────────────────────────────── */
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
 
-.undoToast {
-  position: absolute;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface-1);
-  border: 1px solid var(--line);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--r-full);
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  box-shadow: var(--shadow-3);
-  animation: slideUp 0.3s var(--spring) both;
-  z-index: 100;
-}
-
-.undoToast span {
-  font-size: var(--t-sm);
-  color: var(--text);
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.undoBtn {
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-weight: 600;
-  font-size: var(--t-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.undoBtn:hover {
-  text-decoration: underline;
+@media (prefers-reduced-motion: reduce) {
+  .sourceRow:hover:not(:disabled) .sourceChevron {
+    transform: none;
+  }
+  /* The spinners keep turning — they are the only signal that work is in flight,
+   * and a rotating 14px ring is not what triggers vestibular discomfort. */
 }

@@ -30,6 +30,28 @@ model User {
   playbackState    PlaybackState?
   shares           Share[]
   playAggregates   PlayAggregate[]
+  spotify          SpotifyConnection?
+}
+
+/// A connected Spotify account. At most one per user, so `userId` is the key.
+///
+/// `refreshToken` is the durable half and the reason this table exists — the
+/// OAuth callback used to discard it and keep only a one-hour access-token
+/// cookie, so the app forgot every connection hourly. `accessToken`/`expiresAt`
+/// are a cache: safe to drop, re-minted from the refresh token on next use.
+///
+/// Both token columns hold AES-256-GCM ciphertext, not the tokens themselves.
+/// See lib/spotifyAuth.ts.
+model SpotifyConnection {
+  userId       String   @id @db.Uuid
+  refreshToken String
+  accessToken  String?
+  expiresAt    DateTime?
+  scope        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserSettings {

@@ -117,6 +117,32 @@ export default function LibraryPage() {
   const [view, setView] = usePersistedChoice<ViewMode>("sakura-library-view", VIEW_MODES, "grid");
   const [sortBy, setSortBy] = usePersistedChoice<SortKey>("sakura-library-sort", SORT_KEYS, "recent");
 
+  /*
+   * Reopen the import sheet when the browser comes back from Spotify's consent
+   * screen. The OAuth callback lands here with `?spotify_connected=1` or
+   * `?spotify_error=…`; without this the user connected, was returned to a
+   * closed modal, and had to find their way back in with no idea whether it had
+   * worked. The modal itself shows the outcome and strips the params.
+   *
+   * Read during render, not from an effect. An effect that calls setState would
+   * commit one render with the sheet closed and another with it open, and the
+   * same reasoning is written up in usePersistedChoice — the codebase's answer to
+   * "client-only value needed on first paint" is never a mount effect. Setting
+   * state during render is React's sanctioned way to do this; it re-renders
+   * before committing, so nothing flashes. Sheet.tsx does the same thing.
+   *
+   * Guarded by a per-mount flag, so navigating away and back doesn't reopen the
+   * sheet — by then the params are gone anyway.
+   */
+  const [urlRead, setUrlRead] = useState(false);
+  if (!urlRead && typeof window !== "undefined") {
+    setUrlRead(true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("spotify_connected") || params.has("spotify_error")) {
+      setModalOpen(true);
+    }
+  }
+
   const load = useCallback(async (userId = getCachedUserId()) => {
     try {
       const [playlistsRes, albumsRes, artistsRes] = await Promise.allSettled([

@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { fetchSpotifyUserPlaylists, fetchSpotifyPlaylist } from "@/lib/spotify";
+import { getSpotifyAccessToken } from "@/lib/spotifyAuth";
 
 /**
  * GET /api/import/spotify/playlists
  * Returns the authenticated user's Spotify playlists.
- * Requires spotify_access_token cookie.
+ * Requires a stored Spotify connection (see lib/spotifyAuth.ts).
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const spotifyToken = req.cookies.get("spotify_access_token")?.value;
+  const spotifyToken = await getSpotifyAccessToken(session.user.id!);
   if (!spotifyToken) {
     return NextResponse.json({ error: "spotify_not_connected" }, { status: 401 });
   }
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const spotifyToken = req.cookies.get("spotify_access_token")?.value;
+  const spotifyToken = await getSpotifyAccessToken(session.user.id!);
   if (!spotifyToken) {
     return NextResponse.json({ error: "spotify_not_connected" }, { status: 401 });
   }
