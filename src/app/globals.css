@@ -198,7 +198,7 @@
   --on-media-fill: rgba(23, 17, 29, 0.08);
   --on-media-fill-strong: rgba(23, 17, 29, 0.16);
   --on-media-rgb: 23 17 29;
-  --on-media-dim-boost: 1.25;
+  --on-media-dim-boost: 1.4;
 
   --media-tint: 0.2;
   --media-tint-strong: 0.3;
@@ -260,7 +260,7 @@
     --on-media-fill: rgba(23, 17, 29, 0.08);
     --on-media-fill-strong: rgba(23, 17, 29, 0.16);
     --on-media-rgb: 23 17 29;
-    --on-media-dim-boost: 1.25;
+    --on-media-dim-boost: 1.4;
     --media-tint: 0.2;
     --media-tint-strong: 0.3;
     --media-tint-base: #f1e9f3;

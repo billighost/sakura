@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import styles from "./Tooltip.module.css";
 
 interface TooltipProps {
@@ -60,18 +59,15 @@ export function Tooltip({
   offsetX = 0,
   children,
 }: TooltipProps) {
-  const id = useId();
-
   return (
     <span className={styles.wrap}>
       {children}
       <span
-        id={id}
         role="presentation"
         aria-hidden="true"
         className={styles.bubble}
         data-placement={placement}
-        style={offsetX ? { "--offset-x": `${offsetX}px` } as React.CSSProperties : undefined}
+        style={offsetX ? ({ "--offset-x": `${offsetX}px` } as React.CSSProperties) : undefined}
       >
         {label}
         {shortcut && <kbd className={styles.key}>{shortcut}</kbd>}

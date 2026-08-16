@@ -16,6 +16,19 @@
  * cover and draws white on it; light mode brightens the cover behind a pale
  * veil and draws near-black on it. Neither depends on an image having loaded,
  * because the base colour alone already satisfies the contrast.
+ *
+ * ── Two panes ──────────────────────────────────────────────────────────────
+ *
+ *   .stage   — everything you need to run playback, sized to exactly one
+ *              viewport so it is never partly visible.
+ *   .reading — the lyrics preview and credits, below the fold, on a veiled
+ *              surface of their own.
+ *
+ * The previous layout stacked an art block and a controls *card* inside the
+ * scroller with independent sizing, so on a short screen the transport was cut
+ * in half with nothing to indicate more existed. And that card carried
+ * `backdrop-filter` and a top radius — it looked like fixed chrome, then
+ * scrolled away like content. Now the panel that looks like a panel is one.
  */
 .root {
   position: fixed;
@@ -93,9 +106,14 @@
   margin: 0 auto;
 }
 
+/* ── Header ────────────────────────────────────────────────────────────────
+ *
+ * Above the scroller in the stacking order, because its tooltips open downwards
+ * into it.
+ */
 .header {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -113,12 +131,14 @@
   cursor: pointer;
   border-radius: 50%;
   color: var(--on-media);
-  transition: background 0.15s;
+  transition: background var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
   flex-shrink: 0;
 }
 
-.headerBtn:hover {
-  background: var(--on-media-fill);
+@media (hover: hover) and (pointer: fine) {
+  .headerBtn:hover {
+    background: var(--on-media-fill);
+  }
 }
 
 .headerBtn:active {
@@ -136,8 +156,8 @@
   font-size: 0.625rem;
   color: var(--on-media-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 600;
+  letter-spacing: var(--track-caps);
+  font-weight: 700;
 }
 
 .headerTitle {
@@ -151,24 +171,7 @@
   margin-top: 0.0625rem;
 }
 
-.mainContent {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  z-index: 2;
-}
-
-.artContainer {
-  position: relative;
-  z-index: 2;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-3) var(--space-4);
-  min-height: 0;
-}
+/* ── Scroller ─────────────────────────────────────────────────────────────── */
 
 .scrollContainer {
   flex: 1;
@@ -183,6 +186,26 @@
 
 .scrollContainer::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * `min-height: 100%` is the whole point: the stage occupies exactly the visible
+ * height of the scroller, so the artwork, the name, the transport and the
+ * utilities are always on screen together — and anything below is genuinely
+ * below, reached by scrolling rather than by luck.
+ */
+.stage {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.artArea {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--space-3) var(--space-4);
+  min-height: 0;
 }
 
 /*
@@ -226,51 +249,122 @@
   background: var(--accent);
 }
 
-.controls {
-  position: relative;
-  z-index: 2;
+/* ── Deck ──────────────────────────────────────────────────────────────────
+ *
+ * No panel fill, no blur. The scrim already ramps to `--media-scrim-4` (0.94
+ * alpha) by the bottom of the screen, so a second translucent surface on top of
+ * it was buying contrast that had already been paid for — and it was the thing
+ * that made scrolling chrome look like a fault. Dropping it is also what lets
+ * the stage size itself cleanly.
+ */
+.deck {
   flex-shrink: 0;
-  background: var(--media-chrome);
-  backdrop-filter: blur(28px) saturate(1.3);
-  -webkit-backdrop-filter: blur(28px) saturate(1.3);
-  border-top: 1px solid var(--media-chrome-line);
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
-  padding: var(--space-4) clamp(0.875rem, 4vw, 1.5rem) var(--space-5);
-  margin-top: var(--space-5);
+  padding: 0 clamp(0.875rem, 4vw, 1.5rem) var(--space-4);
 }
 
-/* No backdrop-filter support: fall back to something opaque enough that the
- * controls stay legible over artwork. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .controls {
-    background: var(--media-chrome-solid);
-  }
+.identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.trackInfo {
-  text-align: center;
-  margin-bottom: var(--space-3);
+.identityText {
+  flex: 1;
   min-width: 0;
 }
 
 .trackTitle {
   font-family: var(--font-display);
-  font-size: clamp(1.125rem, 4.5vw, 1.5rem);
+  font-size: clamp(1.25rem, 5.5vw, 1.625rem);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--track-tight);
+  line-height: var(--lh-tight);
   color: var(--on-media);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin: 0;
 }
 
 .trackArtist {
   font-size: clamp(0.8125rem, 3vw, 0.9375rem);
   color: var(--on-media-secondary);
-  margin-top: 0.25rem;
+  margin: 0.1875rem 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── The signature: the line the song is on ────────────────────────────────
+ *
+ * Italic Fraunces, at body size, one line, quiet. Upright display type names
+ * things in this app; italic display type is the singing voice. It's a button,
+ * because tapping the words should open the words.
+ *
+ * Deliberately understated: the stage's boldest object stays the artwork and the
+ * second-boldest stays the play chip. This is the detail you notice on the
+ * second listen, not the first.
+ */
+.nowSinging {
+  all: unset;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: 0.375rem 0;
+  cursor: pointer;
+  /* Fixed height so a new line arriving never nudges the transport. */
+  height: 2rem;
+  overflow: hidden;
+  text-align: left;
+}
+
+.nowSingingLine {
+  display: block;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: var(--t-base);
+  line-height: 1.25rem;
+  letter-spacing: var(--track-snug);
+  color: var(--on-media-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: lineIn var(--d-slow) var(--ease);
+}
+
+/* An upright quote mark in the accent — makes the line read as quoted speech
+ * rather than as one more label. */
+.nowSingingLine::before {
+  content: "\201C";
+  color: var(--track-accent, var(--accent));
+  margin-right: 0.1875rem;
+  font-style: normal;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nowSinging:hover .nowSingingLine {
+    color: var(--on-media);
+  }
+}
+
+@keyframes lineIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Scrubber + times ─────────────────────────────────────────────────────── */
+
+.seekBlock {
+  margin-top: var(--space-3);
 }
 
 .timeRow {
@@ -281,6 +375,8 @@
   color: var(--on-media-tertiary);
   margin-top: 0.375rem;
 }
+
+/* ── Transport ────────────────────────────────────────────────────────────── */
 
 .transport {
   display: flex;
@@ -301,32 +397,64 @@
   border-radius: 50%;
   color: var(--on-media);
   opacity: 0.85;
-  transition: opacity 0.15s, transform 0.15s, color 0.15s;
+  transition: opacity var(--d-fast) var(--ease), transform var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease);
   position: relative;
   flex-shrink: 0;
 }
 
-.transportBtn:hover {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .transportBtn:hover {
+    opacity: 1;
+  }
 }
 
 .transportBtn:active {
   transform: scale(0.85);
 }
 
-.activeBtn {
-  color: var(--track-accent, var(--accent));
+/*
+ * One focus treatment for every control on the surface — the player had no
+ * visible focus state at all, so tabbing through it was invisible.
+ *
+ * Split by shape rather than written as one rule: these controls are circles,
+ * and a shared `border-radius` here would square them off on focus.
+ */
+.headerBtn:focus-visible,
+.transportBtn:focus-visible,
+.playPauseBtn:focus-visible,
+.iconBtn:focus-visible,
+.likeBtn:focus-visible {
+  outline: 2px solid var(--on-media);
+  outline-offset: 2px;
   opacity: 1;
 }
 
+.nowSinging:focus-visible {
+  outline: 2px solid var(--on-media);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/*
+ * `:hover` is also listed, because a hover rule elsewhere is more specific than
+ * a bare class: `.iconBtn:hover` (0,2,0) beat `.activeBtn` (0,1,0), so hovering
+ * the queue button while the queue was open dropped it from the accent back to
+ * the ordinary foreground — the one moment the state most needed to be legible.
+ */
+.activeBtn,
+.activeBtn:hover {
+  color: var(--track-accent, var(--accent));
+  opacity: 1;
+}
 
 .playPauseBtn {
   all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: clamp(3.25rem, 13vw, 4.5rem);
-  height: clamp(3.25rem, 13vw, 4.5rem);
+  width: clamp(3.25rem, 13vw, 4.25rem);
+  height: clamp(3.25rem, 13vw, 4.25rem);
   cursor: pointer;
   border-radius: 50%;
   background: var(--track-accent, var(--accent));
@@ -338,27 +466,23 @@
    * back to the theme's on-accent when no artwork colour is known.
    */
   color: var(--on-track-accent, var(--on-accent));
-  transition: transform 0.15s, box-shadow 0.2s, background 0.4s ease;
+  transition: transform var(--d-fast) var(--spring), box-shadow var(--d-base) var(--ease),
+    background 0.4s ease;
   box-shadow: 0 8px 26px -6px var(--track-accent, var(--accent));
   flex-shrink: 0;
 }
 
-.playPauseBtn:hover {
-  transform: scale(1.04);
+@media (hover: hover) and (pointer: fine) {
+  .playPauseBtn:hover {
+    transform: scale(1.04);
+  }
 }
 
 .playPauseBtn:active {
   transform: scale(0.92);
 }
 
-.extras {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.25rem;
-  padding: 0;
-  margin-top: var(--space-4);
-}
+/* ── Like ─────────────────────────────────────────────────────────────────── */
 
 .likeBtn {
   all: unset;
@@ -368,17 +492,27 @@
   justify-content: center;
   width: var(--tap-min);
   height: var(--tap-min);
+  /* Pulls the glyph's optical centre onto the title's cap height. */
+  margin-top: -0.125rem;
   cursor: pointer;
+  border-radius: 50%;
   color: var(--on-media-secondary);
-  transition: color 0.15s, transform 0.15s;
+  transition: color var(--d-fast) var(--ease), transform var(--d-fast) var(--ease);
   flex-shrink: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .likeBtn:hover {
+    color: var(--on-media);
+  }
 }
 
 .likeBtn:active {
   transform: scale(0.85);
 }
 
-.likedBtn {
+.likedBtn,
+.likedBtn:hover {
   color: var(--track-accent, var(--accent));
 }
 
@@ -410,6 +544,19 @@
   }
 }
 
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+
+.utilities {
+  display: flex;
+  align-items: center;
+  /* Evenly distributed, not `space-between`. With the like button moved up to
+   * the title, what's left is four peers doing the same kind of job, and peers
+   * should be spaced like peers. */
+  justify-content: space-around;
+  gap: 0.25rem;
+  margin-top: var(--space-3);
+}
+
 .iconBtn {
   all: unset;
   position: relative;
@@ -420,57 +567,89 @@
   height: var(--tap-min);
   cursor: pointer;
   color: var(--on-media-secondary);
-  transition: color 0.15s, background 0.15s, transform 0.15s;
+  transition: color var(--d-fast) var(--ease), background var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.iconBtn:hover {
-  color: var(--on-media);
-  background: var(--on-media-fill);
+@media (hover: hover) and (pointer: fine) {
+  .iconBtn:hover {
+    color: var(--on-media);
+    background: var(--on-media-fill);
+  }
 }
 
 .iconBtn:active {
   transform: scale(0.85);
 }
 
-.sleepTimerBadge {
+/*
+ * One badge treatment, for the sleep timer and the queue count alike. They were
+ * two different sizes doing the same job in the same row.
+ */
+.badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 1px;
+  right: 1px;
+  min-width: 1rem;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 0.5rem;
+  font-size: 0.5625rem;
   font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 6px;
-  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 3px;
+  border-radius: var(--r-full);
+  line-height: 1.2;
+  text-align: center;
   pointer-events: none;
 }
 
+/* ── Volume popover ───────────────────────────────────────────────────────── */
+
 .volumeGroup {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
-.volumeSliderWrap {
-  overflow: hidden;
-  width: 0;
-  transition: width 0.2s ease;
+.volumePop {
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--r-full);
+  background: var(--media-chrome-solid);
+  border: 1px solid var(--media-chrome-line);
+  box-shadow: var(--shadow-3);
+  animation: popIn var(--d-fast) var(--spring);
 }
 
-.volumeSliderWrap.volumeOpen {
-  width: clamp(3rem, 14vw, 6rem);
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 .volumeSlider {
-  width: clamp(3rem, 14vw, 6rem);
+  width: clamp(5rem, 26vw, 8rem);
   height: 4px;
   border-radius: 2px;
   background: var(--on-media-fill-strong);
   appearance: none;
+  -webkit-appearance: none;
   outline: none;
   cursor: pointer;
   /* The global 44px minimum would blow out the inline slider. */
@@ -480,72 +659,148 @@
 
 .volumeSlider::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--on-media);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-1);
 }
 
 .volumeSlider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--on-media);
   cursor: pointer;
   border: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-1);
 }
 
-/*
- * Landscape phones. Both axes are tight, so the layout goes side-by-side:
- * artwork left, controls right, each scrolling independently. Stacked, the
- * transport would be entirely below the fold.
+.volumeSlider:focus-visible {
+  outline: 2px solid var(--on-media);
+  outline-offset: 4px;
+}
+
+.volumeValue {
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-media-secondary);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* ── The fold ─────────────────────────────────────────────────────────────── */
+
+.fold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-top: var(--space-3);
+  color: var(--on-media-tertiary);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+  transition: opacity var(--d-base) var(--ease);
+  pointer-events: none;
+}
+
+.fold[data-hidden] {
+  opacity: 0;
+}
+
+.fold svg {
+  animation: foldNudge 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes foldNudge {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+  85% {
+    transform: translateY(2px);
+  }
+}
+
+/* ── The reading pane ─────────────────────────────────────────────────────── */
+
+.reading {
+  position: relative;
+  z-index: 2;
+  margin-top: var(--space-4);
+  padding: var(--space-2) clamp(0.875rem, 4vw, 1.5rem) var(--space-6);
+  background: var(--media-veil);
+  border-top: 1px solid var(--media-chrome-line);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+}
+
+/* No backdrop-filter support: the veil token is already ~0.94 alpha, so this
+ * only has to stop being translucent at all. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .reading {
+    background: var(--media-chrome-solid);
+  }
+}
+
+/* ── Landscape phones ─────────────────────────────────────────────────────
+ *
+ * Both axes are tight, so the stage goes side-by-side: artwork left, deck right.
+ * Stacked, the transport would be entirely below the fold. The reading pane
+ * stays full-width beneath, which is right — it's a reading surface, and a
+ * column of lyrics half a screen wide is worse than one that spans it.
  */
 @media (max-height: 480px) and (orientation: landscape) {
-  .scrollContainer {
-    display: flex;
+  .stage {
     flex-direction: row;
     align-items: center;
     gap: var(--space-3);
     padding: 0 var(--space-3);
   }
 
-  .mainContent {
+  .artArea {
     flex: 0 0 auto;
-  }
-
-  .artContainer {
     padding: var(--space-2);
   }
 
-  .controls {
+  .deck {
     flex: 1;
-    margin-top: 0;
-    border-radius: var(--r-lg);
-    padding: var(--space-3);
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-top: none;
     min-width: 0;
+    padding: var(--space-2) 0;
   }
 
-  .trackInfo {
-    margin-bottom: var(--space-2);
-  }
-
-  .transport {
+  .seekBlock,
+  .transport,
+  .utilities {
     margin-top: var(--space-2);
   }
 
-  .extras {
-    margin-top: var(--space-2);
+  /*
+   * The lyric line and the fold hint are the first things to go when there's no
+   * room: one is an embellishment, and the other points at content that stays
+   * reachable by scrolling whether or not it's advertised.
+   */
+  .nowSinging,
+  .fold {
+    display: none;
   }
 
   .dragArea {
     padding: 0.375rem 0 0.125rem;
+  }
+}
+
+/* Very short portrait screens — the lyric line costs 2rem the transport needs. */
+@media (max-height: 620px) and (orientation: portrait) {
+  .nowSinging {
+    display: none;
   }
 }
 
@@ -554,7 +809,10 @@
     transition: none;
   }
 
-  .petal {
+  .petal,
+  .fold svg,
+  .nowSingingLine,
+  .volumePop {
     animation: none;
   }
 }

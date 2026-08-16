@@ -171,6 +171,10 @@ export function NowPlayingMenu({
                 ],
                 true
               );
+              // The queue itself is silent, and this sheet closes on the way
+              // out — without a toast the tap would have no visible result at
+              // all until the file finished.
+              showToast("Downloading for offline", "success");
             })
           }
         >
