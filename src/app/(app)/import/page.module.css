@@ -1,663 +1,671 @@
+/*
+ * Import from a link.
+ *
+ * The previous stylesheet was 11KB of hand-rolled cards, a step rail, three
+ * gradient panels and fixed pixel heights, all built on the legacy `--sakura-*`
+ * aliases. Two things it got wrong structurally, which are the reasons the page
+ * "overflowed" and "felt unresponsive":
+ *
+ *   - fixed heights and no `min-width: 0` on flex text, so a long track title
+ *     pushed the duration and status marks outside the row;
+ *   - no scroll container of its own for the list, so a 200-track playlist grew
+ *     the page instead of scrolling inside a bounded region.
+ *
+ * This one is a single column on the app's own tokens: `--gutter` for alignment
+ * with every other page, `--space-*` for rhythm, and one bounded scroller for
+ * the list.
+ */
+
 .page {
-  padding: clamp(0.75rem, 3vw, 1.25rem);
-  max-width: 36rem;
-  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 0 calc(var(--bottom-chrome) + var(--space-6));
+  background: var(--bg);
 }
 
-.heroSection {
-  text-align: center;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
-}
-
-.title {
-  font-size: clamp(1.25rem, 4vw, 1.5rem);
-  font-weight: 700;
-  color: var(--sakura-text);
-  margin: 0 0 0.25rem;
-}
-
-.subtitle {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  margin: 0;
-}
-
-.stepIndicator {
+.body {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  margin-bottom: clamp(1rem, 3vw, 1.5rem);
-}
-
-.stepItem {
-  display: flex;
-  align-items: center;
-}
-
-.stepCircle {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  border: 1.5px solid var(--sakura-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--sakura-text-secondary);
-  background: var(--sakura-surface);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.stepActive {
-  border-color: var(--sakura-accent);
-  background: var(--sakura-accent);
-  color: #fff;
-}
-
-.stepComplete {
-  border-color: var(--sakura-success);
-  background: var(--sakura-success);
-  color: #fff;
-}
-
-.stepLabel {
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-left: 0.375rem;
-  white-space: nowrap;
-  transition: color 0.3s;
-}
-
-.stepLabelActive {
-  color: var(--sakura-accent);
-  font-weight: 600;
-}
-
-.stepLine {
-  width: 2rem;
-  height: 1.5px;
-  background: var(--sakura-border);
-  margin: 0 0.375rem;
-}
-
-.inputGroup {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.inputWrapper {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.platformBadge {
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.urlInput {
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-inline: var(--gutter);
+  /* Long-form width cap: a paste field stretched across a tablet is unusable. */
+  max-width: 40rem;
+  margin-inline: auto;
   width: 100%;
-  height: clamp(2.75rem, 8vw, 3.25rem);
-  padding: 0 2.5rem;
-  padding-left: 2.5rem;
-  background: var(--sakura-input-bg);
-  border: 1.5px solid var(--sakura-input-border);
-  border-radius: 12px;
-  color: var(--sakura-text);
-  font-size: 0.875rem;
+}
+
+.lede {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+  margin: 0;
+  /* Text wraps rather than reflowing awkwardly at the last word. */
+  text-wrap: pretty;
+}
+
+/* ── Paste field ──────────────────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* No fixed height: the row grows with the density scale and the 44px minimum
+   * is met by the control inside rather than by a magic number here. */
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  transition: border-color var(--d-fast) var(--ease),
+    box-shadow var(--d-fast) var(--ease);
+}
+
+.inputWrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* State is on the wrapper, not the input, so the border and the mark agree. */
+.inputWrap[data-state="valid"] {
+  border-color: var(--success);
+}
+
+.inputWrap[data-state="invalid"] {
+  border-color: var(--line-strong);
+}
+
+.inputIcon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.inputWrap[data-state="valid"] .inputIcon {
+  color: var(--success);
+}
+
+.input {
+  flex: 1;
+  /* The one line that stops a long URL widening the row past the screen. */
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: var(--space-3) 0;
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  color: var(--text);
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  /* iOS zooms the viewport on focus below 16px; --t-base is 15px, so the
+   * text-size-adjust opt-out keeps the layout still without shrinking type. */
+  -webkit-text-size-adjust: 100%;
+  text-overflow: ellipsis;
 }
 
-.urlInput:focus {
-  border-color: var(--sakura-accent);
-  box-shadow: 0 0 0 3px rgba(242, 120, 159, 0.1);
+.input::placeholder {
+  color: var(--text-3);
 }
 
-.urlInput::placeholder {
-  color: var(--sakura-text-secondary);
+.providerTag {
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 
-.urlValid {
-  border-color: var(--sakura-success);
-}
-
-.urlInvalid {
-  border-color: var(--sakura-danger);
-}
-
-.urlIndicator {
-  position: absolute;
-  right: 2.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.pasteBtn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  all: unset;
+.inputBtn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.pasteBtn:hover {
-  background: var(--sakura-hover);
-  color: var(--sakura-text);
-}
-
-.importBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: clamp(2.75rem, 8vw, 3.25rem);
-  padding: 0 1.25rem;
-  background: var(--sakura-accent);
-  color: white;
+  gap: var(--space-1);
+  min-height: 2rem;
+  min-width: 2rem;
+  padding-inline: var(--space-2);
   border: none;
-  border-radius: 12px;
-  font-size: 0.875rem;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.importBtn:disabled {
-  opacity: 0.5;
+@media (hover: hover) and (pointer: fine) {
+  .inputBtn:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+}
+
+.hint {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-3);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+.submit,
+.secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.submit:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.importBtn:not(:disabled):hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+.secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
 }
 
-.importBtn:not(:disabled):active {
-  transform: scale(0.97);
+@media (hover: hover) and (pointer: fine) {
+  .submit:not(:disabled):hover {
+    background: var(--accent-press);
+  }
+  .secondary:hover {
+    background: var(--surface-3);
+  }
 }
 
-.btnSpinner {
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.spin {
+  animation: importSpin 0.8s linear infinite;
 }
 
-.progressSection {
-  margin-bottom: 1rem;
+@keyframes importSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.progressBar {
-  width: 100%;
-  height: 4px;
-  background: var(--sakura-border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.progressText {
-  font-size: 0.75rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 0.375rem;
-  text-align: center;
-}
+/* ── Error ────────────────────────────────────────────────────────────────── */
 
 .error {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(232, 93, 117, 0.08);
-  border: 1px solid rgba(232, 93, 117, 0.25);
-  border-radius: 10px;
-  color: var(--sakura-danger);
-  font-size: 0.8125rem;
-  margin-bottom: 1rem;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
-.errorDismiss {
-  all: unset;
+.error p {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.errorIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 1px;
+  border-radius: var(--r-full);
+  background: var(--danger);
+  color: var(--on-accent);
+}
+
+.errorDismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 0;
+  min-width: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: inherit;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.15s;
+  opacity: 0.7;
 }
 
 .errorDismiss:hover {
   opacity: 1;
 }
 
-.results {
-  margin-top: 1rem;
-}
+/* ── Result ───────────────────────────────────────────────────────────────── */
 
-.resultsHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.selectAll {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.8125rem;
-}
-
-.selectAll input[type="checkbox"] {
-  accent-color: var(--sakura-accent);
-}
-
-.resultsBadges {
-  display: flex;
-  gap: 0.375rem;
-}
-
-.savedBadge {
-  background: rgba(94, 196, 158, 0.12);
-  color: var(--sakura-success);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.6875rem;
-  font-weight: 500;
-}
-
-.errorBadge {
-  background: rgba(232, 93, 117, 0.12);
-  color: var(--sakura-danger);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.6875rem;
-  font-weight: 500;
-}
-
-.trackList {
+.result {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  max-height: 50vh;
-  overflow-y: auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  animation: importReveal var(--d-slow) var(--spring-soft) both;
+  /* Contains the list's rounded corners and anything that would otherwise
+   * paint past the card edge. */
+  overflow: hidden;
 }
 
-.trackItem {
+@keyframes importReveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.resultHead {
   display: flex;
   align-items: center;
-  padding: 0.625rem 0.75rem;
-  background: var(--sakura-card-bg, var(--sakura-surface));
-  border: 1px solid var(--sakura-card-border, var(--sakura-border));
-  border-radius: 10px;
-  transition: all 0.15s;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.trackItem:hover {
-  background: var(--sakura-hover);
+.resultCover {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--surface-3);
 }
 
-.trackItem.saved {
-  border-color: rgba(94, 196, 158, 0.3);
-}
-
-.trackItem.exists {
-  border-color: rgba(201, 166, 224, 0.3);
-}
-
-.trackItem.error {
-  border-color: rgba(232, 93, 117, 0.3);
-  background: rgba(232, 93, 117, 0.04);
-}
-
-.trackCheck {
+.resultCover[data-placeholder] {
   display: flex;
   align-items: center;
-  margin-right: 0.625rem;
+  justify-content: center;
+  color: var(--text-3);
 }
 
-.trackCheck input[type="checkbox"] {
-  accent-color: var(--sakura-accent);
-}
-
-.trackInfo {
+.resultText {
   flex: 1;
   min-width: 0;
 }
 
-.trackTitle {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--sakura-text);
-  white-space: nowrap;
+.resultName {
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  margin: 0;
+  /* Two lines, then ellipsis — a 90-character playlist name is common and must
+   * not be allowed to push the layout around. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.trackArtist {
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.resultMeta {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  margin: 2px 0 0;
+  text-transform: lowercase;
 }
 
-.trackDuration {
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-left: 0.5rem;
+.resultTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2rem;
+  min-width: 0;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toolBtn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+.toolCount {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Track list ───────────────────────────────────────────────────────────── */
+
+.trackList {
+  /*
+   * Bounded and scrollable, rather than growing the page. `dvh` because on a
+   * phone the visual viewport shrinks when the keyboard opens, and `vh` would
+   * leave the list taller than the space it has.
+   */
+  max-height: min(52dvh, 30rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block: 1px solid var(--line);
+}
+
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  min-width: 0;
+}
+
+.trackRow + .trackRow {
+  border-top: 1px solid var(--line);
+}
+
+.trackPick {
+  position: relative;
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  /* The label is the hit area, sized to the platform minimum without a 44px
+   * box that would space the rows out to nothing. */
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
 }
 
-.trackStatus {
-  margin-left: 0.5rem;
-  flex-shrink: 0;
+.checkbox {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.checkboxBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  color: transparent;
+  transition: background-color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
 }
 
-.statusPending {
-  background: var(--sakura-text-secondary);
+.checkbox:checked + .checkboxBox {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.checkbox:disabled + .checkboxBox {
   opacity: 0.4;
 }
 
-.statusSaved {
-  background: var(--sakura-success);
+.checkbox:focus-visible + .checkboxBox {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.statusExists {
-  background: var(--sakura-accent-2);
+.trackCover {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-xs);
+  object-fit: cover;
+  background: var(--surface-3);
 }
 
-.statusError {
-  background: var(--sakura-danger);
-}
-
-.saveBtn {
-  all: unset;
+.trackCover[data-placeholder] {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  height: clamp(2.75rem, 8vw, 3.25rem);
-  margin-top: 1rem;
-  background: var(--sakura-accent);
-  color: white;
-  border-radius: 12px;
-  font-size: 0.875rem;
+  color: var(--text-3);
+}
+
+.trackText {
+  flex: 1;
+  /* The fix for the overflow: without it a long title expands the flex item
+   * beyond the row and the columns after it are pushed off screen. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.trackTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
+  line-height: 1.3;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.saveBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.trackArtist {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  line-height: 1.35;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.saveBtn:not(:disabled):hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+.trackTime {
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
 }
 
-.saveBtn:not(:disabled):active {
-  transform: scale(0.98);
+.trackState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  color: transparent;
 }
 
-.doneSection {
+.trackState[data-status="saved"] {
+  color: var(--success);
+}
+
+.trackState[data-status="exists"] {
+  color: var(--text-3);
+}
+
+.trackState[data-status="error"] {
+  color: var(--danger);
+}
+
+/* ── Done ─────────────────────────────────────────────────────────────────── */
+
+.done {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(1.5rem, 5vh, 2.5rem) 1rem;
+  gap: var(--space-3);
   text-align: center;
+  padding: var(--space-2) 0;
 }
 
 .doneIcon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  background: rgba(94, 196, 158, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-full);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .doneText {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--sakura-text);
-  margin-bottom: 1rem;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+  color: var(--text);
+  margin: 0;
+  text-wrap: pretty;
 }
 
-.importAnotherBtn {
-  all: unset;
-  display: inline-flex;
-  align-items: center;
-  height: 2.5rem;
-  padding: 0 1.25rem;
-  border-radius: 9999px;
-  background: var(--sakura-surface-2);
-  color: var(--sakura-text);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--sakura-border);
-  transition: all 0.15s;
+/* ── Recent ───────────────────────────────────────────────────────────────── */
+
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.importAnotherBtn:hover {
-  background: var(--sakura-hover);
-}
-
-.importAnotherBtn:active {
-  transform: scale(0.97);
-}
-
-.platformsSection {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-top: clamp(1rem, 3vw, 1.5rem);
-  margin-bottom: 1rem;
-}
-
-.platformCard {
+.recentHead {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: var(--sakura-surface);
-  border: 1px solid var(--sakura-border);
-  border-radius: 12px;
-}
-
-.platformInfo {
-  flex: 1;
-}
-
-.platformName {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--sakura-text);
-}
-
-.platformDesc {
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 2px;
-}
-
-.historySection {
-  margin-top: clamp(0.75rem, 2vw, 1rem);
-  margin-bottom: 1rem;
-}
-
-.historyHeader {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
+  gap: var(--space-3);
 }
 
-.historyTitle {
-  font-size: 0.8125rem;
+.recentTitle {
+  font-family: var(--font-display);
+  font-size: var(--t-base);
   font-weight: 600;
-  color: var(--sakura-text);
+  letter-spacing: var(--track-snug);
+  color: var(--text);
+  margin: 0;
 }
 
-.historyClear {
-  all: unset;
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  transition: all 0.15s;
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.historyClear:hover {
-  color: var(--sakura-danger);
-  background: rgba(232, 93, 117, 0.08);
-}
-
-.historyItem {
-  all: unset;
+.recentItem {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   width: 100%;
-  padding: 0.75rem;
-  background: var(--sakura-surface);
-  border: 1px solid var(--sakura-border);
-  border-radius: 10px;
-  margin-bottom: 0.375rem;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  text-align: left;
   cursor: pointer;
-  transition: all 0.15s;
-  box-sizing: border-box;
-}
-
-.historyItem:hover {
-  background: var(--sakura-hover);
-  border-color: var(--sakura-text-secondary);
-}
-
-.historyIcon {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
-  background: var(--sakura-surface-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.historyContent {
-  flex: 1;
   min-width: 0;
 }
 
-.historyUrl {
-  font-size: 0.8125rem;
-  color: var(--sakura-text);
-  white-space: nowrap;
+.recentIcon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.recentText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recentName {
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.historyMeta {
-  font-size: 0.6875rem;
-  color: var(--sakura-text-secondary);
-  margin-top: 0.125rem;
+.recentMeta {
+  font-family: var(--font-body);
+  font-size: var(--t-2xs);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tipsSection {
-  margin-top: clamp(1rem, 3vw, 1.5rem);
-  padding: 1rem;
-  background: var(--sakura-surface);
-  border: 1px solid var(--sakura-border);
-  border-radius: 12px;
-}
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
 
-.tipsTitle {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--sakura-text);
-  margin-bottom: 0.75rem;
-}
+@media (prefers-reduced-motion: reduce) {
+  .result {
+    animation: none;
+  }
 
-.tipItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  margin-bottom: 0.625rem;
-}
-
-.tipItem:last-child {
-  margin-bottom: 0;
-}
-
-.tipNumber {
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
-  background: var(--sakura-accent);
-  color: #fff;
-  font-size: 0.625rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 0.125rem;
-}
-
-.tipText {
-  font-size: 0.8125rem;
-  color: var(--sakura-text-secondary);
-  line-height: 1.5;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  .spin {
+    /* Still needs to convey "working", so it slows rather than stopping. */
+    animation-duration: 2.4s;
+  }
 }

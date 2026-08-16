@@ -148,7 +148,15 @@ export async function copyImage(blob: Blob): Promise<ShareOutcome> {
  * Failure is deliberately non-fatal: the image or video is worth sharing on
  * its own, so a dead /api/shares degrades to a file-only share rather than
  * blocking the thing the user actually asked for.
+ *
+ * Which is exactly why it's on a timeout. Without one, a request that never
+ * settles — a captive portal, a phone that lost signal mid-export — left the
+ * sheet sitting on "Preparing…" indefinitely after the file was already
+ * finished. Four seconds is long enough for a slow-but-live connection and short
+ * enough not to read as a hang; past it the share goes ahead without a link.
  */
+const SHARE_LINK_TIMEOUT_MS = 4000;
+
 export async function createShareLink(payload: {
   kind: "lyric" | "track";
   trackId: string;
@@ -159,17 +167,22 @@ export async function createShareLink(payload: {
   startTime?: number;
   accentColor?: string | null;
 }): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SHARE_LINK_TIMEOUT_MS);
   try {
     const res = await fetch("/api/shares", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: payload.kind, payload }),
+      signal: controller.signal,
     });
     if (!res.ok) return undefined;
     const { url } = await res.json();
     return typeof url === "string" ? url : undefined;
   } catch {
     return undefined;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

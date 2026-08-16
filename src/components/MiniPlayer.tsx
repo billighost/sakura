@@ -65,9 +65,18 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const [artLoaded, setArtLoaded] = useState(false);
   const artWrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  /*
+   * Reset the art fade when the cover changes — adjusted during render rather
+   * than in an effect, which is React's documented "adjust state when a prop
+   * changes" pattern and the one FullPlayer already uses for the same job. An
+   * effect runs a frame after the commit, so for that frame the *new* image was
+   * painted with the previous one's `loaded` opacity.
+   */
+  const [lastCover, setLastCover] = useState(currentTrack?.coverUrl);
+  if (currentTrack?.coverUrl !== lastCover) {
+    setLastCover(currentTrack?.coverUrl);
     setArtLoaded(false);
-  }, [currentTrack?.coverUrl]);
+  }
 
   // Keep the last-known art position fresh so the Full Player can grow out of
   // it the instant it's asked to (avoids a stale rect from before a resize).
@@ -148,6 +157,10 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   return (
     <div
       className={`${styles.root} ${isPlaying ? styles.isPlaying : ""}`}
+      // The bar is one line taller while a lyric is showing — see the height
+      // note in MiniPlayer.module.css. Attribute rather than a class because it
+      // states a fact about the content, not a variant.
+      data-has-lyric={activeLyricLine ? "" : undefined}
       style={
         {
           "--track-accent": accentColor || undefined,

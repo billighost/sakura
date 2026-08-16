@@ -38,7 +38,14 @@ import { lineIndexAt, type LyricLine } from "./lyrics";
  * construction: it assigns its own timestamps.
  */
 
-import { detectFastEncode, decodeRegion, encodeFast } from "./fastEncode";
+import {
+  detectFastEncode,
+  decodeRegion,
+  encodeFast,
+  estimateVideoBytes,
+  videoBitrateFor,
+  AUDIO_BITRATE,
+} from "./fastEncode";
 
 export type CoverStyle = "bloom" | "vinyl" | "field" | "pulse" | "type" | "frame";
 
@@ -77,6 +84,26 @@ export interface VideoShareOptions {
 const FPS = 30;
 const WIDTH = 720;
 const HEIGHT = 1280;
+
+/** What an export of this length will roughly weigh, in bytes. */
+export function estimateShareVideoBytes(seconds: number): number {
+  return estimateVideoBytes(seconds, WIDTH, HEIGHT, FPS);
+}
+
+/** Human-readable size, for setting expectations before an export runs. */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/**
+ * Past this, a clip is awkward to keep and several share targets refuse it
+ * outright (WhatsApp caps at 16 MB, Discord's free tier at 25 MB). Not a hard
+ * limit — a whole-song export is a legitimate thing to want — but worth saying
+ * before the user waits for one.
+ */
+export const LARGE_EXPORT_BYTES = 25 * 1024 ** 2;
 
 /* ── Codec selection ─────────────────────────────────────────────────────── */
 
@@ -191,6 +218,7 @@ async function renderFast(options: VideoShareOptions): Promise<VideoResult> {
     freqData,
     lyricLines,
     showLyrics: showLyrics && lyricLines.length > 0,
+    blurCache: new Map(),
   };
 
   const samples = audio.getChannelData(0);
@@ -351,6 +379,7 @@ async function renderViaRecorder(options: VideoShareOptions): Promise<Blob> {
       freqData,
       lyricLines,
       showLyrics: showLyrics && lyricLines.length > 0,
+      blurCache: new Map(),
     };
 
     /* ── Recording ────────────────────────────────────────────────────── */
@@ -364,8 +393,12 @@ async function renderViaRecorder(options: VideoShareOptions): Promise<Blob> {
 
     const recorder = new MediaRecorder(combined, {
       mimeType,
-      videoBitsPerSecond: 4_500_000,
-      audioBitsPerSecond: 128_000,
+      // The same rate the WebCodecs path uses, derived from the frame size
+      // rather than a flat 4.5 Mbps — see the note on BITS_PER_PIXEL in
+      // fastEncode.ts. A recorded clip is the fallback, not a lesser product,
+      // so it shouldn't be five times the size of the fast one either.
+      videoBitsPerSecond: videoBitrateFor(WIDTH, HEIGHT, FPS),
+      audioBitsPerSecond: AUDIO_BITRATE,
     });
 
     const chunks: BlobPart[] = [];
@@ -462,6 +495,56 @@ interface VideoScene {
   freqData: Uint8Array;
   lyricLines: LyricLine[];
   showLyrics: boolean;
+  /**
+   * Blurred copies of the artwork, rendered once and re-blitted every frame.
+   *
+   * `ctx.filter = "blur(56px)"` over a full-bleed image is the single most
+   * expensive thing in a frame — it was costing more than the encoder, and doing
+   * it 900 times per export is what made a clip take tens of seconds and the
+   * sheet feel dead. The blur depends only on the cover, the radius and the
+   * size, none of which change during an export, so it is cached here and the
+   * per-frame cost drops to one drawImage.
+   */
+  blurCache: Map<string, HTMLCanvasElement | null>;
+}
+
+/**
+ * A pre-blurred square of the artwork, sized so its soft edges stay off-frame.
+ *
+ * Returns null when there's no cover, so callers fall back to a flat fill.
+ */
+function blurredCover(
+  s: VideoScene,
+  size: number,
+  blurPx: number,
+  saturate: number
+): HTMLCanvasElement | null {
+  if (!s.cover) return null;
+
+  const key = `${size}|${blurPx}|${saturate}`;
+  const cached = s.blurCache.get(key);
+  if (cached !== undefined) return cached;
+
+  let result: HTMLCanvasElement | null = null;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.filter = `blur(${blurPx}px) saturate(${saturate})`;
+      ctx.drawImage(s.cover, 0, 0, size, size);
+      ctx.filter = "none";
+      result = canvas;
+    }
+  } catch {
+    // A browser without canvas filters draws the artwork sharp instead of
+    // failing the export; the scrim on top still carries readability.
+    result = null;
+  }
+
+  s.blurCache.set(key, result);
+  return result;
 }
 
 function drawVideoFrame(
@@ -508,18 +591,21 @@ function drawVideoFrame(
 function drawBloom(s: VideoScene, elapsed: number): void {
   const { ctx, W, H, cover, accent } = s;
 
-  if (cover) {
-    // Blurred backdrop. `filter` is expensive per frame, so the drift is slow
-    // and the scale generous enough that the blur edges never enter frame.
-    ctx.save();
-    ctx.filter = "blur(56px) saturate(1.5)";
+  const size = Math.max(W, H) * 1.5;
+  const backdrop = blurredCover(s, size, 56, 1.5);
+
+  if (backdrop) {
+    // The blur is pre-rendered (see blurredCover); the drift is slow and the
+    // square generous enough that the soft edges never enter frame.
     const drift = Math.sin(elapsed * 0.12) * 24;
-    const size = Math.max(W, H) * 1.5;
-    ctx.drawImage(cover, (W - size) / 2 + drift, (H - size) / 2, size, size);
-    ctx.restore();
-    ctx.filter = "none";
+    ctx.drawImage(backdrop, (W - size) / 2 + drift, (H - size) / 2);
 
     ctx.fillStyle = "rgba(12,9,14,0.52)";
+    ctx.fillRect(0, 0, W, H);
+  } else if (cover) {
+    // No filter support: the artwork itself, under a heavier scrim.
+    drawCover(s, 0, 0, W, H);
+    ctx.fillStyle = "rgba(12,9,14,0.7)";
     ctx.fillRect(0, 0, W, H);
   } else {
     ctx.fillStyle = rgb(shift(accent, -0.6));
@@ -639,14 +725,18 @@ function drawPulse(s: VideoScene): void {
   ctx.fillStyle = rgb(shift(accent, -0.78));
   ctx.fillRect(0, 0, W, H);
 
-  if (cover) {
+  const size = Math.max(W, H) * 1.3;
+  const backdrop = blurredCover(s, size, 40, 1);
+  if (backdrop) {
     ctx.save();
     ctx.globalAlpha = 0.2;
-    ctx.filter = "blur(40px)";
-    const size = Math.max(W, H) * 1.3;
-    ctx.drawImage(cover, (W - size) / 2, (H - size) / 2, size, size);
+    ctx.drawImage(backdrop, (W - size) / 2, (H - size) / 2);
     ctx.restore();
-    ctx.filter = "none";
+  } else if (cover) {
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    drawCover(s, 0, 0, W, H);
+    ctx.restore();
   }
 
   const cx = W / 2;

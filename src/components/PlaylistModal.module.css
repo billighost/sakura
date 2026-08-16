@@ -202,6 +202,27 @@
 
 .urlInputRow .input {
   flex: 1;
+  /* Without this a long pasted URL sets the flex item's base size from its
+   * content and pushes the Paste button off the sheet's right edge. */
+  min-width: 0;
+}
+
+/* Field-level messages, under the field they belong to. */
+.fieldHint,
+.fieldError {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-snug);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.fieldHint {
+  color: var(--text-3);
+}
+
+.fieldError {
+  color: var(--danger);
 }
 
 .pasteBtn {
@@ -375,18 +396,30 @@
 
 /* ── Preview step ─────────────────────────────────────────────────────────── */
 
+/*
+ * The preview lives inside <Sheet>'s own scrolling body, so it must not declare
+ * a second full-height scroller of its own: a `max-height: 70vh` here plus the
+ * sheet's cap meant two nested scroll regions, and on a short screen the Import
+ * button ended up below the fold of the inner one — reachable only by scrolling
+ * a container that didn't look scrollable.
+ *
+ * Now the container is free-height and only the *list* is bounded, so the header
+ * and the actions are always on screen. `dvh` rather than `vh` because the
+ * visual viewport shrinks when the keyboard is open.
+ */
 .previewContainer {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-height: 70vh;
-  overflow: hidden;
+  min-height: 0;
 }
 
 .previewHeader {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .previewTitle {
@@ -395,9 +428,12 @@
   font-weight: 600;
   color: var(--text);
   margin: 0;
-  white-space: nowrap;
+  /* Ellipsis rather than bare nowrap: a 90-character playlist name would
+   * otherwise run out past the count beside it. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .previewCount {
@@ -410,7 +446,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* The only bounded scroller in the preview — see .previewContainer. */
+  max-height: min(46dvh, 26rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding-right: var(--space-2);
 }
 

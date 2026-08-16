@@ -70,6 +70,8 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
   const [importUrl, setImportUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState("");
+  /** Field-level failure for the pasted link, shown under the field. */
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   // ── Preview state ────────────────────────────────────────────────────────
   const [previewTracks, setPreviewTracks] = useState<PreviewTrack[]>([]);
@@ -94,6 +96,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
         setDescription("");
         setImportUrl("");
         setStatus("");
+        setLinkError(null);
         setUserPlaylists([]);
         setSpotifyCheckDone(false);
       }, 300);
@@ -101,22 +104,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
     }
   }, [isOpen]);
 
-  // ── Check Spotify connection when spotify step opens ─────────────────────
-  useEffect(() => {
-    if (step === "spotify" && !spotifyCheckDone) {
-      fetch("/api/import/spotify/check")
-        .then((r) => r.json())
-        .then((data) => {
-          setSpotifyConnected(data.connected ?? false);
-          setSpotifyCheckDone(true);
-          if (data.connected) {
-            loadUserPlaylists();
-          }
-        })
-        .catch(() => setSpotifyCheckDone(true));
-    }
-  }, [step, spotifyCheckDone]);
-
+  // ── Your connected Spotify account ──────────────────────────────────────
   const loadUserPlaylists = useCallback(async () => {
     setLoadingPlaylists(true);
     try {
@@ -134,22 +122,53 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
     }
   }, []);
 
-  // ── Fetch preview from a public URL ─────────────────────────────────────
+  /*
+   * Declared *after* the loader it calls, previously — so the effect closed over
+   * a binding that didn't exist yet and could never see a later definition. It
+   * happened to work because `useCallback` returns a stable function and the
+   * effect ran after commit, but the dependency was missing and the ordering was
+   * a genuine hazard. Loader first, and listed as a dependency.
+   */
+  useEffect(() => {
+    if (step !== "spotify" || spotifyCheckDone) return;
+
+    fetch("/api/import/spotify/check")
+      .then((r) => r.json())
+      .then((data) => {
+        setSpotifyConnected(data.connected ?? false);
+        setSpotifyCheckDone(true);
+        if (data.connected) void loadUserPlaylists();
+      })
+      .catch(() => setSpotifyCheckDone(true));
+  }, [step, spotifyCheckDone, loadUserPlaylists]);
+
+  // ── Fetch preview from a pasted link ────────────────────────────────────
+  /*
+   * Goes to `/api/import/link`, the provider-neutral resolver — not at Spotify
+   * directly. That's what makes an album link, a single-track link, a Deezer
+   * link and a share-sheet short link all work here, and what puts the keyless
+   * engine in front of the Web API so a user who isn't on our Spotify app's
+   * allowlist gets tracks instead of a 403. See lib/importLink.ts.
+   */
   async function handleFetchPublicUrl() {
     if (!importUrl.trim()) return;
     setIsLoading(true);
-    setStatus("Fetching playlist…");
+    setLinkError(null);
+    setStatus("Reading the link…");
     try {
-      const res = await fetch("/api/import/spotify/preview", {
+      const res = await fetch("/api/import/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: importUrl.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch playlist");
+      if (!res.ok) throw new Error(data.error || "Couldn't read that link.");
+      if (!data.tracks?.length) throw new Error("That link didn't have any tracks in it.");
       goToPreview(data);
-    } catch (err: any) {
-      showToast(err.message, "error");
+    } catch (err) {
+      // Inline, next to the field it belongs to. A toast for a field-level
+      // error disappears before the user has finished reading the URL again.
+      setLinkError(err instanceof Error ? err.message : "Couldn't read that link.");
     } finally {
       setIsLoading(false);
       setStatus("");
@@ -169,18 +188,30 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch playlist tracks");
       goToPreview(data);
-    } catch (err: any) {
-      showToast(err.message, "error");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't load that playlist.", "error");
     } finally {
       setIsLoading(false);
       setStatus("");
     }
   }
 
-  function goToPreview(data: { name: string; tracks: any[] }) {
-    const tracksWithIds = data.tracks.map((t: any) => ({
-      ...t,
-      id: Math.random().toString(36).substring(7),
+  /**
+   * Both sources — a pasted link and a playlist picked from the connected
+   * account — arrive in this shape, so the preview doesn't care which it was.
+   */
+  function goToPreview(data: {
+    name?: string;
+    tracks: { title: string; artist: string; duration?: number; coverUrl?: string }[];
+  }) {
+    const tracksWithIds: PreviewTrack[] = data.tracks.map((t) => ({
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration ?? 0,
+      coverUrl: t.coverUrl ?? "",
+      // Identity for the list and for undo — the source has no stable id, and
+      // the index can't be one because rows are removable.
+      id: `${t.title}-${t.artist}-${Math.random().toString(36).slice(2, 8)}`,
     }));
     setPreviewTracks(tracksWithIds);
     setPlaylistName(data.name || "Imported Playlist");
@@ -238,8 +269,8 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       if (onSuccess) onSuccess(playlist.id);
       onClose();
       router.refresh();
-    } catch (err: any) {
-      showToast(err.message, "error");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't import those tracks.", "error");
     } finally {
       setIsLoading(false);
       setStatus("");
@@ -263,8 +294,8 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       if (onSuccess) onSuccess(data.id);
       onClose();
       router.refresh();
-    } catch (err: any) {
-      showToast(err.message || "Something went wrong", "error");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Something went wrong", "error");
     } finally {
       setIsLoading(false);
     }
@@ -287,7 +318,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       : step === "manual"
       ? "Create Playlist"
       : step === "spotify"
-      ? "Import from Spotify"
+      ? "Import music"
       : "Preview Playlist";
 
   return (
@@ -302,7 +333,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       {step === "pick" && (
         <div className={styles.pickStep}>
           <p className={styles.pickSubtitle}>
-            Start fresh or bring in tracks from Spotify
+            Start fresh, or bring tracks in from a link you paste
           </p>
           <div className={styles.optionCards}>
             <button
@@ -325,8 +356,10 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
               <span className={`${styles.optionCardIcon} ${styles.optionCardIconSpotify}`}>
                 <SpotifyLogoIcon size={24} />
               </span>
-              <span className={styles.optionCardLabel}>Import from Spotify</span>
-              <span className={styles.optionCardDesc}>Paste a link or pick from your account</span>
+              <span className={styles.optionCardLabel}>Import from a link</span>
+              <span className={styles.optionCardDesc}>
+                Spotify or Deezer — or pick from your Spotify account
+              </span>
             </button>
           </div>
         </div>
@@ -386,15 +419,29 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
       {/* ── Step: spotify ───────────────────────────────────────────────── */}
       {step === "spotify" && (
         <div className={styles.spotifyStep}>
-          {/* ── Paste a public link ── */}
+          {/* ── Paste a link ── */}
           <div className={styles.spotifySection}>
-            <span className={styles.sectionHeading}>Public playlist URL</span>
+            <span className={styles.sectionHeading}>Paste a link</span>
             <div className={styles.urlInputRow}>
               <input
                 className={styles.input}
-                placeholder="https://open.spotify.com/playlist/…"
+                placeholder="Song, album or playlist link"
+                aria-label="Link to import"
+                inputMode="url"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
                 value={importUrl}
-                onChange={(e) => setImportUrl(e.target.value)}
+                onChange={(e) => {
+                  setImportUrl(e.target.value);
+                  if (linkError) setLinkError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && importUrl.trim() && !isLoading) {
+                    e.preventDefault();
+                    void handleFetchPublicUrl();
+                  }
+                }}
                 disabled={isLoading}
                 autoFocus
               />
@@ -408,6 +455,17 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
                 Paste
               </button>
             </div>
+
+            {linkError ? (
+              <p className={styles.fieldError} role="alert">
+                {linkError}
+              </p>
+            ) : (
+              <p className={styles.fieldHint}>
+                Spotify or Deezer — including the short links the mobile apps share.
+              </p>
+            )}
+
             <button
               type="button"
               className={`${styles.btn} ${styles.btnSubmit} pressable`}
@@ -417,7 +475,7 @@ export function PlaylistModal({ isOpen, onClose, onSuccess }: PlaylistModalProps
             >
               {isLoading && status ? (
                 <><span className={`${styles.spinner} ${styles.spinnerSmall}`} /> {status}</>
-              ) : "Import link"}
+              ) : "Find the tracks"}
             </button>
           </div>
 

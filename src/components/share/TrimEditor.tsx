@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { extractWaveform, TrimPreview, type WaveformData } from "@/lib/shareAudio";
 import { haptic } from "@/lib/haptics";
 import { clamp01 } from "@/lib/motion";
@@ -52,7 +52,16 @@ export interface TrimEditorProps {
   disabled?: boolean;
 }
 
-export function TrimEditor({
+/**
+ * Memoised, and that isn't a micro-optimisation.
+ *
+ * The waveform is a few hundred DOM nodes, and this sits directly under the
+ * export progress bar. Without the memo every progress tick re-rendered all of
+ * them — which, once the encoder started yielding to the UI properly, became the
+ * new reason the sheet stuttered during an export. None of these props change
+ * while one is running.
+ */
+export const TrimEditor = memo(function TrimEditor({
   audioUrl,
   trackDuration,
   atTime = 0,
@@ -433,7 +442,7 @@ export function TrimEditor({
       </div>
     </div>
   );
-}
+});
 
 function formatClock(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;

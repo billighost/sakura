@@ -178,11 +178,13 @@ export async function detectFastEncode(): Promise<FastEncodeSupport | null> {
 
     for (const candidate of candidates) {
       try {
+        // Probed with the values the export actually uses, so a browser that
+        // rejects a specific rate is caught here rather than at encode time.
         const video = await VideoEncoder.isConfigSupported({
           codec: candidate.videoCodec,
           width: 720,
           height: 1280,
-          bitrate: 4_500_000,
+          bitrate: videoBitrateFor(720, 1280, 30),
           framerate: 30,
         });
         if (!video.supported) continue;
@@ -191,7 +193,7 @@ export async function detectFastEncode(): Promise<FastEncodeSupport | null> {
           codec: candidate.audioCodec,
           sampleRate: 48000,
           numberOfChannels: 2,
-          bitrate: 128_000,
+          bitrate: AUDIO_BITRATE,
         });
         if (!audio.supported) continue;
 

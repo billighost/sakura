@@ -41,8 +41,6 @@ export const THEME_STORAGE_KEY = "sakura-theme";
 const CHROME_DARK = "#0E0B0F";
 const CHROME_LIGHT = "#FAF8FA";
 
-const THEME_EVENT = "sakura:themechange";
-
 const listeners = new Set<() => void>();
 
 /** Cached so `getSnapshot` can return a stable value between changes. */
@@ -201,7 +199,6 @@ export function setTheme(theme: ThemeId, opts: SetThemeOptions = {}): void {
 
   if (changed) {
     for (const listener of listeners) listener();
-    window.dispatchEvent(new CustomEvent(THEME_EVENT));
   }
 }
 
@@ -212,8 +209,7 @@ export function setTheme(theme: ThemeId, opts: SetThemeOptions = {}): void {
  * it the right cross-tab channel: a change here notifies local listeners
  * directly, and every other tab hears it through storage and repaints without a
  * reload. Shaped for `useSyncExternalStore`.
- */
-export function subscribeTheme(onChange: () => void): () => void {
+ */export function subscribeTheme(onChange: () => void): () => void {
   listeners.add(onChange);
 
   const onStorage = (e: StorageEvent) => {

@@ -550,6 +550,25 @@
   margin: 0;
 }
 
+/*
+ * Expected file size, next to the button that commits to it. Quiet by default —
+ * it's a fact, not a warning — and only takes the warning colour once the clip
+ * is big enough that a share target may refuse it.
+ */
+.sizeNote {
+  font-family: var(--font-body);
+  font-size: var(--t-xs);
+  line-height: var(--lh-normal);
+  color: var(--text-3);
+  text-align: center;
+  margin: 0;
+}
+
+.sizeNoteWarn {
+  color: var(--warning);
+  text-align: left;
+}
+
 /* ── Result ───────────────────────────────────────────────────────────────── */
 
 .resultHead {

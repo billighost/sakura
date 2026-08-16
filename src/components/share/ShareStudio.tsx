@@ -222,6 +222,7 @@ export function ShareStudio() {
             accentColor={subject.accentColor ?? null}
             atTime={subject.atTime}
             onExport={deliver}
+            busy={busy}
           />
         )}
 

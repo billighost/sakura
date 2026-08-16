@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TrimEditor } from "./TrimEditor";
 import {
   COVER_STYLES,
+  estimateShareVideoBytes,
+  formatBytes,
   isVideoShareSupported,
+  LARGE_EXPORT_BYTES,
   renderShareVideo,
   type CoverStyle,
   type VideoTrack,
@@ -34,6 +37,13 @@ export interface VideoStepProps {
   accentColor: string | null;
   atTime?: number;
   onExport: (blob: Blob, extension: string) => void;
+  /**
+   * True while the studio is handing the finished file over — minting a link,
+   * opening the OS share sheet. Without it this step dropped straight back to
+   * "Make the video" the moment the encode finished, so the seconds of delivery
+   * that follow looked like the sheet had stopped responding.
+   */
+  busy?: boolean;
 }
 
 export function VideoStep({
@@ -44,6 +54,7 @@ export function VideoStep({
   accentColor,
   atTime = 0,
   onExport,
+  busy = false,
 }: VideoStepProps) {
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("bloom");
   const [showLyrics, setShowLyrics] = useState(canUseLyrics);
@@ -141,7 +152,21 @@ export function VideoStep({
         accentColor,
         lyricLines: showLyrics ? lyricLines : [],
         showLyrics,
-        onProgress: setProgress,
+        /*
+         * Throttled, and deliberately not passed straight to setState.
+         *
+         * The encoder now yields to the UI on every frame (see fastEncode), so
+         * this fires ~30 times a second — and each call re-rendered this step
+         * *and* the trim editor's few hundred waveform bars underneath it. The
+         * export was no longer blocking the main thread, but React was. A
+         * percentage point is smaller than the progress bar can show anyway.
+         */
+        onProgress: (value) => {
+          setProgress((prev) => {
+            if (prev !== null && value < 1 && value - prev < 0.01) return prev;
+            return value;
+          });
+        },
         signal: controller.signal,
       });
 
@@ -161,6 +186,20 @@ export function VideoStep({
   // An export left running after the sheet closes would keep recording audio
   // in the background with nowhere to deliver it.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  /*
+   * Size, shown before the export rather than discovered afterwards.
+   *
+   * The old exports ran at a flat 4.5 Mbps, so a whole-song clip came out over
+   * 100 MB — and the only way to find that out was to wait for it and then have
+   * a share target reject it. The rate is much lower now (fastEncode.ts), and
+   * the number is on screen next to the choice that drives it.
+   */
+  const estimatedBytes = useMemo(
+    () => estimateShareVideoBytes(trim.duration),
+    [trim.duration]
+  );
+  const isLarge = estimatedBytes > LARGE_EXPORT_BYTES;
 
   if (!supported) {
     return (
@@ -286,15 +325,28 @@ export function VideoStep({
             Cancel
           </button>
         </div>
+      ) : busy ? (
+        <div className={styles.exportPanel}>
+          <p className={styles.progressNote} role="status">
+            Your video is ready — opening the share sheet…
+          </p>
+        </div>
       ) : (
-        <button
-          type="button"
-          className={`${styles.primary} pressable`}
-          onClick={handleExport}
-          disabled={!localAudio}
-        >
-          Make the video
-        </button>
+        <>
+          <p className={`${styles.sizeNote} ${isLarge ? styles.sizeNoteWarn : ""}`}>
+            {isLarge
+              ? `About ${formatBytes(estimatedBytes)} — long clips are slow to send and some apps won't accept them. A shorter one shares more easily.`
+              : `About ${formatBytes(estimatedBytes)}`}
+          </p>
+          <button
+            type="button"
+            className={`${styles.primary} pressable`}
+            onClick={handleExport}
+            disabled={!localAudio}
+          >
+            Make the video
+          </button>
+        </>
       )}
     </div>
   );

@@ -3,16 +3,23 @@
   display: flex;
   flex-direction: column;
   /*
-   * `min-height`, not `height`. The bar carries two lines normally and three
-   * while a synced lyric is showing, and a fixed height clipped the third one
-   * against `overflow: hidden` below — the lyric was there, cropped off under
-   * the artist. The bar is a flex child of the app shell's bottom chrome, so
-   * growing shortens the scroll area rather than covering any content.
+   * Height is *definite*, and it has to be.
    *
-   * The floor tracks `--miniplayer-h` so it steps down with the density scale
-   * on short viewports, instead of the clamp() that used to duplicate it.
+   * With `height: auto` the row has no definite height to stretch the artwork
+   * against, so the `<img>` inside falls back to its intrinsic size — a 640px
+   * cover then becomes the height of the bar. That's the "mini player is
+   * enormous" bug. Everything below (`.content`, `.artWrap`) resolves from this
+   * one value.
+   *
+   * It steps with `--miniplayer-h` rather than duplicating it in a clamp(), and
+   * grows by one line when a synced lyric is showing — three lines of text do
+   * not fit in a two-line bar, which is what was cropping the lyric under the
+   * artist. The safe-area inset is added on top rather than eating into it:
+   * `box-sizing: border-box` means padding would otherwise come out of the
+   * content's share.
    */
-  min-height: var(--miniplayer-h);
+  --mini-h: var(--miniplayer-h);
+  height: calc(var(--mini-h) + env(safe-area-inset-bottom, 0px));
   background: var(--chrome);
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
@@ -23,13 +30,19 @@
   z-index: 49;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-shadow: 0 -6px 26px rgba(0, 0, 0, 0.2);
-  transition: transform var(--d-base) var(--ease), opacity var(--d-base) var(--ease);
+  transition: transform var(--d-base) var(--ease), opacity var(--d-base) var(--ease),
+    height var(--d-base) var(--ease);
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
   /* The art now sits edge-to-edge and the artwork can gently scale while
    * playing (see .artWrap.playing) — this keeps that scale, and the ambient
    * wash below, clipped to the bar's own bounds instead of poking past them. */
   overflow: hidden;
+}
+
+/* Room for the third line. Set by the component whenever it renders a lyric. */
+.root[data-has-lyric] {
+  --mini-h: calc(var(--miniplayer-h) + 1rem);
 }
 
 /* A hairline of the track's accent along the very top edge. One pixel of
@@ -118,12 +131,17 @@
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
   overflow: hidden;
+  /* Belt and braces against the intrinsic-size blowup described on `.root`:
+   * even if the row's height ever goes indefinite again, the artwork can never
+   * be taller than the space it was given. */
+  max-height: 100%;
 }
 
 .art {
   position: relative;
   width: 100%;
   height: 100%;
+  max-height: 100%;
   object-fit: cover;
   background: var(--skeleton);
   opacity: 0;
@@ -242,7 +260,7 @@
    * this padding keeps the block off the bar's edges.
    */
   gap: 1px;
-  padding: 0.1875rem 0;
+  padding: 0.125rem 0;
   /* The tap-to-expand affordance lives here, so it must not swallow the
    * buttons' hit areas — it's a sibling, not an overlay. */
 }
