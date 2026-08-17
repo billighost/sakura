@@ -11,12 +11,12 @@ means, and it is why the session cannot live on Vercel: every serverless
 instance has its own IP and its own memory, and a lock can serialise the
 handshake but not the socket that outlives it.
 
-Read the two findings below before you click anything. Both of them change what
-you have to buy.
+Read the three findings below before you click anything. The first two decide
+whether you need to spend money.
 
 ---
 
-## 1. The worker needs a **paid** instance, and a **disk**
+## 1. A disk is what makes redeploys safe — and a disk means a paid instance
 
 Render's default deploy behaviour would revoke the session on your first
 redeploy. From Render's own docs:
@@ -40,16 +40,52 @@ And:
 So: **disk required → paid instance required.** The `starter` plan (512 MB, 0.5
 CPU) is plenty — the worker streams bytes through without buffering files.
 
-The free tier is unusable here for three separate reasons, any one of which is
-fatal: no disk, it spins down after 15 minutes idle (a ~1 minute cold start on
-every play), and Render states it "might restart a Free web service at any
-time."
+Two more things a paid instance buys, which matter for a music app: the free tier
+spins down after 15 minutes idle, so the first play after a quiet spell waits
+~1 minute for a cold start, and Render states it "might restart a Free web service
+at any time."
+
+None of that is fatal, though — see §2. If you can't spend money right now, the
+free tier works with one manual step per deploy.
 
 There is no dollar figure in this document because Render does not publish one
 anywhere in its docs — the prices live only on the JavaScript-rendered pricing
 page. Check <https://render.com/pricing> yourself before committing.
 
-## 2. Bandwidth is the real ceiling, not CPU
+## 2. If you can't pay for a disk: suspend before every deploy
+
+Without a disk you get zero-downtime deploys whether you want them or not, and
+Render's docs are explicit that this is not plan-dependent:
+
+> All service types redeploy with zero downtime, unless they attach a persistent
+> disk.
+
+So every redeploy overlaps: your original instance "continues to receive all
+incoming traffic while the new instance is spinning up," and only "after 60
+seconds" does Render SIGTERM the old one. Sixty seconds of two processes holding
+one auth key from two IPs. That is the revocation, on a timer.
+
+There is a free way out, and it's manual. **Suspend the service, deploy, resume.**
+
+1. Turn **auto-deploy off**: Settings → Build & Deploy → Auto-Deploy → **No**.
+   This is the important half. Leave it on and a routine `git push` triggers an
+   overlapping deploy behind your back — you'd find out when Telegram logs you
+   out.
+2. Service → top-right menu → **Suspend Service**. Wait for the logs to show
+   `[tg] disconnected cleanly — session released`. That line is your proof the
+   key is free; don't skip it.
+3. Push your commit.
+4. **Resume Service**, which deploys the latest commit.
+
+The cost is a cold start instead of a seamless swap. The benefit is that the two
+processes provably never overlap, which is the only thing that matters here.
+
+The rest of the free tier's behaviour is safe by comparison: spin-down after 15
+minutes idle, spin-up on the next request, and Render's "might restart a Free web
+service at any time" are all *stop, then start* — sequential, so the key is
+released before it's reclaimed. It's only **deploys** that overlap.
+
+## 3. Bandwidth is the real ceiling, not CPU
 
 Outbound bandwidth is billed against your **workspace plan**, not the instance:
 
@@ -110,15 +146,21 @@ Dashboard → **New** → **Web Service** → connect `billighost/sakura`.
 | Branch          | `master`                     |
 | Root Directory  | `worker`                     |
 | Region          | pick the one nearest Vercel — `Virginia (US East)` matches Vercel's `iad` default |
-| Instance Type   | **Starter** or higher (not Free) |
+| Instance Type   | **Starter** or higher if you can — **Free** works with §2's manual step |
 
 Region is fixed once the service exists; changing it later means a new service.
+
+Leave **Health Check Path** and **Docker Command** alone for now, and do not add
+a `PORT` variable. Render's default expected port is 10000 and the image no longer
+claims otherwise.
 
 Setting Root Directory to `worker` also means commits that touch nothing under
 `worker/` will not trigger a rebuild. That is deliberate — every rebuild is a
 brief outage now, so app-only pushes should not cause one.
 
-### 3. Add the disk — do this before the first successful deploy
+### 3. Add the disk, if you're paying — before the first successful deploy
+
+Skip this on Free and follow §2 instead; the two are alternatives, not a pair.
 
 Service → **Settings** → **Disks** → **Add Disk**:
 
@@ -130,8 +172,10 @@ Service → **Settings** → **Disks** → **Add Disk**:
 
 Size can be increased later but never decreased, so start small.
 
-This is the step that disables zero-downtime deploys. Do not skip it, and do not
-remove the disk later to "get zero-downtime back" — that trade is the bug.
+This is the step that disables zero-downtime deploys. Do not skip it and then
+also skip §2 — one of the two has to be true, or a redeploy revokes the session.
+And if you add a disk, add `SESSION_FILE=/var/data/session.json` to the
+environment; without a disk, leave that variable out entirely.
 
 ### 4. Paste the environment
 
@@ -151,18 +195,31 @@ What each key is for:
 | `TELEGRAM_SESSION_STRING` | **paste by hand, here only**                       |
 | `TELEGRAM_BOT_USERNAME`   | the bot the session talks to                       |
 | `WORKER_SECRET`           | bearer token; must match Vercel byte for byte      |
-| `SESSION_FILE`            | `/var/data/session.json` — must be inside the disk |
+| `SESSION_FILE`            | **only if you attached a disk** — see below         |
 | `NODE_ENV`                | `production`                                       |
-| `PORT`                    | `8080`                                             |
 
-`SESSION_FILE` caches the session *after* Telegram's DC migration mutates it.
-Without it every boot repeats the migration handshake. It is a cache, not the
-source of truth: the file records a fingerprint of the env session string, and a
-file whose fingerprint no longer matches is ignored — so rotating
-`TELEGRAM_SESSION_STRING` cannot be undone by a stale file. If the logs say
-`could not persist session: EACCES`, the mount is not writable by the container's
-`node` user; the worker carries on regardless and you lose one handshake per
-boot.
+**Do not set `PORT`.** Render injects `PORT=10000` and a runtime variable
+overrides the image's `ENV`, so any value you set here just makes the port the
+process binds disagree with the port Render probes. That is a fifteen-minute
+deploy timeout, not an error message — see [When the deploy times
+out](#when-the-deploy-times-out).
+
+**Only set `SESSION_FILE` if you have a disk**, and then to a path inside the
+mount (`/var/data/session.json`). With no disk, leave it unset: the image already
+points it at `/data/session.json`, which the Dockerfile creates and chowns to the
+container's non-root user.
+
+It caches the session *after* Telegram's DC migration mutates it; without it,
+every boot repeats that handshake. It is a cache, not the source of truth — the
+file records a fingerprint of the env session string and is ignored when the
+fingerprint stops matching, so rotating `TELEGRAM_SESSION_STRING` can never be
+undone by a stale file. If the path is unwritable (a root-owned mount, or a
+directory that doesn't exist) the worker logs one line and falls back to the
+temp directory:
+
+```
+[tg] /var/data/session.json is not writable — caching the session at /tmp/sakura-tg-session.json instead
+```
 
 ### 5. Health check
 
@@ -242,6 +299,53 @@ bot chain and it is not a secret.
 
 ---
 
+## When the deploy times out
+
+The symptom, from a real deploy of this worker:
+
+```
+[boot] connecting to Telegram…
+[tg] connected as @… — this process now owns the session
+[boot] listening on 0.0.0.0:10000
+==> Timed Out
+[shutdown] SIGTERM — releasing session
+==> Detected service running on port 10000
+==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+```
+
+Everything the app logs says success, and the deploy still fails. Read the gap
+between the timestamps: exactly fifteen minutes, which is Render's documented
+limit for the start command. Render never accepted the service as live.
+
+The cause was a **port mismatch**, and the last two lines are Render telling you
+so. The image declared `EXPOSE 8080` and `ENV PORT=8080`; Render injects
+`PORT=10000`, and a runtime variable overrides an image `ENV`, so the process
+bound 10000 while the image still advertised 8080. Render probed the port it had
+been told about, found nothing, and gave up — then reported which port the
+process was *actually* on.
+
+Both lines are gone from the Dockerfile now. `index.js` reads `PORT` and falls
+back to 8080, so Render's 10000 is bound on Render, Fly's `internal_port = 8080`
+matches the fallback on Fly, and nothing in the image can contradict the platform.
+If you hit this again, the fix is never to set `PORT` — it's to make sure nothing
+else claims a different one.
+
+Other ways this deploy can stall, in the order worth checking:
+
+- **`==> Timed Out` with no `listening` line at all.** The process never got
+  past `client.start()`. Look for `AUTH_KEY_DUPLICATED` (revoked — mint a new
+  session) or a `TELEGRAM_API_ID`/`API_HASH` error.
+- **A login prompt in the logs.** The session string is missing or truncated.
+  Re-paste it; a session string is long and dashboards can eat it.
+- **Deploy cancelled rather than timed out.** That's the health check: Render
+  "cancels your deploy" when `/health` "responds with an unexpected value (or
+  doesn't respond at all)." `/health` returns 503 until the session is live, so
+  this means Telegram refused the connection — read the `[tg]` line above it.
+- **`EACCES: permission denied, mkdir '/var/data'`.** Cosmetic, and now
+  self-correcting: you set `SESSION_FILE` to a disk path with no disk mounted.
+  Unset it.
+
+
 ## Deploying with the blueprint instead
 
 `render.yaml` at the repo root encodes every setting above. Dashboard → **New**
@@ -256,20 +360,24 @@ instance count and the shutdown delay is written down.
 ## Operating it
 
 **Rotating the session.** Run `npm run login` again, update
-`TELEGRAM_SESSION_STRING` in Render, save. Render restarts the service — old
-instance stopped first, so the two keys never overlap. The cached session file's
-fingerprint stops matching and it is ignored automatically.
+`TELEGRAM_SESSION_STRING` in Render, save. The cached session file's fingerprint
+stops matching and it is ignored automatically. Saving an environment variable
+restarts the service in place rather than running a new deploy alongside the old
+one, so the two keys don't overlap — but if you're on Free and want certainty,
+suspend first, save, then resume.
 
-**Redeploying.** Expect a few seconds of downtime. During it, Telegram-backed
-requests from the app fail; playback of already-cached audio does not.
+**Redeploying.** With a disk: a few seconds of downtime, automatic. Without one:
+suspend → push → resume, per §2. Either way, Telegram-backed requests fail during
+the gap; playback of already-cached audio does not.
 
 **Never run two.** Not a second Render service, not a local `node index.js`
 against the same session string while the deployed one is up, not a rollback that
 runs alongside. One process. This is the whole design.
 
 **Reading the logs.** `[tg] connected as … — this process now owns the session`
-is the line that says the invariant holds. If you ever see it twice without a
-shutdown in between, something is wrong.
+is the line that says the invariant holds, and `[tg] disconnected cleanly —
+session released` is the line that says it's safe to start another. If you ever
+see the first one twice without the second in between, something is wrong.
 
 ## What went wrong the previous three times
 

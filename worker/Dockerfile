@@ -22,11 +22,22 @@ COPY telegram.js index.js login.js ./
 RUN mkdir -p /data && chown node:node /data
 ENV SESSION_FILE=/data/session.json
 ENV NODE_ENV=production
-ENV PORT=8080
 
 USER node
 
-EXPOSE 8080
+# No ENV PORT and no EXPOSE, deliberately.
+#
+# Both used to say 8080, and on Render that combination fails the deploy. Render
+# injects PORT=10000 into the container, which overrides an image ENV, so the
+# process listened on 10000 while the image still advertised 8080 — the platform
+# probed the port it had been told about, found nothing, and timed out after
+# fifteen minutes with "Detected service running on port 10000".
+#
+# index.js reads PORT and falls back to 8080, so: Render sets it to 10000 and
+# that is what gets bound; Fly doesn't set it and fly.toml's internal_port 8080
+# matches the fallback; locally it is 8080. EXPOSE publishes nothing on its own,
+# it only declares intent — and a declaration that can be wrong is worse here
+# than no declaration at all.
 
 # No init system and no process manager on purpose: this must be ONE process.
 # A supervisor that restarts it while the old one is still draining would put two

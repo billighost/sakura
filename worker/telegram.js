@@ -45,6 +45,7 @@
  */
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { Readable } = require("node:stream");
@@ -152,6 +153,49 @@ function trackFromMessage(msg, doc, audioAttr, buttonIndex = 0) {
   };
 }
 
+/**
+ * Pick a session-cache path that can actually be written to, once, at startup.
+ *
+ * The cache stores the session *after* Telegram's DC migration mutates it, which
+ * saves one handshake per boot. It is an optimisation, so an unwritable path must
+ * never be fatal — but it must not be retried silently either. The first Render
+ * deploy of this worker logged
+ *
+ *   [tg] could not persist session: EACCES: permission denied, mkdir '/var/data'
+ *
+ * twice on every boot, because SESSION_FILE pointed at a disk mount path that
+ * did not exist and the container runs as a non-root user. Resolving the path
+ * once turns that into a single, actionable line.
+ *
+ * The fallback is the OS temp dir: it survives a reconnect within the process,
+ * but not a new container. One extra handshake per deploy, none per reconnect.
+ */
+function resolveSessionFile(preferred) {
+  if (!preferred) return null;
+
+  const fallback = path.join(os.tmpdir(), "sakura-tg-session.json");
+  for (const candidate of preferred === fallback ? [fallback] : [preferred, fallback]) {
+    const dir = path.dirname(candidate);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.accessSync(dir, fs.constants.W_OK);
+      if (candidate !== preferred) {
+        console.warn(
+          `[tg] ${preferred} is not writable — caching the session at ${candidate} instead`,
+        );
+      }
+      return candidate;
+    } catch (err) {
+      console.warn(`[tg] cannot cache the session at ${candidate}: ${err.message}`);
+    }
+  }
+
+  console.warn(
+    "[tg] no writable session cache — the DC-migration handshake repeats every boot (harmless, just slower)",
+  );
+  return null;
+}
+
 class TelegramWorkerClient {
   constructor({ apiId, apiHash, sessionString, sessionFile }) {
     if (!apiId || !apiHash) {
@@ -166,7 +210,7 @@ class TelegramWorkerClient {
     this.apiId = apiId;
     this.apiHash = apiHash;
     this.envSession = sessionString;
-    this.sessionFile = sessionFile;
+    this.sessionFile = resolveSessionFile(sessionFile);
     this.envFingerprint = fingerprint(sessionString);
 
     /**

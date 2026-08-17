@@ -89,11 +89,17 @@ services:
         value: musicshuntersbot
 
       # Must sit inside mountPath above, or the cache dies with the container
-      # and every boot repeats the DC-migration handshake.
+      # and every boot repeats the DC-migration handshake. Only correct because
+      # this blueprint declares a disk — with no disk, leave this unset and the
+      # image's /data/session.json is used instead. If the mount turns out to be
+      # root-owned, the worker logs one line and falls back to the temp dir.
       - key: SESSION_FILE
         value: /var/data/session.json
 
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "8080"
+
+      # No PORT here on purpose. Render injects PORT=10000, a runtime variable
+      # overrides the image's ENV, and setting anything else only makes the port
+      # the process binds disagree with the port Render probes — which fails the
+      # deploy after a fifteen-minute start timeout. index.js reads PORT.
