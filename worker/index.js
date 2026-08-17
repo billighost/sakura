@@ -306,8 +306,39 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   const method = req.method || "GET";
 
-  // ── /health: unauthenticated on purpose (platform probes can't carry a secret)
-  if (pathname === "/health") {
+  /*
+   * One line per request, always.
+   *
+   * Two Render deploys of this worker died at the 15-minute start timeout while
+   * every application log line said the process was healthy and listening. The
+   * logs could not answer the only question that mattered — whether the platform
+   * was making requests at all, and what it got back — because the worker only
+   * logged failures. A silent success and a request that never arrived looked
+   * identical. They aren't, and now they don't.
+   *
+   * Registered on `finish` so it reports the status actually written, from
+   * whichever branch below wrote it, without threading a logger through all of
+   * them.
+   */
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    console.log(
+      `[http] ${method} ${pathname} -> ${res.statusCode} (${Date.now() - startedAt}ms)`,
+    );
+  });
+
+  /*
+   * Platform probes, unauthenticated on purpose: a health check cannot carry a
+   * bearer token.
+   *
+   * `/` and `/healthz` answer the same as `/health` because everything else here
+   * replies 401, and a platform whose health check path is set to `/` — the
+   * default in more than one dashboard — would read that 401 as "not ready" and
+   * retry until the deploy timed out. Matching the probe to the path is the
+   * operator's job; surviving a wrong one is cheap insurance, and none of these
+   * three reveal anything a caller doesn't already know.
+   */
+  if (pathname === "/health" || pathname === "/healthz" || pathname === "/") {
     const h = client.health();
     sendJson(res, h.ok ? 200 : 503, h);
     return;
@@ -478,7 +509,47 @@ async function main() {
   await client.start();
 
   server.listen(PORT, HOST, () => {
-    console.log(`[boot] listening on ${HOST}:${PORT}`);
+    const addr = server.address();
+    console.log(
+      `[boot] listening on ${HOST}:${PORT}` +
+        (addr && typeof addr === "object"
+          ? ` (bound ${addr.address}:${addr.port} ${addr.family}, PORT env ${process.env.PORT ?? "unset"})`
+          : ""),
+    );
+    void selfProbe();
+  });
+}
+
+/**
+ * Ask ourselves for /health over real TCP, once, right after binding.
+ *
+ * This exists because two Render deploys timed out after fifteen minutes with
+ * the process reporting itself listening the whole time, and there was no way to
+ * tell from the logs whether the socket was genuinely accepting connections. A
+ * successful probe moves the fault outside the container — to the port the
+ * platform expects, the health check path it asks for, or its routing — and a
+ * failed one puts it squarely in here. Either answer saves a deploy cycle.
+ */
+function selfProbe() {
+  return new Promise((resolve) => {
+    const req = http.request(
+      { host: "127.0.0.1", port: PORT, path: "/health", method: "GET", timeout: 5000 },
+      (res) => {
+        res.resume();
+        console.log(`[boot] self-probe GET /health -> ${res.statusCode}`);
+        resolve();
+      },
+    );
+    req.on("timeout", () => {
+      console.error("[boot] self-probe timed out — the socket is not accepting connections");
+      req.destroy();
+      resolve();
+    });
+    req.on("error", (err) => {
+      console.error(`[boot] self-probe failed: ${err.message}`);
+      resolve();
+    });
+    req.end();
   });
 }
 
