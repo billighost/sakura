@@ -16,7 +16,7 @@ export function LyricsView({ onClose, onOpenShare }: { onClose?: () => void; onO
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<{ trackId: string; indices: number[] }>({ trackId: "", indices: [] });
   const [reading, setReading] = useState(false);
-  const [readingBusy, setReadingBusy] = useState(false);
+  const [readingBusy, setReadingBusy] = useState(false);const readingLock=useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const lineRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -32,13 +32,13 @@ export function LyricsView({ onClose, onOpenShare }: { onClose?: () => void; onO
     const scrollRect = scroll.getBoundingClientRect();
     scroll.scrollTo({ top: Math.max(0, scroll.scrollTop + lineRect.top - scrollRect.top - scroll.clientHeight * .4 + lineRect.height / 2), behavior: music.settings.reducedMotion || matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }, [active, follow, selecting, music.settings.reducedMotion]);
-  async function toggleReading() {
+  async function toggleReading() {if(readingLock.current)return;
     if (reading) { setReading(false); return; }
-    setReadingBusy(true);
+    readingLock.current=true;setReadingBusy(true);
     setMessage(null);
     try { await lyrics.getJapaneseReadings(); setReading(true); music.dismissNotice(); }
     catch (error) { music.reportError(error, "lyrics", () => void toggleReading()); setMessage("The reading guide is taking a little pause. You can try again."); }
-    finally { setReadingBusy(false); }
+    finally { readingLock.current=false;setReadingBusy(false); }
   }
   function chooseLine(index: number) {
     if (!music.track || !data) return;

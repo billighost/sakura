@@ -1,6 +1,7 @@
 import { getRebuildPool,inTransaction } from "./db";
 import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
 import { ProductError,encodeCursor,ids,object,pageInput,text,uuid } from "./validation";
+import {randomUUID} from "node:crypto";
 
 export async function listPlaylists(accountId:string) {
   const rows=await getRebuildPool().query(`SELECT p.id,p.name,p.description,p.cover_url AS "coverUrl",p.revision,
@@ -48,8 +49,10 @@ export async function setFavorite(accountId:string,value:unknown) {
 }
 export async function createPlaylist(accountId:string,value:unknown) {
   const input=object(value),name=text(input.name,"playlist name",120),description=input.description===undefined?"":text(input.description,"description",2000,true);
-  const row=(await getRebuildPool().query(`INSERT INTO sakura_v2."Playlist"(account_id,name,description) VALUES($1::uuid,$2,$3)
-    RETURNING id,name,description,revision,created_at AS "createdAt",updated_at AS "updatedAt"`,[accountId,name,description])).rows[0];
+  const id=input.requestId===undefined?randomUUID():uuid(input.requestId,"playlist request ID");
+  await getRebuildPool().query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(id) DO NOTHING`,[id,accountId,name,description]);
+  const row=(await getRebuildPool().query(`SELECT id,name,description,revision,created_at AS "createdAt",updated_at AS "updatedAt" FROM sakura_v2."Playlist" WHERE id=$1::uuid AND account_id=$2::uuid`,[id,accountId])).rows[0];
+  if(!row||row.name!==name||row.description!==description)throw new ProductError(409,"Playlist request has already been used");
   return {...row,revision:Number(row.revision),trackCount:0,recordings:[],tracks:[]};
 }
 export async function getPlaylist(accountId:string,rawId:string) {

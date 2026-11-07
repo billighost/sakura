@@ -1,0 +1,135 @@
+.world{--world-bg:#e5d5ae;--world-ink:#343a39;--world-soft:#676852;--world-accent:#a76155;position:relative;width:100%;height:auto;min-height:100%;isolation:isolate;display:grid;place-items:center;overflow:hidden;background:var(--world-bg);color:var(--world-ink);padding:120px clamp(34px,6vw,100px) 100px;container-type:inline-size}
+.paintedRoom,.eveningLight,.paperDust{position:absolute;inset:0;pointer-events:none}
+.paintedRoom{z-index:-5;overflow:hidden}
+.screen{width:100%;height:100%;transform:scale(1.06);transition:transform 1.6s cubic-bezier(.22,.7,.3,1);transform-origin:50% 58%}
+.courtyardWindow{opacity:0;transition:opacity 1.3s}
+.eveningLight{z-index:-3;background:linear-gradient(130deg,#edb68400 20%,#e6bb8a43 63%,#6a686746);opacity:calc(.3 + var(--evening) * .55);transition:opacity 1.5s}
+.readingSpace{position:relative;z-index:3;width:min(760px,66%);min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.readingSpace::before{content:"";position:absolute;inset:-60px -80px;z-index:-1;pointer-events:none;background:radial-gradient(ellipse closest-side,#e9ddbbfa 0%,#e9ddbbf7 57%,#e9ddbbe6 77%,#e9ddbb00 100%)}
+.content{position:relative;width:100%;min-width:0;animation:panelArrival 850ms cubic-bezier(.22,.7,.3,1) both}
+.content :global(.bloom-content){color:var(--world-ink);min-width:0;width:100%;max-width:none}
+.content :global(.bloom-heading){color:var(--world-ink);max-width:min(21ch,100%);text-wrap:balance;font-family:var(--font-fraunces,Georgia),Georgia,serif;line-height:1.12;overflow-wrap:anywhere}
+.content :global(.bloom-stat){color:#63583f;font-variant-numeric:tabular-nums}
+.content :global(.bloom-content) p,.content :global(.bloom-artworks) h3{overflow-wrap:anywhere}
+.content :global(.bloom-artworks){position:relative;gap:clamp(17px,2.5vw,34px);max-width:none}
+.content :global(.bloom-artworks)>*{position:relative;min-width:0}
+.content :global(.bloom-artworks)>*::after{content:"";position:absolute;left:-5%;right:-5%;top:63%;height:10px;background:#b3996d;border:1px solid #817250;box-shadow:0 4px 0 #c2ae8559;z-index:-1;pointer-events:none}
+.content :global(.bloom-artworks) img{object-fit:cover;outline:1px solid #82704f;outline-offset:5px;box-shadow:0 10px 22px #48493835;border-radius:1px}
+.content :global(.bloom-artworks) h3{color:var(--world-ink)}
+.content :global(.bloom-artist){position:relative;color:var(--world-ink);padding:14px 0}
+.content :global(.bloom-artist)>:first-child{border-radius:3px;outline:1px solid #867250;outline-offset:6px;box-shadow:0 7px 18px #404b3a30}
+.world[data-shot=gallery] .readingSpace{width:min(1030px,78%)}
+.world[data-shot=gallery] .readingSpace::before{inset:-60px -70px;background:radial-gradient(ellipse closest-side,#eddfbcff 0%,#eddfbcff 64%,#eddfbcee 82%,#eddfbc00 100%)}
+.world[data-shot=gallery] .screen{transform:scale(1.055) translateY(1%)}
+.world[data-shot=gallery] .content :global(.bloom-artworks)>*:nth-child(2){transform:translateY(13px)}
+.world[data-shot=portrait] .readingSpace{width:min(850px,69%)}
+.world[data-shot=portrait] .screen{transform:scale(1.14) translate(-2%,1%)}
+.world[data-shot=portrait] .content :global(.bloom-artist)::after{content:"";position:absolute;left:-27px;top:-7px;bottom:-7px;width:7px;border-inline:1px solid #aa8c5b;background:#cec099;opacity:.7;pointer-events:none}
+.world[data-shot=alcove] .screen{transform:scale(1.13) translate(2%,1%)}
+.world[data-shot=alcove] .readingSpace{width:min(670px,60%);margin-left:5%}
+.world[data-shot=court] .courtyardWindow{opacity:.9}
+.world[data-shot=court] .screen{transform:scale(1.035)}
+.world[data-shot=court] .readingSpace::before{background:radial-gradient(ellipse closest-side,#e8debbf5 0%,#e8debbeb 57%,#e8debbcf 77%,#e8debb00 100%)}
+.world[data-shot=screen] .screen{transform:scale(1)}
+.world[data-shot=screen] .readingSpace{width:min(860px,68%)}
+.world[data-shot=tiger] .screen{transform:scale(1.07) translateX(2%)}
+.world[data-shot=tiger] .readingSpace{margin-left:12%;width:min(720px,62%)}
+.world[data-scene=song-winner] .content :global(.bloom-artworks){max-width:340px;margin-inline:auto}
+.world[data-scene=song-winner] .readingSpace{text-align:center}
+.world[data-scene=song-winner] .content :global(.bloom-heading){margin-inline:auto}
+.pine{position:absolute;top:-5%;height:80%;width:34%;pointer-events:none;z-index:1;overflow:visible;transition:transform 1.5s cubic-bezier(.22,.7,.3,1),opacity 1.5s}
+.pineLeft{left:-9%;transform:rotate(-4deg);transform-origin:0 0}
+.pineRight{right:-12%;transform:rotate(5deg);transform-origin:100% 0;opacity:.78}
+.world[data-shot=gallery] .pineLeft{transform:translateX(-17%) rotate(-7deg)}
+.world[data-shot=gallery] .pineRight{transform:translateX(25%) rotate(9deg);opacity:.6}
+.world[data-shot=portrait] .pineLeft{transform:translateX(-19%) rotate(-9deg)}
+.world[data-shot=portrait] .pineRight{transform:translateX(13%) rotate(8deg)}
+.world[data-shot=screen] .pine{opacity:.72}
+.flowerEdge{position:absolute;right:-1%;bottom:-2%;width:24%;height:54%;pointer-events:none;z-index:2;transform-origin:50% 100%;transition:transform 1.5s}
+.flowerEdge svg{width:100%;height:100%;overflow:visible}
+.world[data-quality="4"] .flowerEdge,.world[data-quality="5"] .flowerEdge{animation:flowerSway 8s ease-in-out infinite alternate}
+.magpie{position:absolute;left:22%;top:11%;width:clamp(70px,8.5vw,138px);pointer-events:none;z-index:2;transform-origin:50% 90%;animation:magpieArrival 1.6s cubic-bezier(.3,.7,.3,1) both;transition:left 1.4s,top 1.4s}
+.magpie svg{display:block;width:100%;overflow:visible}
+.world[data-shot=gallery] .magpie{left:72%;top:10%}
+.world[data-shot=portrait] .magpie{left:79%;top:12%}
+.world[data-shot=screen] .magpie{left:20%;top:12%}
+.tiger{position:absolute;left:2%;bottom:2%;width:clamp(180px,25vw,355px);pointer-events:none;z-index:2;opacity:.86;transition:transform 1.5s,opacity 1.5s;transform:translateX(-24%)}
+.tiger svg{width:100%;overflow:visible}
+.world[data-shot=tiger] .tiger{transform:translateX(0);opacity:1}
+.world[data-shot=gallery] .tiger{transform:translateX(-49%);opacity:.65}
+.world[data-shot=portrait] .tiger{transform:translateX(-46%);opacity:.7}
+.tigerTail{transform-origin:74% 69%}
+.world[data-quality="5"] .tigerTail{animation:tailTurn 5s ease-in-out infinite alternate}
+.world[data-quality="3"] .tigerEyes,.world[data-quality="4"] .tigerEyes,.world[data-quality="5"] .tigerEyes{transform-origin:center;animation:tigerBlink 9s linear infinite}
+.drawnTitle{width:min(560px,100%);margin:0 auto 18px;color:#464c40;position:relative}
+.titleFirst{display:block;width:66%;margin:0 auto 12px}
+.titleSecond{display:block;width:75%;margin:5px auto 7px;opacity:.82}
+.brushTitle{width:100%;display:block;overflow:visible}
+.titleInk{animation:letterPaint 1.3s cubic-bezier(.2,.7,.3,1) both}
+.titleBranch{display:block;width:94%;height:40px;margin:6px auto -6px;overflow:visible}
+.drawnTitle :global([data-letter]){animation:letterPaint 1s cubic-bezier(.2,.7,.3,1) both}
+.drawnTitle :global([data-letter="1"]){animation-delay:.06s}.drawnTitle :global([data-letter="2"]){animation-delay:.12s}.drawnTitle :global([data-letter="3"]){animation-delay:.18s}.drawnTitle :global([data-letter="4"]){animation-delay:.24s}.drawnTitle :global([data-letter="5"]){animation-delay:.3s}.drawnTitle :global([data-letter="6"]){animation-delay:.36s}.drawnTitle :global([data-letter="7"]){animation-delay:.42s}.drawnTitle :global([data-letter="8"]){animation-delay:.48s}
+.world[data-opening=true] .readingSpace{width:min(650px,62%);text-align:center}
+.world[data-opening=true] .content :global(.bloom-heading){margin-inline:auto;font-size:clamp(28px,3.2vw,45px)}
+.world[data-opening=true] .content p{max-width:46ch;margin-inline:auto}
+.world[data-opening=true] .content :global(.bloom-content){margin-inline:auto}
+.world[data-opening=true] .tiger{left:3%;width:28%;transform:translateX(-13%)}
+.signature{position:absolute;right:9%;bottom:4.5%;width:190px;color:#c9b488;opacity:.68;pointer-events:none;z-index:2}
+.paperDust{z-index:1;overflow:hidden}
+.paperDust i{position:absolute;width:var(--size);height:var(--size);background:#fff1c6;border-radius:50%;opacity:.4;animation:dustFloat 7s ease-in-out infinite alternate;animation-delay:var(--delay)}
+.needleSway{transform-box:fill-box;transform-origin:50% 90%;animation:needleWave 7s ease-in-out infinite alternate;animation-delay:var(--delay)}
+.panelBreath{animation:panelWarmth 12s ease-in-out infinite alternate;animation-delay:var(--delay)}
+.screenWing{transform-box:fill-box;transform-origin:50% 50%}
+.world[data-opening=true] .screenWing{animation:screenOpen 1.4s cubic-bezier(.2,.7,.3,1) both}
+.world[data-opening=true] .screenWingLeft{transform-origin:100% 50%}
+.world[data-opening=true] .screenWingRight{transform-origin:0 50%;animation-delay:.12s}
+.bojagi{position:absolute;inset:auto 0 0;height:100px;pointer-events:none;z-index:2;overflow:hidden}
+.bojagi i{position:absolute;bottom:-19px;background:var(--cloth);border:1px solid #665b47;transform:rotate(var(--turn));opacity:.7;animation:clothUnfold 1.5s cubic-bezier(.22,.7,.3,1) both;animation-delay:var(--delay)}
+.bojagi i::after{content:"";position:absolute;inset:6px;border:1px dashed #f5e3b077}
+.world[data-theme=dark]{--world-bg:#242b3b;--world-ink:#e8dabb;--world-soft:#c4b494}
+.world[data-theme=dark] .readingSpace::before,.world[data-theme=dark][data-shot=court] .readingSpace::before,.world[data-theme=dark][data-shot=gallery] .readingSpace::before{background:radial-gradient(ellipse closest-side,#303a42fc 0%,#303a42f7 59%,#303a42e6 80%,#303a4200 100%)}
+.world[data-theme=dark] .content :global(.bloom-stat){color:#ebd0a0}
+.world[data-theme=dark] .drawnTitle{color:#e8d4aa}
+.world[data-theme=dark] .screen{filter:brightness(.7) saturate(.8)}
+.world[data-view=cover]{height:100%;min-height:270px;padding:35px 35px 33px}
+.world[data-view=cover] .readingSpace{width:66%}
+.world[data-view=cover] .drawnTitle{margin:0;width:min(490px,100%)}
+.world[data-view=cover] .titleFirst{margin-bottom:8px}
+.world[data-view=cover] .titleBranch{height:29px}
+.world[data-view=cover] .content{font-size:11px;margin-top:7px;text-align:center}
+.world[data-view=cover] .content p{font-size:10px;margin:7px 0}
+.world[data-view=cover] .pine{width:39%;height:105%;top:-11%}
+.world[data-view=cover] .pineLeft{left:-14%}.world[data-view=cover] .pineRight{right:-17%}
+.world[data-view=cover] .tiger{width:33%;bottom:-3%;left:0;opacity:.95}
+.world[data-view=cover] .magpie{width:64px;left:20%;top:1%}
+.world[data-view=cover] .flowerEdge{width:30%;height:64%;right:-5%}
+.world[data-view=cover] .screen{transform:scale(1.05)}
+.world[data-view=poster]{min-height:100%;padding-block:70px}
+.world[data-view=poster] .readingSpace{width:min(850px,70%)}
+.world[data-quality="1"] .content,.world[data-quality="1"] .drawnTitle :global([data-letter]),.world[data-quality="1"] .titleInk,.world[data-quality="1"] .magpie,.world[data-quality="1"] .screenWing{animation:none}
+.world[data-quality="1"] .screen,.world[data-quality="1"] .pine,.world[data-quality="1"] .tiger,.world[data-quality="1"] .magpie{transition:none}
+.world[data-quality="2"] .paperDust i{animation-duration:11s}
+.world[data-motion=still] *,.world[data-motion=still] *::before,.world[data-motion=still] *::after{animation:none!important;transition:none!important}
+:global(dialog[data-paused=true]) .world *,:global(dialog[data-paused=true]) .world *::before,:global(dialog[data-paused=true]) .world *::after{animation-play-state:paused!important}
+@keyframes panelArrival{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes letterPaint{from{opacity:0;translate:0 7px}to{opacity:1;translate:0 0}}
+@keyframes magpieArrival{0%{translate:-17px -10px;rotate:-8deg}30%{translate:0 0;rotate:3deg}56%{translate:10px -8px;rotate:-3deg}80%,100%{translate:16px 0;rotate:0deg}}
+@keyframes needleWave{from{rotate:-1.5deg}to{rotate:1.5deg}}
+@keyframes flowerSway{from{rotate:-1deg}to{rotate:1.5deg}}
+@keyframes tigerBlink{0%,45%,48%,100%{scale:1 1}46.5%{scale:1 .12}}
+@keyframes tailTurn{from{rotate:-1.3deg}to{rotate:1.7deg}}
+@keyframes dustFloat{from{translate:0 0;opacity:.14}to{translate:8px calc(-1 * var(--float));opacity:.58}}
+@keyframes panelWarmth{from{opacity:.76}to{opacity:1}}
+@keyframes clothUnfold{from{translate:0 80px;opacity:0}to{translate:0 0;opacity:.7}}
+@keyframes screenOpen{from{scale:.2 1;opacity:.32}to{scale:1 1;opacity:1}}
+@media(max-width:850px){.world{padding-inline:32px}.readingSpace{width:72%}.world[data-shot=gallery] .readingSpace{width:86%}.world[data-shot=portrait] .readingSpace{width:76%}.pine{width:43%}.pineLeft{left:-17%}.pineRight{right:-21%}.flowerEdge{width:29%;right:-6%}.tiger{width:29%;left:-3%}.magpie{left:18%;top:12%;width:90px}.world[data-shot=alcove] .readingSpace{width:72%;margin-left:3%}.signature{right:9%;width:150px}.world[data-opening=true] .readingSpace{width:72%}.drawnTitle{width:460px}.content :global(.bloom-artworks){gap:18px}}
+@media(max-width:540px){.world{padding:110px 27px 105px;min-height:inherit}.screen{width:155%;max-width:none;margin-left:-27.5%;transform:scale(1.035)}.readingSpace,.world[data-shot=gallery] .readingSpace,.world[data-shot=portrait] .readingSpace,.world[data-shot=alcove] .readingSpace,.world[data-shot=screen] .readingSpace,.world[data-shot=tiger] .readingSpace,.world[data-opening=true] .readingSpace{width:100%;margin-left:0;min-width:0}.readingSpace::before,.world[data-shot=gallery] .readingSpace::before,.world[data-shot=court] .readingSpace::before{inset:-50px -32px;background:radial-gradient(ellipse closest-side,#eadfbdff 0%,#eadfbdff 64%,#eadfbdef 83%,#eadfbd00 100%)}.pine{width:76%;height:55%;top:-2%;opacity:.8}.pineLeft{left:-43%}.pineRight{right:-48%;opacity:.65}.flowerEdge{width:42%;height:38%;right:-15%;bottom:-2%;opacity:.77}.tiger{width:47%;left:-13%;bottom:-1%;opacity:.68}.world[data-shot=tiger] .tiger{width:53%;left:-8%;bottom:0;opacity:.84}.world[data-opening=true] .tiger{width:51%;left:-11%;bottom:0}.magpie{width:70px;top:10%;left:14%;opacity:.9}.world[data-shot=gallery] .magpie,.world[data-shot=portrait] .magpie{left:76%;top:10%}.content :global(.bloom-heading){font-size:clamp(27px,7.9vw,37px);max-width:19ch}.content :global(.bloom-artworks){gap:17px}.content :global(.bloom-artworks)>*::after{left:-4%;right:-4%;top:61%;height:6px}.content :global(.bloom-artworks) img{outline-offset:3px}.world[data-shot=gallery] .content :global(.bloom-artworks)>*:nth-child(2){transform:none}.content :global(.bloom-artist)>:first-child{outline-offset:4px}.world[data-shot=portrait] .content :global(.bloom-artist)::after{left:-12px;width:3px}.world[data-scene=song-winner] .content :global(.bloom-artworks){max-width:260px}.drawnTitle{width:100%;margin-bottom:14px}.titleFirst{margin-bottom:11px}.titleBranch{height:30px}.world[data-opening=true] .content :global(.bloom-heading){font-size:29px}.signature{right:17px;bottom:4%;width:124px;opacity:.6}.bojagi{height:70px;opacity:.65}.world[data-view=cover]{padding:32px 27px 29px;min-height:270px}.world[data-view=cover] .readingSpace{width:100%}.world[data-view=cover] .screen{width:152%;margin-left:-26%;transform:scale(1.045)}.world[data-view=cover] .pine{width:65%;height:115%}.world[data-view=cover] .pineLeft{left:-35%}.world[data-view=cover] .pineRight{right:-38%}.world[data-view=cover] .tiger{width:43%;left:-12%;bottom:-2%}.world[data-view=cover] .flowerEdge{width:41%;right:-15%;height:71%}.world[data-view=cover] .magpie{width:51px;left:10%;top:1%}.world[data-view=cover] .titleFirst{width:63%;margin-bottom:7px}.world[data-view=cover] .titleBranch{height:24px}.world[data-view=cover] .content{font-size:10px}.world[data-view=poster]{padding:70px 27px}.world[data-view=poster] .readingSpace{width:100%}}
+@media(prefers-reduced-motion:reduce){.world *,.world *::before,.world *::after{animation:none!important;transition:none!important}}
+@media(max-width:540px){.world{min-height:100%}.world[data-shot=gallery] .flowerEdge{right:-25%;bottom:-7%;width:38%;height:30%;opacity:.52}.world[data-shot=gallery] .signature{bottom:3%;opacity:.4}.world[data-shot=gallery] .readingSpace{padding-top:7px}.world[data-view=cover]{min-height:270px}.world[data-view=cover] .titleSecond{width:86%;margin-top:5px}.world[data-view=cover] .brushTitle{margin-top:-8px}.content :global(.bloom-heading){max-width:100%;text-wrap:balance}.world[data-view=cover] .readingSpace::before{inset:-30px -15px}}
+
+/* Each authored movement arrives once and rests while the music is read. */
+.world .needleSway,.world .panelBreath,.world .paperDust i,.world[data-quality="4"] .flowerEdge,.world[data-quality="5"] .flowerEdge,.world[data-quality="5"] .tigerTail,.world[data-quality="3"] .tigerEyes,.world[data-quality="4"] .tigerEyes,.world[data-quality="5"] .tigerEyes{animation-duration:6s;animation-iteration-count:1;animation-fill-mode:both;animation-delay:max(-3s,var(--delay,0s))}
+@media(max-width:540px){
+ .world[data-theme=light][data-shot=gallery] .readingSpace::before{background:radial-gradient(ellipse farthest-corner,#eadfbdff 0%,#eadfbdff 74%,#eadfbdf0 89%,#eadfbd00 100%)}
+ .world[data-theme=dark][data-shot=gallery] .readingSpace::before{background:radial-gradient(ellipse farthest-corner,#303a42ff 0%,#303a42ff 74%,#303a42f0 89%,#303a4200 100%)}
+}

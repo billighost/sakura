@@ -1,0 +1,2 @@
+/* The illustrated camera may deliberately extend a vector beyond its frame. */
+.stage svg{max-width:none}

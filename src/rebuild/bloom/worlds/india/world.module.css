@@ -1,0 +1,141 @@
+.world {
+  --paper-light: #f3e8cd;
+  --paper: #ece0c1;
+  --paper-deep: #dfcea5;
+  --leaf: #62815a;
+  --leaf-ink: #3e6144;
+  --rose: #c98287;
+  --title-ink: #6b3e45;
+  --world-ink: #38463e;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  min-height: max(740px, 100%);
+  height: auto;
+  width: 100%;
+  overflow: hidden;
+  color: var(--world-ink);
+  background: #e2d3b0;
+}
+.world[data-theme="dark"] {--paper-light:#eadbc0;--paper:#e5d5b4;--paper-deep:#d1bd97;background:#bbaa83;}
+.landscapeArt,.portraitArt {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+.portraitArt {display:none;}
+.clouds {transform-box:fill-box;transform-origin:center;}
+.gardenGround {transition:opacity .7s;}
+.world[data-music="true"] .pool,.world[data-artist="true"] .pool {opacity:.12;}
+.world[data-music="true"] .sideTrees,.world[data-artist="true"] .sideTrees {opacity:.8;}
+.world[data-music="true"] .leftTrees,.world[data-artist="true"] .leftTrees {transform:translateX(-58px);}
+.world[data-music="true"] .rightTrees,.world[data-artist="true"] .rightTrees {transform:translateX(42px);}
+.world[data-music="true"] .hills,.world[data-artist="true"] .hills {opacity:.1;}
+.world[data-scene="song-winner"] .pavilion {opacity:.86;}
+.world[data-scene="song-winner"] .sideTrees {opacity:.55;}
+.world[data-opening="true"] .pavilion {opacity:.74;}
+.world[data-opening="true"] .pool {opacity:.73;}
+.world[data-scene="time"] .pavilion,.world[data-scene="comparison"] .pavilion,.world[data-scene="returns"] .pavilion {opacity:.35;}
+.poolClose {transform:translate(290px,-85px) scale(.78);transform-origin:800px 735px;}
+.dawnLight {position:absolute;inset:7% 5%;z-index:1;background:linear-gradient(137deg,transparent 12%,#ebd4a200 40%,#efd3a653 93%);opacity:var(--dawn);pointer-events:none;}
+.titleObject {position:absolute;z-index:3;top:16%;left:26%;width:49%;text-align:center;pointer-events:none;}
+.paintedTitle {display:block;width:100%;height:auto;overflow:visible;}
+.titleObject>span {display:block;letter-spacing:.33em;font:11px/1.5 var(--font-inter),Arial,sans-serif;color:#4f4637;margin-top:-14px;}
+.titleObject>i {display:block;letter-spacing:.16em;font:8px/1.5 var(--font-inter),Arial,sans-serif;color:#574e3a;margin-top:8px;font-style:normal;}
+.content {position:relative;z-index:4;padding:180px 42% 160px 22%;width:100%;min-width:0;}
+.content :global(.bloom-content) {max-width:none;width:100%;color:var(--world-ink);min-width:0;}
+.content :global(.bloom-heading) {color:#514636;max-width:20ch;}
+.content :global(.bloom-heading)::after {content:"";display:block;width:72px;height:2px;background:linear-gradient(90deg,#ab7866,#c6a577 65%,transparent);margin-top:17px;}
+.content :global(.bloom-stat) {color:#415d56;}
+.content :global(.bloom-content) p {overflow-wrap:anywhere;}
+.content :global(.bloom-artworks) {gap:25px;max-width:none;}
+.content :global(.bloom-artworks)>* {position:relative;min-width:0;}
+.content :global(.bloom-artworks)>*>div:first-child {outline:1px solid #b7a075;outline-offset:8px;}
+.content :global(.bloom-artworks) img {object-fit:cover;}
+.content :global(.bloom-artworks) h3 {color:#534435;}
+.content :global(.bloom-artist) {padding:25px 0;border-block:1px solid #a98d5c50;}
+.content :global(.bloom-artist) h3 {color:#615041;}
+.content :global(.bloom-artist) img {border-color:#ba9b67;}
+.world[data-music="true"] .content {padding:190px 16% 155px;}
+.world[data-artist="true"] .content {padding:220px 22% 190px;}
+.world[data-scene="song-winner"] .content {padding-inline:27%;}
+.world[data-scene="song-winner"] .content :global(.bloom-artworks) {max-width:380px;margin-inline:auto;}
+.world[data-opening="true"] .content {padding:370px 31% 185px 27%;}
+.world[data-opening="true"] .content :global(.bloom-heading) {font-size:30px;}
+.world[data-opening="true"] .content :global(.eyebrow) {letter-spacing:.18em;}
+.world[data-opening="true"] .content :global(.openingCopy) {padding:0;}
+.world[data-opening="true"] .content :global(.openingCopy)>p {text-align:center;}
+.world[data-opening="true"] .content :global(.openingCopy)>button {display:block;margin-inline:auto;}
+.world[data-opening="true"] .content :global(.openingOptions) {justify-content:center;}
+.world[data-scene="finale"] .content {padding:180px 20% 170px;}
+.world[data-scene="finale"] .content :global(.bloom-heading) {max-width:24ch;}
+.folioNumber {position:absolute;z-index:3;bottom:9%;left:50%;transform:translateX(-50%);font:8px/1.2 var(--font-inter),Arial,sans-serif;letter-spacing:.23em;color:#7e6844;opacity:.67;white-space:nowrap;}
+.rain {position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;}
+.rain i {position:absolute;left:var(--rain-x);top:var(--rain-y);width:1px;height:17px;background:#e4dbc2;opacity:0;transform:rotate(21deg);animation:monsoon 1.5s var(--rain-delay) ease-out 4;}
+.entrance {position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden;}
+.entrance i {position:absolute;left:3%;top:8%;bottom:9%;width:7%;background:linear-gradient(90deg,#ddc9a800,#cfb693a6,#eddfbda0);transform:translateX(-180%);opacity:0;animation:pavilionPass .9s cubic-bezier(.15,.75,.25,1) both;}
+.entrance i:nth-child(2) {left:auto;right:3%;width:4%;animation-delay:.08s;background:linear-gradient(90deg,#d6be9c88,#eddabcbb,#d6be9c00);}
+.pigmentMotes {position:absolute;inset:0;z-index:2;pointer-events:none;}
+.pigmentMotes i {position:absolute;width:3px;height:3px;background:#c8ab6f;border-radius:50%;opacity:0;animation:pigment 3.2s ease-in-out 2;}
+.world[data-motion="full"] .clouds {animation:cloudPass 7.4s ease-out both;}
+.world[data-motion="full"] .titleObject {animation:titleArrive 1.4s ease-out both;}
+.world[data-motion="full"] .flyingBirds {animation:birdPass 5.8s ease-in-out both;}
+.world[data-quality="1"] .gardenGround {transition:none;}
+.world[data-motion="still"] *,.world[data-motion="still"] *::before,.world[data-motion="still"] *::after {animation:none!important;transition:none!important;}
+:global(dialog[data-paused="true"]) .world *,:global(dialog[data-paused="true"]) .world *::before,:global(dialog[data-paused="true"]) .world *::after {animation-play-state:paused!important;}
+@keyframes titleArrive {from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes pavilionPass {0%{opacity:0;transform:translateX(-180%) skewY(-4deg)}25%{opacity:.7}100%{opacity:0;transform:translateX(1550%) skewY(1deg)}}
+@keyframes monsoon {0%{opacity:0;transform:translate(0,-4px) rotate(21deg)}20%{opacity:.5}100%{opacity:0;transform:translate(-30px,66px) rotate(21deg)}}
+@keyframes cloudPass {from{transform:translateX(-12px)}to{transform:translateX(9px)}}
+@keyframes birdPass {from{opacity:0;transform:translate(-20px,5px)}25%{opacity:.9}to{opacity:.7;transform:translate(12px,-5px)}}
+@keyframes pigment {0%,100%{opacity:0;transform:translateY(4px)}45%{opacity:.5}85%{opacity:.1;transform:translateY(-9px)}}
+.world[data-view="cover"] {min-height:260px;height:100%;aspect-ratio:1.35;}
+.world[data-view="cover"] .titleObject {top:19%;left:20%;width:61%;}
+.world[data-view="cover"] .titleObject>span {font-size:8px;letter-spacing:.23em;margin-top:-6px;}
+.world[data-view="cover"] .titleObject>i {font-size:6px;margin-top:5px;}
+.world[data-view="cover"] .pool {opacity:.68;}
+.coverContent {position:absolute;z-index:4;inset:auto 10% 9%;text-align:center;}
+.world[data-view="poster"] {height:auto;min-height:100%;}
+.world[data-view="poster"] .landscapeArt {display:none;}
+.world[data-view="poster"] .portraitArt {display:block;}
+.world[data-view="poster"] .content {padding:27% 14% 19%;}
+.world[data-view="poster"] .folioNumber {bottom:9%;}
+.world[data-view="poster"] .titleObject {top:6%;left:23%;width:57%;}
+.world[data-view="poster"] .titleObject>span {font-size:13px;}
+.world[data-view="poster"] .titleObject>i {font-size:9px;}
+@media(max-width:1000px) and (min-width:651px) {
+  .content {padding-left:15%;padding-right:40%;}
+  .world[data-music="true"] .content {padding-inline:14%;}
+  .world[data-opening="true"] .content {padding-inline:23%;}
+}
+@media(max-width:650px) {
+  .world {min-height:max(760px,100%);background:var(--paper);align-items:start;}
+  .landscapeArt {display:none;}
+  .portraitArt {display:block;}
+  .content {padding:280px 13% 170px;}
+  .content :global(.bloom-heading) {font-size:32px;max-width:18ch;}
+  .content :global(.bloom-stat) strong {font-size:78px;}
+  .content :global(.bloom-heading)::after {margin-top:13px;}
+  .world[data-music="true"] .content {padding:286px 14% 170px;}
+  .world[data-music="true"] .content :global(.bloom-artworks) {gap:21px 15px;}
+  .world[data-music="true"] .content :global(.bloom-artworks)[data-count="3"]>:first-child {width:75%;}
+  .world[data-artist="true"] .content {padding:300px 14% 180px;}
+  .world[data-artist="true"] .content :global(.bloom-artist) {flex-direction:column;align-items:flex-start;gap:22px;}
+  .world[data-artist="true"] .content :global(.bloom-artist) img {width:150px;height:150px;}
+  .world[data-scene="song-winner"] .content {padding-inline:16%;}
+  .world[data-scene="song-winner"] .content :global(.bloom-artworks) {max-width:100%;}
+  .world[data-scene="finale"] .content {padding:275px 14% 180px;}
+  .world[data-scene="finale"] .content :global(.bloom-artworks) {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .world[data-scene="finale"] .content :global(.bloom-artworks)[data-count="3"]>:first-child {grid-column:1/-1;width:68%;justify-self:center;}
+  .world[data-scene="finale"] .content :global(.bloom-artworks) h3 {font-size:16px;}
+  .world[data-opening="true"] .content {padding:385px 17% 160px;}
+  .world[data-opening="true"] .content :global(.bloom-heading) {font-size:27px;}
+  .titleObject {top:17%;left:9%;width:88%;}
+  .titleObject>span {font-size:9px;letter-spacing:.21em;margin-top:-10px;}
+  .titleObject>i {font-size:6px;letter-spacing:.1em;}
+  .folioNumber {bottom:9%;font-size:7px;letter-spacing:.17em;}
+  .world[data-view="cover"] {min-height:280px;aspect-ratio:1.2;}
+  .world[data-view="cover"] .landscapeArt {display:block;}
+  .world[data-view="cover"] .portraitArt {display:none;}
+  .world[data-view="cover"] .titleObject {top:21%;left:13%;width:77%;}
+  .world[data-view="cover"] .titleObject>span {font-size:9px;margin-top:-8px;}
+  .world[data-view="cover"] .titleObject>i {font-size:6px;}
+}
+@media(prefers-reduced-motion:reduce) {.world *,.world *::before,.world *::after {animation:none!important;transition:none!important;}}

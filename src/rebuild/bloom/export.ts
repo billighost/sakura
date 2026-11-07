@@ -1,5 +1,13 @@
 import type {BloomDesign,BloomRecap} from "./uiTypes";
-export async function exportBloomCard(recap:BloomRecap,design:BloomDesign,theme:"light"|"dark",demo=false){
+import type {BloomQuality} from "./worlds/types";
+export async function exportBloomCard(recap:BloomRecap,design:BloomDesign,theme:"light"|"dark",demo=false,_liveCanvas?:HTMLElement,quality:BloomQuality=5){
+ if(!["herbarium","nocturne","risograph"].includes(design)){
+  const {exportCinematicBloom}=await import("./posterCapture");
+  return exportCinematicBloom(recap,design,theme,demo,quality);
+ }
+ return exportLegacyBloomCard(recap,design,theme,demo);
+}
+async function exportLegacyBloomCard(recap:BloomRecap,design:BloomDesign,theme:"light"|"dark",demo=false){
  const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1920;const context=canvas.getContext("2d");if(!context)throw new Error("Canvas unavailable");const ctx=context;
  await document.fonts.ready;
  const colors=design==="herbarium"?(theme==="dark"?["#172922","#e6e7cb","#c39b97"]:["#f3f1dc","#344e3d","#bc7a86"]):design==="nocturne"?(theme==="dark"?["#10182c","#ece6f5","#c6a7ed"]:["#e8e5f0","#26213f","#77609b"]):(theme==="dark"?["#261d34","#fbded0","#f38d69"]:["#f8d5b6","#37214d","#ef6946"]);

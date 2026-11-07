@@ -15,6 +15,10 @@
 
 # next.js
 /.next/
+/.next-audio/
+/.next-refine/
+/.next-bloom-verify/
+/.next-bloom-build/
 /out/
 
 # production

@@ -1,0 +1,128 @@
+.world {
+  --glass-room: #ebe9d7;
+  --glass-ink: #263f39;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  width: 100%;
+  min-height: max(720px, 100%);
+  height: auto;
+  overflow: hidden;
+  color: var(--glass-ink);
+  background: var(--glass-room);
+}
+.world[data-theme="dark"] {--glass-room:#203d38;--glass-ink:#f0ead4;}
+.architecture {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.portraitArchitecture {display:none;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.windows,.dayGlass,.floorGlass,.foreground,.lunette {pointer-events:none;}
+.content {position:relative;z-index:3;padding:160px 18% 150px 36%;min-width:0;}
+.content :global(.bloom-content) {width:100%;max-width:760px;min-width:0;color:var(--glass-ink);}
+.content :global(.bloom-heading) {max-width:19ch;position:relative;color:var(--glass-ink);}
+.content :global(.bloom-heading)::after {content:"";display:block;width:69px;height:6px;margin-top:18px;border:1px solid #486255;background:#bba378;clip-path:polygon(0 25%,21% 25%,32% 0,51% 32%,72% 14%,100% 40%,98% 75%,77% 72%,56% 100%,38% 65%,15% 80%,0 70%);}
+.content :global(.bloom-stat) {color:var(--glass-ink);}
+.content :global(.bloom-artworks) {position:relative;gap:25px;}
+.content :global(.bloom-artworks)>* {min-width:0;}
+.content :global(.bloom-artworks) img {object-fit:cover;filter:none;opacity:1;}
+.content :global(.bloom-artworks)>*>:first-child {outline:1px solid #9b9772;outline-offset:5px;box-shadow:0 15px 30px #1d3f3326;}
+.content :global(.bloom-artworks)>*>:first-child::after {content:"";position:absolute;inset:0;pointer-events:none;border:1px solid #f5e4b154;}
+.content :global(.bloom-content) p,.content :global(.bloom-content) h3 {overflow-wrap:anywhere;}
+.content :global(.bloom-artist) {padding:15px 0;}
+.content :global(.bloom-artist)>:first-child {border-radius:3px;border-color:#939878;outline:1px solid #b6ab86;outline-offset:5px;}
+.world[data-music="true"] .content {padding:163px 17% 160px;}
+.world[data-scene="comparison"] .content {padding-left:14%;padding-right:40%;}
+.world[data-scene="days"] .content,.world[data-scene="pattern"] .content,.world[data-scene="genres"] .content {padding-left:25%;padding-right:30%;}
+.world[data-scene="song-winner"] .content {padding-left:17%;padding-right:42%;}
+.world[data-scene="song-winner"] .content :global(.bloom-artworks) {max-width:350px;}
+.world[data-scene="artist"] .content,.world[data-scene="artists"] .content {padding-left:24%;padding-right:22%;}
+.world[data-scene="artist-songs"] .content {padding-left:21%;padding-right:15%;}
+.world[data-scene="finale"] .content {padding:228px 24% 151px;}
+.title {position:absolute;z-index:3;left:8%;top:26%;width:43%;max-width:650px;pointer-events:none;color:var(--glass-ink);}
+.titleLabel {font:9px Arial,sans-serif;letter-spacing:.34em;display:block;margin:0 0 16px 7px;opacity:.7;}
+.titleMark {width:100%;height:auto;overflow:visible;display:block;}
+.titleCaption {display:block;margin-left:8px;margin-top:5px;font:italic clamp(18px,2.2vw,27px) Georgia,serif;letter-spacing:-.02em;opacity:.75;}
+.world[data-theme="dark"] .titleMark {filter:drop-shadow(0 2px 0 #071d1b70);}
+.world[data-opening="true"] .content {padding:475px 49% 130px 8.6%;}
+.world[data-opening="true"] .content :global(.bloom-heading) {max-width:23ch;}
+.windowSeal {position:absolute;left:36%;top:124px;z-index:3;color:var(--glass-ink);pointer-events:none;opacity:.6;}
+.windowSeal span {font:8px Arial,sans-serif;letter-spacing:.23em;}
+.windowSeal svg {width:70px;height:18px;display:block;margin-top:6px;}
+.world[data-music="true"] .windowSeal,.world[data-scene="song-winner"] .windowSeal {left:17%;}
+.world[data-scene="comparison"] .windowSeal {left:14%;}
+.world[data-scene="days"] .windowSeal,.world[data-scene="artist"] .windowSeal,.world[data-scene="artists"] .windowSeal,.world[data-scene="pattern"] .windowSeal,.world[data-scene="genres"] .windowSeal {left:25%;}
+.world[data-scene="finale"] .windowSeal {left:24%;top:190px;}
+.lightPassage {position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;}
+.lightPassage i {position:absolute;left:var(--light-x);top:0;width:7%;height:110%;background:var(--light-colour);opacity:0;transform:rotate(var(--light-angle));transform-origin:50% 0;clip-path:polygon(20% 0,70% 0,100% 100%,0 100%);animation:lightArrives 7.8s var(--delay) ease-out both;}
+.rosePane {position:absolute;right:12%;bottom:16%;width:58px;pointer-events:none;z-index:2;animation:petalAssembles 1.05s cubic-bezier(.19,.7,.2,1) both;}
+.rosePane svg {display:block;width:100%;height:auto;}
+.assemblingPane {animation:paneIlluminates 1.1s var(--delay) ease-out both;}
+.paneSegment {transform-box:fill-box;transform-origin:center;animation:glassAssembles 1.1s var(--delay) cubic-bezier(.17,.74,.21,1) both;}
+.titleLetter {animation:titleIlluminates 1.05s var(--delay) ease-out both;}
+.world[data-quality="1"] .assemblingPane,.world[data-still="true"] .assemblingPane,.world[data-still="true"] .titleLetter {animation:none;}
+.world[data-view="cover"] {min-height:100%;height:100%;}
+.world[data-view="cover"] .content {display:none;}
+.world[data-view="cover"] .title {left:6.5%;top:36%;width:57%;}
+.world[data-view="cover"] .titleLabel {font-size:7px;letter-spacing:.25em;margin-bottom:10px;}
+.world[data-view="cover"] .titleCaption {font-size:16px;}
+.world[data-view="cover"] .architecture {width:145%;left:-15%;}
+.world[data-view="poster"] {height:100%;min-height:max(1500px,100%);align-items:start;}
+.world[data-view="poster"] .content {padding:390px 17% 180px;}
+.world[data-view="poster"] .windowSeal {left:17%;top:347px;}
+.world[data-view="poster"] .architecture {display:none;}
+.world[data-view="poster"] .portraitArchitecture {display:block;}
+.world[data-still="true"] *, .world[data-still="true"] *::before,.world[data-still="true"] *::after {animation:none!important;transition:none!important;}
+:global(dialog[data-paused="true"]) .world *, :global(dialog[data-paused="true"]) .world *::before,:global(dialog[data-paused="true"]) .world *::after {animation-play-state:paused!important;}
+@keyframes paneIlluminates {from{opacity:.35}to{opacity:1}}
+@keyframes glassAssembles {from{opacity:.15;transform:translate(var(--pane-x),-5px) rotate(var(--pane-turn))}to{opacity:1;transform:translate(0,0) rotate(0)}}
+@keyframes titleIlluminates {from{opacity:.3}to{opacity:1}}
+@keyframes petalAssembles {from{opacity:0;transform:translate3d(18px,-22px,0) rotate(16deg)}to{opacity:1;transform:translate3d(0,0,0) rotate(0)}}
+@keyframes lightArrives {0%{opacity:0;translate:-9px 0}15%{opacity:.08}55%{opacity:.045}100%{opacity:0;translate:22px 0}}
+@media(max-width:900px){
+  .content {padding-left:29%;padding-right:17%;}
+  .windowSeal {left:29%;}
+  .world[data-opening="true"] .content {padding-top:445px;padding-right:45%;}
+  .title {width:46%;top:25%;}
+  .world[data-scene="song-winner"] .content {padding-left:16%;padding-right:32%;}
+  .world[data-scene="comparison"] .content {padding-left:13%;padding-right:32%;}
+}
+@media(max-width:600px){
+  .world {min-height:max(760px,100%);}
+  .architecture {display:none;}
+  .portraitArchitecture {display:block;}
+  .content,.world[data-music="true"] .content,.world[data-scene="comparison"] .content,.world[data-scene="days"] .content,.world[data-scene="pattern"] .content,.world[data-scene="genres"] .content,.world[data-scene="artist"] .content,.world[data-scene="artists"] .content,.world[data-scene="artist-songs"] .content,.world[data-scene="song-winner"] .content {padding:181px 15% 163px;}
+  .content :global(.bloom-heading) {max-width:22ch;}
+  .content :global(.bloom-heading)::after {margin-top:14px;}
+  .content :global(.bloom-artworks) {gap:19px;}
+  .content :global(.bloom-artworks)[data-count="3"] {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .content :global(.bloom-artworks)[data-count="3"]>:first-child {grid-column:1/-1;width:74%;justify-self:center;}
+  .content :global(.bloom-artworks) h3 {font-size:17px;line-height:1.25;}
+  .content :global(.bloom-artworks) p {font-size:10px;line-height:1.65;}
+  .content :global(.bloom-artworks)>*>:first-child {outline-offset:4px;}
+  .content :global(.bloom-artist) {flex-direction:column;align-items:flex-start;gap:23px;}
+  .content :global(.bloom-artist)>:first-child {width:130px;height:130px;}
+  .content :global(.bloom-artist)>div {min-width:0;width:100%;}
+  .content :global(.bloom-artist) h3 {font-size:33px;line-height:1.16;}
+  .world[data-scene="song-winner"] .content {padding-inline:16%;}
+  .world[data-scene="song-winner"] .content :global(.bloom-artworks) {max-width:none;}
+  .world[data-scene="artist-songs"] .content {padding-inline:14%;}
+  .world[data-scene="finale"] .content {padding:208px 15% 173px;}
+  .world[data-scene="finale"] .content :global(.bloom-artworks) {gap:13px;}
+  .world[data-scene="finale"] .content :global(.bloom-artworks)>:first-child {grid-column:auto;width:auto;}
+  .world[data-scene="finale"] .content :global(.bloom-artworks) h3 {font-size:13px;}
+  .world[data-opening="true"] .title {left:14%;top:173px;width:73%;}
+  .world[data-opening="true"] .content {padding:390px 15% 180px;}
+  .titleLabel {font-size:7px;letter-spacing:.25em;margin-bottom:15px;}
+  .titleCaption {font-size:20px;}
+  .windowSeal,.world[data-music="true"] .windowSeal,.world[data-scene="song-winner"] .windowSeal,.world[data-scene="comparison"] .windowSeal,.world[data-scene="days"] .windowSeal,.world[data-scene="artist"] .windowSeal,.world[data-scene="artists"] .windowSeal,.world[data-scene="pattern"] .windowSeal,.world[data-scene="genres"] .windowSeal {left:15%;top:140px;}
+  .world[data-scene="finale"] .windowSeal {left:15%;top:176px;}
+  .lightPassage i {width:6%;height:92%;}
+  .rosePane {right:5%;bottom:11%;width:39px;}
+  .world[data-view="cover"] {min-height:100%;height:100%;}
+  .world[data-view="cover"] .architecture {display:block;left:-45%;width:190%;}
+  .world[data-view="cover"] .portraitArchitecture {display:none;}
+  .world[data-view="cover"] .title {left:7%;top:36%;width:58%;}
+  .world[data-view="cover"] .titleCaption {font-size:17px;}
+  .world[data-view="poster"] {min-height:max(1250px,100%);}
+  .world[data-view="poster"] .content {padding:219px 15% 190px;}
+}
+@media(prefers-reduced-motion:reduce){.world *,.world *::before,.world *::after {animation:none!important;transition:none!important;}}

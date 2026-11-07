@@ -1,0 +1,44 @@
+"use client";
+import {useCallback,useEffect,useRef,useState} from "react";
+import type {BloomRecap} from "./uiTypes";
+import {chapterHold,resumeBloomIndex} from "./story";
+
+export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initial:BloomRecap;onReveal:(id:string)=>Promise<BloomRecap>;onComplete:()=>Promise<BloomRecap>;storageKey?:string}){
+ const [recap,setRecap]=useState(initial),[index,setIndex]=useState(0),[begun,setBegun]=useState(false),[finished,setFinished]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[autoplay,setAutoplay]=useState(false),[paused,setPaused]=useState(false),[reading,setReading]=useState(false),[hidden,setHidden]=useState(false),[elapsed,setElapsed]=useState(0);
+ const state=useRef({recap,index,begun,finished}),lock=useRef(false),alive=useRef(true),generation=useRef(0),clock=useRef({index:-1,elapsed:0}),callbacks=useRef({onReveal,onComplete});
+ const failedAction=useRef<{target:number}|{complete:true}|null>(null);
+ useEffect(()=>{callbacks.current={onReveal,onComplete};},[onReveal,onComplete]);
+ useEffect(()=>{const epoch=generation.current;alive.current=true;return()=>{alive.current=false;generation.current=epoch+1;};},[]);
+ useEffect(()=>{const change=()=>setHidden(document.hidden);change();document.addEventListener("visibilitychange",change);return()=>document.removeEventListener("visibilitychange",change);},[]);
+ const enter=useCallback(async(target:number)=>{
+  if(lock.current)return;const current=state.current.recap;if(target<0||target>=current.chapters.length)return;
+  lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
+  try{const chapter=current.chapters[target];const result=chapter.revealed?current:await callbacks.current.onReveal(chapter.id);
+   if(!alive.current||epoch!==generation.current)return;
+   if(result.id!==current.id||!result.chapters[target]?.revealed)throw new Error("This part of your Bloom has not opened yet. Please try again.");
+   state.current={recap:result,index:target,begun:true,finished:false};failedAction.current=null;
+   clock.current={index:target,elapsed:0};setRecap(result);setIndex(target);setBegun(true);setFinished(false);setElapsed(0);
+   if(storageKey)try{localStorage.setItem(storageKey,JSON.stringify({index:target,version:result.version||1}));}catch{}
+  }catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={target};setError(problem);setPaused(true);}}finally{lock.current=false;if(alive.current&&epoch===generation.current)setBusy(false);}
+ },[storageKey]);
+ const begin=useCallback(()=>{let saved=0;if(storageKey)try{saved=Number(JSON.parse(localStorage.getItem(storageKey)||"{}").index)||0;}catch{}return enter(resumeBloomIndex(state.current.recap,saved));},[enter,storageKey]);
+ const next=useCallback(async()=>{
+  if(lock.current)return;const current=state.current;
+  if(!current.begun){await begin();return;}
+  if(current.index<current.recap.chapters.length-1){await enter(current.index+1);return;}
+  lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
+  try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{lock.current=false;if(alive.current&&epoch===generation.current)setBusy(false);}
+ },[begin,enter]);
+ const previous=useCallback(()=>{setPaused(true);if(state.current.finished){state.current={...state.current,finished:false};setFinished(false);setElapsed(0);return;}if(state.current.index>0)void enter(state.current.index-1);},[enter]);
+ const jump=useCallback((target:number)=>{if(state.current.recap.chapters[target]?.revealed){setPaused(true);void enter(target);}},[enter]);
+ useEffect(()=>{
+  if(!autoplay||paused||reading||hidden||busy||!begun||finished)return;
+  if(clock.current.index!==index)clock.current={index,elapsed:0};
+  const activeClock=clock.current,started=performance.now(),hold=chapterHold(recap.chapters[index]);
+  const timer=setTimeout(()=>void next(),Math.max(0,hold-clock.current.elapsed));
+  return()=>{clearTimeout(timer);activeClock.elapsed+=performance.now()-started;if(alive.current&&clock.current===activeClock)setElapsed(activeClock.elapsed);};
+ },[autoplay,paused,reading,hidden,busy,begun,finished,index,recap,next]);
+
+ function replay(){setFinished(false);setPaused(false);void enter(0);}
+ return {recap,index,begun,finished,busy,error,autoplay,paused,reading,hidden,elapsed,setAutoplay,setPaused,setReading,begin,next,previous,jump,replay,retry:()=>void (failedAction.current&&"target" in failedAction.current?enter(failedAction.current.target):next()),motionPaused:paused||hidden||reading};
+}

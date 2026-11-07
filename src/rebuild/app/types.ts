@@ -1,5 +1,6 @@
 import type { ProviderReference, RecordingVersion } from "../core/types";
 import type {ReadyPlayback} from "../data/catalog";
+import type {AudioTechnology} from "../audio/presets";
 export interface MusicTrack {
  id: string;
  title: string;
@@ -28,7 +29,7 @@ export interface DownloadEntry {
  downloadedBytes:number;totalBytes:number|null;error?:string;operationId:string;sha256?:string;
 }
 export type PlayerModal = "queue"|"share"|"lyrics"|"player"|null;
-export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";privateSession:boolean;discovery:number;reducedMotion:boolean;openingAnimation:number;seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean; }
+export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";audioTechnology?:AudioTechnology;privateSession:boolean;discovery:number;reducedMotion:boolean;openingAnimation:number;bloomPerformance?:"auto"|"1"|"2"|"3"|"4"|"5";seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean;volume?:number;shuffle?:boolean;repeat?:"off"|"one"|"all";previewVolume?:number;previewLoop?:boolean;sleepTimerMinutes?:number; }
 /** Normalize catalog and persisted cards at the API boundary, never by fuzzy title identity. */
 export function musicTrack(raw:Record<string,unknown>):MusicTrack {
  const metadata=(raw.metadata&&typeof raw.metadata==="object"?raw.metadata:raw) as Record<string,unknown>;

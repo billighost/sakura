@@ -16,7 +16,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   const music=useMusic();
   const menu=useRef<HTMLDivElement>(null);
   const [playlists,setPlaylists]=useState<Array<{id:string;name:string}>|null>(null);
-  const [busy,setBusy]=useState(false);
+  const [busy,setBusy]=useState(false);const busyRef=useRef(false);
   const [failure,setFailure]=useState<{issue:UserIssue;retry:()=>void}|null>(null);
   const close=useRef(onClose);
   useLayoutEffect(()=>{close.current=onClose;},[onClose]);
@@ -44,8 +44,8 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
     event.preventDefault();event.stopPropagation();const items=Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')||[]);if(!items.length)return;
     const index=items.indexOf(document.activeElement as HTMLElement);const target=event.key==="Home"?0:event.key==="End"?items.length-1:(index+(event.key==="ArrowDown"?1:-1)+items.length)%items.length;items[target].focus();
   }
-  async function showPlaylists(){setBusy(true);setFailure(null);try{const data=await requestJson<{playlists?:Array<{id:string;name:string}>}>("/api/v2/playlists",{},{context:"page",accountId:music.account?.id});setPlaylists(data.playlists||[]);}catch(error){setFailure({issue:userIssue(error,"page"),retry:()=>void showPlaylists()});}finally{setBusy(false);}}
-  async function choose(list:{id:string;name:string}){setBusy(true);setFailure(null);try{const canonical=await music.ensureRecording(track);await requestJson("/api/v2/playlists/"+encodeURIComponent(list.id)+"/tracks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recordingIds:[canonical.id]})},{context:"save",accountId:music.account?.id});if(music.account)invalidateResources(music.account.id);music.notify(`Added to “${list.name}”.`);onClose();}catch(error){setFailure({issue:userIssue(error,"save"),retry:()=>void choose(list)});}finally{setBusy(false);}}
+  async function showPlaylists(){if(busyRef.current)return;busyRef.current=true;setBusy(true);setFailure(null);try{const data=await requestJson<{playlists?:Array<{id:string;name:string}>}>("/api/v2/playlists",{},{context:"page",accountId:music.account?.id});setPlaylists(data.playlists||[]);}catch(error){setFailure({issue:userIssue(error,"page"),retry:()=>void showPlaylists()});}finally{busyRef.current=false;setBusy(false);}}
+  async function choose(list:{id:string;name:string}){if(busyRef.current)return;busyRef.current=true;setBusy(true);setFailure(null);try{const canonical=await music.ensureRecording(track);await requestJson("/api/v2/playlists/"+encodeURIComponent(list.id)+"/tracks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recordingIds:[canonical.id]})},{context:"save",accountId:music.account?.id});if(music.account)invalidateResources(music.account.id);music.notify(`Added to “${list.name}”.`);onClose();}catch(error){setFailure({issue:userIssue(error,"save"),retry:()=>void choose(list)});}finally{busyRef.current=false;setBusy(false);}}
   const id=music.effectiveId(track);
   const content=<div ref={menu} popover="auto" role="menu" aria-label={`Options for ${track.title}`} className={s.songPopover} onKeyDown={keyboard} onToggle={event=>{if(event.newState==="closed")onClose();}}>
     <div className={s.popoverHeading}><span>a little more music</span><strong>{track.title}</strong><small onClick={onClose}><ArtistLinks track={track}/></small></div>
@@ -55,7 +55,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
       <button role="menuitem" onClick={()=>{music.addQueue(track);onClose();}}><Icon name="queue"/>Add to queue</button>
       <button role="menuitem" onClick={()=>{void music.toggleLike(track);onClose();}}><Icon name="heart"/>{music.liked.has(id)?"Remove from liked songs":"Like this song"}</button>
       <button role="menuitem" disabled={busy} onClick={()=>void showPlaylists()}><Icon name="library"/>{busy?"Finding your playlists…":"Add to playlist"}</button>
-      <button role="menuitem" onClick={()=>{music.requestDownload(track);onClose();}}><Icon name="download"/>Save on this device</button>
+      <button role="menuitem" disabled={["ready","queued","downloading","resolving"].includes(music.downloads[id]?.status)} onClick={()=>{music.requestDownload(track);onClose();}}><Icon name={music.downloads[id]?.status==="ready"?"check":"download"}/>{music.downloads[id]?.status==="ready"?"Saved on this device":music.downloads[id]?.status==="downloading"||music.downloads[id]?.status==="resolving"?"Saving on this device…":"Save on this device"}</button>
       <button role="menuitem" onClick={()=>{music.openModal("share",track);onClose();}}><Icon name="share"/>Share this song</button>
       {track.artists[0]&&<Link role="menuitem" href={track.artistId?"/artist/"+encodeURIComponent(track.artistId):"/search?"+new URLSearchParams({q:track.artists[0],tab:"Artists"})} onClick={onClose}><Icon name="user"/>Visit artist</Link>}
       <Link role="menuitem" href={"/track/"+encodeURIComponent(id)} onClick={onClose}><Icon name="lyrics"/>Song details</Link>

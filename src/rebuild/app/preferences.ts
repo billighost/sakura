@@ -1,7 +1,8 @@
 import {localRead,localWrite} from "./offline";
 import type {UserSettings} from "./types";
 export interface PreferenceDraft {settings:UserSettings;pending:boolean;pendingPatch?:Partial<UserSettings>;savedAt:number}
-const supported=["theme","audioQuality","privateSession","discovery","reducedMotion","openingAnimation","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded"] as const;
+const supported=["theme","audioQuality","audioTechnology","privateSession","discovery","reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
+export function cachedPreferences(accountId?:string):Partial<UserSettings>{try{const id=accountId||localStorage.getItem("sakura-v2-active-account");if(!id)return {};const raw=localStorage.getItem("sakura-v2-preferences:"+id);return raw?settingsFields(JSON.parse(raw).settings):{};}catch{return {};}}
 export function settingsFields(value:unknown):Partial<UserSettings>{const object=value&&typeof value==="object"?value as Record<string,unknown>:{};return Object.fromEntries(supported.filter(key=>object[key]!==undefined).map(key=>[key,object[key]])) as Partial<UserSettings>;}
 const writes=new Map<string,Promise<void>>();
 export async function readPreferenceDraft(accountId:string):Promise<PreferenceDraft|undefined>{

@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     if (!sameRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
     const account = await requireRebuildAccount();
     if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if(request.headers.get("X-Sakura-Account")&&request.headers.get("X-Sakura-Account")!==account.id)return NextResponse.json({error:"Session changed"},{status:401});
     const raw = await request.text();
     if (raw.length > 20_000) return NextResponse.json({ error: "Share is too large" }, { status: 413 });
     let body: unknown;

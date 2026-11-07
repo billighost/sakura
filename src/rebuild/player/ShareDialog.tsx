@@ -34,7 +34,7 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
   const [progress, setProgress] = useState(0);
   const [seconds, setSeconds] = useState(8);
   const [link, setLink] = useState<{ key: string; url: string } | null>(null);
-  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);const linkLock=useRef(false);const videoLock=useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const abortVideo = useRef<AbortController | null>(null);
   const cardKey = JSON.stringify([track?.id, kind, selected.map((line) => [line.text, line.start]), colorMode, layout]);
@@ -80,14 +80,14 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
     } else { saveFile(file);setMessage("The ready file has been saved. You can share it from your photos or files."); }
   }
   async function prepareLink() {
-    if (!track || (kind === "lyric" && !selected.length)) return;
+    if (!track || linkLock.current || readyLink || (kind === "lyric" && !selected.length)) return;linkLock.current=true;
     setLinkBusy(true);setMessage(null);
     try {
-      const payload = await requestJson<{url?:string;slug?:string}>("/api/v2/shares", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: track.id, reference: track.reference, kind, lines: kind === "lyric" ? selected : [], colorMode }) },{context:"share"});
+      const payload = await requestJson<{url?:string;slug?:string}>("/api/v2/shares", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: track.id, reference: track.reference, kind, lines: kind === "lyric" ? selected : [], colorMode }) },{context:"share",accountId:music.account?.id});
       if(!payload.url)throw new Error("Share link unavailable");const address=new URL(payload.url, location.origin);if(address.origin!==location.origin||!address.pathname.startsWith("/s/"))throw new Error("Share link unavailable");const url=address.toString();
       setLink({ key: cardKey, url });setMessage("Your link is ready. Copy it or open Share link.");
     } catch (error) { music.reportError(error,"share",()=>void prepareLink()); }
-    finally { setLinkBusy(false); }
+    finally { linkLock.current=false;setLinkBusy(false); }
   }
   function shareLink() {
     if (!readyLink) return;
@@ -100,7 +100,7 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
     catch { setMessage("Select the link below and copy it from your browser."); }
   }
   async function prepareVideo() {
-    if (!usableAudioTrack || !readyImage) return;
+    if (!usableAudioTrack || !readyImage || videoLock.current) return;videoLock.current=true;
     abortVideo.current?.abort();
     const controller = new AbortController();abortVideo.current = controller;
     setVideoBusy(true);setProgress(0);setMessage(null);
@@ -110,7 +110,7 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
       if (controller.signal.aborted) return;
       setVideo({ key: videoKey, url: URL.createObjectURL(result.blob), file: result.file });setMessage("Your video and its exact recording are ready to save or share.");
     } catch (error) { if (!controller.signal.aborted) music.reportError(error,"share",()=>void prepareVideo()); }
-    finally { if (abortVideo.current === controller) setVideoBusy(false); }
+    finally { videoLock.current=false;if (abortVideo.current === controller) setVideoBusy(false); }
   }
   return <PlayerDialog title="Pass the feeling along." subtitle="SHARING STUDIO" onClose={() => { abortVideo.current?.abort();onClose(); }} wide>
     {!track ? <div className={s.empty}><p>Choose a song to make a shared moment.</p><PlayerButton secondary onClick={onClose}>Back to music</PlayerButton></div> : <><p className={s.shareDescription}>Your song, or the exact words that stayed with you. Make a little piece of it your own.</p><div className={s.chips}><button type="button" aria-pressed={kind === "track"} onClick={() => { setKind("track");abortVideo.current?.abort(); }}>Song card</button><button type="button" aria-pressed={kind === "lyric"} onClick={() => { setKind("lyric");abortVideo.current?.abort(); }}>Lyric card</button></div><div className={s.shareGrid}>

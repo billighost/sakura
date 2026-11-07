@@ -104,12 +104,13 @@ export class MusicCollectionImporter {
   }
   return{provider:"youtube",sourceId:id,name,items,total:videos.length,truncated:videos.length>2000};
  }
- async confirm(accountId:string,url:string){
+ async confirm(accountId:string,url:string,requestId?:string){
   const preview=await this.preview(url),recordingIds:string[]=[],failed:string[]=[];const selected=preview.items.filter(item=>item.status==="matched"&&item.reference);
   for(let at=0;at<selected.length;at+=4){const results=await Promise.allSettled(selected.slice(at,at+4).map(item=>this.ingestor.ensureRecording(item.reference!,item.metadata)));
    results.forEach((result,index)=>{if(result.status==="fulfilled")recordingIds.push(result.value.recordingId);else failed.push(selected[at+index].title);});}
-  const unique=[...new Set(recordingIds)];if(!unique.length)throw new Error("No songs were verified. Review the playlist matches before importing.");const playlistId=randomUUID();
+  const unique=[...new Set(recordingIds)];if(!unique.length)throw new Error("No songs were verified. Review the playlist matches before importing.");const playlistId=requestId||randomUUID();
   await this.transaction(async query=>{
+   if(requestId){await query("SELECT pg_advisory_xact_lock(hashtext('playlist-import:'||$1))",[requestId]);const existing=(await query('SELECT account_id FROM sakura_v2."Playlist" WHERE id=$1::uuid',[requestId]))[0] as {account_id:string}|undefined;if(existing){if(existing.account_id!==accountId)throw new Error("Import request has already been used.");return;}}
    await query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description,cover_url) VALUES($1::uuid,$2::uuid,$3,$4,$5)`,[playlistId,accountId,preview.name,`Imported from ${preview.provider}.`,preview.coverUrl??null]);
    await query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position) SELECT $1::uuid,id,ordinality-1 FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id,ordinality)`,[playlistId,unique]);
   });

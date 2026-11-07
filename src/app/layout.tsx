@@ -15,7 +15,7 @@ export const viewport: Viewport = {
  width: "device-width", initialScale: 1, viewportFit: "cover",
  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f5f5ee" }, { media: "(prefers-color-scheme: dark)", color: "#18241f" }],
 };
-const themeScript = `(function(){try{var t=localStorage.getItem('sakura-v2-theme');document.documentElement.dataset.inkTheme=t==='dark'||t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){}})()`;
+const themeScript = `(function(){try{var a=localStorage.getItem('sakura-v2-active-account'),p=a&&localStorage.getItem('sakura-v2-preferences:'+a),t=p?JSON.parse(p).settings.theme:localStorage.getItem('sakura-v2-theme');document.documentElement.dataset.inkTheme=t==='dark'||t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){}})()`;
 export default function RootLayout({ children }: { children: React.ReactNode }) {
  return <html lang="en" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: themeScript }}/></head><body><Pwa/>{children}</body></html>;
 }

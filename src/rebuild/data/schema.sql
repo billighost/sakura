@@ -150,4 +150,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS v2_telegram_audio_source ON sakura_v2."AudioAs
   (locator->>'kind'),(locator->>'chatScope'),(locator->>'messageId'))
   WHERE locator->>'kind' = 'telegram-worker';
 INSERT INTO sakura_v2."SchemaVersion"(version) VALUES(1) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS sakura_v2."ListeningSession" (
+ account_id uuid PRIMARY KEY REFERENCES public."User"(id) ON DELETE CASCADE,
+ state jsonb NOT NULL,
+ device_id uuid NOT NULL,
+ revision bigint NOT NULL DEFAULT 1,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 COMMIT;

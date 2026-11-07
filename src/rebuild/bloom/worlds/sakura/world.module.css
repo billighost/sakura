@@ -1,0 +1,154 @@
+.world {
+ --sakura-sky:#e2c9ad; --sakura-haze:#f7e8cd; --sakura-ground:#c7c8ac;
+ --sakura-hill-far:#bdc9b6; --sakura-hill-near:#aab89a; --sakura-distance-tree:#768b73;
+ --sakura-sun:#fff1c5; --sakura-path:#f7ebd3; --sakura-bark:#3e4540;
+ --sakura-branch:#555347; --sakura-bark-light:#8d8370; --sakura-vine:#7b8c68;
+ --sakura-flower-light:#fff0db; --sakura-flower:#eeb4a7; --sakura-flower-deep:#c67375;
+ --sakura-pollen:#f6dda3; --sakura-leaf-light:#a3af77; --sakura-leaf:#6d825c;
+ --sakura-lichen:#c1cba0; --sakura-ink:#393b34; --sakura-title:#5f5148;
+ --world-bg:#f5e8d1; --world-ink:#383d32; --world-muted:#687059;
+ --world-accent:#a76669; --world-line:#8e8f7160;
+ position:relative; isolation:isolate; width:100%; min-height:100%; display:flex;
+ color:var(--world-ink); overflow:hidden; background:var(--sakura-haze);
+}
+.world[data-theme="dark"] {
+ --sakura-sky:#142b35; --sakura-haze:#4b5954; --sakura-ground:#263d36;
+ --sakura-hill-far:#354b44; --sakura-hill-near:#2e463b; --sakura-distance-tree:#a1b2a1;
+ --sakura-sun:#edc999; --sakura-path:#b3ad8c; --sakura-bark:#14251f;
+ --sakura-branch:#26352a; --sakura-bark-light:#758173; --sakura-vine:#839371;
+ --sakura-flower-light:#f5ddd0; --sakura-flower:#d6a4a3; --sakura-flower-deep:#ba8088;
+ --sakura-pollen:#ead6a3; --sakura-leaf-light:#a1ac7d; --sakura-leaf:#657b5c;
+ --sakura-lichen:#a3af7b; --sakura-ink:#d9d5bb; --sakura-title:#f2ddc6;
+ --world-bg:#283e35; --world-ink:#f4ead1; --world-muted:#c2c8ae;
+ --world-accent:#e0afa0; --world-line:#c5c5a650;
+}
+.landscape,.orchard,.breeze { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.landscape { z-index:-4; }
+.orchard { z-index:-2; transform:translateX(var(--sakura-camera-x)); transition:transform 1.3s cubic-bezier(.2,.7,.2,1); }
+.breeze { z-index:2; }
+.sunlight { opacity:calc(.16 + var(--sakura-afterglow) * .84); transform-origin:949px 378px; transition:opacity 2s; }
+.hills { opacity:.92; }
+.distantOrchard { opacity:calc(.32 + var(--sakura-growth) * .6); transition:opacity 1.4s; }
+.gardenPath { opacity:.82; }
+.rays { opacity:calc(.1 + var(--sakura-growth) * .8); }
+.rays>path { transform-origin:650px 0; animation:lightPassing 28s ease-in-out infinite; animation-delay:var(--ray-delay); }
+.leftLimb,.rightLimb { transform-origin:50% 100%; animation:branchSettle 1.7s cubic-bezier(.18,.8,.3,1) both; }
+.rightLimb { animation-delay:.13s; }
+.sprig { transform-box:fill-box; transform-origin:50% 100%; animation:sprigSettle 1.6s cubic-bezier(.18,.8,.3,1) both,canopySway 23s ease-in-out infinite alternate; animation-delay:var(--sprig-delay),calc(1.6s + var(--sprig-delay)); }
+.sprig use { transition:opacity 1.35s cubic-bezier(.2,.7,.2,1); }
+.portraitBranches { display:none; position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:-1; }
+.portraitVines { opacity:calc(.2 + var(--sakura-growth) * .65); }
+.vines { stroke-dasharray:1600; stroke-dashoffset:0; opacity:calc(.3 + var(--sakura-growth) * .7); }
+.grassSprig { transform-origin:center bottom; animation:grassBreeze 16s ease-in-out infinite alternate; animation-delay:var(--grass-delay); }
+.fireflies>circle { animation:glint 5.8s ease-in-out infinite; animation-delay:var(--glint-delay); }
+.clearing { position:relative; z-index:1; margin:auto; padding:60px clamp(36px,7vw,125px) 70px; width:min(100%,1200px); }
+.clearing::before { content:""; position:absolute; z-index:-1; inset:4% 8% 5%; background:radial-gradient(ellipse at center,var(--sakura-haze) 0%,transparent 74%); opacity:.58; pointer-events:none; }
+.content { max-width:760px; margin:auto; position:relative; }
+.content :global(.bloom-content) { width:100%; }
+.content :global(.bloom-heading) { color:var(--world-ink); }
+.content :global(.bloom-stat) { color:var(--world-ink); text-shadow:0 2px 24px var(--sakura-haze); }
+.content :global(.bloom-artworks) { position:relative; gap:clamp(15px,2.2vw,32px); }
+.content :global(.bloom-artworks)::before { content:""; position:absolute; width:calc(100% + 46px); left:-23px; height:13px; top:42%; border-bottom:2px solid var(--sakura-vine); border-radius:50%; opacity:.65; z-index:-1; transform:rotate(-2deg); }
+.content :global(.bloom-artworks)>* { box-shadow:0 12px 34px #293c2721; }
+.content :global(.bloom-artworks) img { outline:1px solid #e8d3b361; outline-offset:5px; }
+.titleArt { width:min(100%,620px); margin:-36px auto -6px; position:relative; }
+.lettering { display:block; width:100%; height:auto; overflow:visible; }
+.letterStrokes>path { stroke-dasharray:550; animation:letterGrow 2s cubic-bezier(.3,.05,.25,1) both; }
+.letterStrokes>path:nth-child(2) { animation-delay:.12s; }
+.letterStrokes>path:nth-child(3) { animation-delay:.24s; }
+.letterStrokes>path:nth-child(4) { animation-delay:.36s; }
+.letterStrokes>path:nth-child(5) { animation-delay:.48s; }
+.titleCaption { display:block; font-size:9px; letter-spacing:.31em; text-align:center; color:var(--world-muted); margin-top:-15px; }
+.sceneMark { position:absolute; bottom:22px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; font-size:8px; letter-spacing:.21em; color:var(--world-muted); white-space:nowrap; opacity:.8; }
+.sceneMark>span { display:block; height:1px; width:28px; background:currentColor; opacity:.45; }
+.floatingPetal { position:absolute; left:var(--petal-x); top:var(--petal-y); width:var(--petal-size); height:calc(var(--petal-size) * 2); animation:petalPass var(--petal-duration) cubic-bezier(.2,.4,.5,.9) var(--petal-delay) both; opacity:0; transform-origin:center; will-change:transform,opacity; overflow:visible; }
+.world[data-scene="opening"] .orchard { transform:scale(1.09); }
+.world[data-scene="opening"] .clearing { width:min(100%,940px); text-align:center; }
+.world[data-scene="time"] .clearing { margin-left:15%; margin-right:auto; width:70%; }
+.world[data-scene="time"] .content { max-width:650px; }
+.world[data-scene="comparison"] .clearing { width:70%; margin-left:auto; margin-right:10%; }
+.world[data-scene="comparison"] .sunlight { transform:translate(-150px,40px); }
+.world[data-scene="days"] .clearing { text-align:center; }
+.world[data-scene="days"] .gardenPath { opacity:1; }
+.world[data-scene="breadth"] .clearing { margin-bottom:auto; padding-top:90px; }
+.world[data-scene="songs"] .clearing,.world[data-scene="artist-songs"] .clearing,.world[data-scene="artists"] .clearing { width:min(100%,1250px); padding-inline:clamp(32px,8vw,135px); }
+.world[data-scene="songs"] .content,.world[data-scene="artist-songs"] .content,.world[data-scene="artists"] .content { max-width:900px; }
+.world[data-scene="songs"] .orchard { transform:scale(1.04) translateY(-1%); }
+.world[data-scene="song-winner"] .content { max-width:700px; }
+.world[data-scene="song-winner"] .clearing::before { opacity:.83; }
+.world[data-scene="song-winner"] .orchard { transform:scale(1.16) translateY(-3%); }
+.world[data-scene="artist"] .clearing { width:76%; margin-left:12%; margin-right:auto; }
+.world[data-scene="artist"] .content { max-width:770px; }
+.world[data-scene="artist"] .content :global(.bloom-artist) { position:relative; }
+.world[data-scene="artist"] .content :global(.bloom-artist)::after { content:""; width:45%; height:12px; margin:17px 0; display:block; border-bottom:1px solid var(--sakura-vine); border-radius:50%; }
+.world[data-scene="discoveries"] .clearing { margin-top:auto; margin-bottom:5%; }
+.world[data-scene="returns"] .content { max-width:670px; }
+.world[data-scene="returns"] .sunlight { transform:translate(-250px,-70px); }
+.world[data-scene="genres"] .clearing { text-align:center; }
+.world[data-scene="pattern"] .clearing { margin-left:auto; margin-right:12%; width:72%; }
+.world[data-scene="finale"] .clearing { padding-top:26px; text-align:center; }
+.world[data-scene="finale"] .titleArt { width:min(100%,470px); margin:-30px auto -5px; }
+.world[data-view="cover"] { min-height:440px; }
+.world[data-view="cover"] .clearing { width:100%; padding:46px 24px 62px; }
+.world[data-view="cover"] .titleArt { width:120%; max-width:560px; margin:42px -10% 0; }
+.world[data-view="cover"] .titleCaption { font-size:7px; }
+.world[data-view="cover"] .content { text-align:center; max-width:330px; }
+.world[data-view="cover"] .orchard { transform:scale(1.05); }
+.world[data-view="cover"] .sceneMark { font-size:6px; letter-spacing:.13em; gap:7px; bottom:18px; }
+.world[data-view="poster"] .clearing { padding-bottom:90px; }
+.world[data-quality="1"] .sprig,.world[data-quality="1"] .grassSprig,.world[data-quality="1"] .fireflies>circle,.world[data-quality="1"] .rays>path { animation:none; }
+.world[data-quality="2"] .sprig { animation:sprigSettle 1.4s ease-out both; }
+.world[data-quality="2"] .grassSprig,.world[data-quality="2"] .rays>path { animation:none; }
+.world[data-quality="1"] .letterStrokes>path { animation:none; }
+.world[data-reduced-motion="true"] * { animation:none!important; transition:none!important; }
+.world[data-reduced-motion="true"] .floatingPetal { opacity:.35; transform:rotate(var(--petal-turn)); will-change:auto; }
+@keyframes branchSettle { from { opacity:.1; transform:translateY(40px) rotate(-1.2deg); } to { opacity:1; transform:translateY(0) rotate(0); } }
+@keyframes sprigSettle { from { transform:translateY(8px) rotate(-6deg) scaleY(.88); } to { transform:translateY(0) rotate(0) scaleY(1); } }
+@keyframes canopySway { from { transform:rotate(0); } to { transform:rotate(var(--sway)); } }
+@keyframes grassBreeze { from { transform:skewX(-1deg); } to { transform:skewX(1.5deg); } }
+@keyframes lightPassing { 0%,100% { opacity:.009; transform:rotate(-.5deg); } 50% { opacity:.021; transform:rotate(.8deg); } }
+@keyframes glint { 0%,100% { opacity:.05; } 42% { opacity:.85; } 60% { opacity:.23; } }
+@keyframes letterGrow { from { stroke-dashoffset:550; opacity:0; } to { stroke-dashoffset:0; opacity:1; } }
+@keyframes petalPass { 0% { opacity:0; transform:translate3d(0,0,0) rotate(0); } 12% { opacity:.75; } 60% { opacity:.62; } 100% { opacity:0; transform:translate3d(var(--petal-dx),var(--petal-dy),0) rotate(var(--petal-turn)); } }
+@media(max-width:800px) {
+ .clearing { padding:52px 60px 65px; }
+ .world[data-scene="time"] .clearing,.world[data-scene="comparison"] .clearing,.world[data-scene="artist"] .clearing,.world[data-scene="pattern"] .clearing { width:100%; margin-inline:auto; }
+ .titleArt { max-width:500px; }
+ .world[data-scene="songs"] .clearing,.world[data-scene="artist-songs"] .clearing,.world[data-scene="artists"] .clearing { padding-inline:48px; }
+ .sceneMark { letter-spacing:.14em; font-size:7px; }
+}
+@media(max-width:540px) {
+ .portraitBranches { display:block; }
+ .orchard { width:155%; left:-27.5%; }
+ .landscape { width:135%; left:-17.5%; }
+ .breeze { width:135%; left:-17.5%; }
+ .clearing { padding:44px 29px 65px; }
+ .clearing::before { inset:8% -5% 3%; opacity:.74; }
+ .titleArt { width:112%; margin:0 -6% 2px; }
+ .titleCaption { font-size:7px; letter-spacing:.25em; margin-top:-12px; }
+ .content { max-width:100%; }
+ .world[data-scene="songs"] .clearing,.world[data-scene="artist-songs"] .clearing,.world[data-scene="artists"] .clearing { padding-inline:27px; }
+ .world[data-scene="breadth"] .clearing { padding-top:55px; }
+ .world[data-scene="discoveries"] .clearing { margin-bottom:auto; }
+ .world[data-scene="opening"] .orchard { transform:scale(1.04); }
+ .world[data-scene="song-winner"] .orchard { transform:scale(1.04); }
+ .world[data-scene="finale"] .titleArt { width:110%; margin:0 -5% 0; }
+ .world[data-view="cover"] .orchard { width:155%; left:-27.5%; }
+ .world[data-view="cover"] .clearing { padding:25px 25px 59px; }
+ .world[data-view="cover"] .titleArt { margin:36px -10% 0; width:120%; }
+ .sceneMark { font-size:6px; gap:9px; max-width:calc(100% - 40px); letter-spacing:.12em; }
+ .sceneMark>span { width:17px; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .world * { animation:none!important; transition:none!important; }
+ .floatingPetal { opacity:.35; transform:rotate(var(--petal-turn)); will-change:auto; }
+}
+/* The exported canvas is always portrait, regardless of the browsing viewport. */
+.world[data-view="poster"] .portraitBranches { display:block; }
+.world[data-view="poster"] .landscape { width:135%; left:-17.5%; }
+.world[data-view="poster"] .orchard { width:155%; left:-27.5%; }
+.world[data-view="poster"] .breeze { width:135%; left:-17.5%; }
+.world[data-view="poster"] .clearing { width:100%; padding:26px 29px 90px; }
+.world[data-view="poster"] .clearing::before { inset:8% -5% 3%; opacity:.74; }
+.world[data-view="poster"] .titleArt { width:110%; margin:0 -5% 0; }
+.world[data-view="poster"] .titleCaption { font-size:7px; letter-spacing:.25em; margin-top:-12px; }

@@ -1,17 +1,13 @@
 import type { PoolClient } from "pg";
 import { getRebuildPool,inTransaction } from "../data/db";
-import { cardsForIds,type RecordingCard } from "../data/catalog";
+import { cardsForIds } from "../data/catalog";
 import { getSettings } from "../data/settings";
 import { ProductError,text } from "../data/validation";
 import { bloomWindow,bloomWindows,validTimeZone,DEFAULT_BLOOM_TIME_ZONE,type BloomWindow,type BloomPeriod } from "./calendar";
 
-export interface BloomChapter {
-  id:string;title:string;prompt:string;
-  stat:{label:string;value:number|string;unit:string};
-  relatedRecording:RecordingCard|null;
-}
-interface BloomSnapshot {summary:{audibleMs:number;playCount:number;recordingCount:number;activeDays:number};chapters:BloomChapter[]}
-const displayTime=(ms:number)=>ms<60000?{value:Number((ms/1000).toFixed(1)),unit:"seconds"}:{value:Number((ms/60000).toFixed(1)),unit:"minutes"};
+import {buildBloomSnapshot,discloseBloomChapter,type BloomSnapshot,type SavedBloomChapter} from "./snapshot";
+import {bloomDesignForMonth,legacyBloomDesignForMonth} from "./design";
+export type BloomChapter = SavedBloomChapter;
 async function zone(accountId:string){const settings=await getSettings(accountId);return validTimeZone(settings.timeZone)?settings.timeZone:DEFAULT_BLOOM_TIME_ZONE;}
 function window(id:string,now:Date,timeZone:string){try{return bloomWindow(id,now,timeZone);}catch{throw new ProductError(400,"Invalid Bloom period");}}
 function requireAvailable(item:BloomWindow){
@@ -33,38 +29,14 @@ async function snapshot(accountId:string,item:BloomWindow,client:PoolClient):Pro
   const days=(await client.query(`SELECT COUNT(DISTINCT (COALESCE(occurred_at,created_at) AT TIME ZONE $4)::date)::integer n
     FROM sakura_v2."ListeningChunk" WHERE account_id=$1::uuid AND audible_ms>0
       AND COALESCE(occurred_at,created_at)>=$2::timestamptz AND COALESCE(occurred_at,created_at)<$3::timestamptz`,args)).rows[0].n;
-  const cards=await cardsForIds(accountId,recordings.map(r=>r.id),client),byId=new Map(cards.map(c=>[c.id,c]));
-  const audibleMs=recordings.reduce((n,r)=>n+Number(r.audible_ms),0),playCount=recordings.reduce((n,r)=>n+Number(r.plays),0);
-  const summary={audibleMs,playCount,recordingCount:recordings.length,activeDays:Number(days)};
-  if(!audibleMs)return {summary,chapters:[]};
-  const first=recordings[0],top=byId.get(first.id)||null;
-  const artists=new Map<string,{name:string;ms:number;recording:RecordingCard}>();
-  const genres=new Map<string,{ms:number;recording:RecordingCard}>();
-  for(const row of recordings){const recording=byId.get(row.id);if(!recording)continue;
-    const credit=recording.artistCredits.find(c=>c.role==="primary"),key=credit?.artistId||`credit:${recording.artists[0]}`;
-    const previous=artists.get(key);artists.set(key,{name:credit?.name||recording.artists[0],ms:(previous?.ms||0)+Number(row.audible_ms),recording:previous?.recording||recording});
-    const genre=recording.genres[0];if(genre){const previousGenre=genres.get(genre);genres.set(genre,{ms:(previousGenre?.ms||0)+Number(row.audible_ms),recording:previousGenre?.recording||recording});}
-  }
-  const artist=[...artists.values()].sort((a,b)=>b.ms-a.ms||a.name.localeCompare(b.name))[0];
-  const genre=[...genres.entries()].sort((a,b)=>b[1].ms-a[1].ms||a[0].localeCompare(b[0]))[0];
-  const discoveries=recordings.filter(r=>new Date(r.first_ever)>=new Date(item.periodStart));
-  const repeated=recordings.filter(r=>r.plays>1);
-  const chapters:BloomChapter[]=[
-    {id:"listening-time",title:"Time in sound",prompt:"How much music filled your days?",stat:{label:"Actual listening",...displayTime(audibleMs)},relatedRecording:top},
-    {id:"top-song",title:"Your leading melody",prompt:"Which song held the most of your listening time?",stat:{label:top?.title||"Your most heard recording",...displayTime(Number(first.audible_ms))},relatedRecording:top},
-    {id:"song-count",title:"A wider canvas",prompt:"How many different recordings did you hear?",stat:{label:"Recordings heard",value:recordings.length,unit:"songs"},relatedRecording:byId.get(recordings.at(-1)?.id)||null},
-    {id:"listening-days",title:"Days with music",prompt:"On how many days did you press play?",stat:{label:"Active listening days",value:Number(days),unit:"days"},relatedRecording:top},
-    {id:"discoveries",title:"First brushstrokes",prompt:"Which recordings became part of your listening history?",stat:{label:"First heard in this period",value:discoveries.length,unit:"songs"},relatedRecording:byId.get(discoveries[0]?.id)||null},
-    {id:"returning-songs",title:"Welcome back",prompt:"How many songs drew you back again?",stat:{label:"Recordings played more than once",value:repeated.length,unit:"songs"},relatedRecording:byId.get(repeated[0]?.id)||null},
-  ];
-  if(artist)chapters.splice(2,0,{id:"top-artist",title:"A familiar voice",prompt:"Whose primary credit appears across your most heard songs?",stat:{label:artist.name,...displayTime(artist.ms)},relatedRecording:artist.recording});
-  if(genre)chapters.push({id:"catalog-genre",title:"Your catalog colors",prompt:"Which published genre appeared most in your listening?",stat:{label:genre[0],...displayTime(genre[1].ms)},relatedRecording:genre[1].recording});
-  return {summary,chapters};
+  const cards=await cardsForIds(accountId,recordings.map(r=>r.id),client);
+  return buildBloomSnapshot(recordings,cards,Number(days),item);
 }
+
 function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null}) {
   const revealed=new Set(row.revealed_chapters);
-  return {...item,status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
-    chapters:row.snapshot.chapters.map(c=>({...c,stat:revealed.has(c.id)?c.stat:null,relatedRecording:revealed.has(c.id)?c.relatedRecording:null,revealed:revealed.has(c.id)})),
+  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||(row.snapshot.version===2?bloomDesignForMonth:legacyBloomDesignForMonth)(item.periodStart,item.timeZone),status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
+    chapters:row.snapshot.chapters.map(c=>discloseBloomChapter(c,revealed.has(c.id))),
     completedAt:row.completed_at,completed:Boolean(row.completed_at)};
 }
 export async function listBloom(accountId:string,rawPeriod:string|null,now=new Date()){
@@ -80,7 +52,7 @@ export async function listBloom(accountId:string,rawPeriod:string|null,now=new D
       if(Number(amount)===0)status="empty";
       else count=(await inTransaction(client=>snapshot(accountId,item,client))).chapters.length;
     }else if(status==="available"&&!count)status="empty";
-    items.push({...effective,status,chapterCount:count,completed:Boolean(saved?.completed_at),teaser:status==="locked"?"Your next listening story is still growing.":status==="empty"?"No listening was recorded during this period.":"A story made from the music you actually heard."});
+    items.push({...effective,version:saved?saved.snapshot.version||1:2,worldId:saved?.snapshot?.worldId||(saved&&(saved.snapshot.version||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),status,chapterCount:count,completed:Boolean(saved?.completed_at),teaser:status==="locked"?"Your next listening story is still growing.":status==="empty"?"No listening was recorded during this period.":"A story made from the music you actually heard."});
   }
   return {items,schedule:{timeZone,weekStartsOn:"monday",weeklyAvailableThrough:"saturday",monthlyClosesDaysBeforeNextMonth:7}};
 }

@@ -12,6 +12,7 @@ import type {ResolveRecordingResult} from "../server/contracts";
 export function useBloomAudio(){
  const music=useMusic();const latest=useRef(music);useEffect(()=>{latest.current=music;},[music]);
  const media=useRef<HTMLAudioElement|null>(null),controller=useRef<AbortController|null>(null),objectUrl=useRef<string|null>(null);
+ const paused=useRef(false);
  const returning=useRef<{accountId:string;entryId:string|null;trackId:string;resume:boolean}|null>(null);
  const receipt=useRef<{id:string;accountId:string;recordingId:string;sequence:number;ms:number;last:number;wall:number}|null>(null);
  const [message,setMessage]=useState("");
@@ -34,6 +35,8 @@ export function useBloomAudio(){
   receipt.current=null;if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current=null;}
  }
  function stop(paint=true){dispose();if(paint)setMessage("");}
+ function pause(){paused.current=true;flush();media.current?.pause();}
+ function resume(){paused.current=false;const audio=media.current;if(audio&&!audio.ended&&audio.paused)void audio.play().catch(()=>{if(media.current===audio)setMessage("Tap Sound to resume this chapter's soundtrack.");});}
  function close(paint=true){
   stop(paint);const original=returning.current;returning.current=null;const p=latest.current;
   if(original?.resume&&p.account?.id===original.accountId&&p.currentEntryId===original.entryId&&p.track?.id===original.trackId&&p.status==="paused")p.togglePlay();
@@ -61,11 +64,11 @@ export function useBloomAudio(){
    audio.addEventListener("pause",()=>{if(current()&&media.current===audio)flush();});
    audio.addEventListener("ended",()=>{if(!current()||media.current!==audio)return;flush(true);setMessage("The chapter’s song has ended. Your Bloom is still here.");});
    audio.addEventListener("error",()=>{if(!current()||media.current!==audio)return;setMessage("This chapter’s song isn’t available right now. Continue your story, or tap Sound to try again.");});
-   await audio.play();if(current())setMessage("");
+   if(!paused.current)await audio.play();if(current())setMessage("");
   }catch{if(current())setMessage("This chapter’s song isn’t available right now. Continue your story, or tap Sound to try again.");}})();
  }
  useEffect(()=>{if(media.current)media.current.volume=music.volume;},[music.volume]);
- useEffect(()=>{dispose();returning.current=null;
+ useEffect(()=>{dispose();returning.current=null;paused.current=false;
  // Account changes cancel chapter audio before requests or receipts can reach another account.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[music.account?.id]);
@@ -73,6 +76,6 @@ export function useBloomAudio(){
  // The lifetime timer reads current audio, account and settings through refs.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[]);
- return {play,stop,close,message};
+ return {play,stop,close,pause,resume,message};
 }
 

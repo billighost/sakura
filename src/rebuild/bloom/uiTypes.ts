@@ -1,7 +1,11 @@
-export type BloomDesign="herbarium"|"nocturne"|"risograph";
+import type {BloomWorldId,BloomSceneKind} from "./worlds/types";
+export type BloomDesign=BloomWorldId|"herbarium"|"nocturne"|"risograph";
 export type BloomPeriod="weekly"|"monthly"|"yearly";
-export interface BloomItem {id:string;period:BloomPeriod;periodStart:string;periodEnd:string;publishAt:string;expiresAt:string;timeZone:string;status:"locked"|"available"|"expired"|"empty"|"archived";chapterCount:number;teaser?:string}
-export interface BloomChapter {id:string;title:string;prompt:string;stat:{label:string;value:number|string;unit:string}|null;relatedRecording:Record<string,unknown>|null;revealed:boolean}
+export interface BloomItem {id:string;period:BloomPeriod;periodStart:string;periodEnd:string;publishAt:string;expiresAt:string;timeZone:string;status:"locked"|"available"|"expired"|"empty"|"archived";chapterCount:number;teaser?:string;worldId?:BloomDesign;version?:number}
+export interface BloomRankedRecording {rank:number;audibleMs:number;plays:number;recording:Record<string,unknown>}
+export interface BloomArtistInsight {key:string;name:string;artistId:string|null;imageUrl:string|null;audibleMs:number;recordings:BloomRankedRecording[]}
+export interface BloomComparison {title:string;detail:string;reference:string;referenceUrl?:string;approximate:boolean}
+export interface BloomChapter {id:string;title:string;prompt:string;stat:{label:string;value:number|string;unit:string}|null;relatedRecording:Record<string,unknown>|null;revealed:boolean;kind?:BloomSceneKind;detail?:string|null;recordings?:BloomRankedRecording[];artists?:BloomArtistInsight[];comparison?:BloomComparison|null}
 export interface BloomRecap extends BloomItem {summary:{audibleMs:number;playCount:number;recordingCount:number;activeDays:number};chapters:BloomChapter[];completed?:boolean;completedAt?:string|null}
 export const bloomDesigns:{id:BloomDesign;name:string;description:string}[]=[
  {id:"herbarium",name:"The listening herbarium",description:"Pressed petals, botanical ink, and the pages of a secret listening journal."},

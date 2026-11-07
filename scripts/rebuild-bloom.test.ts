@@ -1,18 +1,24 @@
 import assert from "node:assert/strict";
 import { describe,it } from "node:test";
 import { bloomWindow,bloomWindows,currentBloomId,validTimeZone } from "../src/rebuild/bloom/calendar";
-import { bloomDesignForMonth } from "../src/rebuild/bloom/design";
+import { bloomDesignForMonth,legacyBloomDesignForMonth,bloomDesignForItem } from "../src/rebuild/bloom/design";
 import { groupArtistCards } from "../src/rebuild/data/artistSelection";
 import { preferencesPatch } from "../src/rebuild/data/validation";
 import { eligibleSituations,planOfflineMixes,SITUATIONAL_MIXES } from "../src/rebuild/recommendations/situations";
 import { planMixes } from "../src/rebuild/recommendations/planner";
+import {buildBloomSnapshot,discloseBloomChapter} from "../src/rebuild/bloom/snapshot";
+import {listeningComparison,listeningDuration} from "../src/rebuild/bloom/comparisons";
+import {deviceBloomTier,selectedBloomTier} from "../src/rebuild/bloom/performance";
+import {resumeBloomIndex} from "../src/rebuild/bloom/story";
+import type {RecordingCard} from "../src/rebuild/data/catalog";
+import type {BloomRecap} from "../src/rebuild/bloom/uiTypes";
 describe("Bloom calendar and truthful discovery rules",()=>{
   it("uses every Bloom design in a stable monthly rotation without consecutive repeats",()=>{
-    const months=Array.from({length:15},(_,index)=>new Date(Date.UTC(2026,index,15)));
+    const months=Array.from({length:30},(_,index)=>new Date(Date.UTC(2025,index,15)));
     const selected=months.map(date=>bloomDesignForMonth(date,"Africa/Lagos"));
-    assert.deepEqual(selected.slice(0,3).sort(),["herbarium","nocturne","risograph"]);
+    const worlds=["sakura","jungle","disco","japan","china","korea","india","ocean","cosmos","glass"].sort();
     for(let index=1;index<selected.length;index++)assert.notEqual(selected[index],selected[index-1]);
-    for(let index=0;index<12;index+=3)assert.deepEqual(selected.slice(index,index+3).sort(),["herbarium","nocturne","risograph"]);
+    for(let index=0;index<30;index+=10)assert.deepEqual(selected.slice(index,index+10).sort(),worlds);
     assert.equal(bloomDesignForMonth("2026-11-01T00:30:00+01:00","Africa/Lagos"),bloomDesignForMonth("2026-11-01T00:30:00+01:00","Africa/Lagos"));
     assert.notEqual(bloomDesignForMonth("2026-10-31T23:30:00Z","Africa/Lagos"),bloomDesignForMonth("2026-10-31T23:30:00Z","America/New_York"));
   });
@@ -76,4 +82,53 @@ describe("Bloom calendar and truthful discovery rules",()=>{
       [{recordingId:"unknown",artistId:"a",genres:[],affinity:10},{recordingId:"known",artistId:"b",genres:[],affinity:1,durationMs:200000}],context);
     assert.deepEqual(planned[0].recordingIds,["known"]);
   });
+});
+describe("Cinematic Bloom snapshot and compatibility",()=>{
+ const period=bloomWindow("monthly-2026-10",new Date("2026-11-07T12:00:00Z"));
+ function recording(id:string,artistId:string|null,name="Same display name"):RecordingCard{
+  return {id,recordingId:id,title:`Song ${id}`,artists:[name,"Featured Artist"],durationMs:300000,metadata:{},coverUrl:null,artistImageUrl:null,artistId,albumId:null,albumTitle:null,reference:{provider:"deezer",id},references:[],genres:["Jazz"],popularity:0,playability:"resolvable",artistCredits:[{name,role:"primary",artistId},{name:"Featured Artist",role:"featured",artistId:"featured"}]};
+ }
+ it("ranks actual audible time, keeps same-name artists distinct, and connects the artist's own songs",()=>{
+  const cards=[recording("a","artist-a"),recording("b","artist-a"),recording("c","artist-b")];
+  const data=buildBloomSnapshot([{id:"c",audible_ms:60000,plays:20,first_ever:"2026-09-01"},{id:"b",audible_ms:120000,plays:2,first_ever:"2026-10-02"},{id:"a",audible_ms:120000,plays:1,first_ever:"2026-10-01"}],cards,2,period);
+  assert.equal(data.version,2);assert.equal(data.summary.audibleMs,300000);
+  assert.equal(data.chapters.find(c=>c.id==="top-song")?.recordings?.[0].recording.id,"a");
+  const winner=data.chapters.find(c=>c.id==="top-artist")!.artists![0];
+  assert.equal(winner.key,"artist-a");assert.equal(winner.audibleMs,240000);
+  assert.deepEqual(winner.recordings.map(c=>c.recording.id),["a","b"]);
+  assert.equal(data.chapters.find(c=>c.id==="other-artists")?.artists?.[0].key,"artist-b");
+  assert.ok(!data.chapters.some(c=>c.artists?.some(a=>a.key==="featured")));
+  assert.equal(data.chapters.find(c=>c.id==="discoveries")?.stat.value,2);
+ });
+ it("does not promote a lower-ranked song when the true winner's metadata is missing",()=>{
+  const data=buildBloomSnapshot([{id:"missing",audible_ms:500000,plays:2,first_ever:"2026-10-01"},{id:"b",audible_ms:60000,plays:1,first_ever:"2026-09-01"}],[recording("b",null)],1,period);
+  assert.equal(data.summary.audibleMs,560000);assert.equal(data.summary.recordingCount,2);
+  assert.ok(!data.chapters.some(c=>c.id==="top-song"));
+  assert.equal(data.chapters.find(c=>c.id==="runner-up")?.recordings?.[0].rank,2);
+  assert.ok(!data.chapters.some(c=>c.id==="top-artist"));
+  assert.equal(buildBloomSnapshot([],[],0,period).chapters.length,0);
+ });
+ it("withholds every new music collection and comparison before reveal",()=>{
+  const data=buildBloomSnapshot([{id:"a",audible_ms:216*60000,plays:2,first_ever:"2026-10-01"}],[recording("a","artist-a")],1,period);
+  for(const chapter of data.chapters){const hidden=discloseBloomChapter(chapter,false);assert.equal(hidden.stat,null);assert.equal(hidden.relatedRecording,null);assert.equal(hidden.recordings,undefined);assert.equal(hidden.artists,undefined);assert.equal(hidden.comparison,null);assert.equal(hidden.detail,null);}
+  assert.equal(discloseBloomChapter(data.chapters[0],true).stat!.value,"3 h 36 min");
+ });
+ it("preserves explicit and original saved theme choices across the ten-world rotation",()=>{
+  const old=bloomDesignForItem({periodStart:period.periodStart,timeZone:period.timeZone,version:1});
+  assert.equal(old,legacyBloomDesignForMonth(period.periodStart,period.timeZone));
+  assert.ok(["herbarium","nocturne","risograph"].includes(old));
+  assert.equal(bloomDesignForItem({periodStart:period.periodStart,timeZone:period.timeZone,version:2,worldId:"jungle"}),"jungle");
+ });
+ it("uses explicit comparison arithmetic and preserves a manual device-tier choice",()=>{
+  assert.equal(listeningDuration(0),"0 sec");assert.equal(listeningDuration(3.6*3600000),"3 h 36 min");
+  assert.match(listeningComparison(216*60000).title,/double feature/);
+  assert.match(listeningComparison(225*60000).detail,/9 minutes to spare/);
+  assert.ok(!listeningComparison(180*60000).title.includes("film marathon"));
+  assert.equal(deviceBloomTier({cores:16,memory:8}),5);assert.equal(deviceBloomTier({cores:16,memory:8,saveData:true}),2);
+  assert.equal(selectedBloomTier("5",1),5);assert.equal(selectedBloomTier("auto",2),2);
+ });
+ it("resumes at most at the first undisclosed chapter",()=>{
+  const recap={chapters:[{revealed:true},{revealed:false},{revealed:false}]} as BloomRecap;
+  assert.equal(resumeBloomIndex(recap,99),1);assert.equal(resumeBloomIndex(recap,-1),0);assert.equal(resumeBloomIndex(recap,NaN),0);
+ });
 });

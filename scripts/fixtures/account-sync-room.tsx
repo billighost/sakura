@@ -1,0 +1,9 @@
+"use client";
+import {useEffect,useState} from "react";
+import {useMusic} from "@/rebuild/app/MusicContext";
+import {musicTrack} from "@/rebuild/app/types";
+import {Button,SearchField,TrackList} from "@/rebuild/app/Elements";
+import {VolumeControl,GardenSlider} from "@/rebuild/app/ListeningControls";
+import {Branch} from "@/rebuild/app/Brand";
+import s from "@/rebuild/app/ink.module.css";
+export default function Room(){const p=useMusic();const [query,setQuery]=useState("");const [tracks,setTracks]=useState<ReturnType<typeof musicTrack>[]>([]);useEffect(()=>{fetch("/api/v2/home").then(r=>r.json()).then(data=>setTracks(data.featured.map(musicTrack)));},[]);useEffect(()=>{(window as unknown as {syncState:unknown}).syncState=p;},[p]);return <><div className={s.homeHero}><div><h1>A little room<br/><em>to listen.</em></h1><Button onClick={()=>tracks[0]&&p.play(tracks[0])}>Play Ye</Button><Button onClick={()=>tracks[1]&&p.play(tracks[1])}>Play Work</Button></div><Branch className={s.heroBranch}/></div><SearchField value={query} onChange={setQuery} label="Search music" placeholder="Follow a little thread"/><VolumeControl label="Player volume" value={p.volume} onChange={p.setVolume}/><div className={s.discoveryRange}><span>Familiar</span><GardenSlider label="Discovery amount" value={p.settings.discovery} onChange={value=>void p.updateSettings({discovery:value})}/><span>Surprise me</span></div><div className={s.settingRow}><label htmlFor="theme">Appearance</label><select id="theme" value={p.settings.theme} onChange={e=>void p.updateSettings({theme:e.target.value as "dark"|"light"|"system"})}><option value="dark">Dark</option><option value="light">Light</option><option value="system">Follow device</option></select></div><Button onClick={()=>void p.updateSettings({onboarded:true})}>Finish onboarding</Button><Button onClick={()=>void p.logout()}>Sign out</Button><TrackList tracks={tracks}/></>;}

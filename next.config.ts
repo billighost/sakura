@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 const config:NextConfig={
+ distDir:process.env.SAKURA_BUILD_DIR||".next",
  compress:true,
  allowedDevOrigins:["localhost","172.20.10.3"],
  turbopack:{root:path.resolve(__dirname)},
