@@ -1,0 +1,170 @@
+{
+  "checkedAt": "2026-11-07T06:48:24.610Z",
+  "verification": "Separate exact catalogue IDs, strict source/decoded artist+version checks and full-file integrity. No personal account rows mutated.",
+  "results": [
+    {
+      "target": "finesse-original",
+      "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+      "reference": {
+        "provider": "deezer",
+        "id": "136336124"
+      },
+      "status": "verified-full-file",
+      "metadata": {
+        "title": "Finesse",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 191000,
+        "artistsComplete": true,
+        "explicit": "unknown"
+      },
+      "artistCredits": [
+        {
+          "name": "Bruno Mars",
+          "role": "primary",
+          "reference": {
+            "provider": "deezer",
+            "id": "429675"
+          }
+        }
+      ],
+      "source": {
+        "title": "Finesse",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 191000,
+        "explicit": "unknown"
+      },
+      "bytes": 7802010,
+      "sha256": "c39fec009224ce6f42fb43fc8f6290d75ff19d0d9cf432348a941785760c29aa",
+      "decoded": {
+        "title": "Finesse",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 191000
+      },
+      "elapsedMs": 23230
+    },
+    {
+      "target": "finesse-cardi-b-remix",
+      "recordingId": "b5314d9d-c917-441a-bb3b-1b4a792c2148",
+      "reference": {
+        "provider": "deezer",
+        "id": "444333332"
+      },
+      "status": "verified-full-file",
+      "metadata": {
+        "title": "Finesse (Remix; feat. Cardi B)",
+        "artists": [
+          "Bruno Mars",
+          "Cardi B"
+        ],
+        "durationMs": 217000,
+        "artistsComplete": true,
+        "version": {
+          "kinds": [
+            "remix"
+          ],
+          "labels": [
+            "remix"
+          ]
+        },
+        "explicit": "unknown"
+      },
+      "artistCredits": [
+        {
+          "name": "Bruno Mars",
+          "role": "primary",
+          "reference": {
+            "provider": "deezer",
+            "id": "429675"
+          }
+        },
+        {
+          "name": "Cardi B",
+          "role": "featured",
+          "reference": {
+            "provider": "deezer",
+            "id": "9064930"
+          }
+        }
+      ],
+      "source": {
+        "title": "Finesse (Remix; feat. Cardi B)",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 217000,
+        "explicit": "unknown"
+      },
+      "bytes": 8967525,
+      "sha256": "466a5e9e3d4c7fc414ef40240c83dcd8a473c00973f954c2bb2c2983e8fd774b",
+      "decoded": {
+        "title": "Finesse (Remix; feat. Cardi B)",
+        "artists": [
+          "Bruno Mars; Cardi B"
+        ],
+        "durationMs": 217289
+      },
+      "elapsedMs": 23782
+    },
+    {
+      "target": "inertia-sawano-rei",
+      "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+      "reference": {
+        "provider": "deezer",
+        "id": "3284976751"
+      },
+      "status": "verified-full-file",
+      "metadata": {
+        "title": "INERTIA",
+        "artists": [
+          "SawanoHiroyuki[nZk]",
+          "REI"
+        ],
+        "durationMs": 199000,
+        "artistsComplete": true,
+        "explicit": "unknown"
+      },
+      "artistCredits": [
+        {
+          "name": "SawanoHiroyuki[nZk]",
+          "role": "primary",
+          "reference": {
+            "provider": "deezer",
+            "id": "51708732"
+          }
+        },
+        {
+          "name": "REI",
+          "role": "featured",
+          "reference": {
+            "provider": "deezer",
+            "id": "117814012"
+          }
+        }
+      ],
+      "source": {
+        "title": "INERTIA",
+        "artists": [
+          "SawanoHiroyuki[nZk], REI"
+        ],
+        "durationMs": 199000,
+        "explicit": "unknown"
+      },
+      "bytes": 8316270,
+      "sha256": "ab6be93def6032314b73b743dfa0c07da9885745c555c5c202a802ba2fc69a9f",
+      "decoded": {
+        "title": "INERTIA",
+        "artists": [
+          "SawanoHiroyuki[nZk], REI"
+        ],
+        "durationMs": 199523
+      },
+      "elapsedMs": 17872
+    }
+  ]
+}

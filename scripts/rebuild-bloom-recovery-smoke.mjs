@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import {chromium,expect} from '@playwright/test';
+import {readFile,writeFile} from 'node:fs/promises';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'no-preference'});
+const fixture=JSON.parse(await readFile('.local/rebuild-test-account.json','utf8'));
+await context.addCookies(fixture.cookie.split('; ').map(value=>{const i=value.indexOf('=');return{name:value.slice(0,i),value:value.slice(i+1),url:'http://127.0.0.1:3002'};}));
+const page=await context.newPage();page.setDefaultTimeout(15000);
+let detailRequests=0,expired=false;
+const id='weekly-review',now=Date.now();
+await page.clock.install({time:new Date(now)});
+const window={id,period:'weekly',periodStart:new Date(now-7*86400000).toISOString(),periodEnd:new Date(now-1000).toISOString(),publishAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+60000).toISOString(),timeZone:'Africa/Lagos',status:'available',chapterCount:1};
+const recap={...window,summary:{audibleMs:60000,playCount:1,recordingCount:1,activeDays:1},chapters:[{id:'listening-time',title:'Time in sound',prompt:'How much did you hear?',stat:{label:'Actual listening',value:1,unit:'minutes'},relatedRecording:null,revealed:true}]};
+const archived={...recap,id:'yearly-2025',period:'yearly',status:'archived',completed:true,periodStart:'2025-01-01T00:00:00.000Z',periodEnd:'2026-01-01T00:00:00.000Z',publishAt:'2026-01-01T00:00:00.000Z',expiresAt:'2026-02-01T00:00:00.000Z'};
+const account={id:'90000000-0000-4000-8000-000000000001',username:'synthetic_review',email:'review@example.invalid'};
+await page.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');});
+await page.route('**/api/**',route=>{
+ const path=new URL(route.request().url()).pathname;
+ if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+ if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,reducedMotion:true,onboarded:true,seedArtists:[],seedGenres:[],revision:7}});
+ if(path==='/api/v2/library')return route.fulfill({json:{recordings:[]}});
+ if(path==='/api/v2/bloom/'+id){detailRequests++;return expired?route.fulfill({status:410,json:{error:'This Bloom window has closed'}}):route.fulfill({json:recap});}
+ if(path==='/api/v2/bloom/archive')return route.fulfill({json:{items:[archived]}});
+ if(path==='/api/v2/bloom')return route.fulfill({json:{items:expired?[{...window,status:'expired'}]:[window],schedule:{timeZone:'Africa/Lagos'}}});
+ return route.fulfill({json:{}});
+});
+try{
+ await page.goto('http://127.0.0.1:3002/bloom',{waitUntil:'domcontentloaded'});
+ await page.getByRole('link',{name:'Open this Bloom',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Open my Bloom',exact:true})).toBeVisible();
+ expired=true;
+ await page.clock.fastForward(60001);
+ await expect(page.getByRole('heading',{name:'This Bloom’s season has passed.',exact:true})).toBeVisible();
+ await expect(page.locator('dialog[open]')).toHaveCount(0);
+ const openPastExpiry=await page.locator('dialog[open]').count();
+ await page.getByRole('button',{name:'Check again',exact:true}).click();
+ await expect.poll(()=>detailRequests).toBeGreaterThan(1);
+ await expect(page.getByRole('heading',{name:'This Bloom’s season has passed.',exact:true})).toBeVisible();
+ // A full navigation restores disk caches; a definitive410 must have invalidated them.
+ const beforeReload=detailRequests;
+ await page.goto('http://127.0.0.1:3002/bloom/'+id,{waitUntil:'domcontentloaded'});
+ await expect.poll(()=>detailRequests).toBeGreaterThan(beforeReload);
+ await expect(page.getByRole('heading',{name:'This Bloom’s season has passed.',exact:true})).toBeVisible();
+ await expect(page.locator('dialog[open]')).toHaveCount(0);
+ const cachedStoryAfterServerExpiry=await page.locator('dialog[open]').count();
+ await page.getByRole('link',{name:'Open Sakura Bloom',exact:true}).click();
+ await page.getByRole('button',{name:'Yearly',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Your pressed years',exact:true})).toBeVisible();
+ const archive=page.locator('article').filter({has:page.getByRole('heading',{name:'2025',exact:true})});
+ const archiveActions=await archive.locator('button,a').count();
+ await archive.getByRole('link',{name:'Revisit this year'}).click();
+ await expect(page).toHaveURL(/\/bloom\/yearly-2025\?archive=1$/);
+ await expect(page.getByRole('button',{name:'Open my Bloom',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Open my Bloom',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Actual listening',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'This Bloom’s season has passed.',exact:true})).toHaveCount(0);
+ assert.equal(openPastExpiry,0);assert.equal(cachedStoryAfterServerExpiry,0);assert.equal(archiveActions,1);
+ const report={scope:'isolated browser contexts with intercepted synthetic APIs; no account/database writes',detailRequests,openPastExpiry,cachedStoryAfterServerExpiry,archiveActions,archiveRevisit:true};
+ await writeFile('.local/rebuild-independent-review-report.json',JSON.stringify(report,null,2));
+ console.log(JSON.stringify(report));
+}finally{await context.close();await browser.close();}

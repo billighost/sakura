@@ -1,0 +1,15 @@
+.songPopover{position:fixed;inset:auto;margin:0;width:280px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--ink-line,#d7dfd3);border-radius:4px 18px 6px 18px;background:var(--ink-card,#f9faf5);color:var(--ink-text,#273b34);box-shadow:0 14px 50px #13251c28;padding:9px;font:12px/1.4 var(--font-inter),Arial,sans-serif;scrollbar-width:thin;animation:menuUnfold .16s ease-out;box-sizing:border-box}
+.songPopover{z-index:9999}.songPopover::backdrop{background:transparent}
+.popoverHeading{padding:14px 13px 16px;margin-bottom:5px;border-bottom:1px solid var(--ink-line,#d7dfd3);position:relative}
+.popoverHeading:after{content:"";position:absolute;right:13px;top:17px;width:13px;height:19px;transform:rotate(35deg);border-radius:80% 15% 70% 20%;background:var(--ink-petal,#c68c95);opacity:.35}
+.popoverHeading>span{display:block;font:italic 14px var(--font-fraunces),Georgia,serif;color:var(--ink-accent,#446b57);margin-bottom:8px}
+.popoverHeading strong{display:block;padding-right:20px;overflow-wrap:anywhere;font:20px var(--font-fraunces),Georgia,serif}
+.popoverHeading small{display:block;margin-top:7px;font-size:10px;color:var(--ink-muted,#69786d)}
+.songPopover button,.songPopover a{display:flex;width:100%;align-items:center;gap:13px;min-height:44px;padding:10px 13px;border:0;border-radius:4px;background:transparent;color:inherit;text-decoration:none;font:inherit;text-align:left;cursor:pointer;box-sizing:border-box;touch-action:manipulation}
+.songPopover button:hover,.songPopover a:hover,.songPopover button:focus-visible,.songPopover a:focus-visible{background:var(--ink-surface,#e9ede4);outline:none;color:var(--ink-accent,#446b57)}
+.songPopover button:focus-visible,.songPopover a:focus-visible{box-shadow:inset 2px 0 var(--ink-accent,#446b57)}
+.songPopover button:disabled{opacity:.4;cursor:default}.songPopover svg{width:18px;height:18px;flex-shrink:0;color:var(--ink-muted,#69786d)}
+.popoverHeading small a{display:inline-flex;width:auto;min-height:32px;gap:0;padding:3px 0;font:inherit}
+.popoverNote{padding:14px;color:var(--ink-muted,#69786d);font-size:11px}
+@keyframes menuUnfold{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.songPopover{animation:none}}

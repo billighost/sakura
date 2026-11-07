@@ -1,0 +1,66 @@
+{
+  "checkedAt": "2026-11-07T08:52:50.364Z",
+  "measurement": "Actual user-gesture Chrome playing event after immutable CDN audio is ready; excludes catalogue resolution and preparation. Fresh browser context, real CDN files, no mocked audio or account writes.",
+  "results": [
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "136336124"
+      },
+      "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+      "assetId": "55cffcf1-c8e6-5d52-8454-99834d231981",
+      "sha256": "c39fec009224ce6f42fb43fc8f6290d75ff19d0d9cf432348a941785760c29aa",
+      "playingMs": 1855,
+      "time": 0.506813,
+      "duration": 191,
+      "readyState": 4,
+      "error": null,
+      "actualTimeAdvanced": true
+    },
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "444333332"
+      },
+      "recordingId": "b5314d9d-c917-441a-bb3b-1b4a792c2148",
+      "assetId": "e9fd580c-55dd-5d21-87b5-141cd67c5166",
+      "sha256": "466a5e9e3d4c7fc414ef40240c83dcd8a473c00973f954c2bb2c2983e8fd774b",
+      "playingMs": 3775,
+      "time": 0.510053,
+      "duration": 217.288957,
+      "readyState": 4,
+      "error": null,
+      "actualTimeAdvanced": true
+    },
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "3284976751"
+      },
+      "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+      "assetId": "cfe12c3c-fbf2-599a-8491-5aa3124843cc",
+      "sha256": "ab6be93def6032314b73b743dfa0c07da9885745c555c5c202a802ba2fc69a9f",
+      "playingMs": 2123,
+      "time": 0.511362,
+      "duration": 199.523265,
+      "readyState": 4,
+      "error": null,
+      "actualTimeAdvanced": true
+    },
+    {
+      "reference": {
+        "provider": "spotify",
+        "id": "2lEl1iNGpz9r2B7R5BqXSD"
+      },
+      "recordingId": "aaa1b85f-d1bc-495d-8377-02b20b888929",
+      "assetId": "c110d3c3-2e8c-55e6-8dca-15ce4c137f46",
+      "sha256": "40b45a7f60fa5866e9ca08914722f1d1830377849d73397bf48ceb61acbac62e",
+      "playingMs": 2080,
+      "time": 0.505475,
+      "duration": 231.61839,
+      "readyState": 4,
+      "error": null,
+      "actualTimeAdvanced": true
+    }
+  ]
+}

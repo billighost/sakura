@@ -1,0 +1,46 @@
+{
+  "checkedAt": "2026-11-07T06:52:29.971Z",
+  "measurement": "Server-side ready resolver plus initial signing and warm signing cache. Excludes browser media decode, device/network first byte and cold Next compilation.",
+  "results": [
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "136336124"
+      },
+      "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+      "firstResolveMs": 4230,
+      "warmResolveMs": 593,
+      "fullAudioReady": true
+    },
+    {
+      "reference": {
+        "provider": "spotify",
+        "id": "2lEl1iNGpz9r2B7R5BqXSD"
+      },
+      "recordingId": "aaa1b85f-d1bc-495d-8377-02b20b888929",
+      "firstResolveMs": 854,
+      "warmResolveMs": 630,
+      "fullAudioReady": true
+    },
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "444333332"
+      },
+      "recordingId": "b5314d9d-c917-441a-bb3b-1b4a792c2148",
+      "firstResolveMs": 820,
+      "warmResolveMs": 578,
+      "fullAudioReady": true
+    },
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "3284976751"
+      },
+      "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+      "firstResolveMs": 837,
+      "warmResolveMs": 506,
+      "fullAudioReady": true
+    }
+  ]
+}

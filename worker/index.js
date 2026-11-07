@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Single-owner Node worker intentionally uses CommonJS. */
 "use strict";
 
 /**
@@ -26,6 +27,9 @@ require("dotenv").config();
 const http = require("node:http");
 const crypto = require("node:crypto");
 const { TelegramWorkerClient, DEFAULT_BOT } = require("./telegram");
+const { RebuildAudioService } = require("./rebuild/service.cjs");
+const { Api } = require("telegram/tl");
+const bigInt = require("big-integer");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -65,6 +69,18 @@ const client = new TelegramWorkerClient({
   sessionString: (process.env.TELEGRAM_SESSION_STRING || "").trim(),
   sessionFile: SESSION_FILE,
 });
+const rebuild = new RebuildAudioService({ telegram: () => client.client, api: Api, bigInt,
+  bots: [DEFAULT_BOT, ...(process.env.TELEGRAM_FALLBACK_BOTS || "").split(",").map(bot => bot.trim()).filter(Boolean)], queue: client.botQueue });
+
+function scopedSignature(bot,messageId,expires) {
+  return crypto.createHmac("sha256",WORKER_SECRET).update(JSON.stringify([bot.toLowerCase(),String(messageId),expires])).digest("hex");
+}
+function scopedSignatureValid(bot,messageId,query) {
+  const expires=Number(query.get("exp"));const signature=query.get("sig")||"";
+  if(!Number.isSafeInteger(expires)||expires<Date.now()/1000||! /^[a-f0-9]{64}$/.test(signature))return false;
+  const expected=scopedSignature(bot,messageId,expires);
+  return crypto.timingSafeEqual(Buffer.from(signature,"hex"),Buffer.from(expected,"hex"));
+}
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -345,6 +361,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   const audioMatch = /^\/audio\/(\d+)$/.exec(pathname);
+  const scopedAudioMatch = /^\/v2\/audio\/([a-zA-Z0-9_]{3,64})\/(\d+)$/.exec(pathname);
 
   // ── Preflight. Answered before auth on purpose: a browser never attaches the
   //    Authorization header or the query string to an OPTIONS probe, so checking
@@ -357,10 +374,10 @@ const server = http.createServer(async (req, res) => {
 
   // ── Auth
   const hasBearer = secretMatches(bearerOf(req));
-  const signedOk =
-    audioMatch && (method === "GET" || method === "HEAD")
-      ? audioSignatureValid(audioMatch[1], url.searchParams)
-      : false;
+  const signedOk = (method === "GET" || method === "HEAD") && Boolean(
+    scopedAudioMatch ? scopedSignatureValid(scopedAudioMatch[1],scopedAudioMatch[2],url.searchParams)
+      : audioMatch ? audioSignatureValid(audioMatch[1],url.searchParams) : false
+  );
 
   if (!hasBearer && !signedOk) {
     sendJson(res, 401, { error: "Unauthorized" });
@@ -376,6 +393,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if(scopedAudioMatch && (method === "GET" || method === "HEAD")) {
+      try { await rebuild.serve(req,res,scopedAudioMatch[1],scopedAudioMatch[2]); }
+      catch(error) { if(res.headersSent)res.destroy();else fail(res,error,`${method} ${pathname}`); }
+      return;
+    }
     if (audioMatch && (method === "GET" || method === "HEAD")) {
       const messageId = parseInt(audioMatch[1], 10);
       if (!messageId || messageId <= 0) {
@@ -394,6 +416,23 @@ const server = http.createServer(async (req, res) => {
     const body = await readJsonBody(req);
 
     switch (pathname) {
+      case "/v2/resolve": {
+        const result=await rebuild.resolve(body);
+        sendJson(res,result.status==="review"?409:200,result);
+        return;
+      }
+      case "/v2/audio-info": {
+        const {audio}=await rebuild.info(body.chatScope,String(body.messageId));
+        sendJson(res,200,{...audio,title:audio.metadata.title,artist:audio.metadata.artists[0],duration:audio.metadata.durationMs/1000});
+        return;
+      }
+      case "/v2/sign-audio": {
+        const bot=rebuild.scope(body.chatScope),messageId=String(body.messageId);
+        if(!/^[1-9]\d{0,14}$/.test(messageId))throw new Error("Invalid source message ID");
+        const expires=Math.floor(Date.now()/1000)+Math.min(3600,Math.max(60,Number(body.ttlSeconds)||1800));
+        sendJson(res,200,{path:`/v2/audio/${bot}/${messageId}?exp=${expires}&sig=${scopedSignature(bot,messageId,expires)}`,expiresAt:expires});
+        return;
+      }
       case "/search": {
         if (!body.query) throw new Error("Missing query");
         const out = await client.searchMusic(

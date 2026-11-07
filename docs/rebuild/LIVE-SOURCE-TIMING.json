@@ -1,0 +1,129 @@
+{
+  "checkedAt": "2026-11-07T08:00:19.660Z",
+  "origin": "http://127.0.0.1:3003",
+  "method": "Existing synthetic account; real signed-worker and authenticated gateway HTTP timing, metadata-only public evidence",
+  "results": [
+    {
+      "target": "finesse-remix",
+      "recordingId": "b5314d9d-c917-441a-bb3b-1b4a792c2148",
+      "expectedBytes": 8967525,
+      "samples": [
+        {
+          "label": "signed-head",
+          "limitMs": 30000,
+          "bytes": 0,
+          "headersMs": 910,
+          "status": 200,
+          "mime": "audio/mpeg",
+          "contentRange": null,
+          "contentLength": "8967525",
+          "totalMs": 911,
+          "complete": true
+        },
+        {
+          "label": "signed-first4096",
+          "limitMs": 30000,
+          "bytes": 4096,
+          "headersMs": 2233,
+          "status": 206,
+          "mime": "audio/mpeg",
+          "contentRange": "bytes 0-4095/8967525",
+          "contentLength": "4096",
+          "firstByteMs": 2233,
+          "totalMs": 2236,
+          "sha256": "5042c4123065b0cc1bb33abfc6c361aaa302fa1eca2ec979816e6767a614b32b",
+          "complete": true
+        },
+        {
+          "label": "signed-full",
+          "limitMs": 30000,
+          "bytes": 8967525,
+          "headersMs": 1508,
+          "status": 200,
+          "mime": "audio/mpeg",
+          "contentRange": null,
+          "contentLength": "8967525",
+          "firstByteMs": 1508,
+          "totalMs": 19781,
+          "sha256": "466a5e9e3d4c7fc414ef40240c83dcd8a473c00973f954c2bb2c2983e8fd774b",
+          "complete": true
+        },
+        {
+          "label": "gateway-first4096",
+          "limitMs": 30000,
+          "bytes": 4096,
+          "headersMs": 3542,
+          "status": 206,
+          "mime": "audio/mpeg",
+          "contentRange": "bytes 0-4095/8967525",
+          "contentLength": null,
+          "firstByteMs": 3543,
+          "totalMs": 3543,
+          "sha256": "5042c4123065b0cc1bb33abfc6c361aaa302fa1eca2ec979816e6767a614b32b",
+          "complete": true
+        }
+      ]
+    },
+    {
+      "target": "inertia",
+      "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+      "expectedBytes": 8316270,
+      "samples": [
+        {
+          "label": "signed-head",
+          "limitMs": 30000,
+          "bytes": 0,
+          "headersMs": 636,
+          "status": 200,
+          "mime": "audio/mpeg",
+          "contentRange": null,
+          "contentLength": "8316270",
+          "totalMs": 637,
+          "complete": true
+        },
+        {
+          "label": "signed-first4096",
+          "limitMs": 30000,
+          "bytes": 4096,
+          "headersMs": 1397,
+          "status": 206,
+          "mime": "audio/mpeg",
+          "contentRange": "bytes 0-4095/8316270",
+          "contentLength": "4096",
+          "firstByteMs": 1398,
+          "totalMs": 1398,
+          "sha256": "f245505ca369941dccbc52c84195bda47ea0c2cd12ed5ab446e13cc4ee98bc24",
+          "complete": true
+        },
+        {
+          "label": "signed-full",
+          "limitMs": 30000,
+          "bytes": 8316270,
+          "headersMs": 1495,
+          "status": 200,
+          "mime": "audio/mpeg",
+          "contentRange": null,
+          "contentLength": "8316270",
+          "firstByteMs": 1495,
+          "totalMs": 14919,
+          "sha256": "ab6be93def6032314b73b743dfa0c07da9885745c555c5c202a802ba2fc69a9f",
+          "complete": true
+        },
+        {
+          "label": "gateway-first4096",
+          "limitMs": 30000,
+          "bytes": 4096,
+          "headersMs": 1954,
+          "status": 206,
+          "mime": "audio/mpeg",
+          "contentRange": "bytes 0-4095/8316270",
+          "contentLength": null,
+          "firstByteMs": 1954,
+          "totalMs": 1958,
+          "sha256": "f245505ca369941dccbc52c84195bda47ea0c2cd12ed5ab446e13cc4ee98bc24",
+          "complete": true
+        }
+      ]
+    }
+  ]
+}

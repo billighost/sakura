@@ -1,0 +1,42 @@
+"use client";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Icon, type IconName } from "./Icon";
+import { TrackActions, type SongMenuAnchor } from "./TrackActions";
+import { SongGesture } from "./SongGesture";
+import { ArtistLinks } from "./ArtistLinks";
+import { RecoveryNotice } from "./RecoveryNotice";
+import { PlaybackRibbon, VolumeControl } from "./ListeningControls";
+import { Blossom } from "./Brand";
+import { useMusic } from "./MusicContext";
+import type { MusicTrack } from "./types";
+import s from "./ink.module.css";
+export function IconButton({icon,label,onClick,active=false,disabled=false}:{icon:IconName;label:string;onClick:()=>void;active?:boolean;disabled?:boolean}){return <button className={s.iconButton+" "+(active?s.active:"")} type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled}><Icon name={icon}/></button>;}
+export function Button({children,onClick,icon,secondary=false,disabled=false}:{children:ReactNode;onClick?:()=>void;icon?:IconName;secondary?:boolean;disabled?:boolean}){return <button className={secondary?s.secondaryButton:s.primaryButton} type="button" onClick={onClick} disabled={disabled}>{icon&&<Icon name={icon} size={18}/>} {children}</button>;}
+export function Artwork({url,title,className=""}:{url?:string|null;title:string;className?:string}){const [failedUrl,setFailedUrl]=useState<string|null>(null);const failed=failedUrl===url;return <div className={s.artwork+" "+className}>{url&&!failed?<img src={url} alt={title} loading="lazy" decoding="async" onError={()=>setFailedUrl(url||null)}/>:<div className={s.artFallback} aria-label={title}><Blossom/><span>{title.slice(0,1)}</span></div>}</div>;}
+export function PageTitle({eyebrow,title,description,children}:{eyebrow:string;title:string;description?:string;children?:ReactNode}){return <div className={s.pageTitle}><div><span className={s.eyebrow}>{eyebrow}</span><h1>{title}</h1>{description&&<p>{description}</p>}</div>{children}</div>;}
+export function SectionTitle({title,note,href,action}:{title:string;note?:string;href?:string;action?:string}){return <div className={s.sectionTitle}><div><h2>{title}</h2>{note&&<p>{note}</p>}</div>{href&&<Link href={href}>{action||"Explore"}<Icon name="arrow" size={15}/></Link>}</div>;}
+export function LoadingRows(){return <div className={s.skeletonRows} role="status" aria-label="Loading music">{[0,1,2,3].map(i=><div key={i}><i/><span/><b/></div>)}</div>;}
+export function Empty({title="A little room for something good.",description="Your songs will find their home here.",href="/discover",action="Find your next favorite"}:{title?:string;description?:string;href?:string;action?:string}){return <div className={s.empty}><Blossom/><h2>{title}</h2><p>{description}</p><Link className={s.secondaryButton} href={href}>{action}<Icon name="arrow" size={16}/></Link></div>;}
+export function LoadError({message,retry}:{message:unknown;retry:()=>void}){return <RecoveryNotice error={message} retry={retry}/>;}
+export function time(ms:number){const n=Math.max(0,Math.floor(ms/1000));return Math.floor(n/60)+":"+String(n%60).padStart(2,"0");}
+export function TrackList({tracks,showVersion=true,downloaded=false}:{tracks:MusicTrack[];showVersion?:boolean;downloaded?:boolean}){
+ const p=useMusic();const [menu,setMenu]=useState<{track:MusicTrack;anchor:SongMenuAnchor}|null>(null);const unique=[...new Map(tracks.map(t=>[p.effectiveId(t),t])).values()];
+ return <div className={s.trackList}>{unique.map((t,i)=>{const id=p.effectiveId(t);const playing=p.track?.id===id&&p.status==="playing";const saved=p.downloads[id];return <SongGesture key={id} id={id} className={s.trackRow+" "+(playing?s.playingRow:"")} onOptions={anchor=>setMenu({track:t,anchor})}>
+   <button className={s.trackCover} aria-label={"Play "+t.title} onClick={()=>p.play(t,unique)}><span>{playing?<span className={s.equalizer}><i/><i/><i/></span>:String(i+1).padStart(2,"0")}</span><Artwork url={t.coverUrl} title={t.albumTitle||t.title}/><span className={s.coverPlay}><Icon name="play" size={15}/></span></button>
+   <div className={s.trackInfo}><Link href={"/track/"+encodeURIComponent(id)}>{t.title}</Link><ArtistLinks track={t} className={s.artistCredits}/>{showVersion&&<small>{t.versionLabel}</small>}</div>
+   <span className={s.albumColumn}>{t.albumTitle}</span><span className={s.duration}>{time(t.durationMs)}</span><IconButton icon="heart" label={(p.liked.has(id)?"Unlike ":"Like ")+t.title} active={p.liked.has(id)} onClick={()=>void p.toggleLike(t)}/>
+   {downloaded?<IconButton icon="trash" label={"Remove "+t.title+" from this device"} onClick={()=>void p.removeDownload(id)}/>:<IconButton icon={saved?.status==="ready"?"check":saved?.status==="downloading"||saved?.status==="resolving"?"close":"download"} label={saved?.status==="ready"?t.title+" is ready offline":saved?.status==="downloading"||saved?.status==="resolving"?"Cancel "+t.title+" download":"Download "+t.title} active={saved?.status==="ready"} onClick={()=>saved?.status==="downloading"||saved?.status==="resolving"?p.cancelDownload(id):p.requestDownload(t)}/>}
+   <button className={s.iconButton} type="button" aria-haspopup="menu" aria-expanded={menu?.track===t} aria-label={"More options for "+t.title} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setMenu({track:t,anchor:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}});}}><Icon name="more"/></button>
+ </SongGesture>;})}{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>}</div>;
+}
+export function TrackMenu({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){return <TrackActions track={track} onClose={onClose} anchor={anchor}/>;}
+export function PlayerBar(){
+ const p=useMusic();if(!p.track)return null;const active=p.status==="playing"||p.status==="buffering"||p.status==="resolving";
+ return <footer className={s.playerBar}>
+  <div className={s.playerIdentityGroup}><button className={s.playerIdentity} onClick={()=>p.openModal("player")} aria-label="Open now playing"><Artwork url={p.track.coverUrl} title={p.track.albumTitle||p.track.title}/><span><b>{p.track.title}</b><small>{p.status==="resolving"?"Finding the exact recording…":p.status==="buffering"?"Getting the sound ready…":"Open your listening room"}</small></span></button><ArtistLinks track={p.track} className={s.playerCredits}/></div>
+  <div className={s.playerCenter}><div className={s.transport}><IconButton icon="shuffle" label="Shuffle" active={p.shuffle} onClick={()=>p.setShuffle(!p.shuffle)}/><IconButton icon="previous" label="Previous song" onClick={p.previous}/><button className={s.roundPlay} aria-label={active?"Pause":"Play"} onClick={p.togglePlay}><Icon name={active?"pause":"play"}/></button><IconButton icon="next" label="Next song" onClick={p.next}/><IconButton icon="repeat" label={"Repeat: "+p.repeat} active={p.repeat!=="off"} onClick={()=>p.setRepeat(p.repeat==="off"?"all":p.repeat==="all"?"one":"off")}/></div><PlaybackRibbon compact positionMs={p.positionMs} durationMs={p.durationMs} onSeek={p.seek} disabled={p.status==="resolving"}/></div>
+  <div className={s.playerTools}><IconButton icon="lyrics" label="Open lyrics" onClick={()=>p.openModal("lyrics")}/><IconButton icon="queue" label="Open queue" onClick={()=>p.openModal("queue")}/><VolumeControl compact value={p.volume} onChange={p.setVolume}/></div><div className={s.mobileTransport}><IconButton icon="queue" label="Open queue" onClick={()=>p.openModal("queue")}/><IconButton icon={active?"pause":"play"} label={active?"Pause":"Play"} onClick={p.togglePlay}/></div>
+  {p.error&&<div className={s.playerError}><RecoveryNotice compact error={p.error} context="playback" retry={p.togglePlay} href={p.error.includes("exact recording")?"/search?q="+encodeURIComponent(p.track.title+" "+p.track.artists[0]):undefined}/></div>}
+ </footer>;
+}

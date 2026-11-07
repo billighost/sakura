@@ -1,0 +1,64 @@
+{
+  "checkedAt": "2026-11-07T05:34:26.206Z",
+  "verification": "Exact catalogue metadata, strict returned source tags and ranged full-file delivery; this does not certify an acoustic fingerprint.",
+  "results": [
+    {
+      "title": "Finesse",
+      "reference": {
+        "provider": "deezer",
+        "id": "136336124"
+      },
+      "status": "verified-source",
+      "protocol": "v1",
+      "sourceTitle": "Finesse",
+      "sourceArtists": [
+        "Bruno Mars"
+      ],
+      "durationMs": 191000,
+      "sizeBytes": 7802010,
+      "mimeType": "audio/mpeg",
+      "rangeStatus": 206,
+      "rangeHeader": "bytes 0-4095/7802010",
+      "sampleBytes": 4096,
+      "signedHeadStatus": 200,
+      "indexedVerified": true,
+      "fullVerification": {
+        "bytes": 7802010,
+        "sha256": "c39fec009224ce6f42fb43fc8f6290d75ff19d0d9cf432348a941785760c29aa",
+        "decodedDurationMs": 191000,
+        "decodedTitle": "Finesse",
+        "decodedArtist": "Bruno Mars"
+      },
+      "elapsedMs": 22553
+    },
+    {
+      "title": "Ye",
+      "reference": {
+        "provider": "spotify",
+        "id": "2lEl1iNGpz9r2B7R5BqXSD"
+      },
+      "status": "verified-source",
+      "protocol": "v1",
+      "sourceTitle": "Ye",
+      "sourceArtists": [
+        "Burna Boy"
+      ],
+      "durationMs": 231000,
+      "sizeBytes": 9342273,
+      "mimeType": "audio/mpeg",
+      "rangeStatus": 206,
+      "rangeHeader": "bytes 0-4095/9342273",
+      "sampleBytes": 4096,
+      "signedHeadStatus": 200,
+      "indexedVerified": true,
+      "fullVerification": {
+        "bytes": 9342273,
+        "sha256": "40b45a7f60fa5866e9ca08914722f1d1830377849d73397bf48ceb61acbac62e",
+        "decodedDurationMs": 231618,
+        "decodedTitle": "Ye",
+        "decodedArtist": "Burna Boy"
+      },
+      "elapsedMs": 26626
+    }
+  ]
+}

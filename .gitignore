@@ -49,3 +49,9 @@ test-mb.js
 .srv.err
 .server*.log
 .server*.err
+
+# Private migration snapshots and local browser verification
+/.local/
+/test-results/
+/playwright-report/
+/.mesh/*.db

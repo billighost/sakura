@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sakura Ink
 
-## Getting Started
+A fresh music PWA with an ink-and-paper interface, light and dark themes, and a short opening that combines growing branches, gathered petals, bloom, and a passing breeze.
 
-First, run the development server:
+The production frontend is `src/rebuild/app` and `src/rebuild/player`. The replacement catalog, audio resolver, data APIs, and recommendation planner live under `src/rebuild`. The old application UI, player, catalog, downloads, and business logic have been removed.
 
-```bash
+## Run
+
+```sh
+npm install
+npm run migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. Create a fresh account; the old accounts were cleared in the authorized reset.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For production, run `npm run build` and `npm start`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configuration
 
-## Learn More
+Server-only environment variables:
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL database for canonical recordings and account data |
+| `AUTH_SECRET` or `NEXTAUTH_SECRET` | Session signing |
+| `AUTH_URL` | Public app origin when deployment needs an explicit origin |
+| `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Federated Spotify catalog search and exact lookup |
+| `TELEGRAM_WORKER_URL`, `WORKER_SECRET` | Connected single-owner audio worker and matching bearer secret |
+| `TELEGRAM_BOT_USERNAME` | Primary source chat |
+| `TELEGRAM_FALLBACK_BOTS` | Optional comma-separated fallback chats for the v2 worker |
+| `SAKURA_REBUILD_AUDIO_ORIGINS` | Allowed HTTPS audio CDN origins |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Optional immutable, checksum-verified audio on the existing CDN account |
+| `YOUTUBE_API_KEY` | Optional public YouTube playlist import |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+No browser bundle receives provider credentials. Keep environment files and `.local/` private. Start only one process that owns a Telegram session; the Next app calls the existing worker rather than opening its own session.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Product
 
-## Deploy on Vercel
+Main routes: `/home`, `/discover`, `/search`, `/library`, `/liked`, `/library/downloaded`, `/playlist/[id]`, `/mix/[id]`, `/album/[id]`, `/artist/[id]`, `/track/[id]`, `/profile`, `/settings`, `/onboarding`, `/import`, `/offline`, `/bloom`, and `/bloom/[id]`. Public song and lyric cards use `/s/[slug]`. The full player and lyrics occupy the viewport. Song options appear in an anchored popover, including on a touch hold; the queue and sharing use bounded dialogs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Sakura Bloom has weekly, monthly and yearly listening stories. Completed years remain in the archive, and the three artistic directions rotate through production stories. Home and Discover offer 20 situational mix definitions; Downloads builds 18 situations exclusively from complete device files. Sparse collections explain what is missing rather than repeating songs to fill them.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A canonical recording UUID identifies the exact recording; external provider appearances are references. Queue occurrences have their own IDs. Favorites and playlists can index catalog metadata without waiting for an audio download. A device download becomes ready only after complete-byte verification and SHA-256 hashing. Device data and cached resources are scoped to the account. Paused and buffering time is excluded from listening receipts.
+
+Public playlist import previews metadata before creating a collection. Sharing prepares actual PNG images, public links, and WebCodecs video with actual selected audio when the browser supports the encoders. Unsupported video stays unavailable.
+
+## Verification
+
+```sh
+npm test
+npm run test:product
+node scripts/rebuild-export-smoke.mjs
+```
+
+The real Ink smoke (`npm run test:ink`) uses a private temporary account created by `node scripts/rebuild-test-session.mjs`. Its screenshots and reports stay under ignored `.local/`. Tests that access providers can fail when those external services are unavailable; fixture regressions are separate from live-provider evidence.
+
+See `docs/rebuild/PRODUCTION-DATA.md`, `AUDIO-AUDIT.md`, `LYRICS-AUDIT.md`, `UI-VERIFICATION.md`, and `PRODUCT-AUDIT.md` for contracts, reset evidence, and operational limits. Live checks verify Finesse original, its Cardi B remix, INERTIA and Ye by exact catalog evidence, returned file tags, complete checksums, decoder duration and browser playback. They are not acoustic-fingerprint certification. The 30-song Japanese lyric corpus preserves source text/timing; rare poetic readings remain flagged for review.
+
+## Data reset
+
+The authorized reset removed old application rows, including accounts and listening history. A private earlier snapshot remains ignored and was not imported. Fresh migration installs the new schema; fresh catalog seeding uses exact online provider metadata. Reset is a separate explicit CLI operation (`scripts/rebuild-migrate-reset.mjs`) with target/inventory verification; no web endpoint resets or migrates the database.

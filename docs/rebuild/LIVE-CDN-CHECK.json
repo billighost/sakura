@@ -1,0 +1,56 @@
+{
+  "checkedAt": "2026-11-07T08:42:13.484Z",
+  "quota": {
+    "checkedAt": "2026-11-07T08:42:14.645Z",
+    "plan": "Free",
+    "credits": {
+      "usage": 3.84,
+      "limit": 25,
+      "usedPercent": 15.36
+    },
+    "storageBytes": 3245882218,
+    "bandwidthBytes": 821051843
+  },
+  "results": [
+    {
+      "target": "finesse-original",
+      "status": "verified-cdn",
+      "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+      "assetId": "55cffcf1-c8e6-5d52-8454-99834d231981",
+      "sourceAssetId": "9a17a594-4115-4e08-a4c9-8a7b30c1d244",
+      "bytes": 7802010,
+      "sha256": "c39fec009224ce6f42fb43fc8f6290d75ff19d0d9cf432348a941785760c29aa",
+      "elapsedMs": 12785
+    },
+    {
+      "target": "finesse-cardi-b-remix",
+      "status": "verified-cdn",
+      "recordingId": "b5314d9d-c917-441a-bb3b-1b4a792c2148",
+      "assetId": "e9fd580c-55dd-5d21-87b5-141cd67c5166",
+      "sourceAssetId": "30575410-09a4-4838-9c5b-8fd5ce4c8381",
+      "bytes": 8967525,
+      "sha256": "466a5e9e3d4c7fc414ef40240c83dcd8a473c00973f954c2bb2c2983e8fd774b",
+      "elapsedMs": 21236
+    },
+    {
+      "target": "inertia-sawano-rei",
+      "status": "verified-cdn",
+      "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+      "assetId": "cfe12c3c-fbf2-599a-8491-5aa3124843cc",
+      "sourceAssetId": "c0200005-84cb-4520-a8e1-9a0e8cc474dc",
+      "bytes": 8316270,
+      "sha256": "ab6be93def6032314b73b743dfa0c07da9885745c555c5c202a802ba2fc69a9f",
+      "elapsedMs": 23545
+    },
+    {
+      "target": "ye-burna-boy",
+      "status": "verified-cdn",
+      "recordingId": "aaa1b85f-d1bc-495d-8377-02b20b888929",
+      "assetId": "c110d3c3-2e8c-55e6-8dca-15ce4c137f46",
+      "sourceAssetId": "9fc62873-642b-40c7-824b-aa0fdc0e69e0",
+      "bytes": 9342273,
+      "sha256": "40b45a7f60fa5866e9ca08914722f1d1830377849d73397bf48ceb61acbac62e",
+      "elapsedMs": 32342
+    }
+  ]
+}

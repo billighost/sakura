@@ -1,0 +1,17 @@
+{
+  "checkedOn": "2026-11-07",
+  "method": "Read-only live probes of original Finesse; no account changes, bot searches or mocked upstream audio. Measurements are samples under variable network conditions.",
+  "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+  "cdnAssetId": "55cffcf1-c8e6-5d52-8454-99834d231981",
+  "sourceAssetId": "9a17a594-4115-4e08-a4c9-8a7b30c1d244",
+  "expectedBytes": 7802010,
+  "expectedSha256": "c39fec009224ce6f42fb43fc8f6290d75ff19d0d9cf432348a941785760c29aa",
+  "observations": [
+    {"delivery":"node-direct-cdn-range","status":206,"bytes":4096,"headersMs":967,"totalMs":1028,"sha256":"66f90abb02e62d028b6e6ed42eeb79bb97ce5309bc0083e518c55e0f80a20504","completeRequestedRange":true},
+    {"delivery":"node-direct-cdn-full","deadlineMs":30000,"receivedBytes":1732706,"totalMs":30006,"error":"TimeoutError","complete":false},
+    {"delivery":"node-original-worker-full","status":200,"headersMs":2413,"totalMs":12267,"bytes":7802010,"matchesExpectedSha256":true,"complete":true},
+    {"delivery":"node-requested-cdn-via-marked-source-gateway","status":200,"responseDelivery":"verified-source-fallback","headersMs":4239,"totalMs":80808,"bytes":7802010,"matchesExpectedSha256":true,"complete":true,"stage":"Before explicit gateway body-cancellation guard"},
+    {"delivery":"node-marked-source-gateway-cancellation","status":200,"responseDelivery":"verified-source-fallback","bodyMs":1013,"bytesBeforeCancellation":65491,"error":"AbortError","complete":false,"stage":"After explicit gateway body-cancellation guard"}
+  ],
+  "limits":"Historical Chrome CDN startup samples of1.9-3.8seconds do not imply consistent current performance. Partial or canceled transfers cannot be committed as offline artifacts. Production application acceptance remains required."
+}

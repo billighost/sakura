@@ -1,0 +1,98 @@
+import { validTimeZone } from "../bloom/calendar";
+export class ProductError extends Error {
+  constructor(readonly status: number, message: string) { super(message); this.name = "ProductError"; }
+}
+export function object(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ProductError(400, "Expected an object");
+  return value as Record<string, unknown>;
+}
+export function uuid(value: unknown, label = "ID"): string {
+  if (typeof value !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value)) throw new ProductError(400, `Invalid ${label}`);
+  return value.toLowerCase();
+}
+export function text(value: unknown, label: string, max: number, allowEmpty = false): string {
+  if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new ProductError(400, `Invalid ${label}`);
+  return value.trim();
+}
+export function integer(value: unknown, label: string, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max) throw new ProductError(400, `Invalid ${label}`);
+  return value;
+}
+export function strings(value: unknown, label: string, limit: number, maxLength = 120): string[] {
+  if (!Array.isArray(value) || value.length > limit) throw new ProductError(400, `Invalid ${label}`);
+  return [...new Set(value.map(v => text(v,label,maxLength)))];
+}
+export function ids(value: unknown, limit = 200): string[] {
+  if (!Array.isArray(value) || value.length > limit) throw new ProductError(400,"Invalid recording list");
+  const parsed = value.map(v=>uuid(v,"recording ID"));
+  if (new Set(parsed).size !== parsed.length) throw new ProductError(400,"Duplicate recording IDs");
+  return parsed;
+}
+export const DEFAULT_SETTINGS = {
+  theme: "system", audioQuality: "high", privateSession: false, discovery: 0.35,
+  reducedMotion: false, openingAnimation: 0, explicitContent: true,
+  timeZone: "Africa/Lagos", seedArtistSelections: [],
+} as const;
+export function preferencesPatch(value: unknown): Record<string,unknown> {
+  const raw = object(value), result: Record<string,unknown> = {};
+  const choices: Record<string,readonly string[]> = { theme:["system","dark","light"], audioQuality:["high","balanced","data-saver"] };
+  const booleans = ["privateSession","reducedMotion","explicitContent"];
+  const allowed = new Set([...Object.keys(choices),...booleans,"discovery","openingAnimation","seedArtists","seedArtistSelections","seedGenres","onboarded","timeZone"]);
+  if (Object.keys(raw).some(key=>!allowed.has(key))) throw new ProductError(400,"Unsupported setting");
+  for (const [key,values] of Object.entries(choices)) if (raw[key] !== undefined) {
+    if (typeof raw[key] !== "string" || !values.includes(raw[key] as string)) throw new ProductError(400,`Invalid ${key}`);
+    result[key] = raw[key];
+  }
+  for (const key of booleans) if (raw[key] !== undefined) {
+    if (typeof raw[key] !== "boolean") throw new ProductError(400,`Invalid ${key}`);
+    result[key] = raw[key];
+  }
+  if (raw.discovery !== undefined) {
+    if (typeof raw.discovery !== "number" || !Number.isFinite(raw.discovery) || raw.discovery < 0 || raw.discovery > 1) throw new ProductError(400,"Invalid discovery preference");
+    result.discovery = raw.discovery;
+  }
+  if (raw.openingAnimation !== undefined) result.openingAnimation = integer(raw.openingAnimation,"opening animation",0,4);
+  if (raw.seedArtists !== undefined) result.seedArtists = strings(raw.seedArtists,"seed artists",20);
+  if(raw.timeZone!==undefined){if(!validTimeZone(raw.timeZone))throw new ProductError(400,"Invalid timezone");result.timeZone=raw.timeZone;}
+  if(raw.seedArtistSelections!==undefined){
+    if(!Array.isArray(raw.seedArtistSelections)||raw.seedArtistSelections.length>20)throw new ProductError(400,"Invalid artist selections");
+    const selections=raw.seedArtistSelections.map(value=>{
+      const choice=object(value),ref=object(choice.reference),name=text(choice.name,"artist name",120);
+      if(!["deezer","spotify"].includes(String(ref.provider)))throw new ProductError(400,"Invalid artist provider");
+      const id=text(ref.id,"artist reference",80);
+      if((ref.provider==="deezer"&&!/^[1-9]\d{0,17}$/.test(id))||(ref.provider==="spotify"&&!/^[A-Za-z0-9]{22}$/.test(id)))throw new ProductError(400,"Invalid artist reference");
+      return {name,reference:{provider:ref.provider,id},selectionKey:`artist:${ref.provider}:${id}`};
+    });
+    result.seedArtistSelections=[...new Map(selections.map(s=>[s.selectionKey,s])).values()];
+    // Existing clients use names; keep those preferences coherent when exact
+    // choices arrive without the legacy field.
+    if(raw.seedArtists===undefined)result.seedArtists=[...new Set(selections.map(s=>s.name))];
+  }
+  if (raw.seedGenres !== undefined) result.seedGenres = strings(raw.seedGenres,"seed genres",12,80);
+  if (raw.onboarded !== undefined) {
+    if (typeof raw.onboarded !== "boolean") throw new ProductError(400,"Invalid onboarding state");
+    result.onboarded = raw.onboarded;
+  }
+  return result;
+}
+
+export interface PageCursor { timestamp: string; id: string }
+export function encodeCursor(timestamp: Date | string,id: string): string {
+  return Buffer.from(JSON.stringify({timestamp:new Date(timestamp).toISOString(),id})).toString("base64url");
+}
+export function pageInput(url: URL): { limit: number; cursor: PageCursor | null } {
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit === null ? 50 : integer(Number(rawLimit),"page size",1,100);
+  const raw = url.searchParams.get("cursor");
+  let cursor: PageCursor | null = null;
+  if (raw) {
+    try {
+      if (raw.length > 300) throw new Error();
+      const parsed = object(JSON.parse(Buffer.from(raw,"base64url").toString("utf8")));
+      const timestamp = text(parsed.timestamp,"cursor date",40), id = uuid(parsed.id,"cursor ID");
+      if (!Number.isFinite(Date.parse(timestamp))) throw new Error();
+      cursor = { timestamp:new Date(timestamp).toISOString(),id };
+    } catch { throw new ProductError(400,"Invalid page cursor"); }
+  }
+  return { limit,cursor };
+}

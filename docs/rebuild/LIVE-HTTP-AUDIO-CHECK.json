@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-11-07T05:38:14.037Z",
+  "measurement": "Real signed-in localhost HTTP resolver and gateway, excludes actual browser media decode.",
+  "results": [
+    {
+      "reference": {
+        "provider": "deezer",
+        "id": "136336124"
+      },
+      "recordingId": "978daa16-2cda-4525-b784-9503cd2743fb",
+      "title": "Finesse",
+      "firstHttpResolveMs": 3913,
+      "warmHttpResolveMs": 973,
+      "gatewayRangeStatus": 206,
+      "rangeBytes": 4096
+    },
+    {
+      "reference": {
+        "provider": "spotify",
+        "id": "2lEl1iNGpz9r2B7R5BqXSD"
+      },
+      "recordingId": "aaa1b85f-d1bc-495d-8377-02b20b888929",
+      "title": "Ye",
+      "firstHttpResolveMs": 1392,
+      "warmHttpResolveMs": 863,
+      "gatewayRangeStatus": 206,
+      "rangeBytes": 4096
+    }
+  ]
+}

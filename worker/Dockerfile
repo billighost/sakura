@@ -15,6 +15,7 @@ COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 COPY telegram.js index.js login.js ./
+COPY rebuild ./rebuild
 
 # Where the cached (post-DC-migration) session lives. Mount a volume here to
 # skip the migration handshake on every boot; without one it is simply re-derived

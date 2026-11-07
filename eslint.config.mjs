@@ -12,7 +12,18 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".local/**",
+    "test-results/**",
+    "playwright-report/**",
+    "worker/rebuild/**",
   ]),
+  {
+    files: ["worker/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-this-alias": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

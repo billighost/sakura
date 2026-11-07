@@ -1,3 +1,2 @@
-import { handlers } from "@/lib/auth";
-
+import { handlers } from "@/rebuild/auth-engine";
 export const { GET, POST } = handlers;
