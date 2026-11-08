@@ -44,13 +44,16 @@ test("preference acknowledgement removes sent fields while preserving newer edit
  assert.deepEqual(unacknowledgedPreferences({volume:.2,theme:"dark",repeat:"all"},{volume:.8,theme:"dark"}),{volume:.2,repeat:"all"});
  assert.deepEqual(unacknowledgedPreferences({seedArtists:["Rihanna"]},{seedArtists:["Rihanna"]}),{});
 });
-test("first-paint theme uses only the active account cache and tolerates storage damage",()=>{
- const source=readFileSync("src/app/layout.tsx","utf8").match(/const themeScript = `([^`]+)`;/)?.[1];assert.ok(source);
- const render=(values:Record<string,string>,deviceDark=false,blocked=false)=>{const document={documentElement:{dataset:{} as Record<string,string>}};vm.runInNewContext(source,{document,localStorage:{getItem:(key:string)=>{if(blocked)throw new Error("blocked");return values[key]||null;}},matchMedia:()=>({matches:deviceDark})});return document.documentElement.dataset.inkTheme;};
+test("first-paint theme and opening use only the active account cache and tolerate storage damage",()=>{
+ const source=readFileSync("src/app/layout.tsx","utf8").match(/const bootScript = `([^`]+)`;/)?.[1];assert.ok(source);
+ const render=(values:Record<string,string>,deviceDark=false,blocked=false,openingSeen=false)=>{const document={documentElement:{dataset:{} as Record<string,string>,style:{setProperty:()=>undefined}}};vm.runInNewContext(source,{document,localStorage:{getItem:(key:string)=>{if(blocked)throw new Error("blocked");return values[key]||null;}},sessionStorage:{getItem:()=>openingSeen?"1":null},matchMedia:()=>({matches:deviceDark})});return document.documentElement.dataset;};
  const cache={"sakura-v2-active-account":"a","sakura-v2-preferences:a":JSON.stringify({settings:{theme:"dark"}})};
- assert.equal(render(cache),"dark");assert.equal(render({...cache,"sakura-v2-preferences:a":JSON.stringify({settings:{theme:"light"}})},true),"light");
- assert.equal(render({"sakura-v2-active-account":"b","sakura-v2-theme":"dark"}),"light");
- assert.equal(render({...cache,"sakura-v2-preferences:a":"{"}),"light");assert.equal(render({},true,true),"dark");
+ assert.equal(render(cache).inkTheme,"dark");assert.equal(render({...cache,"sakura-v2-preferences:a":JSON.stringify({settings:{theme:"light"}})},true).inkTheme,"light");
+ assert.equal(render({"sakura-v2-active-account":"b","sakura-v2-theme":"dark"}).inkTheme,"light");
+ assert.equal(render({...cache,"sakura-v2-preferences:a":"{"}).inkTheme,"light");assert.equal(render({},true,true).inkTheme,"dark");
+ assert.equal(render(cache).sakuraOpening,"pending");
+ assert.equal(render({...cache,"sakura-v2-preferences:a":JSON.stringify({settings:{theme:"dark",openingAnimation:0}})}).sakuraOpening,undefined);
+ assert.equal(render(cache,false,false,true).sakuraOpening,undefined);
 });
 test("offline favorite intentions overlay remote reads and follow resolved recording identity",()=>{
  const intent:FavoriteIntent={track,liked:true,operationId:randomUUID()};
