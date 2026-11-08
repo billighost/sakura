@@ -1,6 +1,7 @@
 import type { ProviderReference, RecordingVersion } from "../core/types";
 import type {ReadyPlayback} from "../data/catalog";
 import type {AudioTechnology} from "../audio/presets";
+import { collectionDate } from "../core/collectionDate";
 export interface MusicTrack {
  id: string;
  title: string;
@@ -20,6 +21,8 @@ export interface MusicTrack {
  audioUrl?: string;
  readyPlayback?: ReadyPlayback;
  explicit?: boolean;
+ /** When this recording was added to the current library or collection. */
+ addedAt?: string | number;
 }
 export interface Account { id:string;username:string;email:string;avatarUrl?:string|null; }
 export type PlaybackStatus = "idle"|"resolving"|"buffering"|"playing"|"paused"|"error";
@@ -42,5 +45,5 @@ export function musicTrack(raw:Record<string,unknown>):MusicTrack {
  return {id:String(raw.recordingId||raw.id||reference.provider+":"+reference.id),title:String(metadata.title||""),artists:Array.isArray(metadata.artists)?metadata.artists.map(String):[],artistsComplete:typeof metadata.artistsComplete==="boolean"?metadata.artistsComplete:undefined,artistCredits:Array.isArray(raw.artistCredits)?raw.artistCredits as MusicTrack["artistCredits"]:Array.isArray(metadata.artistCredits)?metadata.artistCredits as MusicTrack["artistCredits"]:undefined,
  artistId:raw.artistId?String(raw.artistId):null,albumId:raw.albumId?String(raw.albumId):null,albumTitle:raw.albumTitle||metadata.albumTitle?String(raw.albumTitle||metadata.albumTitle):null,
  durationMs:Number(metadata.durationMs)||0,coverUrl:typeof (raw.coverUrl||metadata.coverUrl)==="string"?String(raw.coverUrl||metadata.coverUrl):null,versionLabel:typeof raw.versionLabel==="string"?raw.versionLabel:version?.labels?.length?version.labels.join(" · "):version?.kinds?.length?version.kinds.join(" · "):"Original recording",
- reference,references:references.length?references:[reference],explicit:metadata.explicit==="explicit",version:version as RecordingVersion|undefined,genres:Array.isArray(raw.genres)?raw.genres.map(String):[],readyPlayback:raw.readyPlayback as ReadyPlayback|undefined};
+ reference,references:references.length?references:[reference],explicit:metadata.explicit==="explicit",version:version as RecordingVersion|undefined,genres:Array.isArray(raw.genres)?raw.genres.map(String):[],readyPlayback:raw.readyPlayback as ReadyPlayback|undefined,addedAt:collectionDate(raw.addedAt)};
 }

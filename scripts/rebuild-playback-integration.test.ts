@@ -28,6 +28,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  const windowEvents=new Map<string,Set<()=>void>>(),documentEvents=new Map<string,Set<()=>void>>(),timers=new Set<ReturnType<typeof setTimeout>>();
  const registrations:Array<{accountId:string;track:MusicTrack;ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>;resolve?:(url:string|undefined)=>void}>=[],resolvers:Array<{track:MusicTrack;resolve:(result:unknown)=>void;signal:AbortSignal}>=[],ensured:Array<{id:string;offset:number;signal?:AbortSignal}>=[];
  const prepares:string[]=[],enqueues:Array<{id:string;requested:boolean}>=[],disposed:string[]=[],objectUrls:string[]=[],revokedUrls:string[]=[],partials=new Map<string,{fingerprint:{assetId:string;sizeBytes:number;sha256:string};blob:Blob;cachedSeconds:number}>();
+ const downloadResolvers:Array<(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>>=[];
  const entries:Record<string,{recordingId:string;requested:boolean;status:string;track:MusicTrack}>={};
  const accountEntries=new Map([[accountId,entries]]),accountStorage=new Map([[accountId,saved]]);
  let media:FixtureAudio|undefined,revocations=0,closed=false,renderQueued=false,stateSlot=0,refSlot=0,effectSlot=0,profileId=accountId,loggedOut=false,value:MusicState;
@@ -53,7 +54,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
   async play(){if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");this.paused=false;this.emit("playing");}
  }
  class Manager {
-  constructor(private options:{accountId:string;onChange:(value:unknown)=>void}){}
+  constructor(private options:{accountId:string;onChange:(value:unknown)=>void;resolve:(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>}){downloadResolvers.push(options.resolve);}
   private get records(){let records=accountEntries.get(this.options.accountId);if(!records){records={};accountEntries.set(this.options.accountId,records);}return records;}
   async hydrate(){this.options.onChange({...this.records});}
   setPriorities(){}
@@ -81,8 +82,21 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {get value(){return value;},states,requests,requestOwners,media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1){resolvers[index].resolve(resolved(resolvers[index].track));},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {get value(){return value;},states,requests,requestOwners,media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
+
+test("Retry song refreshes a failed ready source and its cached resolution while keeping the position",async()=>{
+ const p=await player({bridge:false,deferResolve:true});try{
+  const track=song();p.value.play(track);await until(()=>p.value.status==="playing");assert.equal(p.resolvers.length,0);p.media.currentTime=37.25;p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.value.status==="error");
+  p.value.togglePlay();await until(()=>p.resolvers.length===1);const fresh={...track,readyPlayback:{...track.readyPlayback!,url:track.readyPlayback!.url.replace("/v123/","/v124/")}};p.resolve(0,fresh);await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.src,fresh.readyPlayback.url);assert.equal(p.media.currentTime,37.25);assert.equal(p.requests.filter(path=>path.includes("recordings/resolve")).length,1);
+ }finally{p.close();}
+});
+
+test("failed download source refresh reaches the server through the provider's resolver callback",async()=>{
+ const p=await player({deferResolve:true});try{
+  const track=song();p.value.requestDownload(track);await until(()=>p.downloadResolvers.length===1);const waiting=p.downloadResolvers[0](track,new AbortController().signal,{refresh:true});await until(()=>p.resolvers.length===1);const fresh={...track,readyPlayback:{...track.readyPlayback!,url:track.readyPlayback!.url.replace("/v123/","/v125/")}};p.resolve(0,fresh);assert.equal((await waiting).url,fresh.readyPlayback.url);
+ }finally{p.close();}
+});
 
 test("terminal media failures stop automatic full-file work but preserve explicit downloads",async()=>{
  const p=await player();try{

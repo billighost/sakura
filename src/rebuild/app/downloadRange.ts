@@ -1,4 +1,5 @@
 import {fetchAudioHeaders} from "../core/streaming";
+import {responseIssue,UserFacingError} from "./errors";
 
 const MAX_BYTES=120*1024*1024;
 export class DownloadIntegrityError extends Error {
@@ -7,12 +8,28 @@ export class DownloadIntegrityError extends Error {
 }
 export async function audioSha256(blob:Blob):Promise<string>{const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());return Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,"0")).join("");}
 
+/** Only a small, promptly delivered JSON error may supply an application reason. */
+async function audioResponseError(response:Response,signal:AbortSignal,timeoutMs:number):Promise<UserFacingError>{
+ let payload:unknown;
+ const length=response.headers.get("Content-Length");
+ if(response.body&&/^application\/json(?:;|$)/i.test(response.headers.get("Content-Type")||"")&&!(length!==null&&Number(length)>4096)){
+  const reader=response.body.getReader();let timer:ReturnType<typeof setTimeout>|undefined,abort=()=>{};
+  try{payload=await Promise.race([
+   (async()=>{const decoder=new TextDecoder();let text="",bytes=0;while(true){const chunk=await reader.read();signal.throwIfAborted();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>4096)return; text+=decoder.decode(chunk.value,{stream:true});}return JSON.parse(text+decoder.decode());})(),
+   new Promise<undefined>((resolve,reject)=>{abort=()=>reject(signal.reason??new DOMException("Canceled","AbortError"));signal.addEventListener("abort",abort,{once:true});if(signal.aborted){abort();return;}timer=setTimeout(()=>resolve(undefined),Math.min(timeoutMs,1000));}),
+  ]);}catch{signal.throwIfAborted();}
+  finally{if(timer)clearTimeout(timer);signal.removeEventListener("abort",abort);void reader.cancel().catch(()=>{});reader.releaseLock();}
+ }else void response.body?.cancel().catch(()=>{});
+ signal.throwIfAborted();return new UserFacingError(responseIssue(response.status,payload,"download"));
+}
+
 /** A 200 response is a whole file, never a chunk at the requested offset. */
 export async function readAudioRange(response:Response,start:number,end:number,total:number,signal:AbortSignal,onProgress:(bytes:number)=>void=()=>{},idleTimeoutMs=15000,allowWhole=true,onMode:(whole:boolean)=>void=()=>{}):Promise<{blob:Blob;whole:boolean}> {
  if(signal.aborted){void response.body?.cancel().catch(()=>{});signal.throwIfAborted();}
  const rejectResponse=(message:string,retryAlternate=true):never=>{void response.body?.cancel().catch(()=>{});throw new DownloadIntegrityError(message,retryAlternate);};
  if(!Number.isSafeInteger(total)||total<=0||total>MAX_BYTES||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<start||end>=total)return rejectResponse("This audio file cannot be saved on this device.",false);
- if(!response.ok||!response.body){void response.body?.cancel().catch(()=>{});throw new Error("The audio download did not start.");}
+ if(!response.ok)throw await audioResponseError(response,signal,idleTimeoutMs);
+ if(!response.body)throw new Error("The audio download did not start.");
  const mime=response.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase()||"";
  if(!mime.startsWith("audio/"))return rejectResponse("The source did not return an audio file.");
  let expected=end-start+1,whole=false,wrongWholeOffset=false;

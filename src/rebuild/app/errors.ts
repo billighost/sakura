@@ -12,6 +12,7 @@ const issues: Record<FailureKind, UserIssue> = {
  storage: {kind:"storage",title:"Your device needs a little room.",message:"This device couldn’t save the song. Free some storage or allow browser storage, then try again. You can still stream online.",action:"Retry download",href:"/library/downloaded",linkLabel:"Manage downloads"},
  unknown: {kind:"unknown",title:"That didn’t finish this time.",message:"Something interrupted this step. Try again, or return to your music and come back later.",action:"Try again",href:"/home",linkLabel:"Return to music"},
 };
+const audioUnavailableIssue:UserIssue={...issues.missing,title:"Audio is still being found for this song.",message:"We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",action:"Check again",linkLabel:"Find other versions"};
 const fallbacks: Record<ErrorContext, UserIssue> = {
  page: issues.connection, account: issues.connection,
  playback: {...issues.connection,title:"This song couldn’t start.",action:"Retry song"},
@@ -30,7 +31,7 @@ export function userIssue(error: unknown, context: ErrorContext = "page"): UserI
  const message=error instanceof Error?error.message:typeof error==="string"?error:"";
  const remembered=rememberedIssues.get(context+":"+message);if(remembered)return remembered;
  // Only known application copy is reused. Exception text and response bodies never reach the screen.
- const known=[fallbacks[context],...Object.values(issues)].find(issue=>issue.message===message);
+ const known=[fallbacks[context],audioUnavailableIssue,...Object.values(issues)].find(issue=>issue.message===message);
  if(known)return known;
  if(name==="QuotaExceededError"||name==="SecurityError"||name==="InvalidStateError")return issues.storage;
  if(/different or uncertain recording|recording.+(match|verify)|identity-conflict|ambiguous-audio|asset-mismatch|catalog-mismatch/.test(message))return issues.version;
@@ -56,7 +57,7 @@ export function responseIssue(status:number, payload:unknown, context:ErrorConte
   const message=typeof value.error==="string"?validation[value.error]:undefined;
   return {...issues.validation,...(message?{message}:{})};
  }
- if(reason==="no-ready-audio"||reason==="audio-source-unavailable"||reason==="unsupported-provider")return {...issues.missing,title:"Audio is still being found for this song.",message:"We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",action:"Check again",linkLabel:"Find other versions"};
+ if(reason==="no-ready-audio"||reason==="audio-source-unavailable"||reason==="unsupported-provider")return audioUnavailableIssue;
  return fallbacks[context];
 }
 export interface JsonOptions {context?:ErrorContext;acceptStatuses?:number[];timeoutMs?:number;accountId?:string}

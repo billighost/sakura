@@ -3,6 +3,7 @@ import {test} from "node:test";
 import {createHash} from "node:crypto";
 import {DurableDownloadManager,type DownloadSource,type DownloadStorage,type PartialDownloadRecord} from "../src/rebuild/app/downloadEngine";
 import {readAudioRange} from "../src/rebuild/app/downloadRange";
+import {UserFacingError,userIssue} from "../src/rebuild/app/errors";
 import type {DownloadChunk} from "../src/rebuild/app/downloadTypes";
 import type {DownloadEntry,MusicTrack} from "../src/rebuild/app/types";
 import type {OfflineAudio} from "../src/rebuild/app/offline";
@@ -40,6 +41,56 @@ test("range reader rejects shifted/unknown totals and HTML, accepts whole200 onl
  await assert.rejects(readAudioRange(new Response(data,{headers:{"Content-Type":"text/html"}}),0,3,4,signal),/audio file/);
  await assert.rejects(readAudioRange(new Response(data,{headers:{"Content-Type":"audio/mpeg"}}),1,3,4,signal),/cannot resume/);
  assert.equal((await readAudioRange(new Response(data,{headers:{"Content-Type":"audio/mpeg"}}),0,1,4,signal)).whole,true);
+});
+
+test("audio error responses preserve source availability, session and retry instructions",async()=>{
+ for(const [status,reason,kind]of [[502,"audio-source-unavailable","missing"],[401,"account-mismatch","session"],[429,"backend-unavailable","busy"],[409,"asset-mismatch","version"]] as const){
+  await assert.rejects(readAudioRange(Response.json({status:"unavailable",reason,error:"secret upstream details"},{status}),0,3,4,new AbortController().signal),(error:unknown)=>{
+   assert.ok(error instanceof UserFacingError);assert.equal(userIssue(error,"download").kind,kind);assert.doesNotMatch(error.message,/secret|upstream/);return true;
+  });
+ }
+});
+
+test("audio error parsing joins fragmented JSON and rejects malformed or oversized error details",async()=>{
+ const encoder=new TextEncoder(),json=JSON.stringify({reason:"audio-source-unavailable"});
+ const fragmented=new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(encoder.encode(json.slice(0,12)));controller.enqueue(encoder.encode(json.slice(12)));controller.close();}}),{status:502,headers:{"Content-Type":"application/json; charset=utf-8"}});
+ await assert.rejects(readAudioRange(fragmented,0,3,4,new AbortController().signal),(error:unknown)=>error instanceof UserFacingError&&error.issue.kind==="missing");
+ for(const body of ["{broken secret json",JSON.stringify({reason:"audio-source-unavailable",error:"secret".repeat(1000)})]){
+  let canceled=false;const response=new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(encoder.encode(body));if(body.length<4096)controller.close();},cancel(){canceled=true;}}),{status:502,headers:{"Content-Type":"application/json"}});
+  await assert.rejects(readAudioRange(response,0,3,4,new AbortController().signal),(error:unknown)=>error instanceof UserFacingError&&error.issue.kind==="connection"&&!/secret/.test(error.message));
+  if(body.length>4096)await until(()=>canceled);
+ }
+});
+
+test("stalled audio error bodies stop promptly and caller cancellation stays cancelable",async()=>{
+ for(const cancel of [false,true]){
+  let canceled=false;const controller=new AbortController(),response=new Response(new ReadableStream<Uint8Array>({cancel(){canceled=true;}}),{status:502,headers:{"Content-Type":"application/json"}});
+  const waiting=readAudioRange(response,0,3,4,controller.signal,()=>{},10);if(cancel)controller.abort();
+  await assert.rejects(waiting,(error:unknown)=>cancel?error instanceof DOMException&&error.name==="AbortError":error instanceof UserFacingError&&error.issue.kind==="connection");await until(()=>canceled);
+ }
+});
+
+test("a structured source failure still retries the same verified range through its alternate",async()=>{
+ const data=bytes(4096),storage=new MemoryStorage(),requests:string[]=[];let snapshot:Record<string,DownloadEntry>={};
+ const manager=new DurableDownloadManager({accountId:"account-a",storage,chunkBytes:4096,onChange:rows=>{snapshot=rows;},resolve:async value=>({track:value,url:"https://cdn.example/1",fallbackUrl:"/api/v2/recordings/1/audio?assetId=asset-1",assetId:"asset-1",sizeBytes:data.length,sha256:sha(data)}),fetcher:async(input,init)=>{
+  requests.push(String(input));assert.equal(new Headers(init?.headers).get("Range"),"bytes=0-4095");if(requests.length===1)return Response.json({status:"unavailable",reason:"audio-source-unavailable"},{status:502});
+  return new Response(data,{status:206,headers:{"Content-Type":"audio/mpeg","Content-Length":String(data.length),"Content-Range":`bytes 0-4095/${data.length}`}});
+ }});
+ try{await manager.enqueue(track("1"));assert.deepEqual(requests,["/api/v2/recordings/1/audio?assetId=asset-1","https://cdn.example/1"]);assert.equal(snapshot["1"].status,"ready");assert.equal(storage.audio.get("1")?.sha256,sha(data));}finally{manager.dispose();}
+});
+
+for(const reload of [false,true])for(const changed of [false,true])test(`failed download retry refreshes its source ${reload?"after reopening":"in the same session"} and ${changed?"replaces changed bytes":"retains matching chunks"}`,async()=>{
+ const original=bytes(12288),replacement=changed?original.map(value=>value^64):original,storage=new MemoryStorage(),requests:Array<{url:string;start:number}>=[],resolutions:boolean[]=[];let snapshot:Record<string,DownloadEntry>={};
+ const make=()=>new DurableDownloadManager({accountId:"account-a",storage,chunkBytes:4096,maxChunksPerSong:1,onChange:rows=>{snapshot=rows;},resolve:async(value,_signal,options)=>{const refresh=options?.refresh===true;resolutions.push(refresh);return {track:value,url:refresh?"https://cdn.example/fresh":"https://cdn.example/stale",assetId:refresh?"asset-new":"asset-old",sizeBytes:original.length,sha256:sha(refresh?replacement:original)};},fetcher:async(input,init)=>{
+  const url=String(input),range=/bytes=(\d+)-(\d+)/.exec(new Headers(init?.headers).get("Range")||"")!,start=Number(range[1]),end=Number(range[2]);requests.push({url,start});if(url.endsWith("stale")&&start>0)return Response.json({status:"unavailable",reason:"audio-source-unavailable"},{status:502});
+  const payload=(url.endsWith("fresh")?replacement:original).slice(start,end+1);return new Response(payload,{status:206,headers:{"Content-Type":"audio/mpeg","Content-Length":String(payload.length),"Content-Range":`bytes ${start}-${end}/${original.length}`}});
+ }});
+ let manager=make();try{
+  await assert.rejects(manager.enqueue(track("1")),(error:unknown)=>error instanceof UserFacingError&&error.issue.kind==="missing");await until(()=>storage.records.get("1")?.refreshSource===true);assert.deepEqual([...storage.parts.get("1")!.keys()],[0]);assert.deepEqual(resolutions,[false]);
+  if(reload){manager.dispose();manager=make();await manager.hydrate();}
+  const before=requests.length,retry=manager.resume("1"),joined=manager.enqueue(track("1"));assert.equal(retry,joined);await retry;
+  assert.deepEqual(resolutions,[false,true]);assert.deepEqual(requests.slice(before).map(request=>request.url),Array(changed?3:2).fill("https://cdn.example/fresh"));assert.deepEqual(requests.slice(before).map(request=>request.start),changed?[0,4096,8192]:[4096,8192]);assert.equal(snapshot["1"].status,"ready");assert.equal(storage.audio.get("1")?.sha256,sha(replacement));
+ }finally{manager.dispose();}
 });
 test("duplicate clicks join one recording job; chunks run concurrently and publish only matching complete audio",async()=>{
  const s=setup({delay:5});try{const a=s.manager.enqueue(track("1")),b=s.manager.enqueue(track("1"));assert.equal(a,b);await a;assert.equal(s.requests,8);assert.equal(s.maxActive,2);assert.equal(s.snapshot["1"].status,"ready");assert.equal(s.storage.records.size,0);assert.equal(s.storage.parts.size,0);assert.equal(sha(new Uint8Array(await s.storage.audio.get("1")!.blob.arrayBuffer())),sha(s.data));}finally{s.manager.dispose();}

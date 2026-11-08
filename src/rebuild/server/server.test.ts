@@ -543,6 +543,30 @@ test("expired final audio job lease terminates polling with a retryable failure"
  assert.equal(job.state,"failed");
 });
 
+test("slow source recovery leaves preparation only the remaining job lease budget",async(context)=>{
+ const repo=new MemoryRepository();repo.assets=[];
+ const job={id:assetId,accountId,recordingId,state:"queued",result:null as unknown,attempts:0};
+ const query:ReadonlySql=async<Row>(statement:string,args:readonly unknown[])=>{
+  if(statement.startsWith('INSERT INTO sakura_v2."AudioResolveJob"'))return[{id:job.id}]as Row[];
+  if(statement.startsWith('UPDATE sakura_v2."AudioResolveJob" SET state=\'resolving\'')){assert.ok(statement.includes("INTERVAL '115 seconds'"));job.state="resolving";job.attempts++;return[job]as Row[];}
+  if(statement.startsWith('UPDATE sakura_v2."AudioResolveJob" SET state=$2')){job.state=String(args[1]);job.result=JSON.parse(String(args[2]));return[];}
+  return[job]as Row[];
+ };
+ const startedAt=Date.now(),budgets:number[]=[];let elapsed=0;
+ context.mock.method(Date,"now",()=>startedAt+elapsed);
+ context.mock.method(AbortSignal,"timeout",(milliseconds:number)=>{budgets.push(milliseconds);return new AbortController().signal;});
+ class Ingestor extends RecordingIngestor{override async persistAudio(_recording:CanonicalRecording,asset:StoredAudioAsset){repo.assets.push(asset);}}
+ class Promotions extends AudioPromotions{
+  override needsPreparation(){return true;}
+  override async prepare():Promise<StoredAudioAsset>{throw new AudioPromotionError("provider","Preparation reached the remaining transfer deadline");}
+ }
+ const ingestor=new Ingestor(ingestionDatabase().transaction,[]);
+ const jobs=new AudioResolutionJobs(query,repo,ingestor,{async discover(){elapsed=80000;return{status:"ready",asset:source};}},new RecordingResolver(repo,[]),undefined,new Promotions({async open(){throw new Error("No audio transfer is needed in this regression");}},ingestor));
+ const pending=await jobs.enqueue(canonical,accountId);assert.equal(pending.status,"pending");if(pending.status!=="pending")return;
+ await jobs.process(pending.jobId);
+ assert.deepEqual(budgets,[90000,30000]);assert.equal((await jobs.get(pending.jobId,accountId))?.status,"resolved");assert.equal(repo.assets[0].assetId,source.assetId);
+});
+
 test("YouTube metadata parser preserves braces and script delimiters inside song titles",()=>{
  const value={title:'Song }; with \\"quoted\\" text',nested:{items:[{title:"Japanese 日本語"}]}};
  assert.deepEqual(youtubeInitialData(`<script>var ytInitialData =\n${JSON.stringify(value)}; anotherScript();</script>`),value);
@@ -861,6 +885,36 @@ test("native source recovery retries an older v2 worker with a whole authoritati
  assert.deepEqual(requests[1].reference,localizedReference);assert.deepEqual(requests[1].metadata,parseRecordingMetadata(nativeMetadata));
  assert.ok((requests[1].references as ProviderReference[]).some(ref=>ref.provider==="isrc"&&ref.id===localizedIsrc.id));
  if(result.status==="ready"){assert.ok(result.verifiedMetadata?.verifiedAliases?.length);assert.equal(result.asset.recordingId,recordingId);}
+});
+
+test("production discovery reaches native tags before a slower localized title exhausts its deadline",async(context)=>{
+ const singleMetadata={...localizedMetadata,title:"咆哮",durationMs:209398};
+ const singleReference:ProviderReference={provider:"spotify",id:"7rc79XVkUIvmK4TINjXhl1"};
+ const selected:CanonicalRecording={...localizedRecording,metadata:withVerifiedCatalogAliases({metadata:singleMetadata,references:[singleReference,localizedIsrc]},[{reference:localizedReference,references:[localizedReference,localizedIsrc],metadata:localizedMetadata}]),references:[localizedReference,localizedIsrc,singleReference]};
+ const controller=new AbortController(),startedAt=Date.now();let elapsed=0,lookups=0;
+ context.mock.method(Date,"now",()=>startedAt+elapsed);
+ const advance=(milliseconds:number)=>{elapsed+=milliseconds;if(elapsed>=50000)controller.abort(new DOMException("The discovery job timed out","TimeoutError"));controller.signal.throwIfAborted();};
+ const provider:CatalogProvider={provider:"deezer",async getExact(){return nativeCatalog;},async getByIsrc(){lookups++;advance(12937);return[nativeCatalog];}};
+ const requests:string[]=[];
+ const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async(_url,init)=>{
+  const request=JSON.parse(String(init?.body));requests.push(request.metadata.title);
+  if(request.metadata.title===singleMetadata.title){advance(25409);return Response.json({status:"review",candidates:[{title:nativeMetadata.title,artists:nativeMetadata.artists,durationMs:209000,reasons:["title","artist"]}]});}
+  if(request.metadata.title!==nativeMetadata.title){advance(12100);return Response.json({status:"unavailable"},{status:409});}
+  advance(2527);return Response.json({status:"ready",audio:{messageId:"42",chatScope:"primary",fileId:"123456",metadata:nativeMetadata,size:5000,mimeType:"audio/mpeg"}});
+ })as typeof fetch,[provider]);
+ const result=await discovery.discover(selected,controller.signal);
+ assert.equal(result.status,"ready");assert.deepEqual(requests,[singleMetadata.title,nativeMetadata.title]);assert.equal(lookups,1);assert.equal(elapsed,40873);assert.equal(controller.signal.aborted,false);
+});
+
+test("persisted native recording proof recovers without waiting on unavailable catalogue services",async()=>{
+ const selected={...localizedRecording,metadata:withVerifiedCatalogAliases(localizedRecording,[nativeCatalog])};let lookups=0;
+ const provider:CatalogProvider={provider:"deezer",async getExact(){return null;},async getByIsrc(){lookups++;throw new Error("Catalogue is temporarily unavailable");}};
+ const requests:string[]=[];
+ const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async(_url,init)=>{
+  const request=JSON.parse(String(init?.body));requests.push(request.metadata.title);
+  return request.metadata.title===localizedMetadata.title?Response.json({status:"review",candidates:[]}):Response.json({status:"ready",audio:{messageId:"42",chatScope:"primary",metadata:nativeMetadata,size:5000,mimeType:"audio/mpeg"}});
+ })as typeof fetch,[provider]);
+ assert.equal((await discovery.discover(selected)).status,"ready");assert.deepEqual(requests,[localizedMetadata.title,nativeMetadata.title]);assert.equal(lookups,0);
 });
 
 test("aliases bind complete same-ISRC provider rows while wrong variants and identifiers remain rejected",async()=>{

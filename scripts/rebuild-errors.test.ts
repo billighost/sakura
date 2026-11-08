@@ -25,6 +25,14 @@ test("missing audio has an availability recovery while an identity mismatch stay
  assert.equal(responseIssue(503,{reason:"no-ready-audio"},"download").kind,"missing");
  assert.equal(responseIssue(409,{status:"review",reason:"asset-mismatch"},"download").kind,"version");
 });
+test("persisted audio-unavailable messages retain availability recovery without session memory",()=>{
+ for(const reason of ["no-ready-audio","audio-source-unavailable","unsupported-provider"]){
+  const issue=responseIssue(502,{reason},"download");
+  // Downloads persist plain messages, and the in-memory issue cache is absent after reopening.
+  const restored=JSON.parse(JSON.stringify({error:issue.message})) as {error:string};
+  assert.deepEqual(userIssue(restored.error,"download"),issue);assert.equal(userIssue(new Error(restored.error),"playback").kind,"missing");
+ }
+});
 test("network rejection is normalized while explicit caller cancellation stays cancelable",async t=>{
  t.mock.method(globalThis,"fetch",async()=>{throw new TypeError("Failed to fetch internal-host");});
  await assert.rejects(()=>requestJson("https://fixture.invalid",{},{context:"save"}),e=>e instanceof UserFacingError&&e.issue.kind==="offline"&&!e.message.includes("internal-host"));

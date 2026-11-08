@@ -3,6 +3,7 @@ import { getRebuildPool } from "./db";
 import type { ProviderReference } from "../core/types";
 import { assessAudioCandidate } from "../core/matching";
 import { isUuid,parseRecordingMetadata,parseTrustedRecordingMetadata,supportedAudioMime } from "../server/input";
+import { collectionDate } from "../core/collectionDate";
 
 export interface ReadyPlayback {
   kind:"stream";delivery:"cdn";assetId:string;sizeBytes:number;sha256:string;url:string;fallbackUrl:string;mimeType:string;durationMs:number|null;
@@ -15,6 +16,7 @@ export interface RecordingCard {
   reference:ProviderReference; references:ProviderReference[];
   genres:string[]; popularity:number; playability:"ready"|"resolvable";
   liked?:boolean;
+  addedAt?:string;
   artistCredits:{artistId:string|null;name:string;role:"primary"|"featured";reference?:ProviderReference}[];
   readyPlayback?:ReadyPlayback;
 }
@@ -56,12 +58,13 @@ export function card(row: QueryResultRow): RecordingCard {
       artistId:joined.find(j=>j.name===name)?.artistId||null,...(joined.find(j=>j.name===name)?.reference?{reference:joined.find(j=>j.name===name)!.reference}:{})}));
   const popularity=rank<=1?rank:rank/(reference.provider==="deezer"?1000000:100);
   const playback=readyPlayback(row,metadata,refs);
+  const addedAt=collectionDate(row.addedAt);
   return {id:row.id,recordingId:row.id,title:String(metadata.title),artists:Array.isArray(metadata.artists)?metadata.artists.map(String):[],
     durationMs:typeof metadata.durationMs==="number"?metadata.durationMs:null,metadata,
     coverUrl:safeImage(metadata.coverUrl||catalog.coverUrl),artistImageUrl:safeImage(row.artistImageUrl||metadata.artistImageUrl||catalog.artistImageUrl),
     artistId:row.artistId||null,albumId:row.albumId||null,albumTitle:typeof (metadata.albumTitle||catalog.albumTitle)==="string"?String(metadata.albumTitle||catalog.albumTitle):null,
     reference,references:refs,genres:Array.isArray(metadata.genres)?metadata.genres.map(String):[],
-    popularity:Math.max(0,Math.min(1,popularity)),artistCredits,playability:row.ready?"ready":"resolvable",...(playback?{readyPlayback:playback}:{}),...(typeof row.liked==="boolean"?{liked:row.liked}:{})};
+    popularity:Math.max(0,Math.min(1,popularity)),artistCredits,playability:row.ready?"ready":"resolvable",...(playback?{readyPlayback:playback}:{}),...(typeof row.liked==="boolean"?{liked:row.liked}:{}),...(addedAt?{addedAt}:{})};
 }
 export const CARD_SELECT = `SELECT r.id,r.metadata,r.provenance,
   COALESCE((SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object('provider',e.provider,'id',e.external_id,'scope',NULLIF(e.scope,''))) ORDER BY e.provider,e.external_id)

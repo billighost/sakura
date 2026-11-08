@@ -8,7 +8,7 @@ import { getLibrary,createPlaylist,getPlaylist,mutatePlaylistTracks,setFavorite,
 import { recordHistory,getHistory,compactHistory,historyChunk } from "../src/rebuild/data/history";
 import { getSettings,patchSettings } from "../src/rebuild/data/settings";
 import { getProfile,getArtist,getAlbum } from "../src/rebuild/data/product";
-import { syncCatalog,cardsForIds } from "../src/rebuild/data/catalog";
+import { syncCatalog,cardsForIds,type RecordingCard } from "../src/rebuild/data/catalog";
 import { ensureMixes,getMix,offlineMixes } from "../src/rebuild/recommendations/service";
 import { SITUATIONAL_MIXES } from "../src/rebuild/recommendations/situations";
 import { bloomWindows } from "../src/rebuild/bloom/calendar";
@@ -92,6 +92,7 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     do{
       const url=new URL("http://localhost/api?limit=1");if(cursor)url.searchParams.set("cursor",cursor);
       const page=await getLibrary(first,url);result.push(...page.recordings.map(r=>r.recordingId));cursor=page.nextCursor;
+      assert.ok(page.recordings.every(recording=>typeof recording.addedAt==="string"&&Number.isFinite(Date.parse(recording.addedAt))));
     }while(cursor);
     assert.equal(result.length,3);assert.equal(new Set(result).size,3);
     assert.equal((await getLibrary(second,new URL("http://localhost/api"))).recordings.length,0);
@@ -101,10 +102,13 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     await mutatePlaylistTracks(first,playlist.id,{recordingIds:recordingIds.slice(0,3)});
     await mutatePlaylistTracks(first,playlist.id,{recordingIds:[recordingIds[0]]});
     const loaded=await getPlaylist(first,playlist.id);assert.equal(loaded.trackCount,3);
+    assert.ok(loaded.recordings.every((recording:RecordingCard)=>typeof recording.addedAt==="string"&&Number.isFinite(Date.parse(recording.addedAt))));
+    const dates=new Map(loaded.recordings.map((recording:RecordingCard)=>[recording.id,recording.addedAt]));
     await assert.rejects(getPlaylist(second,playlist.id),e=>e instanceof ProductError&&e.status===404);
     await assert.rejects(mutatePlaylistTracks(second,playlist.id,{recordingIds:[recordingIds[3]]}),e=>e instanceof ProductError&&e.status===404);
     const reordered=await updatePlaylist(first,playlist.id,{recordingIds:recordingIds.slice(0,3).reverse()});
     assert.deepEqual(reordered.recordings.map((r:{recordingId:string})=>r.recordingId),recordingIds.slice(0,3).reverse());
+    assert.ok(reordered.recordings.every((recording:RecordingCard)=>recording.addedAt===dates.get(recording.id)),"Reordering keeps membership timestamps attached to their recording");
     await mutatePlaylistTracks(first,playlist.id,{recordingId:recordingIds[1]},true);
     assert.equal((await getPlaylist(first,playlist.id)).trackCount,2);
     await assert.rejects(updatePlaylist(first,playlist.id,{recordingIds:[recordingIds[0]]}),e=>e instanceof ProductError&&e.status===409);

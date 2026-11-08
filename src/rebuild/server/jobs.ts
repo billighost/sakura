@@ -54,6 +54,11 @@ export class AudioResolutionJobs {
       WHERE id=$1::uuid AND attempts<2 AND (state='queued' OR (state='resolving' AND lease_until<NOW()))
       RETURNING id,account_id AS "accountId",recording_id AS "recordingId",state,result,lease_until AS "leaseUntil",attempts`,[jobId]))[0];
     if (!job) return;
+    // Discovery includes the original source request, exact catalogue/artist
+    // proof and compatibility retries. Their combined budget must fit before
+    // preparation starts, and all work must remain inside the 115-second lease.
+    const deadline=Date.now()+110000;
+    const workSignal=(maximumMs:number)=>AbortSignal.timeout(Math.max(1,Math.min(maximumMs,deadline-Date.now())));
     let result: ResolveRecordingResult;
     try {
       let recording = await this.repository.findById(job.recordingId);
@@ -62,15 +67,15 @@ export class AudioResolutionJobs {
         const reference=recording.references!.find((ref) => ref.provider === "deezer" || ref.provider === "spotify")!;
         const cached = await this.resolver.resolve({ reference },job.accountId);
         if (cached.status === "resolved") {
-          if(await this.needsPreparation(cached,job.accountId)){const asset=await this.repository.findAudio(recording.recordingId,cached.playback.assetId,job.accountId);try{if(asset)await this.promotions!.prepare(recording,asset,AbortSignal.timeout(100000));}catch{/* Keep the already verified worker asset as an explicit fallback. */}result=this.decoratePreparation(await this.resolver.resolve({reference},job.accountId));}
+          if(await this.needsPreparation(cached,job.accountId)){const asset=await this.repository.findAudio(recording.recordingId,cached.playback.assetId,job.accountId);try{if(asset)await this.promotions!.prepare(recording,asset,workSignal(100000));}catch{/* Keep the already verified worker asset as an explicit fallback. */}result=this.decoratePreparation(await this.resolver.resolve({reference},job.accountId));}
           else result = this.decoratePreparation(cached);
         }
         else {
-          const discovered = await this.discovery.discover(recording,AbortSignal.timeout(50000));
+          const discovered = await this.discovery.discover(recording,workSignal(90000));
           if (discovered.status === "ready") {
             if(discovered.verifiedMetadata){recording={...recording,metadata:discovered.verifiedMetadata};await this.ingestor.persistVerifiedAliases(recording);}
             await this.ingestor.persistAudio(recording,discovered.asset);
-            if(this.promotions?.needsPreparation(discovered.asset))try{await this.promotions.prepare(recording,discovered.asset,AbortSignal.timeout(60000));}catch{/* Optional CDN preparation failure never recanonicalizes or replaces the worker recording. */}
+            if(this.promotions?.needsPreparation(discovered.asset))try{await this.promotions.prepare(recording,discovered.asset,workSignal(60000));}catch{/* Optional CDN preparation failure never recanonicalizes or replaces the worker recording. */}
             result = this.decoratePreparation(await this.resolver.resolve({ reference },job.accountId));
           } else if (discovered.status === "review") result = { status: "review",reason: "asset-mismatch",recordingId: recording.recordingId,candidates: discovered.candidates };
           else result = { status: "unavailable",reason: "no-ready-audio",recordingId: recording.recordingId,retryable: discovered.retryable,sourceReason:/^[a-z0-9-]{1,80}$/.test(discovered.reason)?discovered.reason:"audio-source-unavailable" };

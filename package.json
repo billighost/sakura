@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "node scripts/rebuild-migrate.mjs --apply",
-    "test": "node scripts/test-rebuild-core.cjs && node scripts/test-rebuild-server.cjs && node --import tsx --test scripts/rebuild-origin.test.ts scripts/rebuild-lyrics.test.ts scripts/rebuild-player.test.ts scripts/rebuild-queue.test.ts scripts/rebuild-errors.test.ts scripts/rebuild-recording-jobs.test.ts scripts/rebuild-resources.test.ts scripts/rebuild-bloom.test.ts scripts/rebuild-db.test.ts scripts/rebuild-audio-technology-preferences.test.ts scripts/rebuild-navigation.test.ts",
+    "test": "node scripts/test-rebuild-core.cjs && node scripts/test-rebuild-server.cjs && node --import tsx --test scripts/rebuild-origin.test.ts scripts/rebuild-lyrics.test.ts scripts/rebuild-player.test.ts scripts/rebuild-queue.test.ts scripts/rebuild-errors.test.ts scripts/rebuild-recording-jobs.test.ts scripts/rebuild-resources.test.ts scripts/rebuild-bloom.test.ts scripts/rebuild-db.test.ts scripts/rebuild-audio-technology-preferences.test.ts scripts/rebuild-navigation.test.ts scripts/rebuild-track-sorting.test.ts scripts/rebuild-collection-dates.test.ts",
     "test:downloads": "node --import tsx --test scripts/rebuild-download-engine.test.ts scripts/rebuild-download-gate.test.ts scripts/rebuild-download-presentation.test.ts scripts/rebuild-download-start.test.ts scripts/rebuild-mini-lyrics.test.ts scripts/rebuild-shared-flight.test.ts scripts/rebuild-partial-playback.test.ts scripts/rebuild-playback-integration.test.ts scripts/rebuild-audio-route.test.ts && npm --prefix worker test",
     "test:downloads:browser": "node scripts/rebuild-download-browser.mjs && node scripts/rebuild-download-browser.mjs --progressive && node scripts/rebuild-track-presentation-browser.mjs && node scripts/rebuild-partial-playback-browser.mjs",
     "test:downloads:live": "node --import tsx scripts/rebuild-download-acceptance.ts",
@@ -22,7 +22,8 @@
     "test:sync:browser": "node scripts/rebuild-account-sync-browser.mjs",
     "test:bloom:covers": "node --import tsx --test scripts/rebuild-bloom-covers.test.ts",
     "generate:bloom:covers": "node scripts/rebuild-bloom-covers.mjs",
-    "test:mobile": "node scripts/rebuild-mobile-input-browser.mjs && node scripts/rebuild-mobile-volume-browser.mjs && node scripts/rebuild-bloom-cover-scroll.mjs"
+    "test:mobile": "node scripts/rebuild-mobile-input-browser.mjs && node scripts/rebuild-mobile-volume-browser.mjs && node scripts/rebuild-bloom-cover-scroll.mjs",
+    "test:collections:browser": "node scripts/rebuild-responsive-collections-browser.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

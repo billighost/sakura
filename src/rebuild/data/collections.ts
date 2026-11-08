@@ -2,6 +2,7 @@ import { getRebuildPool,inTransaction } from "./db";
 import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
 import { ProductError,encodeCursor,ids,object,pageInput,text,uuid } from "./validation";
 import {randomUUID} from "node:crypto";
+import { collectionDate } from "../core/collectionDate";
 
 export async function listPlaylists(accountId:string) {
   const rows=await getRebuildPool().query(`SELECT p.id,p.name,p.description,p.cover_url AS "coverUrl",p.revision,
@@ -60,8 +61,12 @@ export async function getPlaylist(accountId:string,rawId:string) {
   const playlist=(await pool.query(`SELECT id,name,description,cover_url AS "coverUrl",revision,created_at AS "createdAt",updated_at AS "updatedAt"
     FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid`,[accountId,id])).rows[0];
   if(!playlist)throw new ProductError(404,"Playlist not found");
-  const membership=(await pool.query(`SELECT recording_id AS id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.id);
-  const recordings=await cardsForIds(accountId,membership);
+  const membership=(await pool.query(`SELECT recording_id AS id,added_at AS "addedAt" FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows;
+  const dates=new Map(membership.map(row=>[row.id,collectionDate(row.addedAt)]));
+  const recordings=(await cardsForIds(accountId,membership.map(row=>row.id))).map(recording=>{
+    const addedAt=dates.get(recording.id);
+    return {...recording,...(addedAt?{addedAt}:{})};
+  });
   return {...playlist,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
     durationMs:recordings.reduce((sum,r)=>sum+(r.durationMs||0),0)};
 }

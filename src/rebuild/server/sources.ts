@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { fetchAudioHeaders } from "../core/streaming";
 import { assessAudioCandidate,verifiedRecordingAliases } from "../core/matching";
 import { referenceKey,normalizedRecording } from "../core/identity";
-import type { CanonicalRecording, RecordingMetadata } from "../core/types";
+import type { CanonicalRecording, ProviderReference, RecordingMetadata } from "../core/types";
 import type { StoredAudioAsset, ReviewCandidate, CatalogProvider } from "./contracts";
 import { parseRecordingMetadata, supportedAudioMime } from "./input";
 import { readMetadataJson } from "./providers";
@@ -47,6 +47,20 @@ export class WorkerAudioDiscovery implements AudioSourceDiscovery {
     verifiedRecordingAliases(recording).forEach(alias=>alias.references.forEach(ref=>references.set(referenceKey(ref),ref)));
     return [...references.values()];
   }
+  private recoveryAliases(recording:CanonicalRecording,reference:ProviderReference){
+    const original=normalizedRecording(recording.metadata);
+    const spellingDifference=(metadata:RecordingMetadata)=>{
+      const alternative=normalizedRecording(metadata);
+      return (JSON.stringify(alternative.artists)!==JSON.stringify(original.artists)?2:0)+(alternative.title!==original.title?1:0);
+    };
+    // Same-artist localized titles can repeat the rejected spelling. Try the
+    // independently verified artist/title changes before those slower repeats.
+    return verifiedRecordingAliases(recording).filter(alias=>{
+      const alternative=normalizedRecording(alias.metadata);
+      return alternative.title!==original.title||JSON.stringify(alternative.artists)!==JSON.stringify(original.artists)
+        ||alias.references.some(ref=>(ref.provider==="deezer"||ref.provider==="spotify")&&referenceKey(ref)!==referenceKey(reference));
+    }).sort((a,b)=>spellingDifference(b.metadata)-spellingDifference(a.metadata)).slice(0,6);
+  }
   async discover(recording: CanonicalRecording, signal?: AbortSignal): Promise<AudioDiscoveryResult> {
     if (!this.configuration) return { status: "unavailable", reason: "audio-worker-not-configured", retryable: false };
     signal?.throwIfAborted();
@@ -70,10 +84,15 @@ export class WorkerAudioDiscovery implements AudioSourceDiscovery {
         const initial=response.payload.status==="ready"?this.verifiedAsset(recording,row(response.payload.audio),"v2"):null;
         if(initial?.status==="ready")return initial;
         if(response.payload.status==="review"||initial?.status==="review"||response.payload.status==="unavailable"){
-          const enriched=await this.metadataAliases.hydrate(recording,signal);
+          // Persisted exact catalogue proof is already usable. Re-fetching it
+          // here could spend the remaining job deadline on unrelated catalogue
+          // or artist services before the known native spelling is attempted.
+          const originalArtists=JSON.stringify(normalizedRecording(recording.metadata).artists);
+          const cachedNativeProof=this.recoveryAliases(recording,reference).some(alias=>JSON.stringify(normalizedRecording(alias.metadata).artists)!==originalArtists);
+          const enriched=cachedNativeProof?recording:await this.metadataAliases.hydrate(recording,signal);
           if(enriched!==recording||verifiedRecordingAliases(enriched).length){
             const original=normalizedRecording(recording.metadata);
-            const deadline=Date.now()+30000,attempts=verifiedRecordingAliases(enriched).filter(alias=>{const alternative=normalizedRecording(alias.metadata);return alternative.title!==original.title||JSON.stringify(alternative.artists)!==JSON.stringify(original.artists)||alias.references.some(ref=>(ref.provider==="deezer"||ref.provider==="spotify")&&referenceKey(ref)!==referenceKey(reference));}).slice(0,6);
+            const deadline=Date.now()+30000,attempts=this.recoveryAliases(enriched,reference);
             for(const alias of attempts){
               signal?.throwIfAborted();if(Date.now()>=deadline)break;
               const alternative=normalizedRecording(alias.metadata),changedSpelling=alternative.title!==original.title||JSON.stringify(alternative.artists)!==JSON.stringify(original.artists);
@@ -82,7 +101,10 @@ export class WorkerAudioDiscovery implements AudioSourceDiscovery {
               // message ID. Retry their exact original request using one whole
               // provider-verified spelling, then verify against the original.
               let recovered:Awaited<ReturnType<WorkerAudioDiscovery["post"]>>;
-              try{recovered=await this.post("/v2/resolve",{...request,reference:verifiedReference,references:this.matchingReferences(enriched),metadata:alias.metadata,botScopes:this.primaryScopeOnlyUntil>Date.now()?[this.configuration.primaryBot]:scopes,deadlineMs:Math.max(5000,Math.min(12000,deadline-Date.now()))},signal);}catch{signal?.throwIfAborted();continue;}
+              const budget=Math.min(12000,deadline-Date.now());
+              if(budget<1000)break;
+              const attemptSignal=signal?AbortSignal.any([signal,AbortSignal.timeout(budget+1000)]):AbortSignal.timeout(budget+1000);
+              try{recovered=await this.post("/v2/resolve",{...request,reference:verifiedReference,references:this.matchingReferences(enriched),metadata:alias.metadata,botScopes:this.primaryScopeOnlyUntil>Date.now()?[this.configuration.primaryBot]:scopes,deadlineMs:budget},attemptSignal);}catch{signal?.throwIfAborted();continue;}
               if(recovered.payload.status!=="ready")continue;
               const verified=this.verifiedAsset(enriched,row(recovered.payload.audio),"v2");
               if(verified.status==="ready")return {...verified,verifiedMetadata:enriched.metadata};

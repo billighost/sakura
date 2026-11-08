@@ -8,7 +8,7 @@ export interface DownloadFingerprint {assetId:string;sizeBytes:number;sha256:str
 export interface PartialDownloadRecord {
  version:1;recordingId:string;track:MusicTrack;status:DownloadEntry["status"];
  mode:"full"|"prefix";requested:boolean;priority:number;chunkBytes:number;createdAt:number;updatedAt:number;
- fingerprint?:DownloadFingerprint;mimeType?:string;error?:string;
+ fingerprint?:DownloadFingerprint;mimeType?:string;error?:string;refreshSource?:boolean;
 }
 export interface DownloadChunk {offset:number;blob:Blob;sha256:string}
 /** Every implementation must atomically publish complete audio and delete its partials. */
