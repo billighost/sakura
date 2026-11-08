@@ -12,7 +12,8 @@ const upstreamBase=process.env.SAKURA_TEST_URL||'http://localhost:3015';
 let base=upstreamBase;
 const progressiveOnly=process.argv.includes('--progressive')||process.env.SAKURA_PROGRESSIVE_ONLY==='1';
 const connectionOnly=process.argv.includes('--connection');
-assert.ok(!(progressiveOnly&&connectionOnly),'Choose one browser scenario per run');
+const recoveryOnly=process.argv.includes('--recovery');
+assert.ok([progressiveOnly,connectionOnly,recoveryOnly].filter(Boolean).length<=1,'Choose one browser scenario per run');
 const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;
 assert.ok(secret,'Local auth signing configuration is required');
 const account={id:'90000000-0000-4000-8000-000000000071',username:'Download garden',email:'download-garden@example.invalid'};
@@ -34,11 +35,12 @@ const tracks=titles.map((title,i)=>{
  return track;
 });
 const catalogAlias={...tracks[1],id:'deezer:'+tracks[1].reference.id,recordingId:'deezer:'+tracks[1].reference.id,readyPlayback:undefined};
-const report={scope:'Built production pages with generated WAV bytes, intercepted account/catalog APIs and browser-only storage; no server database mutations',mode:connectionOnly?'connection-transitions':progressiveOnly?'progressive-playback':'downloads-and-library',base,limitation:'Browser automation verifies mechanics and generated media, while the separate real-song audit verifies provider identity',checkedAt:new Date().toISOString(),checks:[],requests:[],pageErrors:[],unexpectedMutations:[],screenshots:[],issues:[]};
+const report={scope:'Built production pages with generated WAV bytes, intercepted account/catalog APIs and browser-only storage; no server database mutations',mode:recoveryOnly?'automatic-download-recovery':connectionOnly?'connection-transitions':progressiveOnly?'progressive-playback':'downloads-and-library',base,limitation:'Browser automation verifies mechanics and generated media, while the separate real-song audit verifies provider identity',checkedAt:new Date().toISOString(),checks:[],requests:[],pageErrors:[],unexpectedMutations:[],screenshots:[],issues:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 let context,page,session=null,delayMs=1200,forceSourceError=false,inFlight=0,maxInFlight=0;
 let networkAvailable=true;
 let fixtureProxy;
+let interruptedRanges=0;
 const pageNames=new WeakMap();
 const malformedRanges=new Set();
 const failingMedia=new Set();
@@ -130,9 +132,17 @@ async function progressiveScenario(){
  await expect.poll(async()=>{const state=await progressiveState();return state.ready.some(audio=>audio.id===tracks[4].id&&audio.requested===true);},{timeout:60000}).toBe(true);await player().getByRole('button',{name:'Pause',exact:true}).click();await go('/library/downloaded');for(const index of [4,5])await expect(page.getByRole('tabpanel').getByRole('button',{name:'Play '+tracks[index].title,exact:true})).toBeVisible();check('Completed playback and a mid-stream explicit save both publish exactly one durable Saved artifact');await verifySavedBytes();
  await navigate('/library');delayMs=1400;await page.getByRole('button',{name:'Play '+tracks[7].title,exact:true}).first().click();await expect.poll(()=>page.evaluate(()=>window.downloadTestAudio?.src.includes('/_sakura/audio/')&&!window.downloadTestAudio.paused&&window.downloadTestAudio.currentTime>1)).toBe(true);
  const beforeFailure=await progressiveState();report.progressive.beforeFailure=beforeFailure;failingMedia.add(7);await page.evaluate(()=>window.downloadTestAudio.dispatchEvent(new Event('error')));
- await expect.poll(async()=>{const state=await progressiveState();report.progressive.afterFailure=state;return state.hasSrc===false&&state.grants.every(grant=>grant.recordingId!==tracks[7].id);}).toBe(true);await expect(player().getByRole('button',{name:'Play',exact:true})).toBeVisible();const afterFailure=await progressiveState();report.progressive.afterFailure=afterFailure;assert.ok(afterFailure.jobs.some(job=>job.id===tracks[7].id&&job.mode==='prefix'&&job.requested===false),'Terminal playback failure yields automatic full-file work');assert.ok(afterFailure.uiPositionMs>=beforeFailure.time*1000-500,'Fallback failure preserves the last audible position');
- const failureMarker=report.requests.length;await sleep(1600);assert.equal(report.requests.slice(failureMarker).some(row=>row.index===7&&row.resourceType==='fetch'),false,'Terminal failure cannot launch further automatic full-file chunks');assert.equal(await page.evaluate(async url=>(await fetch(url,{headers:{Range:'bytes=0-63'}})).status,beforeFailure.src),404);check('A failed progressive source and rejected media fallback revoke access, preserve the retry position and yield automatic downloads');
- failingMedia.delete(7);await player().getByRole('button',{name:'Play',exact:true}).click();await expect.poll(()=>page.evaluate(position=>window.downloadTestAudio?.src.includes('/_sakura/audio/')&&!window.downloadTestAudio.paused&&window.downloadTestAudio.currentTime>position/1000+.5,afterFailure.uiPositionMs)).toBe(true);const afterFailureRetry=await progressiveState();report.progressive.afterFailureRetry=afterFailureRetry;assert.notEqual(afterFailureRetry.src,beforeFailure.src);await player().getByRole('button',{name:'Pause',exact:true}).click();check('Play retries the failed progressive recording from its preserved position with a fresh grant');
+ await expect.poll(()=>page.evaluate(position=>window.downloadTestAudio?.src&&!window.downloadTestAudio.paused&&window.downloadTestAudio.currentTime>position+.5,beforeFailure.time),{timeout:60000}).toBe(true);
+ await expect.poll(async()=>{const state=await progressiveState();return state.ready.some(audio=>audio.id===tracks[7].id);},{timeout:60000}).toBe(true);
+ const recovered=await progressiveState();report.progressive.afterAutomaticRecovery=recovered;assert.notEqual(recovered.src,beforeFailure.src);assert.deepEqual(recovered.alerts,[]);assert.ok(recovered.ready.some(audio=>audio.id===tracks[7].id),'Automatic transfer survives the media failure and verifies its bytes');assert.equal(await page.evaluate(async url=>(await fetch(url,{headers:{Range:'bytes=0-63'}})).status,beforeFailure.src),404);check('A failed progressive source and rejected media fallback recover automatically at the saved position while the recording finishes downloading');
+ failingMedia.delete(7);await player().getByRole('button',{name:'Pause',exact:true}).click();
+ // Decoding failures remain terminal, even though network failures now recover automatically.
+ await page.getByRole('button',{name:'Play '+tracks[3].title,exact:true}).first().click();await expect.poll(()=>page.evaluate(()=>window.downloadTestAudio?.src.includes('/_sakura/audio/')&&!window.downloadTestAudio.paused&&window.downloadTestAudio.currentTime>1)).toBe(true);
+ const beforeTerminal=await progressiveState();report.progressive.beforeTerminal=beforeTerminal;
+ await page.evaluate(()=>{Object.defineProperty(window.downloadTestAudio,'error',{configurable:true,value:{code:3,message:'Synthetic audio decoding failure'}});window.downloadTestAudio.dispatchEvent(new Event('error'));window.downloadTestAudio.dispatchEvent(new Event('error'));});
+ await expect(player().getByRole('button',{name:'Play',exact:true})).toBeVisible();const afterFailure=await progressiveState();report.progressive.afterFailure=afterFailure;assert.equal(afterFailure.hasSrc,false);assert.ok(afterFailure.jobs.some(job=>job.id===tracks[3].id&&job.mode==='prefix'&&job.requested===false),'Terminal playback failure yields automatic full-file work');assert.ok(afterFailure.uiPositionMs>=beforeTerminal.time*1000-500,'Terminal failure preserves the last audible position');
+ const failureMarker=report.requests.length;await sleep(1600);assert.equal(report.requests.slice(failureMarker).some(row=>row.index===3&&row.resourceType==='fetch'),false,'Terminal failure cannot launch further automatic full-file chunks');assert.equal(await page.evaluate(async url=>(await fetch(url,{headers:{Range:'bytes=0-63'}})).status,beforeTerminal.src),404);check('A terminal decoding failure revokes access, preserves the retry position and yields automatic downloads');
+ await page.evaluate(()=>delete window.downloadTestAudio.error);await player().getByRole('button',{name:'Play',exact:true}).click();await expect.poll(()=>page.evaluate(position=>window.downloadTestAudio?.src.includes('/_sakura/audio/')&&!window.downloadTestAudio.paused&&window.downloadTestAudio.currentTime>position/1000+.5,afterFailure.uiPositionMs)).toBe(true);const afterFailureRetry=await progressiveState();report.progressive.afterFailureRetry=afterFailureRetry;assert.notEqual(afterFailureRetry.src,beforeTerminal.src);await player().getByRole('button',{name:'Pause',exact:true}).click();check('Play retries the terminal progressive failure from its preserved position with a fresh grant');
 }
 async function network(online){
  networkAvailable=online;await context.setOffline(!online);
@@ -178,6 +188,11 @@ async function audio(route){
   const headers={'Accept-Ranges':'bytes','Content-Length':String(end-start+1),'ETag':'"'+asset.sha+'"','Access-Control-Allow-Origin':base,'Access-Control-Expose-Headers':'Content-Length, Content-Range, ETag, Accept-Ranges'};
   if(start>=asset.bytes.length||end<start)return await route.fulfill({status:416,headers:{'Content-Range':`bytes */${asset.bytes.length}`}});
   if(range)headers['Content-Range']=`bytes ${start+(malformedRanges.has(index)?1:0)}-${end}/${asset.bytes.length}`;
+  if(recoveryOnly&&index===1&&start>0&&interruptedRanges<8){
+   interruptedRanges++;record.interrupted=true;
+   if(url.origin===base)return await route.fulfill({status:206,contentType:'audio/wav',headers,body:asset.bytes.subarray(start,end+1),fixtureInterrupt:true});
+   return await route.abort('connectionreset');
+  }
   await route.fulfill({status:range?206:200,contentType:'audio/wav',headers,body:asset.bytes.subarray(start,end+1)});record.finished=true;
  }catch{/* Closing or reloading a page intentionally interrupts uncommitted chunks. */}
  finally{if(isDownload){inFlight--;perSong.set(index,(perSong.get(index)||1)-1);}}
@@ -227,7 +242,9 @@ async function startFixtureProxy(){
     await fixtureApi({request:()=>fixtureRequest,abort:()=>{record.aborted=true;response.destroy();},fulfill:async options=>{
      const headers={...options.headers},bytes=options.json===undefined?Buffer.from(options.body||''):Buffer.from(JSON.stringify(options.json));
      if(options.json!==undefined)headers['Content-Type']='application/json';else if(options.contentType)headers['Content-Type']=options.contentType;
-     headers['Content-Length']=String(bytes.length);record.status=options.status||200;response.writeHead(record.status,headers);response.end(method==='HEAD'?undefined:bytes);
+     headers['Content-Length']=String(bytes.length);record.status=options.status||200;response.writeHead(record.status,headers);
+     if(options.fixtureInterrupt){response.write(bytes.subarray(0,Math.min(8192,bytes.length)));await sleep(30);response.destroy();return;}
+     response.end(method==='HEAD'?undefined:bytes);
     }});return;
    }
    if(!['GET','HEAD'].includes(method)){report.proxy.blockedWrites.push({path,method,at:Date.now()});response.writeHead(405,{'Content-Type':'application/json'});response.end(JSON.stringify({error:'Fixture proxy only forwards reads'}));return;}
@@ -235,7 +252,7 @@ async function startFixtureProxy(){
    const controller=new AbortController();flights.add(controller);response.on('close',()=>{if(!response.writableEnded)controller.abort();});
    try{
     report.proxy.forwardedReads.push({path,method,at:Date.now()});const connectionHeaders=new Set(String(request.headers.connection||'').toLowerCase().split(',').map(name=>name.trim()));const headers=new Headers();for(const[name,value]of Object.entries(request.headers)){if(value!==undefined&&!connectionHeaders.has(name)&&!['host','connection','content-length','accept-encoding','transfer-encoding','upgrade','keep-alive','proxy-authenticate','proxy-authorization','te','trailer'].includes(name))headers.set(name,Array.isArray(value)?value.join(', '):value);}headers.set('accept-encoding','identity');
-    const upstreamResponse=await fetch(new URL(url.pathname+url.search,upstream.origin),{method,headers,redirect:'manual',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});
+    const upstreamResponse=await fetch(new URL(url.pathname+url.search,upstream.origin),{method,headers,redirect:'manual',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)])});
     const upstreamConnectionHeaders=new Set((upstreamResponse.headers.get('connection')||'').toLowerCase().split(',').map(name=>name.trim()));const forwarded={};upstreamResponse.headers.forEach((value,name)=>{if(!upstreamConnectionHeaders.has(name)&&!['content-encoding','content-length','transfer-encoding','connection','set-cookie','upgrade','keep-alive','proxy-authenticate','proxy-authorization','te','trailer'].includes(name))forwarded[name]=value;});
     if(forwarded.location){const location=new URL(forwarded.location,upstream.origin);assert.equal(location.origin,upstream.origin,'Fixture upstream cannot redirect outside the local origin');forwarded.location=new URL(location.pathname+location.search,base).href;}
     const bytes=Buffer.from(await upstreamResponse.arrayBuffer());if(method!=='HEAD')forwarded['content-length']=String(bytes.length);response.writeHead(upstreamResponse.status,forwarded);response.end(method==='HEAD'?undefined:bytes);
@@ -248,8 +265,8 @@ async function startFixtureProxy(){
  return {close};
 }
 try{
- if(connectionOnly)fixtureProxy=await startFixtureProxy();
- context=await browser.newContext({viewport:{width:1440,height:960},colorScheme:'light',serviceWorkers:progressiveOnly||connectionOnly?'allow':'block'});await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
+ if(connectionOnly||recoveryOnly)fixtureProxy=await startFixtureProxy();
+ context=await browser.newContext({viewport:{width:1440,height:960},colorScheme:'light',serviceWorkers:progressiveOnly||connectionOnly||recoveryOnly?'allow':'block'});await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(input=>{
   sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const element=new NativeAudio(...args);window.downloadTestAudio=element;return element;};window.Audio.prototype=NativeAudio.prototype;
   window.downloadNetworkEvents=[];for(const type of ['online','offline'])window.addEventListener(type,()=>window.downloadNetworkEvents.push({type,online:navigator.onLine,at:Date.now()}));
@@ -261,7 +278,21 @@ try{
  await context.route('https://res.cloudinary.com/download-garden-fixture/**',audio);
  await context.route('**/api/**',fixtureApi);
  page=await context.newPage();pageNames.set(page,'initial-tab');page.setDefaultTimeout(30000);page.on('pageerror',error=>report.pageErrors.push(error.message));
- if(connectionOnly){await connectionScenario();}else if(progressiveOnly){await progressiveScenario();}else{
+ if(recoveryOnly){
+  delayMs=150;await go('/library');await download(1);
+  await expect.poll(async()=>{const state=await progressiveState();return state.chunks.some(chunk=>chunk.key.includes(tracks[1].id)&&chunk.offset===0);}).toBe(true);
+  await expect.poll(()=>interruptedRanges,{timeout:60000}).toBe(8);
+  await expect.poll(async()=>{const state=await progressiveState();return state.ready.some(audio=>audio.id===tracks[1].id);},{timeout:60000}).toBe(true);
+  const zeroRequests=report.requests.filter(row=>row.index===1&&row.start===0);
+  assert.equal(zeroRequests.length,1,'Recovery retains the verified first chunk');
+  assert.equal(report.requests.filter(row=>row.interrupted).length,8,'Eight connection resets and partial response bodies are recovered');
+  assert.deepEqual((await progressiveState()).alerts,[],'Automatic recovery never displays an application failure card');
+  check('Eight interrupted nonzero ranges finish automatically without a retry click or failure card, preserving the committed first chunk');
+  await go('/library/downloaded');await saved();await expect(page.getByRole('tabpanel').getByRole('button',{name:'Play '+tracks[1].title,exact:true})).toBeVisible();
+  await verifySavedBytes();check('Automatically recovered audio appears in Saved with the exact byte length and SHA-256');
+  await page.reload({waitUntil:'domcontentloaded'});await screenReady('/library/downloaded');await expect(page.getByRole('tabpanel').getByRole('button',{name:'Play '+tracks[1].title,exact:true})).toBeVisible();
+  check('The recovered download remains Saved after reopening the page');await screenshot('automatic-recovery');
+ }else if(connectionOnly){await connectionScenario();}else if(progressiveOnly){await progressiveScenario();}else{
  await go('/library/downloaded');await seedSaved();await page.reload({waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'Play '+tracks[0].title,exact:true}).first().waitFor();
  await expect(page.getByRole('tab',{name:/^Saved songs/})).toHaveAttribute('aria-selected','true');check('Downloads opens on completed songs and restores a verified browser artifact');
  await screenshot('saved-desktop-light');
@@ -326,4 +357,4 @@ try{
  }
  await verifySavedBytes();assert.deepEqual(report.unexpectedMutations,[]);assert.deepEqual(report.pageErrors,[]);assert.deepEqual(report.issues,[]);report.maxConcurrentRequests=maxInFlight;report.maxConcurrentPerSong=Object.fromEntries(maxPerSong);report.status='passed';
 }catch(error){report.status='failed';report.failure=error instanceof Error?error.message:String(error);await page?.screenshot({path:'.local/download-browser-failure.png'}).catch(()=>{});throw error;}
-finally{await browser.close();await fixtureProxy?.close();const reportPath=connectionOnly?'.local/connection-integration-browser-report.json':progressiveOnly?'.local/progressive-integration-browser-report.json':'.local/download-browser-report.json';await fs.writeFile(reportPath,JSON.stringify(report,null,2)+'\n');if(connectionOnly&&report.status==='failed')await fs.writeFile('.local/connection-integration-browser-failure-'+Date.now()+'.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,checks:report.checks,maxConcurrentRequests:maxInFlight,pageErrors:report.pageErrors}));}
+finally{await browser.close();await fixtureProxy?.close();const reportPath=recoveryOnly?'.local/automatic-download-recovery-browser-report.json':connectionOnly?'.local/connection-integration-browser-report.json':progressiveOnly?'.local/progressive-integration-browser-report.json':'.local/download-browser-report.json';await fs.writeFile(reportPath,JSON.stringify(report,null,2)+'\n');if(connectionOnly&&report.status==='failed')await fs.writeFile('.local/connection-integration-browser-failure-'+Date.now()+'.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,checks:report.checks,maxConcurrentRequests:maxInFlight,pageErrors:report.pageErrors}));}

@@ -193,8 +193,9 @@ class RebuildAudioService {
     // Telegram accepts power-of-two request sizes in 4 KiB granularity.
     const requestSize=Math.min(CHUNK,2**Math.ceil(Math.log2(Math.max(ALIGN,skip+length-sent))));
     const chunks=Math.max(1,Math.ceil((skip+length-sent)/requestSize));
-    const download=self.telegram().iterDownload({file:new self.api.InputDocumentFileLocation({id:cached.document.id,accessHash:cached.document.accessHash,fileReference:cached.document.fileReference,thumbSize:""}),dcId:cached.document.dcId,fileSize:self.bigInt(original.size),offset:self.bigInt(aligned),limit:chunks,requestSize,chunkSize:requestSize});
+    let download;
     try{
+     download=self.telegram().iterDownload({file:new self.api.InputDocumentFileLocation({id:cached.document.id,accessHash:cached.document.accessHash,fileReference:cached.document.fileReference,thumbSize:""}),dcId:cached.document.dcId,fileSize:self.bigInt(original.size),offset:self.bigInt(aligned),limit:chunks,requestSize,chunkSize:requestSize});
      for await(const raw of download){
       if(stream.destroyed)return;
       let part=Buffer.from(raw);if(skip){const trim=Math.min(skip,part.length);part=part.subarray(trim);skip-=trim;}
@@ -204,14 +205,21 @@ class RebuildAudioService {
     }catch(error){
      if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error))){self.onFatal?.(error);throw error;}
      if(stream.destroyed)return;
-     if(retries++<2&&/FILE_REFERENCE|FILEREF/i.test(String(error?.errorMessage||error?.message||error))){
+     const detail=[error?.code,error?.errorMessage,error?.message].filter(Boolean).join(" ")||String(error);
+     const referenceExpired=/FILE_REFERENCE|FILEREF/i.test(detail);
+     const interrupted=/ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENETUNREACH|EHOSTUNREACH|ERR_SOCKET_CLOSED|socket|network|Not connected|Disconnect|TIMEOUT|Source stream was truncated/i.test(detail);
+     if(retries<2&&(referenceExpired||interrupted)){
+      retries++;
+      // Resume the exact unsent suffix after a transient socket failure. The
+      // refreshed document must still match the one whose headers were sent.
+      if(!referenceExpired){await self.sleep(400*retries);if(stream.destroyed)return;}
       cached=await self.info(bot,messageId,true);
       if(stream.destroyed)return;
       if(!sameSource(cached.audio,original))throw new Error("Source file changed during transfer");
       continue;
      }
      throw error;
-    }finally{if(typeof download.return==="function")await Promise.resolve(download.return()).catch(()=>{});}
+    }finally{if(typeof download?.return==="function")await Promise.resolve(download.return()).catch(()=>{});}
    }
   }
   stream=Readable.from(body(),{objectMode:false});return stream;

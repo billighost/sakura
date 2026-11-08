@@ -11,6 +11,8 @@ import * as queue from "../src/rebuild/app/listeningQueue";
 import {SharedFlight} from "../src/rebuild/app/sharedFlight";
 import {musicTrack} from "../src/rebuild/app/types";
 import {validOfflineAudio} from "../src/rebuild/app/offline";
+import {boundedSeekPosition} from "../src/rebuild/app/seekPosition";
+import {userIssue,UserFacingError,responseIssue,type FailureKind} from "../src/rebuild/app/errors";
 
 const accountId="90000000-0000-4000-8000-000000000001";
 const code=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/MusicContext.tsx",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
@@ -25,8 +27,8 @@ function song(index=1):MusicTrack{
 async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean}={}){
  const states:unknown[]=[],refs:Array<{current:unknown}>=[],requests:string[]=[],requestOwners:Array<string|undefined>=[],saved=new Map<string,unknown>();
  const hooks:Array<{deps:unknown[]|undefined;cleanup?:()=>void}>=[],pendingEffects:Array<{slot:number;effect:()=>void|(()=>void)}>=[];
- const windowEvents=new Map<string,Set<()=>void>>(),documentEvents=new Map<string,Set<()=>void>>(),timers=new Set<ReturnType<typeof setTimeout>>();
- const registrations:Array<{accountId:string;track:MusicTrack;ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>;resolve?:(url:string|undefined)=>void}>=[],resolvers:Array<{track:MusicTrack;resolve:(result:unknown)=>void;signal:AbortSignal}>=[],ensured:Array<{id:string;offset:number;signal?:AbortSignal}>=[];
+ const windowEvents=new Map<string,Set<()=>void>>(),documentEvents=new Map<string,Set<()=>void>>(),timers=new Set<ReturnType<typeof setTimeout>>(),timerCallbacks=new Map<ReturnType<typeof setTimeout>,{callback:()=>void;delay:number}>();
+ const registrations:Array<{accountId:string;track:MusicTrack;ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>;resolve?:(url:string|undefined)=>void}>=[],resolvers:Array<{track:MusicTrack;resolve:(result:unknown)=>void;reject:(error:unknown)=>void;signal:AbortSignal}>=[],ensured:Array<{id:string;offset:number;signal?:AbortSignal}>=[];
  const prepares:string[]=[],enqueues:Array<{id:string;requested:boolean}>=[],disposed:string[]=[],objectUrls:string[]=[],revokedUrls:string[]=[],partials=new Map<string,{fingerprint:{assetId:string;sizeBytes:number;sha256:string};blob:Blob;cachedSeconds:number}>();
  const downloadResolvers:Array<(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>>=[];
  const entries:Record<string,{recordingId:string;requested:boolean;status:string;track:MusicTrack}>={};
@@ -40,7 +42,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  const react={createContext:()=>({Provider:noop}),useState(initial:unknown){const slot=stateSlot++;if(slot>=states.length)states[slot]=initial;return [states[slot],(next:unknown)=>{states[slot]=typeof next==="function"?(next as (previous:unknown)=>unknown)(states[slot]):next;scheduleRender();}];},useRef(current:unknown){const slot=refSlot++;return refs[slot]||(refs[slot]={current});},useEffect(effect:()=>void|(()=>void),deps?:unknown[]){const slot=effectSlot++,previous=hooks[slot];if(!previous||!deps||deps.length!==previous.deps?.length||deps.some((dep,index)=>!Object.is(dep,previous.deps?.[index])))pendingEffects.push({slot,effect});hooks[slot]={deps,cleanup:previous?.cleanup};}};
  function captureMedia(audio:FixtureAudio){media=audio;}
  class FixtureAudio {
-  private address="";preload="";volume=.8;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;
+  private address="";preload="";volume=.8;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;error:{code:number}|null=null;
   listeners=new Map<string,Set<{listener:()=>void;once:boolean}>>();
   constructor(){captureMedia(this);}
   get src(){return this.address;}set src(address:string){this.address=address?new URL(address,location.href).href:"";}
@@ -50,7 +52,8 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
   pause(){if(!this.paused)queueMicrotask(()=>this.emit("pause"));this.paused=true;}
   removeAttribute(name:string){if(name==="src")this.src="";}
   metadata(){this.duration=180;this.emit("loadedmetadata");}
-  load(){this.currentTime=0;this.duration=Number.NaN;const address=this.src;if(!address||options.deferMetadata||options.failFallbackBeforeMetadata&&address.includes("/api/v2/recordings/"))return;queueMicrotask(()=>{if(this.src===address)this.metadata();});}
+  load(){this.error=null;this.currentTime=0;this.duration=Number.NaN;const address=this.src;if(!address||options.deferMetadata||options.failFallbackBeforeMetadata&&address.includes("/api/v2/recordings/"))return;queueMicrotask(()=>{if(this.src===address)this.metadata();});}
+  networkFailure(code=2){this.error={code};this.emit("error");}
   async play(){if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");this.paused=false;this.emit("playing");}
  }
  class Manager {
@@ -67,22 +70,22 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  const resolved=(track:MusicTrack)=>({status:"resolved",recording:{recordingId:track.id,references:track.references,reference:track.reference,metadata:{title:track.title,artists:track.artists,durationMs:track.durationMs}},playback:track.readyPlayback});
  const modules:Record<string,unknown>={
   react,"react/jsx-runtime":{jsx:(_type:unknown,props:unknown)=>props},"next-auth/react":{signOut:async()=>{loggedOut=true;}},"./types":{musicTrack},
-  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/library?kind=liked")return {recordings:[]};if(path==="/api/v2/settings")return {settings:{privateSession:true,...(init.body?JSON.parse(String(init.body)):{})}};if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise(resolve=>resolvers.push({track,resolve,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue:()=>({kind:"connection"}),userMessage:(error:Error)=>error.message,UserFacingError:Error,responseIssue:()=>({kind:"connection"})},
+  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/library?kind=liked")return {recordings:[]};if(path==="/api/v2/settings")return {settings:{privateSession:true,...(init.body?JSON.parse(String(init.body)):{})}};if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise((resolve,reject)=>resolvers.push({track,resolve,reject,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue,userMessage:(error:Error)=>error.message,UserFacingError,responseIssue},
   "./preferences":{cachedPreferences:()=>({privateSession:true}),settingsFields:(settings:unknown)=>settings,readPreferenceDraft:asyncNoop,writePreferenceDraft:asyncNoop,unacknowledgedPreferences:()=>({})},
   "./favorites":{readFavoriteDraft:asyncNoop,writeFavoriteDraft:asyncNoop,favoriteOverlay:(ids:string[])=>new Set(ids)},
   "./downloadEngine":{DurableDownloadManager:Manager},"./sharedFlight":{SharedFlight},
   "./partialPlayback":{partialPlaybackUrl:async(accountId:string,source:{track:MusicTrack},ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>{if(options.bridge===false)return;const registration={accountId,track:source.track,ensure};registrations.push(registration);return options.deferRegistration?new Promise<string|undefined>(resolve=>Object.assign(registration,{resolve})):"https://sakura.example/_sakura/audio/fixture";},revokePartialPlayback:()=>{revocations++;}},
   "./listeningSync":{ListeningSync:class{start=asyncNoop;stop=noop;refresh=asyncNoop;flush=asyncNoop;change=noop;},deviceIdentity:()=>"fixture"},"./sessionState":{sessionState:()=>({})},
   "../audio/engine":{MediaAudioEngine:class{initialized=false;requiresVolumeGraph=false;setVolume(){}setMode(){return Promise.resolve();}dispose(){}}},"../audio/presets":{audioTechnology:()=>"none"},
-  "./playbackSource":{readyPlaybackFor},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:noop},"./listeningQueue":queue,
+  "./playbackSource":{readyPlaybackFor},"./seekPosition":{boundedSeekPosition},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:noop},"./listeningQueue":queue,
   "./offline":{localRead:async(owner:string,key:string)=>accountStorage.get(owner)?.get(key),localWrite:async(owner:string,key:string,entry:unknown)=>{let storage=accountStorage.get(owner);if(!storage){storage=new Map();accountStorage.set(owner,storage);}storage.set(key,entry);},rememberAccount:asyncNoop,lastAccount:async()=>({id:profileId}),forgetActiveAccount:asyncNoop,drainListen:asyncNoop,validOfflineAudio},
  };
  class FixtureUrl extends URL {static createObjectURL(blob:Blob){const url=URL.createObjectURL(blob);objectUrls.push(url);return url;}static revokeObjectURL(url:string){revokedUrls.push(url);URL.revokeObjectURL(url);}}
- const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:events(windowEvents),URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(callback,delay);timers.add(timer);return timer;},clearTimeout});
+ const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:events(windowEvents),URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {get value(){return value;},states,requests,requestOwners,media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
 
 test("Retry song refreshes a failed ready source and its cached resolution while keeping the position",async()=>{
@@ -95,6 +98,131 @@ test("Retry song refreshes a failed ready source and its cached resolution while
 test("failed download source refresh reaches the server through the provider's resolver callback",async()=>{
  const p=await player({deferResolve:true});try{
   const track=song();p.value.requestDownload(track);await until(()=>p.downloadResolvers.length===1);const waiting=p.downloadResolvers[0](track,new AbortController().signal,{refresh:true});await until(()=>p.resolvers.length===1);const fresh={...track,readyPlayback:{...track.readyPlayback!,url:track.readyPlayback!.url.replace("/v123/","/v125/")}};p.resolve(0,fresh);assert.equal((await waiting).url,fresh.readyPlayback.url);
+ }finally{p.close();}
+});
+
+test("an initial transient source lookup automatically retries the explicit play request before media attaches",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);p.value.seek(23500);p.rejectResolve();await until(()=>p.value.status==="buffering");
+  assert.equal(p.media.src,"");assert.equal(p.value.error,null);assert.equal(p.value.positionMs,23500);assert.deepEqual(p.enqueues,[]);
+  assert.equal(await p.fireTimer(750),true);await until(()=>p.resolvers.length===2);p.resolve();await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.currentTime,23.5);assert.equal(p.registrations.length,1);
+ }finally{p.close();}
+});
+
+test("initial source lookup retries have a finite budget",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);
+  for(const [attempt,delay]of [750,1500,3000].entries()){
+   p.rejectResolve();await until(()=>p.value.status==="buffering");assert.equal(p.value.error,null);assert.equal(await p.fireTimer(delay),true);await until(()=>p.resolvers.length===attempt+2);
+  }
+  p.rejectResolve();await until(()=>p.value.status==="error");assert.equal(await p.fireTimer(6000),false);assert.equal(p.resolvers.length,4);assert.deepEqual(p.enqueues,[]);
+ }finally{p.close();}
+});
+
+test("an interrupted initial lookup waits offline and resumes the existing play request on reconnect",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);await p.connection(false);p.rejectResolve();await until(()=>p.value.status==="buffering");assert.equal(p.value.error,null);assert.equal(await p.fireTimer(750),false);
+  await p.connection(true);assert.equal(await p.fireTimer(750),true);await until(()=>p.resolvers.length===2);p.resolve();await until(()=>p.value.status==="playing");assert.equal(p.registrations.length,1);
+ }finally{p.close();}
+});
+
+for(const kind of ["session","version","missing","storage","validation"] satisfies FailureKind[])test(`an initial ${kind} source failure does not retry automatically`,async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);p.rejectResolve(0,new UserFacingError({kind,title:"Terminal fixture",message:"This step requires user action.",action:"Try again"}));await until(()=>p.value.status==="error");assert.equal(await p.fireTimer(750),false);assert.equal(p.resolvers.length,1);assert.deepEqual(p.enqueues,[]);
+ }finally{p.close();}
+});
+
+for(const name of ["AbortError","NotAllowedError"])test(`an initial ${name} does not restart playback automatically`,async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);p.rejectResolve(0,new DOMException("Playback cannot continue",name));await until(()=>p.value.status==="error");assert.equal(await p.fireTimer(750),false);assert.deepEqual(p.enqueues,[]);
+ }finally{p.close();}
+});
+
+test("pausing after an initial lookup failure cancels its pending automatic retry",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play({...song(),readyPlayback:undefined});await until(()=>p.resolvers.length===1);p.rejectResolve();await until(()=>p.value.status==="buffering");p.value.pause();await tick();assert.equal(await p.fireTimer(750),false);assert.equal(p.value.status,"paused");assert.equal(p.resolvers.length,1);
+ }finally{p.close();}
+});
+
+test("repeated no-progress media events preserve the watchdog deadline until playback advances",async()=>{
+ const p=await player();try{
+  p.value.play(song());await until(()=>p.value.status==="playing");const original=p.timerFor(12000);assert.ok(original);
+  for(let repeat=0;repeat<4;repeat++)for(const event of ["waiting","stalled","timeupdate","playing"]){p.media.emit(event);await tick();assert.equal(p.timerFor(12000),original);}
+  p.media.currentTime=5;p.media.emit("timeupdate");await tick();const advanced=p.timerFor(12000);assert.ok(advanced);assert.notEqual(advanced,original);
+  for(const event of ["waiting","stalled","timeupdate"]){p.media.emit(event);await tick();assert.equal(p.timerFor(12000),advanced);}
+  assert.equal(await p.fireTimer(12000),true);await tick();assert.match(p.media.src,/\/api\/v2\/recordings\//);assert.equal(p.media.currentTime,5);
+  p.media.emit("timeupdate");await tick();const fallback=p.timerFor(12000);assert.ok(fallback);for(const event of ["waiting","stalled","timeupdate"]){p.media.emit(event);await tick();assert.equal(p.timerFor(12000),fallback);}
+  assert.equal(await p.fireTimer(12000),true);await until(()=>p.value.status==="buffering"&&p.media.src==="");assert.equal(p.value.error,null);assert.deepEqual(p.prepares,[]);
+ }finally{p.close();}
+});
+
+for(const code of [2,4])test(`a temporary ${code===2?"network":"progressive source"} failure refreshes playback automatically and preserves the ongoing download and position`,async()=>{
+ const p=await player();try{
+  const track=song();p.value.play(track);await until(()=>p.value.status==="playing");p.value.requestDownload(track);await until(()=>p.entries[track.id].requested);p.media.currentTime=61.25;
+  p.media.networkFailure(code);await tick();p.media.networkFailure(code);await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.equal(p.value.error,null);assert.equal(p.value.positionMs,61250);assert.deepEqual(p.prepares,[]);assert.equal(p.entries[track.id].requested,true);
+  assert.equal(await p.fireTimer(750),true);await until(()=>p.value.status==="playing");await tick();
+  assert.equal(p.media.currentTime,61.25);assert.equal(p.registrations.length,2);assert.equal(p.requests.filter(path=>path.includes("recordings/resolve")).length,1);assert.deepEqual(p.prepares,[]);
+ }finally{p.close();}
+});
+
+test("a stalled fallback reopens playback without downgrading its recovering automatic download",async()=>{
+ const p=await player();try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=29.2;p.media.emit("waiting");await tick();
+  assert.equal(await p.fireTimer(12000),true);await tick();p.media.emit("waiting");await tick();
+  assert.equal(await p.fireTimer(12000),true);await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.deepEqual(p.prepares,[]);assert.equal(p.value.error,null);assert.equal(await p.fireTimer(750),true);await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.currentTime,29.2);
+ }finally{p.close();}
+});
+
+test("network recovery waits for the connection and keeps a seek made while waiting",async()=>{
+ const p=await player();try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=37.5;await p.connection(false);p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.equal(await p.fireTimer(750),false);assert.equal(p.value.error,null);p.value.seek(72500);await p.connection(true);assert.equal(await p.fireTimer(750),true);await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.currentTime,72.5);assert.deepEqual(p.prepares,[]);
+ }finally{p.close();}
+});
+
+test("a transient source refresh failure keeps recovering from the saved position",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=48.5;p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.equal(await p.fireTimer(750),true);await until(()=>p.resolvers.length===1);p.rejectResolve();await until(()=>p.value.status==="buffering");assert.equal(p.value.error,null);assert.equal(p.value.positionMs,48500);assert.deepEqual(p.prepares,[]);
+  assert.equal(await p.fireTimer(1500),true);await until(()=>p.resolvers.length===2);p.resolve();await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.currentTime,48.5);
+ }finally{p.close();}
+});
+
+test("pausing while an automatic source refresh is pending fences its late completion",async()=>{
+ const p=await player({deferResolve:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.equal(await p.fireTimer(750),true);await until(()=>p.resolvers.length===1);p.value.pause();assert.equal(p.resolvers[0].signal.aborted,true);p.resolve();await tick();assert.equal(p.value.status,"paused");assert.equal(p.media.src,"");assert.equal(p.registrations.length,1);
+ }finally{p.close();}
+});
+
+test("successful playback progress restores the retry budget for a later unrelated interruption",async()=>{
+ const p=await player();try{
+  p.value.play(song());await until(()=>p.value.status==="playing");
+  for(let attempt=0;attempt<4;attempt++){
+   p.media.currentTime+=6;p.media.emit("timeupdate");p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");assert.equal(await p.fireTimer(750),true);await until(()=>p.value.status==="playing");await tick();
+  }
+  assert.equal(p.media.currentTime,24);assert.equal(p.value.error,null);assert.deepEqual(p.prepares,[]);
+ }finally{p.close();}
+});
+
+for(const action of ["pause","next","account","logout"] as const)test(`${action} cancels pending network playback recovery`,async()=>{
+ const p=await player();try{
+  p.value.play(song(),[song(),song(2)]);await until(()=>p.value.status==="playing");p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  if(action==="pause")p.value.pause();else if(action==="next")p.value.next();else if(action==="account")await p.profile("90000000-0000-4000-8000-000000000002");else await p.value.logout();
+  await tick();assert.equal(await p.fireTimer(750),false);assert.equal(p.requests.some(path=>path.includes("recordings/resolve")),false);
+  if(action==="next")await until(()=>p.value.status==="playing"&&p.value.track?.id===song(2).id);else assert.ok(["paused","idle"].includes(p.value.status));
+ }finally{p.close();}
+});
+
+test("persistent media network failures exhaust a finite recovery budget while preserving an explicit download",async()=>{
+ const p=await player();try{
+  const track=song();p.value.play(track);await until(()=>p.value.status==="playing");p.value.requestDownload(track);await until(()=>p.entries[track.id].requested);p.media.currentTime=14.2;
+  for(const delay of [750,1500,3000]){
+   p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");assert.equal(p.value.error,null);assert.equal(await p.fireTimer(delay),true);await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.currentTime,14.2);
+  }
+  p.media.networkFailure();await tick();p.media.networkFailure();await until(()=>p.value.status==="error");assert.equal(await p.fireTimer(6000),false);assert.equal(p.registrations.length,4);assert.equal(p.value.positionMs,14200);assert.equal(p.entries[track.id].requested,true);assert.deepEqual(p.prepares,[]);
  }finally{p.close();}
 });
 

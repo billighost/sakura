@@ -28,7 +28,9 @@ callback, return ready after the source deadline, or enter the successful cache.
 Audio `GET`/`HEAD` responses include a strong document `ETag`. `If-Match` rejects
 replaced documents with 412, and `If-Range` only returns partial bytes for the
 same document. Expired Telegram file references refresh and resume at the last
-emitted byte; a changed document ID, size, MIME or recording tag stops the
+emitted byte. Transient socket failures and truncated transfers also refresh
+and resume that exact suffix, with two bounded retries and a short backoff;
+a changed document ID, size, MIME or recording tag stops the
 transfer. Opening a stream checks the document snapshot used for its headers.
 Caller disconnects destroy the byte stream, including while a reference refresh
 is pending, and cannot start another download after that refresh finishes.

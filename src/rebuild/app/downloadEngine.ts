@@ -3,6 +3,7 @@ import type {DownloadEntry,MusicTrack} from "./types";
 import type {OfflineAudio} from "./offline";
 import {indexedDownloadStorage} from "./downloadStorage";
 import {audioSha256,DownloadIntegrityError,fetchAudioRange} from "./downloadRange";
+import {UserFacingError} from "./errors";
 import type {DownloadChunk,DownloadFingerprint,DownloadSource,DownloadStorage,PartialDownloadRecord} from "./downloadTypes";
 export type {DownloadSource,DownloadStorage,DownloadFingerprint,PartialDownloadRecord} from "./downloadTypes";
 
@@ -12,6 +13,10 @@ const connected=()=>typeof navigator==="undefined"||navigator.onLine!==false;
 const sameFingerprint=(a:DownloadFingerprint|undefined,b:DownloadFingerprint)=>!!a&&a.sizeBytes===b.sizeBytes&&a.sha256===b.sha256;
 const referenceKey=(track:MusicTrack)=>JSON.stringify([track.reference.provider,track.reference.scope||"",track.reference.id]);
 const id=()=>typeof crypto.randomUUID==="function"?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now();
+const recoverableTransfer=(error:unknown)=>error instanceof UserFacingError
+ ? ["connection","offline","busy"].includes(error.issue.kind)
+ : error instanceof Error&&error.name!=="AbortError"&&/connection|network|failed to fetch|fetch failed|load failed|socket|terminated|timed? ?out|timeout|audio download did not start/i.test(error.message);
+function waitForRetry(signal:AbortSignal,delay:number):Promise<void>{return new Promise((resolve,reject)=>{const finish=()=>{signal.removeEventListener("abort",abort);resolve();};const timer=setTimeout(finish,delay);const abort=()=>{clearTimeout(timer);signal.removeEventListener("abort",abort);reject(signal.reason??new DOMException("Canceled","AbortError"));};signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();});}
 interface Job {
  record:PartialDownloadRecord;entry:DownloadEntry;source?:DownloadSource;chunks:Map<number,DownloadChunk>;
  controller:AbortController;active:Set<number>;loading:boolean;rangeReady:boolean;lease:boolean;leaseWaiting:boolean;
@@ -26,12 +31,15 @@ interface Job {
  committing:boolean;
  wholeFlight?:{epoch:number;offset:number};
  needsZeroProbe?:boolean;
+ recoveryAttempts:number;recoveryTimer?:ReturnType<typeof setTimeout>;
 }
 export interface DownloadManagerOptions {
  accountId:string;resolve:(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<DownloadSource>;
  onChange:(entries:Record<string,DownloadEntry>)=>void;onError?:(error:unknown,track:MusicTrack)=>void;
  fetcher?:typeof fetch;storage?:DownloadStorage;maxConcurrentChunks?:number;maxChunksPerSong?:number;chunkBytes?:number;
  idleTimeoutMs?:number;
+ /** Source refreshes after a range exhausts its immediate retries. */
+ maxRecoveryAttempts?:number;recoveryDelayMs?:number;
 }
 
 /** Account-scoped jobs yield after every chunk so queue edits can change priority. */
@@ -50,6 +58,8 @@ export class DurableDownloadManager {
   if(typeof window!=="undefined"){window.addEventListener("online",this.online);window.addEventListener("offline",this.offline);if("BroadcastChannel" in window){this.channel=new BroadcastChannel("sakura-downloads:"+options.accountId);this.channel.addEventListener("message",event=>{const message=event.data;if(message?.sender===this.owner||typeof message?.recordingId!=="string")return;if(message.type==="removed")this.externalRemoval(message.recordingId);else if(message.type==="saved")void this.externalSaved(message.recordingId);});}}
   if(!Number.isInteger(this.chunkBytes)||this.chunkBytes<1024||this.chunkBytes>4*1024*1024)throw new Error("Download chunks must be between 1KB and 4MB.");
   for(const limit of [options.maxConcurrentChunks??4,options.maxChunksPerSong??2])if(!Number.isInteger(limit)||limit<1||limit>12)throw new Error("Download concurrency must be between one and twelve.");
+  if(!Number.isInteger(options.maxRecoveryAttempts??3)||(options.maxRecoveryAttempts??3)<0||(options.maxRecoveryAttempts??3)>12)throw new Error("Download recovery attempts must be between zero and twelve.");
+  if(!Number.isFinite(options.recoveryDelayMs??1000)||(options.recoveryDelayMs??1000)<0)throw new Error("Download recovery delay must be non-negative.");
  }
  private get chunkBytes(){return this.options.chunkBytes??CHUNK_BYTES;}
  private snapshot(){return {...this.complete,...Object.fromEntries([...this.jobs].map(([key,job])=>[key,{...job.entry}]))};}
@@ -63,7 +73,7 @@ export class DurableDownloadManager {
  private settle(job:Job,error?:unknown){if(job.settled)return;job.settled=true;if(error)job.reject(error);else job.resolve();}
  private isCurrent(job:Job,epoch:number){return !this.stopped&&job.epoch===epoch&&this.jobs.get(job.record.recordingId)===job;}
  private newJob(record:PartialDownloadRecord):Job {
-  const job:Job={record,entry:{recordingId:record.recordingId,track:record.track,status:record.status,downloadedBytes:0,totalBytes:record.fingerprint?.sizeBytes??null,operationId:id(),requested:record.requested,updatedAt:record.updatedAt,error:record.error},controller:new AbortController(),chunks:new Map(),active:new Set(),loading:false,rangeReady:false,lease:false,leaseWaiting:false,leaseReady:false,lastServed:0,epoch:0,promise:Promise.resolve(),resolve:()=>{},reject:()=>{},settled:true,urgent:new Set(),waiters:new Map(),io:Promise.resolve(),inFlightBytes:new Map(),lastPaint:0,warmingAt:Date.now(),committing:false};
+  const job:Job={record,entry:{recordingId:record.recordingId,track:record.track,status:record.status,downloadedBytes:0,totalBytes:record.fingerprint?.sizeBytes??null,operationId:id(),requested:record.requested,updatedAt:record.updatedAt,error:record.error},controller:new AbortController(),chunks:new Map(),active:new Set(),loading:false,rangeReady:false,lease:false,leaseWaiting:false,leaseReady:false,lastServed:0,epoch:0,promise:Promise.resolve(),resolve:()=>{},reject:()=>{},settled:true,urgent:new Set(),waiters:new Map(),io:Promise.resolve(),inFlightBytes:new Map(),lastPaint:0,warmingAt:Date.now(),committing:false,recoveryAttempts:0};
   this.resetPromise(job);return job;
  }
  private async withIO(job:Job,epoch:number,operation:()=>Promise<void>):Promise<boolean>{let performed=false;const flight=job.io.catch(()=>{}).then(async()=>{if(!this.isCurrent(job,epoch))return;await operation();performed=true;});job.io=flight.catch(()=>{});await flight;return performed;}
@@ -95,7 +105,7 @@ export class DurableDownloadManager {
   if(job?.record.requested&&!requested&&["paused","failed"].includes(job.entry.status))return Promise.resolve();
   if(job&&!job.record.requested&&!requested&&mode==="prefix"&&job.record.mode==="full"&&canonical!==(this.currentId&&this.aliases.get(this.currentId)||this.currentId))return this.prepare(canonical);
   if(job){job.record.priority=Math.max(job.record.priority,options.priority??0);if(requested){job.record.requested=true;job.entry.requested=true;}if(mode==="full")job.record.mode="full";
-   if(["prepared","paused","failed"].includes(job.entry.status)&&!(mode==="prefix"&&job.entry.status==="prepared")){if(job.record.refreshSource){job.source=undefined;job.rangeReady=false;}job.epoch++;job.controller.abort();this.release(job);job.controller=new AbortController();job.entry.status="queued";job.entry.error=undefined;job.warmingAt=Date.now();this.resetPromise(job);}
+   if(["prepared","paused","failed"].includes(job.entry.status)&&!(mode==="prefix"&&job.entry.status==="prepared")){if(job.record.refreshSource){job.source=undefined;job.rangeReady=false;}job.epoch++;job.controller.abort();this.release(job);job.recoveryAttempts=0;job.controller=new AbortController();job.entry.status="queued";job.entry.error=undefined;job.warmingAt=Date.now();this.resetPromise(job);}
   }else{const now=Date.now();job=this.newJob({version:1,recordingId:canonical,track:{...track,id:canonical},status:"queued",mode,requested,priority:options.priority??0,chunkBytes:this.chunkBytes,createdAt:now,updatedAt:now});this.jobs.set(canonical,job);}
   this.aliases.set(referenceKey(track),canonical);this.aliases.set(track.id,canonical);this.emit();const epoch=job.epoch;void this.save(job).then(()=>this.schedule()).catch(error=>{if(this.isCurrent(job!,epoch))this.fail(job!,error);});return job.promise;
  }
@@ -145,8 +155,8 @@ export class DurableDownloadManager {
  private schedule(){if(this.scheduled||this.stopped)return;this.scheduled=true;queueMicrotask(()=>{this.scheduled=false;this.pump();});}
  private pump(){
   if(this.stopped||!connected())return;
-  const candidates=[...this.jobs.values()].filter(job=>activeStatus(job.entry.status)).sort((a,b)=>this.priority(b)-this.priority(a)||a.lastServed-b.lastServed||a.record.createdAt-b.record.createdAt);
-  for(const job of candidates){if(!job.lease){this.acquire(job);continue;}if(job.leaseReady&&!job.source&&!job.loading&&this.resolving<2){job.loading=true;this.resolving++;void this.resolveJob(job);}}
+  const candidates=[...this.jobs.values()].filter(job=>activeStatus(job.entry.status)&&!job.recoveryTimer).sort((a,b)=>this.priority(b)-this.priority(a)||a.lastServed-b.lastServed||a.record.createdAt-b.record.createdAt);
+  for(const job of candidates){if(!job.lease){this.acquire(job);continue;}if(job.leaseReady&&!job.source&&!job.loading&&!job.active.size&&this.resolving<2){job.loading=true;this.resolving++;void this.resolveJob(job);}}
   const limit=this.options.maxConcurrentChunks??4;
   while(this.active<limit){const eligible=candidates.filter(job=>job.lease&&job.leaseReady&&job.source&&!job.loading&&job.active.size<(job.rangeReady?(this.options.maxChunksPerSong??2):1)&&this.nextOffset(job)!==null).sort((a,b)=>this.priority(b)-this.priority(a)||a.lastServed-b.lastServed);
    const job=eligible[0];if(!job)break;const pending=candidates.find(other=>this.priority(other)>this.priority(job)&&!other.active.size&&(!other.leaseReady||!other.source||other.loading)&&other.warmingAt+PRIORITY_WARMUP_MS>Date.now());if(pending){if(!this.priorityWake)this.priorityWake=setTimeout(()=>{this.priorityWake=undefined;this.schedule();},Math.max(1,pending.warmingAt+PRIORITY_WARMUP_MS-Date.now()));break;}const offset=this.nextOffset(job)!;job.active.add(offset);job.lastServed=++this.sequence;this.active++;job.entry.status="downloading";this.updateBytes(job);this.emit();void this.chunk(job,offset);
@@ -163,7 +173,7 @@ export class DurableDownloadManager {
    void navigator.locks.request("sakura-download:"+this.options.accountId+":"+recordingId,{signal:job.controller.signal},async()=>{await new Promise<void>((resolve,reject)=>{releaseAcquisition=resolve;if(this.isCurrent(job,epoch))job.releaseLease=resolve;void acquired().catch(reject);});}).catch(error=>{if(!this.isCurrent(job,epoch))return;job.leaseWaiting=false;if(!job.controller.signal.aborted)this.fail(job,error);});
   }else{void this.storage.lease(recordingId,leaseOwner,Date.now()+8000).then(async held=>{if(!this.isCurrent(job,epoch)){if(held)void this.storage.release(recordingId,leaseOwner).catch(()=>{});return;}job.leaseWaiting=false;if(!held){job.retryTimer=setTimeout(()=>{if(!this.isCurrent(job,epoch))return;job.retryTimer=undefined;this.schedule();},1000);return;}releaseAcquisition=()=>{void this.storage.release(recordingId,leaseOwner).catch(()=>{});};job.releaseLease=releaseAcquisition;job.fallbackOwner=leaseOwner;job.leaseTimer=setInterval(()=>{void this.storage.lease(recordingId,leaseOwner,Date.now()+8000).then(ok=>{if(!this.isCurrent(job,epoch))return;if(!ok)this.leaseLost(job);}).catch(()=>{if(this.isCurrent(job,epoch))this.leaseLost(job);});},2000);await acquired();}).catch(error=>{if(this.isCurrent(job,epoch))this.fail(job,error);});}
  }
- private release(job:Job){if(job.leaseTimer)clearInterval(job.leaseTimer);if(job.retryTimer)clearTimeout(job.retryTimer);const unlock=job.releaseLease,fallbackOwner=job.fallbackOwner,recordingId=job.record.recordingId;job.leaseTimer=undefined;job.retryTimer=undefined;job.lease=false;job.leaseWaiting=false;job.leaseReady=false;job.releaseLease=undefined;job.fallbackOwner=undefined;if(!unlock)return;let finish:()=>void=()=>{};const drain=new Promise<void>(resolve=>{finish=resolve;});job.leaseDrain=drain;queueMicrotask(()=>{const renewal=fallbackOwner?setInterval(()=>{void this.storage.lease(recordingId,fallbackOwner,Date.now()+8000).catch(()=>{});},2000):undefined;void job.io.catch(()=>{}).finally(()=>{if(renewal)clearInterval(renewal);unlock();finish();if(job.leaseDrain===drain)job.leaseDrain=undefined;this.schedule();});});}
+ private release(job:Job){if(job.leaseTimer)clearInterval(job.leaseTimer);if(job.retryTimer)clearTimeout(job.retryTimer);if(job.recoveryTimer)clearTimeout(job.recoveryTimer);const unlock=job.releaseLease,fallbackOwner=job.fallbackOwner,recordingId=job.record.recordingId;job.leaseTimer=undefined;job.retryTimer=undefined;job.recoveryTimer=undefined;job.lease=false;job.leaseWaiting=false;job.leaseReady=false;job.releaseLease=undefined;job.fallbackOwner=undefined;if(!unlock)return;let finish:()=>void=()=>{};const drain=new Promise<void>(resolve=>{finish=resolve;});job.leaseDrain=drain;queueMicrotask(()=>{const renewal=fallbackOwner?setInterval(()=>{void this.storage.lease(recordingId,fallbackOwner,Date.now()+8000).catch(()=>{});},2000):undefined;void job.io.catch(()=>{}).finally(()=>{if(renewal)clearInterval(renewal);unlock();finish();if(job.leaseDrain===drain)job.leaseDrain=undefined;this.schedule();});});}
  private async withExclusive<T>(recordingId:string,operation:()=>Promise<T>):Promise<T>{const name="sakura-download:"+this.options.accountId+":"+recordingId;if(typeof navigator!=="undefined"&&navigator.locks)return navigator.locks.request(name,operation);const owner=this.owner+":clear:"+id();while(!await this.storage.lease(recordingId,owner,Date.now()+8000))await new Promise(resolve=>setTimeout(resolve,50));const renewal=setInterval(()=>{void this.storage.lease(recordingId,owner,Date.now()+8000).catch(()=>{});},2000);try{return await operation();}finally{clearInterval(renewal);await this.storage.release(recordingId,owner).catch(()=>{});}}
  private clearExclusive(recordingId:string,includeReady=false){return this.withExclusive(recordingId,()=>this.storage.clear(recordingId,includeReady));}
  private leaseLost(job:Job){const paused=this.pause(job.record.recordingId),epoch=job.epoch;void paused.catch(error=>{if(this.isCurrent(job,epoch))this.fail(job,error);});}
@@ -187,7 +197,7 @@ export class DurableDownloadManager {
    if(!this.isCurrent(job,epoch))return;
    for(const [offset,group] of job.waiters)if(offset>=source.sizeBytes){for(const waiter of group)waiter.reject(new DownloadIntegrityError("This playback range does not belong to the recording."));job.waiters.delete(offset);job.urgent.delete(offset);}
    job.rangeReady=false;job.entry.status="queued";this.updateBytes(job);await this.save(job);this.emit();
-  }catch(error){if(epoch===job.epoch&&!this.stopped&&!job.controller.signal.aborted)this.fail(job,error);}
+  }catch(error){if(epoch===job.epoch&&!this.stopped&&!job.controller.signal.aborted&&!this.recover(job,error))this.fail(job,error);}
   finally{job.loading=false;this.resolving--;this.schedule();}}
  private async chunk(job:Job,offset:number){const epoch=job.epoch,source=job.source!,signal=job.controller.signal,end=Math.min(source.sizeBytes-1,offset+job.record.chunkBytes-1);try{
    const sameOrigin=(url:string)=>{try{return typeof location!=="undefined"&&new URL(url,location.href).origin===location.origin||url.startsWith("/");}catch{return false;}};
@@ -195,13 +205,13 @@ export class DurableDownloadManager {
    let result:Awaited<ReturnType<typeof fetchAudioRange>>|undefined,lastError:unknown;const structuralFailures=new Set<string>();
    for(let attempt=0;attempt<3;attempt++){signal.throwIfAborted();if(!this.isCurrent(job,epoch))return;if(!connected()){this.suspendForConnection();return;}const url=attempt===1&&alternate?alternate:first;
     job.inFlightBytes.set(offset,0);
-    try{result=await fetchAudioRange(url,offset,end,source.sizeBytes,signal,this.options.fetcher,bytes=>{if(epoch!==job.epoch)return;job.inFlightBytes.set(offset,bytes);this.updateBytes(job);if(Date.now()-job.lastPaint>150){job.lastPaint=Date.now();this.emit();}},this.options.idleTimeoutMs,job.record.mode==="full",whole=>this.responseMode(job,epoch,offset,whole));break;}catch(error){lastError=error;if(error instanceof DownloadIntegrityError){if(!error.retryAlternate)throw error;structuralFailures.add(url);const trappedWhole=job.wholeFlight?.epoch===epoch&&job.wholeFlight.offset===offset;if(!alternate||structuralFailures.has(first)&&structuralFailures.has(alternate)){if(trappedWhole&&offset!==0)return;throw error;}}if(signal.aborted||!this.isCurrent(job,epoch))throw error;if(!connected()){this.suspendForConnection();return;}if(attempt<2&&!(error instanceof DownloadIntegrityError))await new Promise<void>((resolve,reject)=>{const finish=()=>{signal.removeEventListener("abort",abort);resolve();};const timer=setTimeout(finish,250*(attempt+1));const abort=()=>{clearTimeout(timer);reject(signal.reason??new DOMException("Canceled","AbortError"));};signal.addEventListener("abort",abort,{once:true});});}}
+    try{result=await fetchAudioRange(url,offset,end,source.sizeBytes,signal,this.options.fetcher,bytes=>{if(epoch!==job.epoch)return;job.inFlightBytes.set(offset,bytes);this.updateBytes(job);if(Date.now()-job.lastPaint>150){job.lastPaint=Date.now();this.emit();}},this.options.idleTimeoutMs,job.record.mode==="full",whole=>this.responseMode(job,epoch,offset,whole));break;}catch(error){lastError=error;if(error instanceof DownloadIntegrityError){if(!error.retryAlternate)throw error;structuralFailures.add(url);const trappedWhole=job.wholeFlight?.epoch===epoch&&job.wholeFlight.offset===offset;if(!alternate||structuralFailures.has(first)&&structuralFailures.has(alternate)){if(trappedWhole&&offset!==0)return;throw error;}}if(signal.aborted||!this.isCurrent(job,epoch))throw error;if(!connected()){this.suspendForConnection();return;}if(error instanceof UserFacingError&&["session","version","validation","storage"].includes(error.issue.kind))throw error;if(attempt<2&&!(error instanceof DownloadIntegrityError))await waitForRetry(signal,250*(attempt+1));}}
    if(!result){job.record.refreshSource=true;throw lastError;}if(this.stopped||epoch!==job.epoch)return;
    if(job.record.mimeType&&job.record.mimeType!==result.blob.type)throw new DownloadIntegrityError("The source changed audio format while this song was being saved.");job.record.mimeType=result.blob.type;
    if(result.whole){if(await audioSha256(result.blob)!==job.record.fingerprint!.sha256)throw new DownloadIntegrityError("The audio file did not match this verified recording. Check again.");for(let start=0;start<source.sizeBytes;start+=job.record.chunkBytes){const blob=result.blob.slice(start,Math.min(source.sizeBytes,start+job.record.chunkBytes),result.blob.type),chunk={offset:start,blob,sha256:await audioSha256(blob)};if(this.stopped||epoch!==job.epoch)return;await this.withIO(job,epoch,()=>this.storage.putChunk(job.record.recordingId,chunk));if(epoch!==job.epoch)return;this.publishChunk(job,chunk);}}
    else{const chunk={offset,blob:result.blob,sha256:await audioSha256(result.blob)};if(this.stopped||epoch!==job.epoch)return;await this.withIO(job,epoch,()=>this.storage.putChunk(job.record.recordingId,chunk));if(epoch!==job.epoch)return;this.publishChunk(job,chunk);job.rangeReady=true;}
-   this.updateBytes(job);await this.save(job);this.emit();
-  }catch(error){if(epoch===job.epoch&&!this.stopped&&!job.controller.signal.aborted)this.fail(job,error);}
+   job.recoveryAttempts=0;this.updateBytes(job);await this.save(job);this.emit();
+  }catch(error){if(epoch===job.epoch&&!this.stopped&&!job.controller.signal.aborted&&!this.recover(job,error,true))this.fail(job,error);}
   finally{if(job.wholeFlight?.epoch===epoch&&job.wholeFlight.offset===offset)job.wholeFlight=undefined;job.active.delete(offset);job.inFlightBytes.delete(offset);this.active--;this.updateBytes(job);this.schedule();}}
  private async finish(job:Job){if(job.loading||!activeStatus(job.entry.status))return;job.loading=true;const epoch=job.epoch;try{
    if(job.record.mode==="prefix"&&job.entry.downloadedBytes<job.source!.sizeBytes){job.entry.status="prepared";await this.save(job);if(!this.isCurrent(job,epoch))return;this.settle(job);this.release(job);this.emit();void this.pruneCache(job.record.recordingId).catch(()=>{});return;}
@@ -214,6 +224,17 @@ export class DurableDownloadManager {
    if(!committed)throw new Error("The completed song could not be saved on this device. Please try again.");
    this.complete[job.record.recordingId]={...job.entry,status:"ready",downloadedBytes:blob.size,totalBytes:blob.size,sha256:job.record.fingerprint!.sha256,requested:committed.requested!==false,activeChunks:0};this.jobs.delete(job.record.recordingId);this.settle(job);this.release(job);this.emit();this.broadcastSaved(job.record.recordingId);
   }catch(error){if(epoch===job.epoch&&!this.stopped)this.fail(job,error);}finally{job.loading=false;job.committing=false;this.schedule();}}
+ /** Restart an interrupted source without settling readers or losing verified bytes. */
+ private recover(job:Job,error:unknown,fromRange=false):boolean{
+  const expiredSource=fromRange&&error instanceof UserFacingError&&error.issue.kind==="missing"&&error.issue.title==="Audio is still being found for this song.";
+  if(!(recoverableTransfer(error)||expiredSource)||job.recoveryAttempts>=(this.options.maxRecoveryAttempts??3))return false;
+  if(!connected()){this.suspendForConnection();return true;}
+  const epoch=++job.epoch,attempt=++job.recoveryAttempts;job.controller.abort();job.controller=new AbortController();this.release(job);
+  job.source=undefined;job.rangeReady=false;job.wholeFlight=undefined;job.needsZeroProbe=false;job.record.refreshSource=true;job.entry.status="queued";job.entry.error=undefined;job.inFlightBytes.clear();this.updateBytes(job);
+  // The queued manifest also resumes automatically after a reload during backoff.
+  job.recoveryTimer=setTimeout(()=>{if(!this.isCurrent(job,epoch))return;job.recoveryTimer=undefined;job.warmingAt=Date.now();this.schedule();},Math.min(8000,(this.options.recoveryDelayMs??1000)*2**(attempt-1)));
+  void this.save(job).catch(saveError=>{if(this.isCurrent(job,epoch))this.fail(job,saveError);});this.emit();return true;
+ }
  private fail(job:Job,error:unknown){if(this.stopped||this.jobs.get(job.record.recordingId)!==job)return;job.epoch++;job.committing=false;job.controller.abort();job.controller=new AbortController();job.entry.status="failed";job.entry.error=error instanceof Error?error.message:"The song could not finish saving. Your progress is safe.";this.release(job);this.rejectChunks(job,error);this.settle(job,error);if(error instanceof DownloadIntegrityError){job.record.refreshSource=true;job.chunks.clear();job.source=undefined;job.record.mimeType=undefined;job.rangeReady=false;job.inFlightBytes.clear();this.updateBytes(job);void this.withIO(job,job.epoch,()=>this.storage.clear(job.record.recordingId)).then(()=>this.save(job)).catch(()=>{});}else void this.save(job).catch(()=>{});this.emit();if(job.record.requested)this.options.onError?.(error,job.record.track);this.schedule();}
  private cacheProtected(recordingId:string,protectId?:string){return recordingId===protectId||recordingId===(this.currentId&&this.aliases.get(this.currentId)||this.currentId)||this.priorityIds.slice(0,3).some(value=>(this.aliases.get(value)||value)===recordingId);}
  /** Serialize eviction with clicks and atomically refuse any explicit stored download. */

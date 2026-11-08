@@ -128,6 +128,62 @@ test("expired file references resume after emitted bytes without replaying them"
  assert.deepEqual(Buffer.concat(chunks),bytes);assert.equal(downloads,2);
 });
 
+for(const interruption of ["socket","truncated","opening"])test(`transient ${interruption} failure resumes the exact verified suffix`,async()=>{
+ const bytes=Buffer.alloc(12000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ let downloads=0,reads=0;const offsets=[],sleeps=[];
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message("Finesse","Bruno Mars",191,bytes.length)];},iterDownload(options){
+  const attempt=++downloads;offsets.push(options.offset);
+  if(interruption==="opening"&&attempt===1)throw new Error("Not connected");
+  return(async function*(){
+   if(attempt===1){yield bytes.subarray(options.offset,5000);if(interruption==="socket")throw Object.assign(new Error("Transport failed"),{code:"ECONNRESET"});return;}
+   yield bytes.subarray(options.offset);
+  })();
+ }},{sleep:async ms=>{sleeps.push(ms);}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ const chunks=[];for await(const chunk of await backend.stream("primary","42",123,10000))chunks.push(chunk);
+ assert.deepEqual(Buffer.concat(chunks),bytes.subarray(123,10123));
+ assert.deepEqual(offsets,interruption==="opening"?[0,0]:[0,4096]);assert.equal(reads,2);assert.deepEqual(sleeps,[400]);
+});
+
+test("transient transfer retries stop after three failed attempts without progress",async()=>{
+ let downloads=0,reads=0;const sleeps=[];
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message()];},async *iterDownload(){downloads++;throw new Error("ETIMEDOUT");}},{sleep:async ms=>{sleeps.push(ms);}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ await assert.rejects(async()=>{for await(const chunk of await backend.stream("primary","42",0,5000))assert.ok(chunk);},/ETIMEDOUT/);
+ assert.equal(downloads,3);assert.equal(reads,3);assert.deepEqual(sleeps,[400,800]);
+});
+
+test("transient recovery refuses a replaced document before opening its suffix",async()=>{
+ let downloads=0,reads=0;
+ const backend=service({async getEntity(){return"peer";},async getMessages(){const value=message("Finesse","Bruno Mars",191,10000);if(++reads>1)value.media.document.id=789;return[value];},async *iterDownload(){downloads++;yield Buffer.alloc(5000);throw new Error("socket closed");}},{sleep:async()=>{}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ await assert.rejects(async()=>{for await(const chunk of await backend.stream("primary","42",0,10000))assert.ok(chunk);},/Source file changed/);
+ assert.equal(downloads,1);assert.equal(reads,2);
+});
+
+test("terminal transfer failures do not reconnect or retry",async()=>{
+ for(const detail of ["AUTH_KEY_DUPLICATED","FILE_ID_INVALID","FLOOD_WAIT_30"]){
+  let downloads=0,reads=0,fatal=0;const sleeps=[];
+  const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message()];},async *iterDownload(){downloads++;throw new Error(detail);}},{onFatal:()=>{fatal++;},sleep:async ms=>{sleeps.push(ms);}});
+  backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+  await assert.rejects(async()=>{for await(const chunk of await backend.stream("primary","42",0,5000))assert.ok(chunk);},error=>error.message===detail);
+  assert.equal(downloads,1);assert.equal(reads,1);assert.deepEqual(sleeps,[]);assert.equal(fatal,detail==="AUTH_KEY_DUPLICATED"?1:0);
+ }
+});
+
+test("caller disconnect during retry backoff cannot refresh or restart a transfer",async()=>{
+ const {Writable}=require("node:stream"),{once}=require("node:events");
+ let reads=0,downloads=0,backoffStarted,finishBackoff;
+ const backoffEntered=new Promise(resolve=>{backoffStarted=resolve;}),backoffPending=new Promise(resolve=>{finishBackoff=resolve;});
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message("Finesse","Bruno Mars",191,10000)];},async *iterDownload(){downloads++;yield Buffer.alloc(4096,7);throw new Error("ECONNRESET");}},{sleep:async()=>{backoffStarted();await backoffPending;}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ const response=new Writable({write(_chunk,_encoding,done){done();}});response.writeHead=()=>{};
+ const originalStream=backend.stream.bind(backend);let transfer;backend.stream=async(...args)=>{transfer=await originalStream(...args);return transfer;};
+ await backend.serve({method:"GET",headers:{}},response,"primary","42");await backoffEntered;
+ const closed=once(transfer,"close");response.destroy();await new Promise(resolve=>setImmediate(resolve));assert.equal(transfer.destroyed,true);
+ finishBackoff();await closed;assert.equal(downloads,1);assert.equal(reads,1);
+});
+
 test("file-reference refresh rejects a replaced document before mixing its bytes",async()=>{
  let reads=0;const backend=service({async getEntity(){return"peer";},async getMessages(){const value=message("Finesse","Bruno Mars",191,10000);if(++reads>1)value.media.document.id=789;return[value];},async *iterDownload(){yield Buffer.alloc(5000);throw new Error("FILE_REFERENCE_EXPIRED");}});
  backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
