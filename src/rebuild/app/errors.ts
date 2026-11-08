@@ -36,8 +36,8 @@ export function userIssue(error: unknown, context: ErrorContext = "page"): UserI
  if(/different or uncertain recording|recording.+(match|verify)|identity-conflict|ambiguous-audio|asset-mismatch|catalog-mismatch/.test(message))return issues.version;
  if(/lyrics.+(not available|not found)|no-lyrics|not-found/.test(message)&&context==="lyrics")return {...issues.missing,title:"No lyrics for this recording yet.",message:"The lyrics provider has no verified words for this version yet. Keep listening, or check again later.",action:"Check for lyrics",href:undefined,linkLabel:undefined};
  if(/reading guide.+(match|unavailable)/i.test(message))return {...fallbacks.lyrics,title:"The reading guide needs another try.",message:"The reading guide couldn’t be matched to these lyrics. You can read the original words while we try again."};
+ if(/offline|failed to fetch|networkerror|internet disconnected|err_internet_disconnected/i.test(message))return issues.offline;
  if(/connection ended|audio file size|incomplete song|audio.+response|audio source stopped/i.test(message))return fallbacks[context];
- if(typeof navigator!=="undefined"&&navigator.onLine===false)return issues.offline;
  return fallbacks[context];
 }
 export function userMessage(error: unknown, context: ErrorContext = "page"): string { const issue=userIssue(error,context);rememberedIssues.set(context+":"+issue.message,issue);return issue.message; }

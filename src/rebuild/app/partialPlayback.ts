@@ -29,7 +29,7 @@ function listenForChunks(){
   const port=event.ports[0],lease=leases.get(data.token);
   if(!lease?.ensureChunk||typeof data.offset!=="number"||!Number.isSafeInteger(data.offset)||data.offset<0){port.postMessage({status:"unavailable"});port.close();return;}
   const controller=new AbortController();requests.set(data.requestId,controller);
-  void lease.ensureChunk(data.offset!,controller.signal).then(()=>port.postMessage({status:"ready"}),()=>port.postMessage({status:"failed"})).finally(()=>{requests.delete(data.requestId!);port.close();});
+  void lease.ensureChunk(data.offset!,controller.signal).then(chunk=>port.postMessage({status:chunk===undefined?"unavailable":"ready"}),()=>port.postMessage({status:"failed"})).finally(()=>{requests.delete(data.requestId!);port.close();});
  });
 }
 

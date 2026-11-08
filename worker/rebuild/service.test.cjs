@@ -143,8 +143,47 @@ test("unknown configured fallback scopes do not disable a valid primary scope",a
 test("a stale document precondition rejects before any audio transfer",async()=>{
  const backend=service({async getEntity(){return"peer";},async getMessages(){return[message()];},iterDownload(){throw new Error("Must not transfer changed audio");}});
  let code,headers,ended=false;
- await backend.serve({method:"GET",headers:{"if-match":"\"old-document\""}},{writeHead(status,value){code=status;headers=value;},end(){ended=true;}},"primary","42");
+ await backend.serve({method:"GET",headers:{range:"bytes=0-9","if-match":"\"old-document\"","if-range":"\"old-document\""}},{writeHead(status,value){code=status;headers=value;},end(){ended=true;}},"primary","42");
  assert.equal(code,412);assert.equal(ended,true);assert.equal(headers["Content-Length"],"0");assert.ok(/^"[a-f0-9]{64}"$/.test(headers.ETag));
+});
+
+test("serve refuses a concurrent source replacement after validating its ETag",async()=>{
+ const {Writable}=require("node:stream"),{finished}=require("node:stream/promises");
+ let fileId=123,downloads=0;const backend=service({async getEntity(){return"peer";},async getMessages(){const value=message();value.media.document.id=fileId;return[value];},async *iterDownload(){downloads++;yield Buffer.alloc(5000,9);}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ let etag;await backend.serve({method:"HEAD",headers:{}},{writeHead(_code,headers){etag=headers.ETag;},end(){}},"primary","42");
+ const stream=backend.stream.bind(backend);
+ backend.stream=async(...args)=>{fileId=789;await backend.info("primary","42",true);return stream(...args);};
+ let headersSent=false;const response=new Writable({write(_chunk,_encoding,done){done();}});
+ response.writeHead=()=>{headersSent=true;};
+ await assert.rejects(async()=>{await backend.serve({method:"GET",headers:{range:"bytes=0-4999","if-match":etag}},response,"primary","42");await finished(response);},/Source file changed/);
+ assert.equal(headersSent,false);assert.equal(downloads,0);
+});
+
+test("serve keeps exact conditional ranges when the same document's reference refreshes",async()=>{
+ const {Writable}=require("node:stream"),{finished}=require("node:stream/promises");
+ const bytes=Buffer.alloc(5000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ let reference="old",downloads=0;const backend=service({async getEntity(){return"peer";},async getMessages(){const value=message();value.media.document.fileReference=Buffer.from(reference);return[value];},async *iterDownload(options){downloads++;assert.equal(options.file.id,123);assert.equal(options.file.fileReference.toString(),"fresh");yield bytes.subarray(options.offset);}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ let etag;await backend.serve({method:"HEAD",headers:{}},{writeHead(_code,headers){etag=headers.ETag;},end(){}},"primary","42");
+ const stream=backend.stream.bind(backend);
+ backend.stream=async(...args)=>{reference="fresh";await backend.info("primary","42",true);return stream(...args);};
+ for(const [ifRange,status,expected]of [[etag,206,bytes.subarray(4990)],["\"older-document\"",200,bytes]]){
+  const parts=[];let headers;const response=new Writable({write(chunk,_encoding,done){parts.push(Buffer.from(chunk));done();}});
+  response.writeHead=(code,value)=>{assert.equal(code,status);headers=value;};
+  await backend.serve({method:"GET",headers:{range:"bytes=-10","if-range":ifRange,"if-match":"\"other\", "+etag}},response,"primary","42");await finished(response);
+  assert.equal(headers.ETag,etag);assert.equal(headers["Content-Length"],String(expected.length));assert.deepEqual(Buffer.concat(parts),expected);
+  assert.equal(headers["Content-Range"],status===206?"bytes 4990-4999/5000":undefined);
+ }
+ assert.equal(downloads,2);
+});
+
+test("file-reference refresh rejects changed recording tags before resuming",async()=>{
+ let reads=0,downloads=0;const backend=service({async getEntity(){return"peer";},async getMessages(){return[message(++reads===1?"Finesse":"Finesse (Remix)","Bruno Mars",191,10000)];},async *iterDownload(){downloads++;yield Buffer.alloc(5000);throw new Error("FILE_REFERENCE_EXPIRED");}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ const stream=await backend.stream("primary","42",0,10000);let received=0;
+ await assert.rejects(async()=>{for await(const chunk of stream)received+=chunk.length;},/Source file changed/);
+ assert.equal(received,5000);assert.equal(downloads,1);
 });
 
 test("a refreshed replacement document invalidates the successful resolve cache",async()=>{
@@ -192,4 +231,103 @@ test("conflicting request proof never shares a successful localized resolution f
 test("malformed optional matching proof is discarded without failing the source request",async()=>{
  const backend=service({async getEntity(){return"peer";},async getMessages(){return[message()];}});
  const result=await backend.resolve({...originalInput(),references:[{provider:"musicbrainz",id:"not-a-uuid",scope:42},null]});assert.equal(result.status,"ready");
+});
+
+test("expired connection, peer and recent lookup results stop before further source work",async()=>{
+ for(const stage of ["connection","peer","recent"]){
+  let now=10000,peers=0,reads=0,sends=0;
+  const backend=service({async getEntity(){peers++;if(stage==="peer")now=15000;return"peer";},async getMessages(){reads++;if(stage==="recent")now=15000;return[message()];},async sendMessage(){sends++;return{id:1};}},{now:()=>now,ensureConnected:async()=>{if(stage==="connection")now=15000;}});
+  assert.equal((await backend.resolve({...originalInput(),deadlineMs:5000})).status,"unavailable",stage);
+  assert.equal(peers,stage==="connection"?0:1,stage);assert.equal(reads,stage==="recent"?1:0,stage);assert.equal(sends,0,stage);
+  assert.equal(backend.documents.size,0,stage);assert.equal(backend.resolved.size,0,stage);
+ }
+});
+
+test("conversation deadlines fence the initial send, late send and expired poll sleep",async()=>{
+ for(const stage of ["initial","send","sleep"]){
+  let now=stage==="initial"?10100:10000,sends=0,reads=0;
+  const backend=service({async sendMessage(){sends++;if(stage==="send")now=10100;return{id:1};},async getMessages(){reads++;return[message()];}},{now:()=>now,sleep:async()=>{now=10100;},pollIntervalMs:20});
+  assert.equal((await backend.conversation("peer","primary","Finesse Bruno Mars",originalInput(),10100)).status,"unavailable",stage);
+  assert.equal(sends,stage==="initial"?0:1,stage);assert.equal(reads,0,stage);assert.equal(backend.documents.size,0,stage);
+ }
+});
+
+test("late poll results cannot accept audio or click returned selection buttons",async()=>{
+ class ReplyInlineMarkup{constructor(rows){this.rows=rows;}}
+ class KeyboardButtonCallback{constructor(text){this.text=text;this.data=Buffer.from("generated");}}
+ class GetBotCallbackAnswer{constructor(value){Object.assign(this,value);}}
+ let now=10000,reads=0,clicks=0;
+ const backend=service({async sendMessage(){return{id:1};},async getMessages(){reads++;now=10100;return[message(),{id:2,replyMarkup:new ReplyInlineMarkup([{buttons:[new KeyboardButtonCallback("Bruno Mars - Finesse [03:11]")]}])}];},async invoke(){clicks++;}},{now:()=>now,sleep:async ms=>{now+=ms;},pollIntervalMs:20,api:{...api,ReplyInlineMarkup,KeyboardButtonCallback,messages:{GetBotCallbackAnswer}}});
+ assert.equal((await backend.conversation("peer","primary","Finesse Bruno Mars",originalInput(),10100)).status,"unavailable");
+ assert.equal(reads,1);assert.equal(clicks,0);assert.equal(backend.documents.size,0);assert.equal(backend.resolved.size,0);
+});
+
+test("late callback completion cannot start another poll after its conversation expires",async()=>{
+ class ReplyInlineMarkup{constructor(rows){this.rows=rows;}}
+ class KeyboardButtonCallback{constructor(text){this.text=text;this.data=Buffer.from("generated");}}
+ class GetBotCallbackAnswer{constructor(value){Object.assign(this,value);}}
+ let now=10000,reads=0,clicks=0;
+ const backend=service({async sendMessage(){return{id:1};},async getMessages(){reads++;return[{id:2,replyMarkup:new ReplyInlineMarkup([{buttons:[new KeyboardButtonCallback("Bruno Mars - Finesse [03:11]")]}])}];},async invoke(){clicks++;now=10100;}},{now:()=>now,sleep:async ms=>{now+=ms;},pollIntervalMs:20,api:{...api,ReplyInlineMarkup,KeyboardButtonCallback,messages:{GetBotCallbackAnswer}}});
+ assert.equal((await backend.conversation("peer","primary","Finesse Bruno Mars",originalInput(),10100)).status,"unavailable");
+ assert.equal(reads,1);assert.equal(clicks,1);
+});
+
+test("a cancelled response cannot restart a download after pending reference refresh",async()=>{
+ const {Writable}=require("node:stream"),{once}=require("node:events");
+ let reads=0,downloads=0,refreshStarted,finishRefresh;
+ const refreshEntered=new Promise(resolve=>{refreshStarted=resolve;}),refreshPending=new Promise(resolve=>{finishRefresh=resolve;});
+ const backend=service({async getEntity(){return"peer";},async getMessages(){if(++reads>1){refreshStarted();await refreshPending;}return[message("Finesse","Bruno Mars",191,10000)];},async *iterDownload(){downloads++;if(downloads===1){yield Buffer.alloc(4096,7);throw new Error("FILE_REFERENCE_EXPIRED");}yield Buffer.alloc(10000,7);}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ const response=new Writable({write(_chunk,_encoding,done){done();}});response.writeHead=()=>{};
+ const originalStream=backend.stream.bind(backend);let transfer;backend.stream=async(...args)=>{transfer=await originalStream(...args);return transfer;};
+ await backend.serve({method:"GET",headers:{}},response,"primary","42");await refreshEntered;
+ const closed=once(transfer,"close");response.destroy();await new Promise(resolve=>setImmediate(resolve));assert.equal(transfer.destroyed,true);
+ finishRefresh();await closed;assert.equal(downloads,1);assert.equal(reads,2);
+});
+
+test("file-reference refresh retries stop after three failed download attempts",async()=>{
+ let downloads=0,reads=0;
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message()];},async *iterDownload(){downloads++;throw new Error("FILE_REFERENCE_EXPIRED");}});
+ backend.api={...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}};
+ await assert.rejects(async()=>{for await(const chunk of await backend.stream("primary","42",0,5000))assert.ok(chunk);},/FILE_REFERENCE_EXPIRED/);
+ assert.equal(downloads,3);assert.equal(reads,3);
+});
+
+test("a short coalesced caller expires without cancelling the longer source flight",async context=>{
+ context.mock.timers.enable({apis:["Date","setTimeout"],now:10000});
+ const {SerialQueue}=require("./serial-queue.cjs");const queue=new SerialQueue("primary");let reads=0,entered,release;
+ const started=new Promise(resolve=>{entered=resolve;}),pending=new Promise(resolve=>{release=resolve;});
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;entered();await pending;return[message()];}},{queue});
+ const original=backend.resolve({...originalInput(),deadlineMs:45000});await started;
+ const follower=backend.resolve({...originalInput(),deadlineMs:5000});
+ context.mock.timers.tick(5000);const expired=await follower;
+ assert.equal(expired.status,"unavailable");assert.equal(expired.reason,"audio-worker-timeout");assert.equal(expired.retryable,true);
+ assert.equal(queue.active,true);assert.equal(backend.resolveFlights.size,1);assert.equal(backend.resolved.size,0);
+ const joined=backend.resolve(originalInput());context.mock.timers.tick(1000);release();
+ assert.equal((await original).status,"ready");assert.equal((await joined).status,"ready");assert.equal(reads,1);assert.equal(backend.resolveFlights.size,0);
+ assert.equal((await backend.resolve(originalInput())).status,"ready");assert.equal(reads,1);
+});
+
+test("an initial caller timeout keeps the active chat until its late RPC settles",async context=>{
+ context.mock.timers.enable({apis:["Date","setTimeout"],now:10000});
+ const {SerialQueue}=require("./serial-queue.cjs");const queue=new SerialQueue("primary");let entered,release,queuedRan=false;
+ const started=new Promise(resolve=>{entered=resolve;}),pending=new Promise(resolve=>{release=resolve;});
+ const backend=service({async getEntity(){return"peer";},async getMessages(){entered();await pending;return[message()];}},{queue});
+ const first=backend.resolve({...originalInput(),deadlineMs:5000});await started;
+ const joined=backend.resolve({...originalInput(),deadlineMs:45000}),queued=queue.run(()=>{queuedRan=true;});
+ context.mock.timers.tick(5000);assert.equal((await first).reason,"audio-worker-timeout");
+ assert.equal(queue.active,true);assert.equal(queuedRan,false);assert.equal(backend.resolveFlights.size,1);
+ release();assert.equal((await joined).status,"unavailable");await queued;
+ assert.equal(queuedRan,true);assert.equal(backend.resolveFlights.size,0);assert.equal(backend.resolved.size,0);assert.equal(backend.documents.size,0);
+});
+
+test("a fatal RPC after caller expiration still notifies and clears its actual flight",async context=>{
+ context.mock.timers.enable({apis:["Date","setTimeout"],now:10000});
+ let entered,fail,fatals=0;
+ const started=new Promise(resolve=>{entered=resolve;}),pending=new Promise((_resolve,reject)=>{fail=reject;});
+ const backend=service({async getEntity(){entered();return pending;}},{onFatal:()=>fatals++});
+ const caller=backend.resolve({...originalInput(),deadlineMs:5000});await started;
+ const actual=[...backend.resolveFlights.values()][0],rejected=assert.rejects(actual,/AUTH_KEY_DUPLICATED/);
+ context.mock.timers.tick(5000);assert.equal((await caller).reason,"audio-worker-timeout");assert.equal(backend.resolveFlights.size,1);
+ fail(new Error("AUTH_KEY_DUPLICATED"));await rejected;assert.equal(fatals,1);assert.equal(backend.resolveFlights.size,0);
 });

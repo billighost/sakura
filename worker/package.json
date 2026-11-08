@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node index.js",
     "login": "node login.js",
-    "test": "node --test rebuild/service.test.cjs rebuild/serial-queue.test.cjs"
+    "test": "node --test rebuild/service.test.cjs rebuild/serial-queue.test.cjs rebuild/http.test.cjs"
   },
   "engines": {
     "node": ">=20"

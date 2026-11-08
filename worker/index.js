@@ -73,13 +73,14 @@ const rebuild = new RebuildAudioService({ telegram: () => client.client, api: Ap
   bots: [DEFAULT_BOT, ...(process.env.TELEGRAM_FALLBACK_BOTS || "").split(",").map(bot => bot.trim()).filter(Boolean)],
   queue: client.botQueue, queueFor: bot => client.queueFor(bot), ensureConnected: () => client._ensureConnected(),onFatal: error => client._goFatal(error) });
 
-function scopedSignature(bot,messageId,expires) {
-  return crypto.createHmac("sha256",WORKER_SECRET).update(JSON.stringify([bot.toLowerCase(),String(messageId),expires])).digest("hex");
+function scopedSignature(bot,messageId,expires,documentTag) {
+  return crypto.createHmac("sha256",WORKER_SECRET).update(JSON.stringify([bot.toLowerCase(),String(messageId),expires,...(documentTag?[documentTag]:[])])).digest("hex");
 }
 function scopedSignatureValid(bot,messageId,query) {
-  const expires=Number(query.get("exp"));const signature=query.get("sig")||"";
+  const expires=Number(query.get("exp"));const signature=query.get("sig")||"",documentTag=query.get("documentTag");
   if(!Number.isSafeInteger(expires)||expires<Date.now()/1000||! /^[a-f0-9]{64}$/.test(signature))return false;
-  const expected=scopedSignature(bot,messageId,expires);
+  if(query.getAll("documentTag").length>1||(documentTag!==null&&!/^"[a-f0-9]{64}"$/.test(documentTag)))return false;
+  const expected=scopedSignature(bot,messageId,expires,documentTag);
   return crypto.timingSafeEqual(Buffer.from(signature,"hex"),Buffer.from(expected,"hex"));
 }
 
@@ -395,6 +396,13 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if(scopedAudioMatch && (method === "GET" || method === "HEAD")) {
+      const documentTag=url.searchParams.get("documentTag"),ifMatch=req.headers["if-match"];
+      if(documentTag){
+        if(ifMatch&&ifMatch!=="*"&&!String(ifMatch).split(",").map(value=>value.trim()).includes(documentTag)){res.writeHead(412,{...CORS_HEADERS,"Content-Length":"0"});res.end();return;}
+        // Native media requests carry no custom precondition headers. The
+        // signature binds this tag, so enforce its document identity here.
+        req.headers["if-match"]=documentTag;
+      }
       try { await rebuild.serve(req,res,scopedAudioMatch[1],scopedAudioMatch[2]); }
       catch(error) { if(res.headersSent)res.destroy();else fail(res,error,`${method} ${pathname}`); }
       return;
@@ -434,8 +442,11 @@ const server = http.createServer(async (req, res) => {
       case "/v2/sign-audio": {
         const bot=rebuild.scope(body.chatScope),messageId=String(body.messageId);
         if(!/^[1-9]\d{0,14}$/.test(messageId))throw new Error("Invalid source message ID");
+        const documentTag=body.documentTag;
+        if(documentTag!==undefined&&(typeof documentTag!=="string"||!/^"[a-f0-9]{64}"$/.test(documentTag))){sendJson(res,400,{error:"Invalid source document tag"});return;}
         const expires=Math.floor(Date.now()/1000)+Math.min(3600,Math.max(60,Number(body.ttlSeconds)||1800));
-        sendJson(res,200,{path:`/v2/audio/${bot}/${messageId}?exp=${expires}&sig=${scopedSignature(bot,messageId,expires)}`,expiresAt:expires});
+        const query=new URLSearchParams({exp:String(expires),sig:scopedSignature(bot,messageId,expires,documentTag),...(documentTag?{documentTag}:{})});
+        sendJson(res,200,{path:`/v2/audio/${bot}/${messageId}?${query}`,expiresAt:expires});
         return;
       }
       case "/search": {

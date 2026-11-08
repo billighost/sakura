@@ -22,7 +22,7 @@ const bytes=new Uint8Array(await (await fetch('/fixture.wav')).arrayBuffer());
 const digest=async data=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),n=>n.toString(16).padStart(2,'0')).join('');
 async function save(offset){const chunk=bytes.slice(offset,offset+262144);await put('chunk:'+recordingId+':'+offset,{offset,blob:new Blob([chunk],{type:'audio/wav'}),sha256:await digest(chunk)});}
 if(!await read('download:'+recordingId)){await put('download:'+recordingId,{version:1,recordingId,track:{id:recordingId},fingerprint:{assetId,sizeBytes,sha256},chunkBytes:262144,mimeType:'audio/wav'});await save(0);}
-f.ensureChunk=async(offset,signal)=>{f.joined.push(offset);await new Promise(resolve=>setTimeout(resolve,75));signal.throwIfAborted();await save(offset);};
+f.ensureChunk=async(offset,signal)=>{f.joined.push(offset);await new Promise(resolve=>setTimeout(resolve,75));signal.throwIfAborted();await save(offset);return{offset};};
 await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
 f.url=await partialPlaybackUrl(accountId,f.source,f.ensureChunk);f.revoke=revokePartialPlayback;f.read=read;f.db=db;f.ready=true;
 document.querySelector('#play').onclick=()=>{f.audio=new Audio(f.url);f.audio.addEventListener('timeupdate',()=>f.progress.push(f.audio.currentTime));f.audio.play().catch(error=>f.error=error.message);};

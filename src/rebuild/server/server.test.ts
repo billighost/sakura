@@ -19,7 +19,7 @@ import { AudioPromotions, CloudinaryAudioPublisher, completeAudio, AudioPromotio
 import { ProductionRecordingResolver } from "./production-resolver";
 import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
 import { CatalogArtistAliases } from "./artist-aliases";
-import {createHash} from "node:crypto";
+import {createHash,createHmac} from "node:crypto";
 
 const recordingId = "11111111-1111-4111-8111-111111111111";
 const assetId = "22222222-2222-4222-8222-222222222222";
@@ -245,6 +245,46 @@ test("an unavailable verified original does not prevent delivery from the unchan
  assert.equal(response.status,200);assert.equal(await response.text(),"0123456789");assert.deepEqual(opened,[otherId,assetId]);assert.equal(response.headers.get("X-Sakura-Audio-Delivery"),"primary");
 });
 
+test("invalid verified-original response headers retry the unchanged CDN before any bytes escape",async()=>{
+ const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository();
+ repo.assets=[{...source,sha256,deliveryEvidence:{method:"immutable-cdn-sha256",provider:"cloudinary",sourceAssetId:otherId,verifiedSha256:sha256,verifiedAt:source.verifiedAt}},
+  {...source,assetId:otherId,sha256,candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker",messageId:"42",chatScope:"primary"}}];
+ for(const [range,status,headers]of [
+  ["bytes=2-4",200,{"Content-Type":"audio/mpeg","Content-Length":"10"}],
+  ["bytes=2-4",412,{"Content-Type":"audio/mpeg"}],
+  [null,503,{"Content-Type":"text/html"}],
+  ["bytes=2-4",206,{"Content-Type":"audio/mpeg","Content-Range":"bytes 3-5/10","Content-Length":"3"}],
+  ["bytes=2-4",206,{"Content-Type":"audio/mpeg","Content-Range":"bytes 2-4/10","Content-Length":"4"}],
+  ["bytes=2-4",206,{"Content-Type":"text/html","Content-Range":"bytes 2-4/10","Content-Length":"3"}],
+ ]as [string|null,number,Record<string,string>][]){
+  const opened:[string,string|null][]= [];let canceled=false;
+  const response=await gateway(repo,async(asset,requested)=>{opened.push([asset.assetId,requested]);return asset.assetId===otherId?new Response(new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode("wrong"));},cancel(){canceled=true;}}),{status,headers}):audioResponse(requested);}).serve({...gatewayInput,range});
+  assert.equal(response.status,range?206:200);assert.equal(await response.text(),range?"234":"0123456789");assert.equal(canceled,true);
+  assert.deepEqual(opened,[[otherId,range],[assetId,range]]);assert.equal(response.headers.get("X-Sakura-Audio-Delivery"),"primary");
+ }
+});
+
+test("a canceled late original response is closed without opening the verified CDN",async()=>{
+ const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository(),caller=new AbortController();
+ repo.assets=[{...source,sha256,deliveryEvidence:{method:"immutable-cdn-sha256",provider:"cloudinary",sourceAssetId:otherId,verifiedSha256:sha256,verifiedAt:source.verifiedAt}},
+  {...source,assetId:otherId,sha256,candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker",messageId:"42",chatScope:"primary"}}];
+ const opened:string[]=[];let canceled=false;
+ await assert.rejects(gateway(repo,async asset=>{opened.push(asset.assetId);caller.abort(new DOMException("Canceled","AbortError"));return new Response(new ReadableStream({cancel(){canceled=true;}}),{status:503});}).serve({...gatewayInput,signal:caller.signal}),error=>error instanceof Error&&error.name==="AbortError");
+ assert.equal(canceled,true);assert.deepEqual(opened,[otherId]);
+});
+
+test("verified CDN retry rejects invalid CDN headers and never mixes a started original body",async()=>{
+ const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository();
+ repo.assets=[{...source,sha256,deliveryEvidence:{method:"immutable-cdn-sha256",provider:"cloudinary",sourceAssetId:otherId,verifiedSha256:sha256,verifiedAt:source.verifiedAt}},
+  {...source,assetId:otherId,sha256,candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker",messageId:"42",chatScope:"primary"}}];
+ const opened:string[]=[];let canceled=0;
+ const invalid=await gateway(repo,async asset=>{opened.push(asset.assetId);return new Response(new ReadableStream({cancel(){canceled++;}}),{status:503,headers:{"Content-Type":"text/html"}});}).serve({...gatewayInput,range:"bytes=2-4"});
+ assert.equal(invalid.status,502);assert.deepEqual(opened,[otherId,assetId]);assert.equal(canceled,2);
+ opened.length=0;
+ const truncated=await gateway(repo,async asset=>{opened.push(asset.assetId);return new Response("2",{status:206,headers:{"Content-Type":"audio/mpeg","Content-Range":"bytes 2-4/10","Content-Length":"3"}});}).serve({...gatewayInput,range:"bytes=2-4"});
+ assert.equal(truncated.status,206);await assert.rejects(truncated.text(),/ended before/);assert.deepEqual(opened,[otherId]);
+});
+
 test("audio gateway supports suffix ranges, 416 total size and HEAD without audio transfer", async () => {
   let calls = 0;
   const serve = gateway(new MemoryRepository(), async (_asset, range) => { calls++; return audioResponse(range); });
@@ -369,6 +409,25 @@ test("worker signed URLs are minted once, expire safely and include no bearer cr
  })as typeof fetch);
  const first=await transport.signedPlaybackUrl(asset),second=await transport.signedPlaybackUrl(asset);
  assert.equal(first,second);assert.equal(calls,1);assert.ok(!first?.includes("bearer-secret"));
+});
+
+test("document-bound worker playback accepts only a signed URL for its exact validated file",async()=>{
+ const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary",protocol:"v2" as const,documentId:"123"}},secret="generated-signing-secret";
+ const expectedTag='"'+createHash("sha256").update(JSON.stringify(["primary","42","123",10,"audio/mpeg"])).digest("hex")+'"';
+ for(const mode of ["unbound","wrong-tag","wrong-signature","valid"]){
+  let calls=0,requestedTag:unknown;const transport=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:"https://worker.example.test",secret,chatScope:"primary"}},(async(_url,init)=>{
+   calls++;const body=JSON.parse(String(init?.body));requestedTag=body.documentTag;
+   const expiresAt=Math.floor(Date.now()/1000)+1800,tag=mode==="wrong-tag"?'"'+"f".repeat(64)+'"':expectedTag;
+   const payload=mode==="unbound"?["primary","42",expiresAt]:["primary","42",expiresAt,tag];
+   const signature=mode==="wrong-signature"?"0".repeat(64):createHmac("sha256",secret).update(JSON.stringify(payload)).digest("hex");
+   const query=new URLSearchParams({exp:String(expiresAt),sig:signature,...(mode==="unbound"?{}:{documentTag:tag})});
+   return Response.json({path:"/v2/audio/primary/42?"+query,expiresAt});
+  })as typeof fetch);
+  const url=await transport.signedPlaybackUrl(worker);
+  assert.equal(requestedTag,expectedTag);
+  if(mode==="valid"){assert.equal(new URL(url!).searchParams.get("documentTag"),expectedTag);assert.equal(await transport.signedPlaybackUrl(worker),url);assert.equal(calls,1);}
+  else assert.equal(url,undefined);
+ }
 });
 
 function ingestionDatabase(){
@@ -623,6 +682,32 @@ test("CDN preparation coalesces transfer/publication and persists unchanged cano
  const first=promotions.prepare(canonical,worker),second=promotions.prepare(canonical,worker);assert.equal(first,second);const result=await first;assert.equal(opens,1);assert.equal(publishes,1);assert.equal(saved.length,2);assert.equal(result.recordingId,recordingId);assert.equal(result.sha256,sha256);
 });
 
+test("promotion failures stay with their source and cannot revoke another verified CDN asset",async()=>{
+ const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository(),ingestor=new RecordingIngestor(ingestionDatabase().transaction,[]);
+ const failed={...source,assetId:otherId,candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const promotions=new AudioPromotions({async open(){return new Response("01234567890",{headers:{"Content-Type":"audio/mpeg"}});}},ingestor);
+ await assert.rejects(promotions.prepare(canonical,failed),error=>error instanceof AudioPromotionError&&error.reason==="integrity");
+ repo.assets=[{...source,sha256}];const resolver=new RecordingResolver(repo,[]),result=await resolver.resolve({reference},accountId);
+ const jobs=new AudioResolutionJobs(async()=>[],repo,ingestor,{async discover(){throw new Error("No discovery expected");}},resolver,undefined,promotions);
+ assert.equal(jobs.decoratePreparation(result).status,"resolved");
+ await promotions.prepare(canonical,repo.assets[0]);assert.equal(jobs.decoratePreparation(result).status,"resolved");
+ repo.assets=[failed];const failedResult=await resolver.resolve({reference},accountId);assert.equal(jobs.decoratePreparation(failedResult).status,"review");
+ repo.assets=[{...source,assetId:otherId,sha256}];await promotions.prepare(canonical,repo.assets[0]);assert.equal(jobs.decoratePreparation(await resolver.resolve({reference},accountId)).status,"resolved");
+});
+
+test("late failure of a distinct source cannot overwrite successful CDN preparation",async()=>{
+ const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository(),ingestor=new RecordingIngestor(ingestionDatabase().transaction,[]);
+ let release:()=>void=()=>{};const pending=new Promise<void>(resolve=>{release=resolve;});
+ const failed={...source,assetId:otherId,sha256:"b".repeat(64),candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker" as const,messageId:"41",chatScope:"primary"}};
+ const good={...source,sha256,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const promotions=new AudioPromotions({async open(asset){if(asset.assetId===otherId)await pending;return audioResponse(null);}},ingestor,{async publish(_recording,asset){return{...asset,assetId:accountId,candidate:{...asset.candidate,candidateId:accountId},locator:{kind:"https",url:"https://cdn.example.test/checked.mp3"}};}});
+ const late=promotions.prepare(canonical,failed),assertFailure=assert.rejects(late,error=>error instanceof AudioPromotionError&&error.reason==="integrity");
+ const published=await promotions.prepare(canonical,good);release();await assertFailure;
+ repo.assets=[published];const resolver=new RecordingResolver(repo,[]),result=await resolver.resolve({reference},accountId);
+ const jobs=new AudioResolutionJobs(async()=>[],repo,ingestor,{async discover(){throw new Error("No discovery expected");}},resolver,undefined,promotions);
+ assert.equal(jobs.decoratePreparation(result).status,"resolved");
+});
+
 test("ready-worker preparation jobs keep a verified original available when CDN preparation fails",async()=>{
  for(const outcome of ["ready","quota","integrity"] as const){
   const repo=new MemoryRepository(),sha256=createHash("sha256").update("0123456789").digest("hex");
@@ -716,7 +801,7 @@ test("parallel worker ranges share immutable-document validation and bind every 
  })as typeof fetch);
  const responses=await Promise.all([transport.open(worker,"bytes=0-2"),transport.open(worker,"bytes=3-5"),transport.open(worker,null)]);
  assert.equal(inspections,1);assert.deepEqual(await Promise.all(responses.map(response=>response.text())),["012","345","0123456789"]);
- assert.equal(transferHeaders[0].get("If-Range"),expectedTag);assert.equal(transferHeaders[1].get("If-Range"),expectedTag);assert.equal(transferHeaders[2].get("If-Match"),expectedTag);
+ assert.equal(transferHeaders[0].get("If-Range"),expectedTag);assert.equal(transferHeaders[1].get("If-Range"),expectedTag);assert.ok(transferHeaders.every(headers=>headers.get("If-Match")===expectedTag));
  await assert.rejects(transport.open({...worker,locator:{...worker.locator,documentId:"different"}},null),/document has changed/);
 });
 

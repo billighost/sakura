@@ -27,7 +27,7 @@ test("missing audio has an availability recovery while an identity mismatch stay
 });
 test("network rejection is normalized while explicit caller cancellation stays cancelable",async t=>{
  t.mock.method(globalThis,"fetch",async()=>{throw new TypeError("Failed to fetch internal-host");});
- await assert.rejects(()=>requestJson("https://fixture.invalid",{},{context:"save"}),e=>e instanceof UserFacingError&&!e.message.includes("internal-host"));
+ await assert.rejects(()=>requestJson("https://fixture.invalid",{},{context:"save"}),e=>e instanceof UserFacingError&&e.issue.kind==="offline"&&!e.message.includes("internal-host"));
  const c=new AbortController();c.abort();await assert.rejects(()=>requestJson("https://fixture.invalid",{signal:c.signal}),e=>e instanceof TypeError);
 });
 test("a stalled request expires with a recoverable failure",async t=>{

@@ -12,6 +12,7 @@ import { useMusic } from "./MusicContext";
 import type { MusicTrack, DownloadEntry } from "./types";
 import { useLyrics } from "../player/useLyrics";
 import { miniLyricCue } from "../player/miniLyric";
+import { DownloadRemovalDialog } from "./DownloadRemovalDialog";
 import s from "./ink.module.css";
 import t from "./track-presentation.module.css";
 export function IconButton({icon,label,onClick,active=false,disabled=false}:{icon:IconName;label:string;onClick:()=>void;active?:boolean;disabled?:boolean}){return <button className={s.iconButton+" "+(active?s.active:"")} type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled}><Icon name={icon}/></button>;}
@@ -46,16 +47,16 @@ function TrackDownload({track,entry,onDownload}:{track:MusicTrack;entry?:Downloa
  </button>;
 }
 export function TrackList({tracks,showVersion=true,downloaded=false,layout="list"}:{tracks:MusicTrack[];showVersion?:boolean;downloaded?:boolean;layout?:TrackLayout}){
- const p=useMusic();const [menu,setMenu]=useState<{track:MusicTrack;anchor:SongMenuAnchor}|null>(null);const unique=[...new Map(tracks.map(t=>[p.effectiveId(t),t])).values()];
+ const p=useMusic();const [menu,setMenu]=useState<{track:MusicTrack;anchor:SongMenuAnchor}|null>(null),[removing,setRemoving]=useState<MusicTrack|null>(null);const unique=[...new Map(tracks.map(t=>[p.effectiveId(t),t])).values()];
  return <div className={`${s.trackList} ${t[layout]}`} data-track-layout={layout}>{unique.map((song,i)=>{const id=p.effectiveId(song);const current=!!p.track&&p.effectiveId(p.track)===id,playing=current&&p.status==="playing",engaged=current&&(playing||p.status==="buffering"||p.status==="resolving");const saved=p.downloads[id]?.requested===false?undefined:p.downloads[id],busy=saved?.status==="queued"||saved?.status==="resolving"||saved?.status==="downloading",progress=transferProgress(saved);return <SongGesture key={id} id={id} className={`${s.trackRow} ${t.row} ${current?t.current:""} ${playing?s.playingRow:""}`} onOptions={anchor=>setMenu({track:song,anchor})}>
    <button className={`${s.trackCover} ${t.cover}`} aria-label={(engaged?"Pause ":"Play ")+song.title} onClick={()=>current?p.togglePlay():p.play(song,unique)}><span aria-hidden="true">{playing?<span className={s.equalizer}><i/><i/><i/></span>:String(i+1).padStart(2,"0")}</span><Artwork url={song.coverUrl} title={song.albumTitle||song.title} className={t.art}/><span className={`${s.coverPlay} ${t.play}`}><Icon name={engaged?"pause":"play"} size={15}/></span></button>
    <div className={`${s.trackInfo} ${t.info}`}><Link href={"/track/"+encodeURIComponent(id)} dir="auto">{song.title}</Link><ArtistLinks track={song} className={t.artists}/><span className={t.details}>{showVersion&&<span className={t.version} title={song.versionLabel}>{song.versionLabel}</span>}{saved?.status==="ready"?<span className={t.saved}><Icon name="check"/>Offline</span>:saved&&<span className={t.transferText}>{transferLabel(saved)}</span>}</span></div>
    <span className={`${s.albumColumn} ${t.album}`} title={song.albumTitle||undefined}>{song.albumTitle}</span><span className={`${s.duration} ${t.length}`}>{time(song.durationMs)}</span><div className={t.actions}>
    <button className={`${s.iconButton} ${t.like} ${p.liked.has(id)?s.active:""}`} type="button" aria-label={(p.liked.has(id)?"Unlike ":"Like ")+song.title} title={(p.liked.has(id)?"Unlike ":"Like ")+song.title} onClick={()=>void p.toggleLike(song)}><Icon name="heart"/></button>
-   {downloaded?<IconButton icon="trash" label={"Remove "+song.title+" from this device"} onClick={()=>void p.removeDownload(id)}/>:<TrackDownload track={song} entry={saved} onDownload={()=>p.requestDownload(song)}/>}
+   {downloaded?<IconButton icon="trash" label={"Remove "+song.title+" from this device"} onClick={()=>setRemoving(song)}/>:<TrackDownload track={song} entry={saved} onDownload={()=>p.requestDownload(song)}/>}
    <button className={s.iconButton} type="button" aria-haspopup="menu" aria-expanded={menu?.track===song} aria-label={"More options for "+song.title} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setMenu({track:song,anchor:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}});}}><Icon name="more"/></button></div>
    {busy&&<span className={t.vine} role="progressbar" aria-label={"Download progress for "+song.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress===null?undefined:Math.round(progress*100)} aria-valuetext={transferLabel(saved)}><svg viewBox="0 0 500 8" preserveAspectRatio="none" aria-hidden="true"><path className={t.vineTrack} d="M0 5Q70 1 130 4T250 4T370 3T500 4"/><path className={t.vineFill} d="M0 5Q70 1 130 4T250 4T370 3T500 4" pathLength="1" strokeDasharray="1" strokeDashoffset={progress===null ? .9 : 1-progress}/></svg></span>}
- </SongGesture>;})}{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>}</div>;
+ </SongGesture>;})}{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>} {removing&&<DownloadRemovalDialog track={removing} onClose={()=>setRemoving(null)} onRemove={()=>p.removeDownload(p.effectiveId(removing))}/>}</div>;
 }
 export function TrackMenu({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){return <TrackActions key={track.id} track={track} onClose={onClose} anchor={anchor}/>;}
 export function PlayerBar(){

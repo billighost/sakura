@@ -3,7 +3,7 @@ import { fetchAudioHeaders, parseByteRange } from "../core/streaming";
 import type { RecordingRepository, StoredAudioAsset } from "./contracts";
 import { readMetadataJson } from "./providers";
 import { isUuid, parseRecordingMetadata, normalizedAudioMime, supportedAudioMime } from "./input";
-import { createHash } from "node:crypto";
+import { createHash,createHmac,timingSafeEqual } from "node:crypto";
 
 const mime = normalizedAudioMime;
 function safeUrl(raw: string, allowedOrigins: ReadonlySet<string>): string {
@@ -28,6 +28,11 @@ export interface SourceTransportOptions {
   allowedCdnOrigins: readonly string[];
   worker?: { url: string; secret: string; chatScope: string };
   headerTimeoutMs?: number;
+}
+
+function workerDocumentTag(asset:StoredAudioAsset):string|undefined{
+ return asset.locator.kind==="telegram-worker"&&asset.locator.protocol==="v2"&&asset.locator.documentId?
+  `"${createHash("sha256").update(JSON.stringify([asset.locator.chatScope,asset.locator.messageId,asset.locator.documentId,asset.sizeBytes,asset.mimeType])).digest("hex")}"`:undefined;
 }
 
 /** Opens ready assets; no search/select/import/full-download worker operations exist here. */
@@ -57,16 +62,24 @@ export class SourceAudioTransport implements AudioTransport {
     const worker=this.options.worker;if(!worker)return undefined;
     const cached=this.signed.get(asset.assetId);if(cached&&cached.expires>Date.now()+60000)return cached.url;
     const scoped=asset.locator.protocol==="v2";
+    const documentTag=workerDocumentTag(asset);
+    if(scoped&&!documentTag)return undefined;
     if(!scoped&&worker.chatScope.toLowerCase()!==asset.locator.chatScope.toLowerCase())return undefined;
     try{
       const response=await fetchAudioHeaders(new URL(scoped?"/v2/sign-audio":"/sign-audio",worker.url).toString(),{method:"POST",headerTimeoutMs:5000,redirect:"error",
-        headers:{Authorization:`Bearer ${worker.secret}`,"Content-Type":"application/json"},body:JSON.stringify({messageId:asset.locator.messageId,chatScope:asset.locator.chatScope,ttlSeconds:1800})},this.fetcher);
+        headers:{Authorization:`Bearer ${worker.secret}`,"Content-Type":"application/json"},body:JSON.stringify({messageId:asset.locator.messageId,chatScope:asset.locator.chatScope,ttlSeconds:1800,...(documentTag?{documentTag}:{})})},this.fetcher);
       if(!response.ok){await response.body?.cancel();return undefined;}
       const raw=await readMetadataJson(response) as {path?:string;expiresAt?:number};
       const prefix=scoped?`/v2/audio/${asset.locator.chatScope}/${asset.locator.messageId}?`:`/audio/${asset.locator.messageId}?`;
       if(typeof raw.path!=="string"||!raw.path.startsWith(prefix))return undefined;
       const url=new URL(raw.path,worker.url);if(url.protocol!=="https:"||url.origin!==new URL(worker.url).origin)return undefined;
       const expires=Number(raw.expiresAt)*1000;if(!Number.isFinite(expires)||expires<Date.now()+60000)return undefined;
+      if(documentTag){
+        const signature=url.searchParams.get("sig")??"",expiry=Number(raw.expiresAt);
+        if(!Number.isSafeInteger(expiry)||url.searchParams.get("exp")!==String(expiry)||url.searchParams.getAll("documentTag").length!==1||url.searchParams.get("documentTag")!==documentTag||!/^[a-f0-9]{64}$/.test(signature))return undefined;
+        const expected=createHmac("sha256",worker.secret).update(JSON.stringify([asset.locator.chatScope.toLowerCase(),asset.locator.messageId,expiry,documentTag])).digest();
+        if(!timingSafeEqual(Buffer.from(signature,"hex"),expected))return undefined;
+      }
       if(this.signed.size>=1000)this.signed.delete(this.signed.keys().next().value!);
       this.signed.set(asset.assetId,{url:url.toString(),expires});return url.toString();
     }catch{return undefined;}
@@ -119,9 +132,9 @@ export class SourceAudioTransport implements AudioTransport {
       }
     }else await probe(signal);
     signal?.throwIfAborted();
-    const documentTag=scoped&&asset.locator.documentId?`"${createHash("sha256").update(JSON.stringify([asset.locator.chatScope,asset.locator.messageId,asset.locator.documentId,asset.sizeBytes,asset.mimeType])).digest("hex")}"`:undefined;
+    const documentTag=workerDocumentTag(asset);
     return fetchAudioHeaders(new URL(scoped?`/v2/audio/${asset.locator.chatScope}/${asset.locator.messageId}`:`/audio/${asset.locator.messageId}`, base).toString(), {
-      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(range ? { Range: range,...(documentTag?{"If-Range":documentTag}:{}) } : documentTag?{"If-Match":documentTag}:{}) },
+      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(documentTag?{"If-Match":documentTag}:{}), ...(range ? { Range: range,...(documentTag?{"If-Range":documentTag}:{}) } : {}) },
     }, this.fetcher);
   }
 }
@@ -153,6 +166,17 @@ function checkedBody(body: ReadableStream<Uint8Array>, expectedBytes: number,sig
     },
     async cancel(reason) { cleanup();try{await reader.cancel(reason);}finally{reader.releaseLock();} },
   });
+}
+
+function validAudioResponse(response:Response,asset:StoredAudioAsset,range:ReturnType<typeof parseByteRange>):boolean{
+ if(!response.body||mime(response.headers.get("Content-Type")??"")!==mime(asset.mimeType))return false;
+ const reportedLength=response.headers.get("Content-Length");
+ if(range.status==="range"){
+  const contentRange=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range")??"");
+  return response.status===206&&Boolean(contentRange&&Number(contentRange[1])===range.start&&Number(contentRange[2])===range.end&&Number(contentRange[3])===asset.sizeBytes)
+   &&(reportedLength===null||Number(reportedLength)===range.end-range.start+1);
+ }
+ return response.status===200&&(reportedLength===null||Number(reportedLength)===asset.sizeBytes);
 }
 
 /** Auth is handled by the route; this gateway repeats asset ownership and identity checks. */
@@ -197,27 +221,33 @@ export class RecordingAudioGateway {
           &&assessAudioCandidate(recording,original.candidate).acceptable)deliveryAsset=original;
       }
       const sourceRange=range.status === "range" ? `bytes=${range.start}-${range.end}` : null;
-      try{upstream=await this.transport.open(deliveryAsset,sourceRange,input.signal);}catch(error){if(deliveryAsset===asset||input.signal?.aborted)throw error;deliveryAsset=asset;upstream=await this.transport.open(asset,sourceRange,input.signal);}
+      const open=async(candidate:StoredAudioAsset)=>{
+        input.signal?.throwIfAborted();
+        const response=await this.transport.open(candidate,sourceRange,input.signal);
+        if(input.signal?.aborted){await response.body?.cancel(input.signal.reason).catch(()=>{});input.signal.throwIfAborted();}
+        return response;
+      };
+      try{upstream=await open(deliveryAsset);}catch(error){if(deliveryAsset===asset||input.signal?.aborted)throw error;deliveryAsset=asset;upstream=await open(asset);}
+      // Worker restarts and document changes can return HTTP errors instead of
+      // throwing. Reject their headers before returning any bytes, then retry
+      // only the independently verified byte-identical CDN artifact.
+      if(deliveryAsset!==asset&&!validAudioResponse(upstream,asset,range)){
+        await upstream.body?.cancel().catch(()=>{});deliveryAsset=asset;upstream=await open(asset);
+      }
     } catch (error) {
       if (input.signal?.aborted) throw error;
       return jsonError(502, "audio-source-unavailable");
     }
     baseHeaders.set("X-Sakura-Audio-Delivery",deliveryAsset===asset?"primary":"verified-source-fallback");
-    const badUpstream = async () => { await upstream.body?.cancel(); return jsonError(502, "audio-source-invalid-response"); };
-    if (!upstream.body || mime(upstream.headers.get("Content-Type") ?? "") !== mime(asset.mimeType)) return badUpstream();
+    const badUpstream = async () => { await upstream.body?.cancel().catch(()=>{}); return jsonError(502, "audio-source-invalid-response"); };
+    if (!validAudioResponse(upstream,asset,range)) return badUpstream();
     if (range.status === "range") {
-      const contentRange = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(upstream.headers.get("Content-Range") ?? "");
-      if (upstream.status !== 206 || !contentRange || Number(contentRange[1]) !== range.start || Number(contentRange[2]) !== range.end || Number(contentRange[3]) !== asset.sizeBytes) return badUpstream();
       const length = range.end - range.start + 1;
-      const reportedLength = upstream.headers.get("Content-Length");
-      if (reportedLength !== null && Number(reportedLength) !== length) return badUpstream();
       baseHeaders.set("Content-Range", `bytes ${range.start}-${range.end}/${asset.sizeBytes}`);
       baseHeaders.set("Content-Length", String(length));
-      return new Response(checkedBody(upstream.body, length,input.signal), { status: 206, headers: baseHeaders });
+      return new Response(checkedBody(upstream.body!, length,input.signal), { status: 206, headers: baseHeaders });
     }
-    const reportedLength = upstream.headers.get("Content-Length");
-    if (upstream.status !== 200 || (reportedLength !== null && Number(reportedLength) !== asset.sizeBytes)) return badUpstream();
     // Deliberately streamed without a full-body buffer or Content-Length on 200.
-    return new Response(checkedBody(upstream.body, asset.sizeBytes,input.signal), { status: 200, headers: baseHeaders });
+    return new Response(checkedBody(upstream.body!, asset.sizeBytes,input.signal), { status: 200, headers: baseHeaders });
   }
 }

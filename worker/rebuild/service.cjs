@@ -67,17 +67,29 @@ class RebuildAudioService {
   const references=[...new Map(proofReferences.filter(sourceId).map(reference=>[JSON.stringify([reference.provider,String(reference.id)]),{provider:reference.provider,id:String(reference.id)}])).values()];
   const proofKeys=[...new Set(proofReferences.map(referenceKey))].sort();
   const request={metadata,references:proofReferences},key=JSON.stringify([proofKeys,normalizedRecording(metadata),metadata.artistsComplete??null,metadata.verifiedAliases??null,scopes]);
+  const deadline=this.now()+Math.min(45000,Math.max(5000,Number(input.deadlineMs)||35000));
   const cached=this.resolved.get(key);
   if(cached&&this.now()-cached.at<600000&&assessAudioCandidate(request,this.candidate(cached.audio)).acceptable)return {status:"ready",audio:cached.audio};
-  if(this.resolveFlights.has(key))return this.resolveFlights.get(key);
+  if(this.resolveFlights.has(key))return this.waitResolve(this.resolveFlights.get(key),deadline);
   if(!this.queueFor&&this.queue?.depth>=6)return {status:"unavailable",reason:"audio-worker-busy"};
-  const deadline=this.now()+Math.min(45000,Math.max(5000,Number(input.deadlineMs)||35000));
   const flight=this.resolveFresh(request,references,scopes,deadline).then(result=>{
+   if(result.status==="ready"&&this.now()>=deadline)return {status:"unavailable",reason:"audio-source-unavailable",attempts:result.attempts||[]};
    if(result.status==="ready"){this.resolved.delete(key);this.resolved.set(key,{at:this.now(),audio:result.audio});if(this.resolved.size>500)this.resolved.delete(this.resolved.keys().next().value);}
    return result;
-  });
+  }).finally(()=>{if(this.resolveFlights.get(key)===flight)this.resolveFlights.delete(key);});
   this.resolveFlights.set(key,flight);
-  try{return await flight;}finally{if(this.resolveFlights.get(key)===flight)this.resolveFlights.delete(key);}
+  return this.waitResolve(flight,deadline);
+ }
+ async waitResolve(flight,deadline){
+  const expired={status:"unavailable",reason:"audio-worker-timeout",retryable:true};
+  if(this.now()>=deadline)return expired;
+  let timer;
+  // Expiring a caller must not release the active chat or remove its shared
+  // flight. A late RPC still settles under the original source deadline.
+  try{
+   const result=await Promise.race([flight,new Promise(resolve=>{timer=setTimeout(()=>resolve(expired),Math.max(1,deadline-this.now()));})]);
+   return result.status==="ready"&&this.now()>=deadline?expired:result;
+  }finally{clearTimeout(timer);}
  }
  async resolveFresh(request,references,scopes,deadline){
   const reviews=[],attempts=[];let busy=false;
@@ -89,7 +101,11 @@ class RebuildAudioService {
    const operation=async()=>{
     if(this.now()>=botDeadline-500)return {status:"unavailable",reason:"audio-worker-queue-timeout"};
     if(this.ensureConnected)await this.ensureConnected();
-    const peer=await this.peer(bot),recent=await this.telegram().getMessages(peer,{limit:64});
+    if(this.now()>=botDeadline)return {status:"unavailable",reason:"audio-worker-queue-timeout"};
+    const peer=await this.peer(bot);
+    if(this.now()>=botDeadline)return {status:"unavailable",reason:"audio-worker-queue-timeout"};
+    const recent=await this.telegram().getMessages(peer,{limit:64});
+    if(this.now()>=botDeadline)return {status:"unavailable",reason:"audio-worker-queue-timeout"};
     const known=[...this.documents.values()].filter(value=>value.audio.chatScope===bot).map(value=>value.audio);
     const audios=[...new Map([...known,...recent.map(message=>this.audio(message,bot)).filter(Boolean)].map(audio=>[audio.fileId,audio])).values()];
     const audio=this.select(request,audios);if(audio)return {status:"ready",audio};
@@ -105,7 +121,7 @@ class RebuildAudioService {
     }
     return {status:"unavailable"};
    };
-   try{const result=queue?await queue.run(operation,{deadline:botDeadline}):await operation();if(result.status==="ready")return {...result,attempts};}
+   try{const result=queue?await queue.run(operation,{deadline:botDeadline}):await operation();if(result.status==="ready"&&this.now()<botDeadline)return {...result,attempts};}
    catch(error){
     if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error))){this.onFatal?.(error);throw error;}
     attempts.push({chatScope:bot,strategy:"catalog-link",outcome:/FLOOD_WAIT|rate.?limit/i.test(String(error?.message||error))?"rate-limited":"source-error"});
@@ -115,11 +131,15 @@ class RebuildAudioService {
   return unique.length?{status:"review",candidates:unique,attempts}:{status:"unavailable",reason:busy?"audio-worker-busy":"audio-source-unavailable",attempts};
  }
  async conversation(peer,bot,query,request,deadline){
+  if(this.now()>=deadline)return {status:"unavailable"};
   const sent=await this.telegram().sendMessage(peer,{message:query});
+  if(this.now()>=deadline)return {status:"unavailable"};
   const seen=new Map(),processedButtons=new Set();let clickedAt=0;const clicked=new Set();
   while(this.now()<deadline){
    await this.sleep(Math.min(this.pollIntervalMs,Math.max(1,deadline-this.now())));
+   if(this.now()>=deadline)break;
    const messages=await this.telegram().getMessages(peer,{limit:32,minId:sent.id});
+   if(this.now()>=deadline)break;
    const fresh=messages.filter(message=>message?.id>sent.id&&!message.out).sort((a,b)=>a.id-b.id);
    for(const message of fresh){const audio=this.audio(message,bot);if(audio)seen.set(audio.fileId,audio);}
    const audio=this.select(request,[...seen.values()]);if(audio)return {status:"ready",audio};
@@ -140,6 +160,7 @@ class RebuildAudioService {
     if(!selected){processedButtons.add(signature);continue;}
     // Button text chooses a file to inspect. Serving still requires the
     // received file's own title, credits, version and duration to pass.
+    if(this.now()>=deadline)break;
     const button=buttons[Number(selected.candidate.candidateId)];clicked.add(`${signature}:${selected.candidate.candidateId}`);clickedAt=this.now();
     try{await this.telegram().invoke(new this.api.messages.GetBotCallbackAnswer({peer,msgId:message.id,data:Buffer.from(button.data)}));}
     catch(error){if(!/BOT_RESPONSE_TIMEOUT/.test(String(error?.errorMessage||error?.message||error)))throw error;}
@@ -157,13 +178,16 @@ class RebuildAudioService {
   const flight=(async()=>{if(this.ensureConnected)await this.ensureConnected();const peer=await this.peer(scope),messages=await this.telegram().getMessages(peer,{ids:[Number(messageId)]});const audio=this.audio(messages[0],scope);if(!audio){this.forgetSource(scope,messageId);throw new Error("Source audio not found");}return this.documents.get(key);})().catch(error=>{if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error)))this.onFatal?.(error);throw error;});
   this.documentFlights.set(key,flight);try{return await flight;}finally{if(this.documentFlights.get(key)===flight)this.documentFlights.delete(key);}
  }
- async stream(bot,messageId,start,length){
+ async stream(bot,messageId,start,length,expectedAudio){
   let cached=await this.info(bot,messageId);const original={...cached.audio};
+  // A forced refresh can replace the cached document after serve validated it.
+  // Bind the opening document to that snapshot before sending its headers.
+  if(expectedAudio&&!sameSource(original,expectedAudio))throw new Error("Source file changed before transfer");
   if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(length)||length<=0||start+length>original.size)throw new Error("Invalid source byte range");
-  const self=this;
+  const self=this;let stream;
   async function* body(){
    let sent=0,retries=0;
-   while(sent<length){
+   while(sent<length&&!stream.destroyed){
     const position=start+sent,aligned=Math.floor(position/ALIGN)*ALIGN;let skip=position-aligned;
     // Tiny probes and parallel client chunks should not each fetch 512 KiB.
     // Telegram accepts power-of-two request sizes in 4 KiB granularity.
@@ -172,22 +196,25 @@ class RebuildAudioService {
     const download=self.telegram().iterDownload({file:new self.api.InputDocumentFileLocation({id:cached.document.id,accessHash:cached.document.accessHash,fileReference:cached.document.fileReference,thumbSize:""}),dcId:cached.document.dcId,fileSize:self.bigInt(original.size),offset:self.bigInt(aligned),limit:chunks,requestSize,chunkSize:requestSize});
     try{
      for await(const raw of download){
+      if(stream.destroyed)return;
       let part=Buffer.from(raw);if(skip){const trim=Math.min(skip,part.length);part=part.subarray(trim);skip-=trim;}
       if(!part.length)continue;part=part.subarray(0,length-sent);sent+=part.length;yield part;if(sent===length)return;
      }
      throw new Error("Source stream was truncated");
     }catch(error){
      if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error))){self.onFatal?.(error);throw error;}
+     if(stream.destroyed)return;
      if(retries++<2&&/FILE_REFERENCE|FILEREF/i.test(String(error?.errorMessage||error?.message||error))){
       cached=await self.info(bot,messageId,true);
-      if(cached.audio.fileId!==original.fileId||cached.audio.size!==original.size||cached.audio.mimeType!==original.mimeType)throw new Error("Source file changed during transfer");
+      if(stream.destroyed)return;
+      if(!sameSource(cached.audio,original))throw new Error("Source file changed during transfer");
       continue;
      }
      throw error;
     }finally{if(typeof download.return==="function")await Promise.resolve(download.return()).catch(()=>{});}
    }
   }
-  return Readable.from(body(),{objectMode:false});
+  stream=Readable.from(body(),{objectMode:false});return stream;
  }
  async serve(req,res,bot,messageId){
   const {audio}=await this.info(bot,messageId);
@@ -200,13 +227,18 @@ class RebuildAudioService {
   if(range.status==="unsatisfiable"){res.writeHead(416,{...headers,"Content-Range":`bytes */${audio.size}`});res.end();return;}
   const start=range.status==="range"?range.start:0,end=range.status==="range"?range.end:audio.size-1,length=end-start+1;
   if(req.method==="HEAD"){res.writeHead(200,{...headers,"Content-Length":String(length)});res.end();return;}
-  const stream=await this.stream(bot,messageId,start,length);
+  const stream=await this.stream(bot,messageId,start,length,audio);
   if(res.destroyed||req.aborted){stream.destroy();return;}
   const close=()=>stream.destroy();res.on("close",close);
   stream.on("error",()=>res.destroy());stream.on("close",()=>res.removeListener("close",close));
   res.writeHead(range.status==="range"?206:200,{...headers,"Content-Length":String(length),...(range.status==="range"?{"Content-Range":`bytes ${start}-${end}/${audio.size}`}:{})});
   stream.pipe(res);
  }
+}
+
+function sameSource(first,second){
+ const identity=audio=>JSON.stringify([audio.chatScope,audio.messageId,audio.fileId,audio.size,audio.mimeType,audio.metadata]);
+ return identity(first)===identity(second);
 }
 
 function searchQueries(metadata,references,proofReferences=references){

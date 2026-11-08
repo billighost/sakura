@@ -108,3 +108,16 @@ test("a late helper registration acknowledgement cannot recreate a revoked accou
  const old=partial(accountId,input);assert.equal(pending.length,1);revoke();pending[0].port.postMessage({status:"ready",version:1});pending[0].port.close();assert.equal(await old,undefined);
  const fresh=partial(accountId,input);assert.equal(pending.length,2,"A fresh request must register again rather than reuse the revoked lease");pending[1].port.postMessage({status:"ready",version:1});pending[1].port.close();assert.match((await fresh)!,/^\/_sakura\/audio\//);revoke();
 });
+
+test("the page bridge reports an unavailable manager chunk instead of claiming it is ready",async()=>{
+ const pending:Array<{data:{type:string;token:string};port:MessagePort}>=[],listeners=new Map<string,(event:{data:{type:string;token:string;requestId:string;offset:number};ports:Array<{postMessage:(value:{status:string})=>void;close:()=>void}>})=>void>(),exports:Record<string,unknown>={};
+ const controller={postMessage(data:{type:string;token:string},ports?:MessagePort[]){if(data.type==="sakura-audio-register")pending.push({data,port:ports![0]});}};
+ const serviceWorker={controller,addEventListener(name:string,listener:(event:{data:{type:string;token:string;requestId:string;offset:number};ports:Array<{postMessage:(value:{status:string})=>void;close:()=>void}>})=>void){listeners.set(name,listener);}};
+ const context=vm.createContext({exports,module:{exports},navigator:{serviceWorker},location:{origin:"https://sakura.example"},crypto:webcrypto,MessageChannel,setTimeout,clearTimeout,URL,AbortController});
+ const js=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/partialPlayback.ts",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInContext(js,context);
+ const partial=exports.partialPlaybackUrl as (id:string,source:unknown,ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>Promise<string|undefined>,revoke=exports.revokePartialPlayback as ()=>void;
+ const input={track:{id:recordingId},assetId,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`};
+ const registration=partial(accountId,input,async()=>undefined);pending[0].port.postMessage({status:"ready",version:1});pending[0].port.close();const address=await registration,registeredToken=address!.split("/").at(-1)!;
+ const replies:string[]=[];listeners.get("message")!({data:{type:"sakura-audio-chunk",token:registeredToken,requestId:"range-1",offset:0},ports:[{postMessage(value){replies.push(value.status);},close(){}}]});
+ await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(replies,["unavailable"]);revoke();
+});

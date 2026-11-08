@@ -88,13 +88,14 @@ export class AudioPromotions {
  private failures=new Map<string,{until:number;reason:string}>();
  constructor(private readonly transport:AudioTransport,private readonly ingestor:RecordingIngestor,private readonly publisher?:AudioPublisher){}
  get configured(){return true;}
- needsPreparation(asset:StoredAudioAsset){const failure=this.failures.get(asset.recordingId);return Boolean(asset.ownerAccountId===null&&(!asset.sha256||(this.publisher&&asset.locator.kind==="telegram-worker"))&&(!failure||failure.until<=Date.now()));}
- failureReason(recordingId:string){const failure=this.failures.get(recordingId);return failure&&failure.until>Date.now()?failure.reason:undefined;}
+ needsPreparation(asset:StoredAudioAsset){const failure=this.failures.get(asset.recordingId+":"+asset.assetId);return Boolean(asset.ownerAccountId===null&&(!asset.sha256||(this.publisher&&asset.locator.kind==="telegram-worker"))&&(!failure||failure.until<=Date.now()));}
+ failureReason(recordingId:string,assetId:string){const failure=this.failures.get(recordingId+":"+assetId);return failure&&failure.until>Date.now()?failure.reason:undefined;}
  prepare(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal):Promise<StoredAudioAsset>{
-  if(source.sha256&&(!this.publisher||source.locator.kind==="https"))return Promise.resolve(source);
+  const failureKey=recording.recordingId+":"+source.assetId;
+  if(source.sha256&&(!this.publisher||source.locator.kind==="https")){this.failures.delete(failureKey);return Promise.resolve(source);}
   const key=recording.recordingId+":"+(source.sha256||JSON.stringify(source.locator)),existing=this.running.get(key);if(existing)return existing;
-  if(this.running.size>=2){this.failures.set(recording.recordingId,{until:Date.now()+10000,reason:"busy"});return Promise.reject(new AudioPromotionError("busy","Audio preparation is at its transfer limit"));}
-  const work=this.execute(recording,source,signal).catch(error=>{if(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);const reason=error instanceof AudioPromotionError?error.reason:"provider";this.failures.set(recording.recordingId,{until:Date.now()+(reason==="provider"&&!source.sha256?2000:5*60000),reason});throw error;}).finally(()=>this.running.delete(key));
+  if(this.running.size>=2){this.failures.set(failureKey,{until:Date.now()+10000,reason:"busy"});return Promise.reject(new AudioPromotionError("busy","Audio preparation is at its transfer limit"));}
+  const work=this.execute(recording,source,signal).catch(error=>{if(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);const reason=error instanceof AudioPromotionError?error.reason:"provider";this.failures.set(failureKey,{until:Date.now()+(reason==="provider"&&!source.sha256?2000:5*60000),reason});throw error;}).finally(()=>this.running.delete(key));
   this.running.set(key,work);return work;
  }
  private async execute(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal){
@@ -103,12 +104,12 @@ export class AudioPromotions {
   const bytes=await completeAudio(await this.transport.open(source,null,controllerSignal),source.sizeBytes,controllerSignal),sha256=digest(bytes);
   if(source.sha256&&source.sha256!==sha256)throw new AudioPromotionError("integrity","The worker file checksum changed");
   const checked={...source,sha256};await this.ingestor.persistAudio(recording,checked);
-  if(!this.publisher||source.locator.kind==="https"){this.failures.delete(recording.recordingId);return checked;}
+  if(!this.publisher||source.locator.kind==="https"){this.failures.delete(recording.recordingId+":"+source.assetId);return checked;}
   let published:StoredAudioAsset;
   try{published=await this.publisher.publish(recording,checked,bytes,controllerSignal);}catch(error){
    // CDN delivery failure cannot revoke the independently verified original.
    if(error instanceof AudioPromotionError&&error.reason==="integrity")throw new AudioPromotionError("cdn-integrity","Published delivery did not match the verified original");throw error;
   }
-  await this.ingestor.persistAudio(recording,published);this.failures.delete(recording.recordingId);return published;
+  await this.ingestor.persistAudio(recording,published);this.failures.delete(recording.recordingId+":"+source.assetId);return published;
  }
 }

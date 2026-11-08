@@ -20,11 +20,24 @@ transliterations or treats an album title as a song title. Capabilities report
 not disable a supported primary chat. Waiting jobs have deadlines, so an expired
 request never sends a later bot query.
 
+Each resolve caller also has its own response deadline, including callers that
+join an existing search. Expiring one caller keeps the shared chat operation
+queued until its RPC settles. Late replies cannot trigger another query or
+callback, return ready after the source deadline, or enter the successful cache.
+
 Audio `GET`/`HEAD` responses include a strong document `ETag`. `If-Match` rejects
 replaced documents with 412, and `If-Range` only returns partial bytes for the
 same document. Expired Telegram file references refresh and resume at the last
-emitted byte; a changed document ID, size or MIME stops the transfer. Caller
-disconnects destroy the byte stream.
+emitted byte; a changed document ID, size, MIME or recording tag stops the
+transfer. Opening a stream checks the document snapshot used for its headers.
+Caller disconnects destroy the byte stream, including while a reference refresh
+is pending, and cannot start another download after that refresh finishes.
+
+New document-bound playback URLs include `documentTag`, the strong document
+ETag, in their HMAC. Native GET and HEAD requests enforce that tag as `If-Match`,
+so a replaced file returns 412 before audio bytes. The app checks the returned
+tag and signature and uses its authenticated gateway when an older worker
+cannot mint a bound URL. Existing unbound v2 URLs retain their original expiry.
 
 Run `npm --prefix worker test` from the repository root. These tests use fake
 Telegram documents and clients, and never connect a second MTProto session.
@@ -134,6 +147,9 @@ Everything except `/health` requires `Authorization: Bearer $WORKER_SECRET`.
 | `POST /import` | `{url, botUsername?}` | NDJSON: `{type:"start"}`, `{type:"track",track}`…, `{type:"done",count}` or `{type:"error",message}` |
 | `POST /audio-info` | `{messageId}` | `{size, mimeType, title, artist, duration}` |
 | `POST /sign-audio` | `{messageId, ttlSeconds?}` | `{path, expiresAt}` |
+| `POST /v2/audio-info` | `{messageId, chatScope, refresh?}` | Verified document identity, metadata, size and MIME |
+| `POST /v2/sign-audio` | `{messageId, chatScope, documentTag?, ttlSeconds?}` | `{path, expiresAt}` with signed document precondition when supplied |
+| `GET\|HEAD /v2/audio/:scope/:id` | Signed URL or bearer; `Range`, `If-Range`, `If-Match` | 200/206/412/416 audio |
 | `POST /download` | `{messageId}` | raw bytes, `Content-Length` set |
 | `GET\|HEAD /audio/:id` | `Range` header honoured | 200/206/416 audio |
 

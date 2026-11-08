@@ -1,4 +1,4 @@
-const CACHE="sakura-ink-shell-v2";
+const CACHE="sakura-ink-shell-v3";
 const OFFLINE="/offline";
 const AUDIO_PREFIX="/_sakura/audio/";
 const audioCapabilities=new Map();
@@ -127,6 +127,6 @@ self.addEventListener("fetch",event=>{
  const request=event.request;const url=new URL(request.url);
  if(["GET","HEAD"].includes(request.method)&&url.origin===self.location.origin&&url.pathname.startsWith(AUDIO_PREFIX)){event.respondWith(serveDeviceAudio(request,event.clientId,url.pathname.slice(AUDIO_PREFIX.length)));return;}
  if(request.method!=="GET"||url.origin!==self.location.origin||url.pathname.startsWith("/api/")||request.headers.has("RSC")||url.searchParams.has("_rsc"))return;
- if(request.mode==="navigate"){event.respondWith(fetch(request).catch(async()=>{const saved=await caches.match(OFFLINE);return saved||new Response("Your offline library has not been opened on this device yet.",{status:503,headers:{"Content-Type":"text/plain"}});}));return;}
+ if(request.mode==="navigate"){event.respondWith((async()=>{const cache=await caches.open(CACHE);try{const response=await fetch(request);if(response.ok)await cache.put(request,response.clone());return response;}catch{const saved=await cache.match(request,{ignoreSearch:true});if(saved)return saved;const offline=await cache.match(OFFLINE);if(url.pathname===OFFLINE)return offline||new Response("Your offline library has not been opened on this device yet.",{status:503,headers:{"Content-Type":"text/plain"}});return Response.redirect(new URL(OFFLINE,self.location.origin),302);}})());return;}
  if(url.pathname.startsWith("/_next/static/")||url.pathname.startsWith("/icons/")){event.respondWith((async()=>{const cache=await caches.open(CACHE);const saved=await cache.match(request);if(saved)return saved;const response=await fetch(request);if(response.ok){await cache.put(request,response.clone());const keys=await cache.keys();if(keys.length>250)await cache.delete(keys.find(key=>new URL(key.url).pathname!==OFFLINE));}return response;})());}
 });
