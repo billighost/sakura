@@ -22,16 +22,15 @@ function https(value: unknown): string | undefined {
 }
 
 async function getJson(fetcher: typeof fetch, url: string, signal?: AbortSignal, headers?: Record<string, string>) {
-  let response: Response;
-  try {
-    response = await fetchAudioHeaders(url, { signal, headerTimeoutMs: 5000, headers: { "User-Agent": USER_AGENT, ...headers } }, fetcher);
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    throw new ProviderError("unavailable", "Catalogue provider did not answer");
+  for(let attempt=0;attempt<2;attempt++){
+    signal?.throwIfAborted();let response:Response;
+    try {response=await fetchAudioHeaders(url,{signal,headerTimeoutMs:5000,headers:{"User-Agent":USER_AGENT,...headers}},fetcher);}
+    catch(error){if(signal?.aborted)throw error;if(attempt===0)continue;throw new ProviderError("unavailable","Catalogue provider did not answer");}
+    if(response.status===404){await response.body?.cancel();return null;}
+    if(!response.ok){await response.body?.cancel();if(attempt===0&&[429,502,503,504].includes(response.status))continue;throw new ProviderError("unavailable","Catalogue provider is unavailable");}
+    try{return await readMetadataJson(response);}catch(error){if(signal?.aborted)throw error;if(attempt===0&&error instanceof ProviderError&&(error.code==="timeout"||error.code==="unavailable"))continue;throw error;}
   }
-  if (response.status === 404) { await response.body?.cancel(); return null; }
-  if (!response.ok) { await response.body?.cancel(); throw new ProviderError("unavailable", "Catalogue provider is unavailable"); }
-  return readMetadataJson(response);
+  throw new ProviderError("unavailable","Catalogue provider did not answer");
 }
 
 export async function readMetadataText(response: Response, maximumBytes = 1024 * 1024): Promise<string> {
@@ -61,7 +60,7 @@ export async function readMetadataText(response: Response, maximumBytes = 1024 *
     return await Promise.race([read(), timeout]);
   } catch (error) {
     if (error instanceof ProviderError) throw error;
-    throw new ProviderError("invalid-response", "Provider returned unreadable metadata");
+    throw new ProviderError("unavailable", "Provider metadata connection ended");
   } finally { clearTimeout(timer); reader.releaseLock(); }
 }
 
@@ -75,6 +74,17 @@ export async function readMetadataJson(response: Response): Promise<unknown> {
 export class DeezerCatalogProvider implements CatalogProvider {
   readonly provider = "deezer" as const;
   constructor(private readonly fetcher: typeof fetch = fetch) {}
+  async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
+    referenceKey({ provider: "isrc", id: isrc });
+    const payload = await getJson(this.fetcher, `https://api.deezer.com/track/isrc:${encodeURIComponent(isrc.toUpperCase())}`, signal);
+    if (!payload) return [];
+    const candidate = obj(payload);
+    if (candidate.error || !/^[1-9]\d{0,17}$/.test(String(candidate.id))) return [];
+    // The lookup may redirect to a replacement catalogue row; its exact metadata
+    // and returned identifier must provide the same recording proof.
+    const exact = await this.getExact({ provider: "deezer", id: String(candidate.id) }, signal);
+    return exact?.references.some(ref => ref.provider === "isrc" && ref.id.toUpperCase() === isrc.toUpperCase()) ? [exact] : [];
+  }
   async getExact(reference: ProviderReference, signal?: AbortSignal): Promise<CatalogRecording | null> {
     if (reference.provider !== "deezer" || !/^[1-9]\d{0,17}$/.test(reference.id)) throw new ProviderError("invalid-response", "Invalid Deezer reference");
     const payload = await getJson(this.fetcher, `https://api.deezer.com/track/${reference.id}`, signal);
@@ -114,6 +124,19 @@ export class SpotifyCatalogProvider implements CatalogProvider {
   private token: { value: string; expiresAt: number } | null = null;
   private metadata = new Map<string,{value:unknown;expires:number}>();
   constructor(private readonly clientId: string, private readonly clientSecret: string, private readonly fetcher: typeof fetch = fetch) {}
+  async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
+    referenceKey({ provider: "isrc", id: isrc });
+    const payload = obj(await this.getMetadata(`/search?type=track&limit=4&q=${encodeURIComponent("isrc:" + isrc.toUpperCase())}`, signal));
+    const tracks = obj(payload.tracks);
+    const candidates: CatalogRecording[] = [];
+    for (const raw of (Array.isArray(tracks.items) ? tracks.items : []).slice(0, 4)) {
+      const item = obj(raw);
+      if (typeof item.id !== "string" || !/^[A-Za-z0-9]{22}$/.test(item.id)) continue;
+      const exact = await this.getExact({ provider: "spotify", id: item.id }, signal);
+      if (exact?.references.some(ref => ref.provider === "isrc" && ref.id.toUpperCase() === isrc.toUpperCase())) candidates.push(exact);
+    }
+    return candidates;
+  }
   private async bearer(signal?: AbortSignal): Promise<string> {
     if (this.token && this.token.expiresAt > Date.now() + 30000) return this.token.value;
     if (!this.clientId || !this.clientSecret) throw new ProviderError("not-configured", "Spotify catalogue credentials are not configured");
@@ -171,6 +194,9 @@ export class CachedCatalogProvider implements CatalogProvider {
   readonly provider: CatalogProvider["provider"];
   private readonly entries = new Map<string, { value: CatalogRecording; expiresAt: number }>();
   constructor(private readonly upstream: CatalogProvider, private readonly ttlMs = 15 * 60 * 1000, private readonly capacity = 1000) { this.provider = upstream.provider; }
+  async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
+    return this.upstream.getByIsrc ? this.upstream.getByIsrc(isrc, signal) : [];
+  }
   async getExact(reference: ProviderReference, signal?: AbortSignal) {
     const key = referenceKey(reference);
     const cached = this.entries.get(key);

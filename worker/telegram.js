@@ -70,36 +70,10 @@ const ALIGN = 4096;
  * first is still resolving gets the two conversations interleaved in the same
  * chat history, and the poller cannot tell whose audio is whose. That
  * constraint is about the bot, not about auth keys, so it survives the move to
- * a single process. What it no longer needs is Redis: one process means one
- * queue, and `Promise` chaining is the whole implementation.
+ * a single process. Each chat has an independent in-process queue, with
+ * deadlines for waiting work; no distributed lock is necessary.
  */
-class SerialQueue {
-  constructor(label) {
-    this.label = label;
-    this.tail = Promise.resolve();
-    this.depth = 0;
-  }
-
-  run(fn) {
-    this.depth += 1;
-    // `tail` is kept permanently non-rejecting so one failed job cannot wedge
-    // the queue for every job behind it.
-    const result = this.tail.then(fn);
-    this.tail = result.then(
-      () => {},
-      () => {},
-    );
-    result.then(
-      () => {
-        this.depth -= 1;
-      },
-      () => {
-        this.depth -= 1;
-      },
-    );
-    return result;
-  }
-}
+const { SerialQueue } = require("./rebuild/serial-queue.cjs");
 
 function isAuthKeyDuplicated(err) {
   return (
@@ -229,7 +203,8 @@ class TelegramWorkerClient {
     this.startedAt = Date.now();
 
     /** Bot conversations, one at a time. */
-    this.botQueue = new SerialQueue("bot");
+    this.botQueues = new Map();
+    this.botQueue = this.queueFor(DEFAULT_BOT);
 
     /**
      * messageId → document location + size.
@@ -436,15 +411,21 @@ class TelegramWorkerClient {
       fatal: this.fatal,
       uptimeSec: Math.round((Date.now() - this.startedAt) / 1000),
       sessionFingerprint: this.envFingerprint,
-      queueDepth: this.botQueue.depth,
+      queueDepth: [...this.botQueues.values()].reduce((total, queue) => total + queue.depth, 0),
       cachedDocs: this.docCache.size,
     };
   }
 
   // ── Bot conversations ─────────────────────────────────────────────────────
 
-  async searchMusic(query, timeoutMs = 20000, botUsername) {
-    return this.botQueue.run(() =>
+  queueFor(botUsername = DEFAULT_BOT) {
+    const scope = String(botUsername).toLowerCase();
+    if (!this.botQueues.has(scope)) this.botQueues.set(scope, new SerialQueue(scope));
+    return this.botQueues.get(scope);
+  }
+
+  async searchMusic(query, timeoutMs = 20000, botUsername = DEFAULT_BOT) {
+    return this.queueFor(botUsername).run(() =>
       this._withRetry(() => this._searchMusic(query, timeoutMs, botUsername)),
     );
   }
@@ -547,147 +528,60 @@ class TelegramWorkerClient {
   }
 
   async searchAndSelect(opts) {
-    return this.botQueue.run(() => this._withRetry(() => this._searchAndSelect(opts)));
+    const queue = this.queueFor(opts.botUsername || DEFAULT_BOT);
+    if (queue.depth >= 6) throw new Error("Audio worker busy");
+    const deadline = Date.now() + Math.min(45000, Math.max(5000, Number(opts.searchTimeoutMs || 10000) + Number(opts.selectTimeoutMs || 25000)));
+    return queue.run(() => this._withRetry(() => this._searchAndSelect({...opts,deadline})), {deadline});
   }
 
   async _searchAndSelect({
-    query,
-    targetDuration,
-    searchTimeoutMs = 10000,
-    selectTimeoutMs = 60000,
-    expectedTitle,
-    expectedArtist,
-    botUsername = DEFAULT_BOT,
+    query, targetDuration, searchTimeoutMs = 10000, selectTimeoutMs = 25000,
+    expectedTitle, expectedArtist, expectedMetadata, references = [], deadline, botUsername = DEFAULT_BOT,
   }) {
-    const botEntity = await this.client.getEntity(botUsername);
-
-    /*
-     * Fast path: the bot may already have this exact song in recent history, in
-     * which case the whole search-and-select round trip can be skipped.
-     *
-     * The matching has to be strict, because the history is *shared* — one bot
-     * serves every user, so the last 15 messages are whatever anyone happened
-     * to download. A loose match does not merely miss the fast path, it serves
-     * somebody else's song. Both title and artist must agree; when the artist is
-     * known but the Telegram attribute carries no performer, the match is
-     * refused, because an unverifiable hit is worth less than the search it
-     * would save.
-     */
-    if (expectedTitle) {
-      const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-      // Containment is allowed because the bot's copy often carries an extra tag
-      // ("(2012 Remaster)"), but the shorter side must be most of the longer one
-      // — that is what stops a three-letter title matching everything.
-      const closeEnough = (a, b) => {
-        if (!a || !b) return false;
-        if (a === b) return true;
-        if (!a.includes(b) && !b.includes(a)) return false;
-        return Math.min(a.length, b.length) / Math.max(a.length, b.length) >= 0.6;
-      };
-
-      const wantTitle = norm(expectedTitle);
-      const wantArtist = expectedArtist ? norm(expectedArtist) : "";
-
-      const recent = await this.client.getMessages(botEntity, { limit: 15 });
-      for (const msg of recent) {
-        if (!msg.media || !("document" in msg.media)) continue;
-        const doc = msg.media.document;
-        if (!(doc instanceof Api.Document)) continue;
-        const attr = audioAttrOf(doc);
-        if (!attr?.title) continue;
-
-        const gotTitle = norm(attr.title);
-        const gotArtist = attr.performer ? norm(attr.performer) : "";
-
-        // Four characters is the floor for a meaningful title comparison.
-        const titleOk =
-          wantTitle.length >= 4 &&
-          gotTitle.length >= 4 &&
-          closeEnough(gotTitle, wantTitle);
-        const artistOk = wantArtist
-          ? gotArtist !== "" && closeEnough(gotArtist, wantArtist)
-          : true;
-
-        if (titleOk && artistOk) {
-          console.log(
-            `[tg] fast path: reusing "${attr.performer ?? "?"} - ${attr.title}" for "${query}"`,
-          );
-          return trackFromMessage(msg, doc, attr, 0);
-        }
-      }
+    if (!expectedTitle || !expectedArtist || !targetDuration) {
+      throw new Error("Exact title, artist and duration are required to select audio");
     }
-
-    const cleanQuery = (str) =>
-      str
-        .replace(/\b(king|dr\.|dr|sir|chief|dj|mc|prof\.|prof)\b/gi, "")
-        .replace(/[\(\[\{].*?[\)\]\}]/g, "")
-        .replace(/[-_]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    let buttonResult;
+    if (!/^[a-zA-Z0-9_]{3,64}$/.test(botUsername)) throw new Error("Invalid bot scope");
+    const { RebuildAudioService } = require("./rebuild/service.cjs");
+    this.rebuildServices ||= new Map();
+    const scope = botUsername.toLowerCase();
+    if (!this.rebuildServices.has(scope)) {
+      this.rebuildServices.set(scope, new RebuildAudioService({
+        telegram: () => this.client, api: Api, bigInt, bots: [scope],
+        ensureConnected: () => this._ensureConnected(),
+        onFatal: error => this._goFatal(error),
+      }));
+    }
+    const service = this.rebuildServices.get(scope);
+    const metadata = expectedMetadata || {
+      title: expectedTitle, artists: [expectedArtist], artistsComplete: false,
+      durationMs: Math.round(Number(targetDuration) * 1000),
+    };
+    const deadlineMs = Math.min(45000, deadline ? deadline - Date.now() : Math.max(5000, Number(searchTimeoutMs) + Number(selectTimeoutMs)));
+    if (deadlineMs < 5000) throw new Error("Bot queue deadline exceeded");
+    let reference;
     try {
-      buttonResult = await this._searchMusic(query, searchTimeoutMs, botUsername);
-    } catch (err) {
-      const cleaned = cleanQuery(query);
-      if (cleaned && cleaned.toLowerCase() !== query.toLowerCase()) {
-        console.warn(`[tg] retrying with cleaned query "${cleaned}"`);
-        buttonResult = await this._searchMusic(cleaned, searchTimeoutMs, botUsername);
-      } else {
-        throw err;
-      }
+      const url = new URL(query);
+      const id = /^\/track\/([A-Za-z0-9]+)\/?$/.exec(url.pathname)?.[1];
+      if (id && /(?:^|\.)deezer\.com$/.test(url.hostname)) reference = { provider: "deezer", id };
+      if (id && url.hostname === "open.spotify.com") reference = { provider: "spotify", id };
+    } catch { /* Exact metadata text is also a supported search strategy. */ }
+    const result = reference
+      ? await service.resolve({ reference, references, metadata, botScopes: [scope], deadlineMs })
+      : await service.conversation(await service.peer(scope), scope, query, { metadata, references }, Date.now() + deadlineMs);
+    if (result.status !== "ready") {
+      throw new Error(result.status === "review" ? "No source passed exact recording verification" : "Audio source unavailable");
     }
-
-    const { buttonMessageId, buttons } = buttonResult;
-    if (buttons.length === 0) throw new Error("No results found on Telegram");
-
-    let selectedIndex = 0;
-    let bestScore = -999999;
-
-    for (let i = 0; i < buttons.length; i++) {
-      const text = buttons[i].text.toLowerCase();
-      let score = 0;
-
-      const isPreview =
-        text.includes("preview") ||
-        text.includes("30s") ||
-        text.includes("30 sec") ||
-        text.includes("clip");
-      if (isPreview) score -= 1000;
-
-      const match = buttons[i].text.match(/(?:\[|\()(\d{1,2}):(\d{2})(?:\]|\))/);
-      if (match) {
-        const duration = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
-        if (targetDuration && targetDuration > 0) {
-          const diff = Math.abs(duration - targetDuration);
-          if (diff <= 5) score += 200;
-          else if (diff <= 15) score += 100;
-          else if (diff > 45 && targetDuration > 45 && duration < 45) score -= 500;
-          else score -= diff;
-        } else if (duration < 45) {
-          score -= 300;
-        }
-      }
-
-      if (text.includes("320") || text.includes("flac") || text.includes("kbps")) {
-        score += 10;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        selectedIndex = i;
-      }
-    }
-
-    console.log(
-      `[tg] ${buttons.length} results, picking #${selectedIndex} "${buttons[selectedIndex]?.text}" (score ${bestScore})`,
-    );
-    return this._selectResult(buttonMessageId, selectedIndex, botUsername, selectTimeoutMs);
+    const audio = result.audio;
+    return {
+      messageId: Number(audio.messageId), title: audio.metadata.title,
+      artist: audio.metadata.artists.join("; "), duration: audio.metadata.durationMs / 1000,
+      fileId: audio.fileId, buttonIndex: 0, chatScope: audio.chatScope,
+    };
   }
 
   async selectResult(buttonMessageId, buttonIndex, timeoutMs = 60000, botUsername) {
-    return this.botQueue.run(() =>
+    return this.queueFor(botUsername || DEFAULT_BOT).run(() =>
       this._withRetry(() =>
         this._selectResult(
           buttonMessageId,
@@ -788,7 +682,7 @@ class TelegramWorkerClient {
    * down from, so the loop ends on idleness: 20s with no new audio means done.
    */
   async importPlaylist(url, onTrack, botUsername = DEFAULT_BOT) {
-    return this.botQueue.run(() =>
+    return this.queueFor(botUsername).run(() =>
       this._withRetry(async () => {
         const botEntity = await this.client.getEntity(botUsername);
 

@@ -12,7 +12,7 @@ export function SongGesture({children,className,onOptions,id}:{children:ReactNod
   return <div className={className} data-song-id={id} onPointerDown={event=>{
     if(event.pointerType==="mouse"||event.button!==0)return;
     const button=(event.target as HTMLElement).closest("button");
-    if(button&&!button.getAttribute("aria-label")?.startsWith("Play "))return;
+    if(button&&!/^(Play|Pause) /.test(button.getAttribute("aria-label")||""))return;
     cancel();press.current={x:event.clientX,y:event.clientY};const origin=press.current;
     timer.current=setTimeout(()=>{suppress.current=Date.now()+1000;onOptions({left:origin.x,top:origin.y,width:0,height:0});if(navigator.vibrate)navigator.vibrate(12);cancel();},460);
   }} onPointerMove={event=>{if(press.current&&Math.hypot(event.clientX-press.current.x,event.clientY-press.current.y)>9)cancel();}} onPointerUp={cancel} onPointerCancel={cancel} onClickCapture={event=>{if(Date.now()<suppress.current){event.preventDefault();event.stopPropagation();}}} onContextMenu={event=>{if(event.shiftKey)return;event.preventDefault();cancel();onOptions({left:event.clientX,top:event.clientY,width:0,height:0});}}>{children}</div>;

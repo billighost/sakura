@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { referenceKey } from "../core/identity";
+import { assessAudioCandidate } from "../core/matching";
 import type { CanonicalRecording, ProviderReference } from "../core/types";
-import { parseResolveInput, readResolveInput } from "./input";
+import { parseResolveInput, readResolveInput,parseRecordingMetadata,parseTrustedRecordingMetadata } from "./input";
 import { CachedCatalogProvider, DeezerCatalogProvider, SpotifyCatalogProvider } from "./providers";
 import { RecordingResolver } from "./resolver";
 import { RecordingAudioGateway, SourceAudioTransport, type AudioTransport } from "./gateway";
@@ -15,6 +16,9 @@ import { MusicCollectionImporter,collectionUrl,youtubeInitialData } from "./impo
 import { catalogTrack, DeezerCatalogService } from "./catalog";
 import { PlaybackTargets } from "./targets";
 import { AudioPromotions, CloudinaryAudioPublisher, completeAudio, AudioPromotionError } from "./promotion";
+import { ProductionRecordingResolver } from "./production-resolver";
+import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
+import { CatalogArtistAliases } from "./artist-aliases";
 import {createHash} from "node:crypto";
 
 const recordingId = "11111111-1111-4111-8111-111111111111";
@@ -372,7 +376,7 @@ function ingestionDatabase(){
  const artists=new Map<string,{id:string;name:string}>(),credits=new Map<string,{artistId:string;position:number}[]>();
  const query:ReadonlySql=async<Row>(statement:string,args:readonly unknown[])=>{
   let rows:unknown[]=[];
-  if(statement.includes("JOIN sakura_v2.\"Recording\"")){const id=aliases.get(JSON.stringify(args.slice(0,3)));if(id)rows=[{id,metadata:records.get(id)}];}
+  if(statement.includes("JOIN sakura_v2.\"Recording\"")){const id=aliases.get(JSON.stringify(args.slice(0,3)));if(id)rows=[{id,metadata:records.get(id),references:[...aliases.entries()].filter(([,recording])=>recording===id).map(([key])=>{const[provider,scope,referenceId]=JSON.parse(key);return{provider,id:referenceId,...(scope?{scope}:{})};})}];}
   else if(statement.startsWith('INSERT INTO sakura_v2."Recording"'))records.set(String(args[0]),JSON.parse(String(args[1])));
   else if(statement.startsWith('UPDATE sakura_v2."Recording"'))records.set(String(args[0]),{...records.get(String(args[0])),...JSON.parse(String(args[1]))});
   else if(statement.startsWith('INSERT INTO sakura_v2."ExternalReference"')){const key=JSON.stringify(args.slice(0,3));if(!aliases.has(key))aliases.set(key,String(args[3]));}
@@ -619,7 +623,7 @@ test("CDN preparation coalesces transfer/publication and persists unchanged cano
  const first=promotions.prepare(canonical,worker),second=promotions.prepare(canonical,worker);assert.equal(first,second);const result=await first;assert.equal(opens,1);assert.equal(publishes,1);assert.equal(saved.length,2);assert.equal(result.recordingId,recordingId);assert.equal(result.sha256,sha256);
 });
 
-test("ready-worker preparation jobs produce CDN or explicit quota fallback and refuse integrity failure",async()=>{
+test("ready-worker preparation jobs keep a verified original available when CDN preparation fails",async()=>{
  for(const outcome of ["ready","quota","integrity"] as const){
   const repo=new MemoryRepository(),sha256=createHash("sha256").update("0123456789").digest("hex");
   const worker={...source,sha256,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};repo.assets=[worker];
@@ -640,8 +644,334 @@ test("ready-worker preparation jobs produce CDN or explicit quota fallback and r
   assert.equal(await jobs.needsPreparation(await resolver.resolve({reference},accountId),accountId),true);
   const pending=await jobs.enqueue(canonical,accountId,"preparing-audio");assert.equal(pending.status,"pending");if(pending.status!=="pending")throw new Error("Expected preparation job");assert.equal(pending.stage,"preparing-audio");
   await jobs.process(pending.jobId);const result=await jobs.get(pending.jobId,accountId);assert.equal(publications,1);assert.equal(discoveries,0);
-  if(outcome==="integrity"){assert.equal(result?.status,"review");assert.equal(row.state,"review");}
-  else{assert.equal(result?.status,"resolved");if(result?.status!=="resolved")throw new Error("Expected validated playback");assert.equal(result.playback.sha256,sha256);assert.equal(result.recording.recordingId,recordingId);assert.equal(result.playback.delivery,outcome==="ready"?"cdn":"worker-fallback");assert.equal(result.playback.preparationFailure,outcome==="quota"?"quota":undefined);}
+  assert.equal(result?.status,"resolved");if(result?.status!=="resolved")throw new Error("Expected validated playback");assert.equal(result.playback.sha256,sha256);assert.equal(result.recording.recordingId,recordingId);assert.equal(result.playback.delivery,outcome==="ready"?"cdn":"worker-fallback");assert.equal(result.playback.preparationFailure,outcome==="quota"?"quota":outcome==="integrity"?"cdn-integrity":undefined);
   assert.ok(repo.assets.some(a=>a.locator.kind==="telegram-worker"&&a.sha256===sha256),"Verified worker fallback must remain stored");
  }
+});
+
+test("a plain-text missing v2 route falls back to exact legacy source selection",async()=>{
+ const paths:string[]=[];const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async url=>{
+  paths.push(String(url));if(String(url).endsWith("/v2/resolve"))return new Response("Not Found",{status:404});
+  if(String(url).endsWith("/search-and-select"))return Response.json({messageId:42});
+  return Response.json({title:"Finesse",artist:"Bruno Mars",duration:191,size:5000,mimeType:"audio/mpeg"});
+ })as typeof fetch);
+ assert.equal((await discovery.discover(canonical)).status,"ready");assert.equal(paths.length,3);
+});
+
+test("an unsupported optional worker scope cannot disable its primary source",async()=>{
+ const scopes:string[][]=[];const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary",fallbackBots:["unknownbot"]},(async(_url,init)=>{
+  const body=JSON.parse(String(init?.body));scopes.push(body.botScopes);
+  if(body.botScopes.length>1)return Response.json({error:"Unknown worker chat scope"},{status:500});
+  return Response.json({status:"ready",audio:{messageId:"42",chatScope:"primary",metadata:canonical.metadata,size:5000,mimeType:"audio/mpeg"}});
+ })as typeof fetch);
+ assert.equal((await discovery.discover(canonical)).status,"ready");assert.equal((await discovery.discover(canonical)).status,"ready");
+ assert.deepEqual(scopes,[["primary","unknownbot"],["primary"],["primary"]]);
+});
+
+test("legacy selection continues after a wrong version to the other exact catalog reference",async()=>{
+ const queries:string[]=[];let chosen="";const alternate={provider:"spotify" as const,id:"0123456789ABCDEFGHIJKL"};
+ const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async(url,init)=>{
+  const body=JSON.parse(String(init?.body));if(String(url).endsWith("/v2/resolve"))return new Response("Not Found",{status:404});
+  if(String(url).endsWith("/search-and-select")){chosen=String(body.query);queries.push(chosen);return Response.json({messageId:chosen.includes("spotify")?43:42});}
+  return Response.json({title:chosen.includes("spotify")?"Finesse":"Finesse (Remix)",artist:"Bruno Mars",duration:chosen.includes("spotify")?191:217,size:5000,mimeType:"audio/mpeg"});
+ })as typeof fetch);
+ const result=await discovery.discover({...canonical,references:[reference,alternate,isrc]});assert.equal(result.status,"ready");
+ assert.deepEqual(queries,["https://www.deezer.com/track/123","https://open.spotify.com/track/0123456789ABCDEFGHIJKL"]);
+});
+
+test("source discovery adds only exact metadata-and-ISRC verified provider aliases",async()=>{
+ const alternate={provider:"spotify" as const,id:"0123456789ABCDEFGHIJKL"};let received:Record<string,unknown>={};
+ const provider:CatalogProvider={provider:"spotify",async getExact(){return null;},async getByIsrc(){return[{...catalog,metadata:{...catalog.metadata,artistsComplete:true},reference:alternate,references:[alternate,isrc]},{...catalog,reference:{...alternate,id:"ABCDEFGHIJKL0123456789"},references:[{...alternate,id:"ABCDEFGHIJKL0123456789"},isrc],metadata:{...canonical.metadata,title:"Finesse (Remix)",durationMs:217000,artistsComplete:true}}];}};
+ const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async(_url,init)=>{received=JSON.parse(String(init?.body));return Response.json({status:"unavailable"});})as typeof fetch,[provider]);
+ await discovery.discover(canonical);assert.deepEqual(received.references,[reference,isrc,alternate]);
+});
+
+test("rediscovering one scoped immutable source is idempotent and unconfigured scopes are refused",async()=>{
+ let scope="primary";const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async()=>Response.json({status:"ready",audio:{messageId:"42",chatScope:scope,metadata:canonical.metadata,size:5000,mimeType:"audio/mpeg"}}))as typeof fetch);
+ const one=await discovery.discover(canonical),two=await discovery.discover(canonical);assert.equal(one.status,"ready");assert.equal(two.status,"ready");
+ if(one.status==="ready"&&two.status==="ready")assert.equal(one.asset.assetId,two.asset.assetId);
+ scope="unconfigured";assert.equal((await discovery.discover(canonical)).status,"unavailable");
+});
+
+test("Deezer ISRC lookup follows exact provider metadata and rejects recycled identifiers",async()=>{
+ const paths:string[]=[];let returnedIsrc=isrc.id;
+ const provider=new DeezerCatalogProvider((async url=>{paths.push(String(url));if(String(url).includes("/track/isrc:"))return Response.json({id:123});return Response.json({id:123,title:"Finesse",duration:191,isrc:returnedIsrc,artist:{id:1,name:"Bruno Mars"},album:{id:1,title:"24K Magic"}});})as typeof fetch);
+ assert.equal((await provider.getByIsrc!(isrc.id)).length,1);assert.ok(paths[1].endsWith("/track/123"));
+ returnedIsrc="USAT21602950";assert.equal((await provider.getByIsrc!(isrc.id)).length,0);
+});
+
+test("gateway If-Range resumes only its matching artifact identity",async()=>{
+ const repo=new MemoryRepository(),ranges:Array<string|null>=[];const gateway=new RecordingAudioGateway(repo,{async open(_asset,range){ranges.push(range);return audioResponse(range);}});
+ const head=await gateway.serve({...gatewayInput,method:"HEAD"});const etag=head.headers.get("ETag");assert.ok(etag);
+ const resumed=await gateway.serve({...gatewayInput,range:"bytes=2-4",ifRange:etag});assert.equal(resumed.status,206);assert.equal(await resumed.text(),"234");
+ const replaced=await gateway.serve({...gatewayInput,range:"bytes=2-4",ifRange:'"another-artifact"'});assert.equal(replaced.status,200);assert.equal(await replaced.text(),"0123456789");assert.deepEqual(ranges,["bytes=2-4",null]);
+});
+
+test("parallel worker ranges share immutable-document validation and bind every transfer",async()=>{
+ let inspections=0;const transferHeaders:Headers[]=[];const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary",protocol:"v2" as const,documentId:"123456789"}};
+ const expectedTag='"'+createHash("sha256").update(JSON.stringify(["primary","42","123456789",10,"audio/mpeg"])).digest("hex")+'"';
+ const transport=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:"https://worker.example.test",secret:"secret",chatScope:"primary"}},(async(url,init)=>{
+  if(String(url).endsWith("/audio-info")){inspections++;await new Promise(resolve=>setTimeout(resolve,5));return Response.json({fileId:"123456789",size:10,mimeType:"audio/mpeg",metadata:canonical.metadata});}
+  const headers=new Headers(init?.headers);transferHeaders.push(headers);return audioResponse(headers.get("Range"));
+ })as typeof fetch);
+ const responses=await Promise.all([transport.open(worker,"bytes=0-2"),transport.open(worker,"bytes=3-5"),transport.open(worker,null)]);
+ assert.equal(inspections,1);assert.deepEqual(await Promise.all(responses.map(response=>response.text())),["012","345","0123456789"]);
+ assert.equal(transferHeaders[0].get("If-Range"),expectedTag);assert.equal(transferHeaders[1].get("If-Range"),expectedTag);assert.equal(transferHeaders[2].get("If-Match"),expectedTag);
+ await assert.rejects(transport.open({...worker,locator:{...worker.locator,documentId:"different"}},null),/document has changed/);
+});
+
+test("stored worker document identity survives repository decoding",async()=>{
+ const row={id:assetId,recordingId,metadata:canonical.metadata,references:[{provider:"telegram",scope:"primary",id:"42"}],locator:{kind:"telegram-worker",messageId:"42",chatScope:"primary",protocol:"v2",documentId:"123456789"},state:"ready",verifiedAt:source.verifiedAt,mimeType:"audio/mpeg",sizeBytes:10,ownerAccountId:null};
+ const repo=new PostgresRecordingRepository((async()=>[row])as ReadonlySql);const loaded=await repo.findAudio(recordingId,assetId,accountId);
+ assert.deepEqual(loaded?.locator,row.locator);
+});
+
+test("a truncated source is a connection failure and cancellation stops full-file verification promptly",async()=>{
+ await assert.rejects(completeAudio(new Response("short",{headers:{"Content-Type":"audio/mpeg"}}),10),(error:unknown)=>error instanceof AudioPromotionError&&error.reason==="provider");
+ let canceled=false;const controller=new AbortController();const pending=completeAudio(new Response(new ReadableStream<Uint8Array>({start(stream){stream.enqueue(new Uint8Array([1]));},cancel(){canceled=true;}}),{headers:{"Content-Type":"audio/mpeg"}}),10,controller.signal);
+ controller.abort();await assert.rejects(pending,{name:"AbortError"});assert.equal(canceled,true);
+});
+
+test("full-file hashing is available without a configured CDN publisher",async()=>{
+ const saved:StoredAudioAsset[]=[];class Ingestor extends RecordingIngestor{override async persistAudio(_recording:CanonicalRecording,asset:StoredAudioAsset){saved.push(asset);}}
+ const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const promotions=new AudioPromotions({async open(){return audioResponse(null);}},new Ingestor(ingestionDatabase().transaction,[]));
+ assert.equal(promotions.needsPreparation(worker),true);const checked=await promotions.prepare(canonical,worker);
+ assert.equal(checked.sha256,createHash("sha256").update("0123456789").digest("hex"));assert.equal(checked.assetId,worker.assetId);assert.equal(saved.length,1);assert.equal(promotions.needsPreparation(checked),false);
+});
+
+test("stored source mismatch triggers a fresh discovery job while catalog mismatch stays explicit",async()=>{
+ const repo=new MemoryRepository();let enqueued=0;
+ const jobs={async needsPreparation(){return false;},decoratePreparation(result:unknown){return result;},async enqueue(recording:CanonicalRecording){enqueued++;return{status:"pending" as const,jobId:assetId,recording,pollUrl:"/api/v2/recordings/jobs/"+assetId,retryAfterMs:1000};}} as unknown as AudioResolutionJobs;
+ const resolver=new ProductionRecordingResolver(repo,new RecordingIngestor(ingestionDatabase().transaction,[]),new RecordingResolver(repo,[]),jobs);
+ repo.assets=[{...source,candidate:{...source.candidate,metadata:{...canonical.metadata,title:"Finesse (Remix)",durationMs:217000}}}];
+ assert.equal((await resolver.resolve({reference},accountId)).status,"pending");assert.equal(enqueued,1);
+ assert.equal((await resolver.resolve({reference,expected:{...canonical.metadata,title:"Another Song"}},accountId)).status,"review");assert.equal(enqueued,1);
+});
+
+const localizedReference:ProviderReference={provider:"spotify",id:"1fPkUiufkRpzdYcBKXUP3s"};
+const localizedMetadata={title:"咆哮 - HOKO",artists:["TOMONARI SORA"],durationMs:209766,artistsComplete:true} as const;
+const nativeMetadata={title:"HOKO",artists:["友成空"],durationMs:209000,artistsComplete:true} as const;
+const localizedIsrc:ProviderReference={provider:"isrc",id:"JPB602501985"};
+const localizedRecording:CanonicalRecording={recordingId,metadata:localizedMetadata,references:[localizedReference,localizedIsrc]};
+const nativeCatalog:CatalogRecording={reference:{provider:"deezer",id:"3559573421"},references:[{provider:"deezer",id:"3559573421"},localizedIsrc],metadata:nativeMetadata};
+
+test("trusted native metadata proof survives storage while public callers cannot inject aliases",()=>{
+ const metadata=withVerifiedCatalogAliases(localizedRecording,[nativeCatalog]);assert.equal(metadata.verifiedAliases?.length,1);
+ assert.equal(parseRecordingMetadata(metadata).verifiedAliases,undefined);
+ assert.equal(parseResolveInput({reference:localizedReference,expected:metadata}).expected?.verifiedAliases,undefined);
+ assert.deepEqual(parseTrustedRecordingMetadata(metadata).verifiedAliases,metadata.verifiedAliases);
+ assert.equal(assessAudioCandidate({...localizedRecording,metadata},{candidateId:"native",metadata:nativeMetadata,audioKind:"full"}).acceptable,true);
+});
+
+test("native source recovery retries an older v2 worker with a whole authoritative alias",async()=>{
+ const requests:Array<Record<string,unknown>>=[];
+ const provider:CatalogProvider={provider:"deezer",async getExact(){return nativeCatalog;},async getByIsrc(){return[nativeCatalog];}};
+ const discovery=new WorkerAudioDiscovery({url:"https://worker.example.test",secret:"secret",primaryBot:"primary"},(async(_url,init)=>{
+  const request=JSON.parse(String(init?.body));requests.push(request);
+  if(request.metadata.title===localizedMetadata.title)return Response.json({status:"review",candidates:[{title:nativeMetadata.title,artists:nativeMetadata.artists,durationMs:209000,reasons:["title","artist"]}]});
+  return Response.json({status:"ready",audio:{messageId:"42",chatScope:"primary",fileId:"123456",metadata:nativeMetadata,size:5000,mimeType:"audio/mpeg"}});
+ })as typeof fetch,[provider]);
+ const result=await discovery.discover(localizedRecording);assert.equal(result.status,"ready");assert.equal(requests.length,2);
+ assert.deepEqual(requests[1].reference,localizedReference);assert.deepEqual(requests[1].metadata,parseRecordingMetadata(nativeMetadata));
+ assert.ok((requests[1].references as ProviderReference[]).some(ref=>ref.provider==="isrc"&&ref.id===localizedIsrc.id));
+ if(result.status==="ready"){assert.ok(result.verifiedMetadata?.verifiedAliases?.length);assert.equal(result.asset.recordingId,recordingId);}
+});
+
+test("aliases bind complete same-ISRC provider rows while wrong variants and identifiers remain rejected",async()=>{
+ const provider:CatalogProvider={provider:"spotify",async getExact(){return null;},async getByIsrc(){return[
+  nativeCatalog,{...nativeCatalog,metadata:{...nativeMetadata,title:"HOKO (Instrumental)"}},
+  {...nativeCatalog,references:[nativeCatalog.reference,{provider:"isrc",id:"JPB602501986"}]},
+  {...nativeCatalog,metadata:{...nativeMetadata,artists:["友成空","Unrelated Guest"]}},
+ ];}};
+ const hydrated=await new CatalogMetadataAliases([provider]).hydrate(localizedRecording);
+ assert.equal(hydrated.metadata.verifiedAliases?.length,1);assert.deepEqual(hydrated.metadata.verifiedAliases?.[0].metadata,parseRecordingMetadata(nativeMetadata));
+ for(const metadata of [{...nativeMetadata,title:"HOKO (Instrumental)"},{...nativeMetadata,durationMs:240000},{...nativeMetadata,artists:["Another Singer"]}])assert.equal(assessAudioCandidate(hydrated,{candidateId:"wrong",metadata,audioKind:"full"}).acceptable,false);
+});
+
+test("localized reindex retains canonical UUID and both actual provider proofs",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const original=await ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference,localizedIsrc],metadata:localizedMetadata});
+ const native=await ingestor.ensureCatalog(nativeCatalog);assert.equal(original.recordingId,native.recordingId);assert.equal(database.records.size,1);
+ const saved=database.records.get(native.recordingId)!;assert.ok(saved.verifiedAliases);
+ assert.equal(assessAudioCandidate({metadata:parseTrustedRecordingMetadata(saved),references:[nativeCatalog.reference,localizedIsrc]},{candidateId:"old",metadata:localizedMetadata,audioKind:"full"}).acceptable,true);
+});
+
+test("reused exact provider ID with a different authoritative ISRC never fabricates alias proof",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const original=await ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference,localizedIsrc],metadata:localizedMetadata});
+ await assert.rejects(ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference,{provider:"isrc",id:"JPB602501986"}],metadata:nativeMetadata}),RecordingIdentityConflict);
+ assert.equal(database.records.get(original.recordingId)?.title,localizedMetadata.title);assert.equal(database.aliases.size,2);
+});
+
+test("cached locale aliases validate expected display metadata from the trusted recording side",async()=>{
+ const repo=new MemoryRepository();const metadata=withVerifiedCatalogAliases(localizedRecording,[nativeCatalog]);
+ repo.records=[{...localizedRecording,metadata}];repo.aliases.clear();repo.aliases.set(referenceKey(localizedReference),repo.records[0]);
+ repo.assets=[{...source,candidate:{...source.candidate,metadata:nativeMetadata,references:[localizedIsrc]},recordingId}];
+ const resolver=new RecordingResolver(repo,[]);
+ assert.equal((await resolver.resolve({reference:localizedReference,expected:nativeMetadata},accountId)).status,"resolved");
+ assert.equal((await resolver.resolve({reference:localizedReference,expected:{...nativeMetadata,title:"Another Track"}},accountId)).status,"review");
+});
+
+test("reindex preserves earlier complete aliases and rejects incremental duration drift",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const first=await ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference,localizedIsrc],metadata:localizedMetadata});
+ await ingestor.ensureCatalog(nativeCatalog);
+ const third:CatalogRecording={reference:{provider:"spotify",id:"7rc79XVkUIvmK4TINjXhl1"},references:[{provider:"spotify",id:"7rc79XVkUIvmK4TINjXhl1"},localizedIsrc],metadata:{...localizedMetadata,title:"咆哮",durationMs:209398}};
+ await ingestor.ensureCatalog(third);const metadata=parseTrustedRecordingMetadata(database.records.get(first.recordingId));
+ const request={metadata,references:third.references};
+ assert.equal(assessAudioCandidate(request,{candidateId:"single",metadata:localizedMetadata,audioKind:"full"}).acceptable,true);
+ assert.equal(assessAudioCandidate(request,{candidateId:"native",metadata:nativeMetadata,audioKind:"full"}).acceptable,true);
+ assert.equal(assessAudioCandidate(request,{candidateId:"drift",metadata:{...nativeMetadata,durationMs:216000},audioKind:"full"}).acceptable,false);
+ assert.equal(withVerifiedCatalogAliases(request,[]),metadata);
+});
+
+test("resolver read hydrates a cached canonical UUID before starting another source search",async()=>{
+ const repo=new MemoryRepository();repo.records=[localizedRecording];repo.aliases.clear();repo.aliases.set(referenceKey(localizedReference),localizedRecording);
+ repo.assets=[{...source,candidate:{...source.candidate,metadata:nativeMetadata,references:[localizedIsrc]}}];
+ let lookups=0,persisted=0,enqueued=0;const provider:CatalogProvider={provider:"deezer",async getExact(){return nativeCatalog;},async getByIsrc(){lookups++;return[nativeCatalog];}};
+ class Ingestor extends RecordingIngestor{override async persistVerifiedAliases(recording:CanonicalRecording){persisted++;repo.records=[recording];repo.aliases.set(referenceKey(localizedReference),recording);}}
+ const jobs={async needsPreparation(){return false;},decoratePreparation(result:unknown){return result;},async enqueue(){enqueued++;throw new Error("A matching cached source must stay usable");}} as unknown as AudioResolutionJobs;
+ const resolver=new ProductionRecordingResolver(repo,new Ingestor(ingestionDatabase().transaction,[provider]),new RecordingResolver(repo,[]),jobs);
+ assert.equal((await resolver.resolve({reference:localizedReference},accountId)).status,"resolved");assert.equal(lookups,1);assert.equal(persisted,1);assert.equal(enqueued,0);
+ assert.equal((await resolver.resolve({reference:localizedReference,expected:nativeMetadata},accountId)).status,"resolved");assert.equal(lookups,1);assert.equal(persisted,1);
+});
+
+test("stored native proof authorizes gateway delivery while wrong versions remain blocked",async()=>{
+ const repo=new MemoryRepository();const metadata=parseTrustedRecordingMetadata(withVerifiedCatalogAliases(localizedRecording,[nativeCatalog]));repo.records=[{...localizedRecording,metadata}];
+ repo.assets=[{...source,candidate:{...source.candidate,metadata:nativeMetadata,references:[{provider:"telegram",scope:"primary",id:"42"}]}}];
+ const gateway=new RecordingAudioGateway(repo,{async open(){return audioResponse(null);}});
+ assert.equal((await gateway.serve({...gatewayInput,method:"HEAD"})).status,200);
+ repo.assets=[{...repo.assets[0],candidate:{...repo.assets[0].candidate,metadata:{...nativeMetadata,title:"HOKO (Karaoke)"}}}];
+ assert.equal((await gateway.serve({...gatewayInput,method:"HEAD"})).status,409);
+});
+
+test("idempotent exact catalog reads retry one transient connection and never retry corrupt JSON",async()=>{
+ const payload={id:123,title:"Finesse",duration:191,isrc:isrc.id,artist:{id:1,name:"Bruno Mars"},album:{id:1,title:"24K Magic"}};
+ let calls=0;const provider=new DeezerCatalogProvider((async()=>{calls++;if(calls===1)throw new TypeError("Connection reset");return Response.json(payload);})as typeof fetch);
+ assert.equal((await provider.getExact(reference))?.metadata.title,"Finesse");assert.equal(calls,2);
+ calls=0;const corrupt=new DeezerCatalogProvider((async()=>{calls++;return new Response("not JSON");})as typeof fetch);
+ await assert.rejects(corrupt.getExact(reference));assert.equal(calls,1);
+ calls=0;const canceled=new AbortController();canceled.abort();await assert.rejects(provider.getExact(reference,canceled.signal),{name:"AbortError"});assert.equal(calls,0);
+});
+
+test("same exact provider row can update harmless localized spelling before ISRC is available",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const first=await ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference],metadata:localizedMetadata});
+ const second=await ingestor.ensureCatalog({reference:localizedReference,references:[localizedReference,localizedIsrc],metadata:nativeMetadata});
+ assert.equal(first.recordingId,second.recordingId);assert.equal(database.records.size,1);
+ const stored=parseTrustedRecordingMetadata(database.records.get(first.recordingId));
+ assert.equal(assessAudioCandidate({metadata:stored,references:[localizedReference,localizedIsrc]},{candidateId:"old-spelling",metadata:localizedMetadata,audioKind:"full"}).acceptable,true);
+});
+
+const translatedIsrc:ProviderReference={provider:"isrc",id:"TWK970300503"};
+const translatedRecording:CanonicalRecording={recordingId,metadata:{title:"晴天",artists:["Jay Chou"],durationMs:269746,artistsComplete:true},references:[{provider:"spotify",id:"5pIcwtJYNJx93l420oR2Vm"},translatedIsrc]};
+const translatedCatalog:CatalogRecording={reference:{provider:"deezer",id:"2602471112"},references:[{provider:"deezer",id:"2602471112"},translatedIsrc],metadata:{title:"Sunny Day",artists:["Jay Chou"],durationMs:270000,artistsComplete:true},artistCredits:[{name:"Jay Chou",role:"primary",reference:{provider:"deezer",id:"69175"}}]};
+const translatedArtistId="a223958d-5c56-4b2c-a30a-87e357bc121b";
+function artistProofFetcher(change?:(kind:"url"|"artist",payload:Record<string,unknown>)=>Record<string,unknown>,calls:string[]=[]):typeof fetch{
+ return(async(input)=>{
+  const url=new URL(String(input));calls.push(url.toString());assert.equal(url.origin,"https://musicbrainz.org");
+  const resource="https://www.deezer.com/artist/69175",kind=url.pathname==="/ws/2/url"?"url":"artist";
+  const payload:Record<string,unknown>=kind==="url"?{resource,relations:[{"target-type":"artist",ended:false,artist:{id:translatedArtistId}}]}:{id:translatedArtistId,name:"周杰倫",aliases:[{name:"Jay Chou",primary:true,type:"Artist name",ended:false},{name:"Jay",primary:false,type:"Artist name"},{name:"Old credit",primary:true,type:"Artist name",ended:true}],relations:[{"target-type":"url",ended:false,url:{resource}}]};
+  return Response.json(change?change(kind,payload):payload);
+ })as typeof fetch;
+}
+function translatedProvider(row=translatedCatalog):CatalogProvider{return{provider:"deezer",async getExact(){return row;},async getByIsrc(){return[row];}};}
+
+test("exact ISRC titles combine only with reciprocal catalogue artist identities",async()=>{
+ const calls:string[]=[];const aliases=new CatalogMetadataAliases([translatedProvider()],new CatalogArtistAliases(artistProofFetcher(undefined,calls),0));
+ const hydrated=await aliases.hydrate(translatedRecording);
+ assert.equal(assessAudioCandidate(hydrated,{candidateId:"native",metadata:{title:"Sunny Day",artists:["周杰倫"],durationMs:269000},audioKind:"full"}).acceptable,true);
+ assert.deepEqual(calls.map(url=>new URL(url).pathname),["/ws/2/url",`/ws/2/artist/${translatedArtistId}`]);
+ assert.ok(hydrated.metadata.verifiedAliases?.some(alias=>alias.metadata.title==="Sunny Day"&&alias.metadata.artists[0]==="周杰倫"));
+ assert.ok(hydrated.metadata.verifiedAliases?.every(alias=>alias.references.every(ref=>ref.provider!=="musicbrainz")));
+ await aliases.hydrate(translatedRecording);assert.equal(calls.length,2);
+ for(const metadata of [{title:"Sunny Day (Live)",artists:["周杰倫"],durationMs:269000},{title:"Sunny Day",artists:["Jay"],durationMs:269000},{title:"Sunny Day",artists:["周杰倫","Unrelated Guest"],durationMs:269000},{title:"Sunny Day",artists:["周杰倫"],durationMs:290000}])assert.equal(assessAudioCandidate(hydrated,{candidateId:"wrong",metadata,audioKind:"full"}).acceptable,false);
+ assert.equal(assessAudioCandidate(hydrated,{candidateId:"preview",metadata:{title:"Sunny Day",artists:["周杰倫"],durationMs:269000},audioKind:"preview"}).acceptable,false);
+ assert.equal(parseRecordingMetadata(hydrated.metadata).verifiedAliases,undefined);
+});
+
+test("artist aliases reject wrong resources, ambiguous identities and missing reciprocal proof",async()=>{
+ const variants:((kind:"url"|"artist",payload:Record<string,unknown>)=>Record<string,unknown>)[]=[
+  (kind,payload)=>kind==="url"?{...payload,resource:"https://www.deezer.com/artist/999"}:payload,
+  (kind,payload)=>kind==="url"?{...payload,relations:[{"target-type":"artist",artist:{id:translatedArtistId}},{"target-type":"artist",artist:{id:otherId}}]}:payload,
+  (kind,payload)=>kind==="url"?{...payload,relations:[{"target-type":"artist",artist:{id:"not-an-identity"}}]}:payload,
+  (kind,payload)=>kind==="artist"?{...payload,id:otherId}:payload,
+  (kind,payload)=>kind==="artist"?{...payload,relations:[]}:payload,
+  (kind,payload)=>kind==="artist"?{...payload,aliases:[]}:payload,
+  (kind,payload)=>kind==="artist"?{...payload,relations:[{"target-type":"url",ended:true,url:{resource:"https://www.deezer.com/artist/69175"}}]}:payload,
+ ];
+ for(const change of variants){
+  const hydrated=await new CatalogMetadataAliases([translatedProvider()],new CatalogArtistAliases(artistProofFetcher(change),0)).hydrate(translatedRecording);
+  assert.equal(assessAudioCandidate(hydrated,{candidateId:"native",metadata:{title:"Sunny Day",artists:["周杰倫"],durationMs:269000},audioKind:"full"}).acceptable,false);
+ }
+});
+
+test("artist aliases preserve ordered credits and require a proved name for each replacement",async()=>{
+ const row:CatalogRecording={...translatedCatalog,metadata:{...translatedCatalog.metadata,artists:["Jay Chou","Guest"]},artistCredits:[...translatedCatalog.artistCredits!,{name:"Guest",role:"featured"}]};
+ const lookup=new CatalogArtistAliases(artistProofFetcher(),0),variants=await lookup.variants(row,AbortSignal.timeout(1000));
+ assert.ok(variants.some(variant=>JSON.stringify(variant.metadata.artists)===JSON.stringify(["周杰倫","Guest"])));
+ assert.ok(variants.every(variant=>variant.metadata.artists.length===2&&variant.metadata.artists[1]==="Guest"&&variant.artistCredits?.[1].role==="featured"));
+ for(const invalid of [{...row,artistCredits:row.artistCredits!.slice(0,1)},{...row,artistCredits:[{...row.artistCredits![0],name:"Wrong performer"},row.artistCredits![1]]},{...row,artistCredits:[{...row.artistCredits![0],role:"featured" as const},row.artistCredits![1]]},{...row,metadata:{...row.metadata,artistsComplete:false}}])assert.deepEqual(await lookup.variants(invalid,AbortSignal.timeout(1000)),[]);
+});
+
+test("artist metadata transport failures retry independently of cached exact recording rows",async()=>{
+ let lookups=0,requests=0;const valid=artistProofFetcher();
+ const provider={...translatedProvider(),async getByIsrc(){lookups++;return[translatedCatalog];}};
+ const lookup=new CatalogMetadataAliases([provider],new CatalogArtistAliases((async(input,init)=>{requests++;return requests===1?new Response(null,{status:503}):valid(input,init);})as typeof fetch,0));
+ const before=await lookup.hydrate(translatedRecording);assert.equal(before.metadata.verifiedAliases?.some(alias=>alias.metadata.artists[0]==="周杰倫"),false);
+ const after=await lookup.hydrate(translatedRecording);assert.ok(after.metadata.verifiedAliases?.some(alias=>alias.metadata.artists[0]==="周杰倫"));assert.equal(lookups,1);assert.equal(requests,3);
+});
+
+test("wrong recording proofs and editions cannot initiate artist alias enrichment",async()=>{
+ const calls:string[]=[];
+ for(const row of [{...translatedCatalog,references:[translatedCatalog.reference,{provider:"isrc" as const,id:"TWK970300504"}]},{...translatedCatalog,metadata:{...translatedCatalog.metadata,title:"Sunny Day (Live)"}},{...translatedCatalog,metadata:{...translatedCatalog.metadata,durationMs:350000}}]){
+  const hydrated=await new CatalogMetadataAliases([translatedProvider(row)],new CatalogArtistAliases(artistProofFetcher(undefined,calls),0)).hydrate(translatedRecording);
+  assert.equal(hydrated.metadata.verifiedAliases,undefined);
+ }
+ assert.equal(calls.length,0);
+});
+
+test("caller cancellation escapes artist hydration without publishing late alias proof",async()=>{
+ const controller=new AbortController();let requests=0;
+ const lookup=new CatalogMetadataAliases([translatedProvider()],new CatalogArtistAliases((async(_input,init)=>{
+  requests++;controller.abort();init?.signal?.throwIfAborted();throw new Error("unreachable");
+ })as typeof fetch,0));
+ await assert.rejects(lookup.hydrate(translatedRecording,controller.signal),{name:"AbortError"});assert.equal(requests,1);assert.equal(translatedRecording.metadata.verifiedAliases,undefined);
+});
+
+test("queued artist requests cancel promptly without overtaking the preceding public request",async()=>{
+ let release!:()=>void,started!:()=>void;const startedPromise=new Promise<void>(resolve=>{started=resolve;});
+ const holding=new Promise<void>(resolve=>{release=resolve;});let requests=0;
+ const fetcher=(async(input,init)=>{requests++;if(requests===1){started();await holding;}return artistProofFetcher()(input,init);})as typeof fetch;
+ const lookup=new CatalogArtistAliases(fetcher,1),credit=translatedCatalog.artistCredits![0],first=lookup.forCredit(credit,AbortSignal.timeout(1000));
+ await startedPromise;const canceled=new AbortController(),second=lookup.forCredit(credit,canceled.signal);canceled.abort();
+ await assert.rejects(second,{name:"AbortError"});assert.equal(requests,1);
+ const third=lookup.forCredit(credit,AbortSignal.timeout(1000));await new Promise(resolve=>setTimeout(resolve,10));assert.equal(requests,1);
+ release();assert.ok((await first).includes("周杰倫"));assert.ok((await third).includes("周杰倫"));
+});
+
+test("late artist headers and bodies cannot publish or cache proof after cancellation",async()=>{
+ for(const phase of ["headers","body"]){
+  const canceled=new AbortController();let requests=0;const valid=artistProofFetcher();
+  const lookup=new CatalogArtistAliases((async(input,init)=>{
+   requests++;const response=await valid(input,init);
+   if(requests===2){
+    if(phase==="headers"){canceled.abort();return response;}
+    const bytes=new TextEncoder().encode(await response.text());
+    return new Response(new ReadableStream({pull(controller){canceled.abort();controller.enqueue(bytes);controller.close();}},{highWaterMark:0}),{headers:{"Content-Type":"application/json"}});
+   }
+   return response;
+  })as typeof fetch,0);
+  const credit=translatedCatalog.artistCredits![0];await assert.rejects(lookup.forCredit(credit,canceled.signal),{name:"AbortError"});assert.equal(requests,2);
+  assert.ok((await lookup.forCredit(credit,AbortSignal.timeout(1000))).includes("周杰倫"));assert.equal(requests,4);
+ }
+});
+
+test("artist identity lookup refuses redirected authority responses",async()=>{
+ const lookup=new CatalogArtistAliases((async(_input,init)=>{
+  assert.equal(init?.redirect,"error");const response=Response.json({resource:"https://www.deezer.com/artist/69175",relations:[{"target-type":"artist",artist:{id:translatedArtistId}}]});
+  Object.defineProperty(response,"redirected",{value:true});return response;
+ })as typeof fetch,0);
+ assert.deepEqual(await lookup.forCredit(translatedCatalog.artistCredits![0],AbortSignal.timeout(1000)),["Jay Chou"]);
 });

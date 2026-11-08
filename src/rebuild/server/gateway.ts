@@ -3,6 +3,7 @@ import { fetchAudioHeaders, parseByteRange } from "../core/streaming";
 import type { RecordingRepository, StoredAudioAsset } from "./contracts";
 import { readMetadataJson } from "./providers";
 import { isUuid, parseRecordingMetadata, normalizedAudioMime, supportedAudioMime } from "./input";
+import { createHash } from "node:crypto";
 
 const mime = normalizedAudioMime;
 function safeUrl(raw: string, allowedOrigins: ReadonlySet<string>): string {
@@ -12,6 +13,11 @@ function safeUrl(raw: string, allowedOrigins: ReadonlySet<string>): string {
 }
 function jsonError(status: number, code: string): Response {
   return Response.json({ status: "unavailable", reason: code }, { status, headers: { "Cache-Control": "private, no-store" } });
+}
+async function waitForSource<T>(work:Promise<T>,signal?:AbortSignal):Promise<T>{
+ if(!signal)return work;signal.throwIfAborted();let abort:()=>void=()=>{};
+ try{return await Promise.race([work,new Promise<never>((_,reject)=>{abort=()=>reject(signal.reason??new DOMException("Canceled","AbortError"));signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();})]);}
+ finally{signal.removeEventListener("abort",abort);}
 }
 
 export interface AudioTransport {
@@ -28,6 +34,9 @@ export interface SourceTransportOptions {
 export class SourceAudioTransport implements AudioTransport {
   private readonly origins: ReadonlySet<string>;
   private signed = new Map<string,{url:string;expires:number}>();
+  private signing = new Map<string,Promise<string|undefined>>();
+  private probing = new Map<string,Promise<void>>();
+  private inspected = new Map<string,number>();
   constructor(private readonly options: SourceTransportOptions, private readonly fetcher: typeof fetch = fetch) {
     this.origins = new Set(options.allowedCdnOrigins.map((value) => {
       const url = new URL(value);
@@ -40,6 +49,10 @@ export class SourceAudioTransport implements AudioTransport {
     try { return safeUrl(asset.locator.url, this.origins); } catch { return undefined; }
   }
   async signedPlaybackUrl(asset: StoredAudioAsset): Promise<string | undefined> {
+    const running=this.signing.get(asset.assetId);if(running)return running;
+    const work=this.mintSignedPlaybackUrl(asset).finally(()=>this.signing.delete(asset.assetId));this.signing.set(asset.assetId,work);return work;
+  }
+  private async mintSignedPlaybackUrl(asset:StoredAudioAsset):Promise<string|undefined>{
     if(asset.locator.kind==="https")return this.directPlaybackUrl(asset);
     const worker=this.options.worker;if(!worker)return undefined;
     const cached=this.signed.get(asset.assetId);if(cached&&cached.expires>Date.now()+60000)return cached.url;
@@ -80,21 +93,35 @@ export class SourceAudioTransport implements AudioTransport {
     const base = new URL(worker.url);
     if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw new Error("Worker origin must be HTTPS");
     const headers = { Authorization: `Bearer ${worker.secret}` };
+    const locator = asset.locator;
     // Inspect the actual existing audio's tags before delivery, without downloading it.
+    const probeKey=scoped&&asset.locator.documentId?JSON.stringify([asset.locator,asset.sizeBytes,asset.mimeType,asset.candidate.metadata]):null;
+    const probe=async(probeSignal?:AbortSignal)=>{
     const infoResponse = await fetchAudioHeaders(new URL(scoped?"/v2/audio-info":"/audio-info", base).toString(), {
-      method: "POST", signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error",
-      headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ messageId: asset.locator.messageId,chatScope:asset.locator.chatScope }),
+      method: "POST", signal:probeSignal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error",
+      headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ messageId: locator.messageId,chatScope:locator.chatScope }),
     }, this.fetcher);
     if (!infoResponse.ok) { await infoResponse.body?.cancel(); throw new Error("Worker audio metadata is unavailable"); }
     const raw = await readMetadataJson(infoResponse);
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Worker audio metadata is malformed");
     const info = raw as Record<string, unknown>;
+    if(asset.locator.kind==="telegram-worker"&&asset.locator.documentId&&String(info.fileId)!==asset.locator.documentId)throw new Error("Worker document has changed since validation");
     if (Number(info.size) !== asset.sizeBytes || typeof info.mimeType !== "string" || mime(info.mimeType) !== mime(asset.mimeType)) throw new Error("Worker audio has changed since validation");
-    const metadata = parseRecordingMetadata(info.metadata??{ title: info.title, artists: [info.artist], durationMs: Math.round(Number(info.duration) * 1000) });
+    const metadata = parseRecordingMetadata(info.metadata??{ title: info.title, artists: [info.artist], artistsComplete:false, durationMs: Math.round(Number(info.duration) * 1000) });
     const assessment = assessAudioCandidate(asset.candidate, { candidateId: "worker-probe", metadata, audioKind: "full" });
     if (!assessment.acceptable) throw new Error("Worker audio identity does not match the verified recording");
+    };
+    if(probeKey){
+      if((this.inspected.get(probeKey)??0)<=Date.now()){
+        let work=this.probing.get(probeKey);
+        if(!work){work=probe(AbortSignal.timeout(this.options.headerTimeoutMs??8000)).then(()=>{if(this.inspected.size>=1000)this.inspected.delete(this.inspected.keys().next().value!);this.inspected.set(probeKey,Date.now()+10000);}).finally(()=>this.probing.delete(probeKey));this.probing.set(probeKey,work);}
+        await waitForSource(work,signal);
+      }
+    }else await probe(signal);
+    signal?.throwIfAborted();
+    const documentTag=scoped&&asset.locator.documentId?`"${createHash("sha256").update(JSON.stringify([asset.locator.chatScope,asset.locator.messageId,asset.locator.documentId,asset.sizeBytes,asset.mimeType])).digest("hex")}"`:undefined;
     return fetchAudioHeaders(new URL(scoped?`/v2/audio/${asset.locator.chatScope}/${asset.locator.messageId}`:`/audio/${asset.locator.messageId}`, base).toString(), {
-      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(range ? { Range: range } : {}) },
+      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(range ? { Range: range,...(documentTag?{"If-Range":documentTag}:{}) } : documentTag?{"If-Match":documentTag}:{}) },
     }, this.fetcher);
   }
 }
@@ -131,7 +158,7 @@ function checkedBody(body: ReadableStream<Uint8Array>, expectedBytes: number,sig
 /** Auth is handled by the route; this gateway repeats asset ownership and identity checks. */
 export class RecordingAudioGateway {
   constructor(private readonly repository: RecordingRepository, private readonly transport: AudioTransport) {}
-  async serve(input: { recordingId: string; assetId: string; accountId: string; range?: string | null; method?: "GET" | "HEAD"; signal?: AbortSignal }): Promise<Response> {
+  async serve(input: { recordingId: string; assetId: string; accountId: string; range?: string | null; ifRange?: string | null; method?: "GET" | "HEAD"; signal?: AbortSignal }): Promise<Response> {
     if (!isUuid(input.recordingId) || !isUuid(input.assetId) || !isUuid(input.accountId)) return jsonError(400, "invalid-recording-reference");
     if (!this.repository.initialized) return jsonError(503, "backend-not-initialized");
     input.signal?.throwIfAborted();
@@ -141,8 +168,11 @@ export class RecordingAudioGateway {
     if (!recording || !asset || asset.recordingId !== input.recordingId || (asset.ownerAccountId !== null && asset.ownerAccountId !== input.accountId)) return jsonError(404, "audio-not-found");
     if (asset.state !== "ready" || asset.candidate.audioKind !== "full" || !Number.isSafeInteger(asset.sizeBytes) || asset.sizeBytes <= 0 || !supportedAudioMime(asset.mimeType)) return jsonError(409, "audio-not-ready");
     if (!asset.verifiedAt || !Number.isFinite(Date.parse(asset.verifiedAt)) || !assessAudioCandidate(recording, asset.candidate).acceptable) return jsonError(409, "audio-identity-review-required");
-    const range = parseByteRange(input.method === "HEAD" ? null : input.range ?? null, asset.sizeBytes);
-    const baseHeaders = new Headers({ "Content-Type": mime(asset.mimeType), "Cache-Control": "private, max-age=3600", "Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff" });
+    const etag = `"sakura-${asset.assetId}-${asset.sizeBytes}-${asset.sha256 || "verified-tags"}"`;
+    const modified = new Date(asset.verifiedAt).toUTCString();
+    const rangeMatches = !input.ifRange || input.ifRange === etag || (input.ifRange === modified && Boolean(asset.sha256));
+    const range = parseByteRange(input.method === "HEAD" || !rangeMatches ? null : input.range ?? null, asset.sizeBytes);
+    const baseHeaders = new Headers({ "Content-Type": mime(asset.mimeType), "Cache-Control": "private, max-age=3600", "Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff", ETag: etag, "Last-Modified": modified });
     if (range.status === "unsatisfiable") {
       baseHeaders.set("Content-Range", `bytes */${asset.sizeBytes}`);
       return new Response(null, { status: 416, headers: baseHeaders });

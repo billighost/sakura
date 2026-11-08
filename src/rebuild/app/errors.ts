@@ -56,7 +56,7 @@ export function responseIssue(status:number, payload:unknown, context:ErrorConte
   const message=typeof value.error==="string"?validation[value.error]:undefined;
   return {...issues.validation,...(message?{message}:{})};
  }
- if(reason==="no-ready-audio"||reason==="unsupported-provider")return {...issues.version,title:"Audio isn’t available for this recording yet."};
+ if(reason==="no-ready-audio"||reason==="audio-source-unavailable"||reason==="unsupported-provider")return {...issues.missing,title:"Audio is still being found for this song.",message:"We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",action:"Check again",linkLabel:"Find other versions"};
  return fallbacks[context];
 }
 export interface JsonOptions {context?:ErrorContext;acceptStatuses?:number[];timeoutMs?:number;accountId?:string}

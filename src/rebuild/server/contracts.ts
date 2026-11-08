@@ -19,11 +19,13 @@ export interface CatalogRecording {
 export interface CatalogProvider {
   readonly provider: "deezer" | "spotify";
   getExact(reference: ProviderReference, signal?: AbortSignal): Promise<CatalogRecording | null>;
+  /** Candidates are still fetched by exact provider ID and checked against the ISRC. */
+  getByIsrc?(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]>;
 }
 
 export type AudioLocator =
   | { kind: "https"; url: string }
-  | { kind: "telegram-worker"; messageId: string; chatScope: string; protocol?: "v1" | "v2" };
+  | { kind: "telegram-worker"; messageId: string; chatScope: string; protocol?: "v1" | "v2"; documentId?: string };
 
 export interface StoredAudioAsset {
   assetId: string;
@@ -80,6 +82,8 @@ export type ResolveRecordingResult =
     catalog?: CatalogRecording;
     recordingId?: string;
     retryable: boolean;
+    /** Safe, bounded provider diagnostic; never a raw upstream error or URL. */
+    sourceReason?: string;
   };
 
 export class ProviderError extends Error {

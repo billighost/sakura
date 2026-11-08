@@ -6,6 +6,7 @@ exports.normalizeMetadataText = normalizeMetadataText;
 exports.parseRecordingTitle = parseRecordingTitle;
 exports.normalizedRecording = normalizedRecording;
 exports.referenceKey = referenceKey;
+exports.isRecordingProofReference = isRecordingProofReference;
 /** Preserve every writing system; punctuation and Unicode presentation forms do not establish identity. */
 function normalizeMetadataText(value) {
     return value.normalize("NFKC").toLowerCase()
@@ -13,16 +14,16 @@ function normalizeMetadataText(value) {
         .replace(/[^\p{L}\p{N}\p{M}]+/gu, " ").trim().replace(/\s+/g, " ");
 }
 const VERSION_RULES = [
-    ["remix", /\b(?:remix|mix)\b/iu],
-    ["live", /\blive\b/iu],
-    ["acoustic", /\bacoustic\b/iu],
-    ["instrumental", /\binstrumental\b/iu],
-    ["karaoke", /\bkaraoke\b/iu],
+    ["remix", /\b(?:remix|mix)\b|リミックス|混音/iu],
+    ["live", /\blive\b|ライブ|現場|现场/iu],
+    ["acoustic", /\bacoustic\b|アコースティック/iu],
+    ["instrumental", /\b(?:instrumental|off[\s-]*vocal|backing[\s-]*track)\b|インストゥルメンタル/iu],
+    ["karaoke", /\bkaraoke\b|カラオケ/iu],
     ["demo", /\bdemo\b/iu],
     ["sped-up", /\b(?:sped[\s-]*up|speed[\s-]*up|nightcore)\b/iu],
     ["slowed", /\b(?:slowed|slow[\s-]*reverb)\b/iu],
-    ["edit", /\b(?:radio\s*edit|extended|edit|version)\b/iu],
-    ["remaster", /\bremaster(?:ed)?\b/iu],
+    ["edit", /\b(?:radio\s*edit|extended|edit|version)\b|\bver\.?(?:$|\s)|バージョン|버전|버젼|版本|versión|versão|версия|(?:日本語|英語|韓国語|中国語|中文|英文|日文|韓文|韩文|國語|国语|粵語|粤语|日語|日语|英语|韓語|韩语)版|(?:한국어|일본어|영어)(?:판)/iu],
+    ["remaster", /\bremaster(?:ed)?\b|リマスター/iu],
 ];
 /** Only remove a title suffix when its meaning is represented in the result. */
 function parseRecordingTitle(title) {
@@ -48,6 +49,9 @@ function parseRecordingTitle(title) {
         }
         if (/^\s*(?:original(?:\s+(?:mix|version))?|studio(?:\s+version)?)\s*$/iu.test(tag))
             return true;
+        const genericVersion = /^\s*(original(?:\s+mix)?|studio|remix|mix|live|acoustic|instrumental|off[\s-]*vocal|backing[\s-]*track|karaoke|demo|sped[\s-]*up|speed[\s-]*up|nightcore|slowed|radio\s+edit|extended|edit|remaster(?:ed)?|リミックス|ライブ|アコースティック|インストゥルメンタル|カラオケ|リマスター)\s*(?:ver\.?|version|バージョン|버전|버젼)\s*$/iu.exec(tag);
+        if (genericVersion)
+            return takeTag(genericVersion[1]);
         const detected = VERSION_RULES.filter(([, pattern]) => pattern.test(tag)).map(([kind]) => kind);
         if (!detected.length)
             return false;
@@ -68,6 +72,9 @@ function parseRecordingTitle(title) {
     const trailing = /\s+(remix|live|acoustic|instrumental|karaoke|demo|sped[\s-]*up|slowed|radio\s+edit|remaster(?:ed)?)$/iu.exec(base);
     if (trailing && takeTag(trailing[1]))
         base = base.slice(0, trailing.index);
+    const languageVersion = /\s+((?:english|japanese|korean|chinese|mandarin|cantonese|spanish|portuguese|french|german|italian|russian|arabic|hindi|thai|vietnamese|indonesian|turkish|filipino|tagalog|eng|jpn|kor)\s+(?:ver\.?|version)|(?:日本語|英語|韓国語|中国語|中文|英文|日文|韓文|韩文|國語|国语|粵語|粤语|日語|日语|英语|韓語|韩语)(?:版|バージョン)|(?:한국어|일본어|영어)\s*(?:버전|버젼|판))$/iu.exec(base);
+    if (languageVersion && takeTag(languageVersion[1]))
+        base = base.slice(0, languageVersion.index);
     return { base: normalizeMetadataText(base), version: { kinds: [...kinds].sort(), labels: [...labels].sort() }, featuredArtists };
 }
 /** Source tags sometimes combine independently known credits into one performer
@@ -116,7 +123,7 @@ function normalizedRecording(metadata, knownArtists) {
 }
 /** Structured keys cannot collide when a provider, chat or ID contains separators. */
 function referenceKey(ref) {
-    const id = ref.provider === "isrc" ? ref.id.replace(/[\s-]/g, "").toUpperCase() : ref.id.trim();
+    const id = ref.provider === "isrc" ? ref.id.replace(/[\s-]/g, "").toUpperCase() : ref.provider === "musicbrainz" ? ref.id.trim().toLowerCase() : ref.id.trim();
     if (!id)
         throw new Error("Provider reference requires an ID");
     if (ref.provider === "isrc" && !/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(id))
@@ -124,6 +131,28 @@ function referenceKey(ref) {
     if (ref.provider === "telegram" && !ref.scope?.trim())
         throw new Error("Telegram references require a chat scope");
     return JSON.stringify([ref.provider, ref.scope?.trim() ?? "", id]);
+}
+/** Structural validation for references that can authorize catalogue spelling
+ * evidence. A valid ID is still required to come from a trusted exact read. */
+function isRecordingProofReference(ref) {
+    if (!ref || typeof ref.id !== "string" || (ref.scope !== undefined && typeof ref.scope !== "string") || ref.scope?.trim())
+        return false;
+    try {
+        if (ref.provider === "deezer")
+            return /^[1-9]\d{0,17}$/.test(ref.id);
+        if (ref.provider === "spotify")
+            return /^[A-Za-z0-9]{22}$/.test(ref.id);
+        if (ref.provider === "musicbrainz")
+            return /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(ref.id);
+        if (ref.provider === "isrc") {
+            referenceKey(ref);
+            return true;
+        }
+        return false;
+    }
+    catch {
+        return false;
+    }
 }
 /**
  * A caller binds aliases only after verifying the recording. Metadata similarity

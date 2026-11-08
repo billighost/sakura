@@ -1,10 +1,10 @@
-import { normalizedRecording, referenceKey } from "./identity";
-import type { AudioCandidate, RecordingRequest } from "./types";
+import { normalizedRecording, referenceKey, isRecordingProofReference } from "./identity";
+import type { AudioCandidate, RecordingRequest, VerifiedRecordingMetadataAlias, ProviderReference } from "./types";
 
 export type MatchRejection = "preview" | "unverified-audio" | "missing-metadata" | "title" | "artist" | "version" | "explicit" | "duration" | "missing-duration" | "identifier-conflict";
 export type CandidateAssessment = { candidate: AudioCandidate; acceptable: boolean; score: number; reasons: readonly MatchRejection[]; authoritativeMatch: boolean };
 
-function identifierEvidence(request: RecordingRequest, candidate: AudioCandidate) {
+function identifierEvidence(request: RecordingRequest, candidate: RecordingRequest) {
   let shared = false;
   let conflict = false;
   for (const want of request.references ?? []) {
@@ -19,8 +19,43 @@ function identifierEvidence(request: RecordingRequest, candidate: AudioCandidate
   return { shared, conflict };
 }
 
+/** A generic label repeats its kind; a named mix, venue or year adds evidence.
+ * Providers often expose `kinds:["remix"]` while ID3 exposes `(Remix)`. */
+function versionEvidence(version: ReturnType<typeof normalizedRecording>["version"]) {
+  const generic = /^(?:remix|mix|live|acoustic|instrumental|karaoke|demo|sped up|speed up|slowed|remaster|remastered|リミックス|ライブ|アコースティック|インストゥルメンタル|カラオケ|リマスター|混音|现场|現場)$/u;
+  const labels=version.labels.map(label=>label.replace(/リミックス|混音/gu," remix ").replace(/ライブ|现场|現場/gu," live ").replace(/アコースティック/gu," acoustic ").replace(/インストゥルメンタル/gu," instrumental ").replace(/カラオケ/gu," karaoke ").replace(/リマスター/gu," remaster ").replace(/\bremastered\b/gu,"remaster").replace(/\bver\b/gu,"version").trim().replace(/\s+/gu," "));
+  return {kinds:version.kinds,labels:[...new Set(labels.filter(label=>!generic.test(label)))].sort()};
+}
+
+/** Alternate writing is evidence only when a trusted catalogue read binds it
+ * to this exact row or an authoritative recording ID. Variants, missing credit
+ * information and changed duration cannot become spelling aliases. */
+export function verifiedRecordingAliases(request: RecordingRequest): readonly VerifiedRecordingMetadataAlias[] {
+  const want=normalizedRecording(request.metadata),aliases=request.metadata.verifiedAliases;
+  if(!Array.isArray(aliases)||!want.title||!want.primaryArtist||!want.durationMs)return [];
+  return aliases.slice(0,32).filter(alias=>{
+    try{
+      if(!alias||!alias.metadata||!Array.isArray(alias.metadata.artists)||alias.metadata.artistsComplete!==true||!Array.isArray(alias.references))return false;
+      const identity=identifierEvidence(request,{metadata:alias.metadata,references:alias.references});
+      if(!identity.shared||identity.conflict)return false;
+      const sharedRecordingRef=(request.references??[]).some(wantRef=>isRecordingProofReference(wantRef)&&alias.references.some((gotRef:ProviderReference)=>isRecordingProofReference(gotRef)&&referenceKey(wantRef)===referenceKey(gotRef)));
+      if(!sharedRecordingRef)return false;
+      const got=normalizedRecording(alias.metadata);
+      if(!got.title||!got.primaryArtist||!got.durationMs||Math.abs(want.durationMs!-got.durationMs)>Math.max(5000,want.durationMs!*.025))return false;
+      if(request.metadata.artistsComplete!==false&&want.artists.length!==got.artists.length)return false;
+      if(want.explicit!=="unknown"&&got.explicit!=="unknown"&&want.explicit!==got.explicit)return false;
+      return JSON.stringify(versionEvidence(want.version))===JSON.stringify(versionEvidence(got.version));
+    }catch{return false;}
+  }).map(alias=>({
+    metadata:{title:alias.metadata.title,artists:[...alias.metadata.artists],artistsComplete:true,durationMs:alias.metadata.durationMs,
+      ...(alias.metadata.explicit!==undefined?{explicit:alias.metadata.explicit}:{}),
+      ...(alias.metadata.version?{version:{kinds:[...(alias.metadata.version.kinds??[])],labels:[...(alias.metadata.version.labels??[])]}}:{})},
+    references:alias.references.map((ref:ProviderReference)=>({provider:ref.provider,id:ref.id,...(ref.scope?{scope:ref.scope}:{})})),
+  }));
+}
+
 /** Hard gates establish correctness before duration and audio quality can affect ranking. */
-export function assessAudioCandidate(request: RecordingRequest, candidate: AudioCandidate): CandidateAssessment {
+function assessStrictAudioCandidate(request: RecordingRequest, candidate: AudioCandidate): CandidateAssessment {
   const want = normalizedRecording(request.metadata);
   const got = normalizedRecording(candidate.metadata, want.artists);
   const identity = identifierEvidence(request, candidate);
@@ -35,7 +70,7 @@ export function assessAudioCandidate(request: RecordingRequest, candidate: Audio
       ?got.artists.every(artist=>want.artists.includes(artist))
       :JSON.stringify([...want.artists].sort())===JSON.stringify([...got.artists].sort());
   if (want.primaryArtist !== got.primaryArtist || !creditsMatch) reasons.push("artist");
-  if (JSON.stringify(want.version) !== JSON.stringify(got.version)) reasons.push("version");
+  if (JSON.stringify(versionEvidence(want.version)) !== JSON.stringify(versionEvidence(got.version))) reasons.push("version");
   if (want.explicit !== "unknown" && got.explicit !== "unknown" && want.explicit !== got.explicit) reasons.push("explicit");
   if (identity.conflict) reasons.push("identifier-conflict");
   const difference = want.durationMs && got.durationMs ? Math.abs(want.durationMs - got.durationMs) : null;
@@ -44,6 +79,18 @@ export function assessAudioCandidate(request: RecordingRequest, candidate: Audio
   const acceptable = reasons.length === 0;
   const durationScore = difference === null ? 0 : Math.max(0, 20 - difference / 500);
   return { candidate, acceptable, score: acceptable ? 80 + durationScore + (identity.shared ? 200 : 0) : 0, reasons, authoritativeMatch: identity.shared && !identity.conflict };
+}
+
+/** Match one complete, provider-authorized spelling at a time. A localized
+ * title/artist can change; the requested file's other safety gates cannot. */
+export function assessAudioCandidate(request: RecordingRequest, candidate: AudioCandidate): CandidateAssessment {
+  const canonical=assessStrictAudioCandidate(request,candidate);
+  if(canonical.acceptable||canonical.reasons.some(reason=>reason!=="title"&&reason!=="artist"))return canonical;
+  for(const alias of verifiedRecordingAliases(request)){
+    const assessment=assessStrictAudioCandidate({metadata:alias.metadata,references:request.references},candidate);
+    if(assessment.acceptable)return assessment;
+  }
+  return canonical;
 }
 
 export type AudioSelection =

@@ -1,0 +1,25 @@
+"use client";
+import {offlineDatabase,savedAudio,validOfflineAudio,type OfflineAudio} from "./offline";
+import type {DownloadChunk,DownloadStorage,PartialDownloadRecord} from "./downloadTypes";
+
+export function indexedDownloadStorage(accountId:string):DownloadStorage {
+ if(!accountId)throw new Error("Downloads need an account.");
+ const prefix="account:"+accountId+":";
+ const key=(kind:string,id:string)=>prefix+kind+":"+id;
+ const range=(prefix:string)=>IDBKeyRange.bound(prefix,prefix+"\uffff");
+ return {
+  async list(){const rows:PartialDownloadRecord[]=[];let cursor=await (await offlineDatabase()).transaction("entries").store.openCursor(range(key("download","")));while(cursor){const value=cursor.value as PartialDownloadRecord;if(value?.version===1&&typeof value.recordingId==="string"&&value.track?.id===value.recordingId&&String(cursor.key)===key("download",value.recordingId))rows.push(value);cursor=await cursor.continue();}return rows;},
+  async read(id){return (await offlineDatabase()).get("entries",key("download",id));},
+  async save(record){const tx=(await offlineDatabase()).transaction("entries","readwrite"),name=key("download",record.recordingId),existing=await tx.store.get(name) as PartialDownloadRecord|undefined;await tx.store.put({...record,requested:record.requested||!!existing?.requested,mode:existing?.requested&&existing.mode==="full"?"full":record.mode},name);await tx.done;},
+  async chunks(id){const result:DownloadChunk[]=[];let cursor=await (await offlineDatabase()).transaction("entries").store.openCursor(range(key("chunk",id+":")));while(cursor){const chunk=cursor.value as DownloadChunk;if(Number.isSafeInteger(chunk?.offset)&&chunk.offset>=0&&chunk.blob instanceof Blob&&chunk.blob.size>0&&/^[a-f0-9]{64}$/i.test(chunk.sha256))result.push(chunk);cursor=await cursor.continue();}return result.sort((a,b)=>a.offset-b.offset);},
+  async putChunk(id,chunk){await (await offlineDatabase()).put("entries",chunk,key("chunk",id+":"+chunk.offset));},
+  async ready(id){const value=await (await offlineDatabase()).get("entries",key("audio",id));return validOfflineAudio(value)&&value.track.id===id?value:undefined;},
+  allReady:()=>savedAudio(accountId),
+  async finalize(id,audio:OfflineAudio){if(!validOfflineAudio(audio)||audio.track.id!==id)throw new Error("Only complete verified audio can be saved.");const tx=(await offlineDatabase()).transaction("entries","readwrite"),manifest=await tx.store.get(key("download",id)) as PartialDownloadRecord|undefined,existing=await tx.store.get(key("audio",id)) as OfflineAudio|undefined;const requested=audio.requested!==false||!!manifest?.requested||!!(existing&&existing.requested!==false);await tx.store.put({...audio,requested},key("audio",id));await tx.store.delete(key("download",id));let cursor=await tx.store.openCursor(range(key("chunk",id+":")));while(cursor){await cursor.delete();cursor=await cursor.continue();}await tx.done;},
+  async promoteRequested(id){const tx=(await offlineDatabase()).transaction("entries","readwrite"),audio=await tx.store.get(key("audio",id)) as OfflineAudio|undefined;if(!validOfflineAudio(audio)||audio.track.id!==id){await tx.done;return;}const promoted={...audio,requested:true};await tx.store.put(promoted,key("audio",id));await tx.store.delete(key("download",id));let cursor=await tx.store.openCursor(range(key("chunk",id+":")));while(cursor){await cursor.delete();cursor=await cursor.continue();}await tx.done;return promoted;},
+  async clear(id,includeReady=false){const tx=(await offlineDatabase()).transaction("entries","readwrite");await tx.store.delete(key("download",id));if(includeReady)await tx.store.delete(key("audio",id));let cursor=await tx.store.openCursor(range(key("chunk",id+":")));while(cursor){await cursor.delete();cursor=await cursor.continue();}await tx.done;},
+  async clearAutomatic(id){const tx=(await offlineDatabase()).transaction("entries","readwrite"),record=await tx.store.get(key("download",id)) as PartialDownloadRecord|undefined,audio=await tx.store.get(key("audio",id)) as OfflineAudio|undefined;if(record?.requested||audio&&audio.requested!==false){await tx.done;return false;}await tx.store.delete(key("download",id));await tx.store.delete(key("audio",id));let cursor=await tx.store.openCursor(range(key("chunk",id+":")));while(cursor){await cursor.delete();cursor=await cursor.continue();}await tx.done;return true;},
+  async lease(id,owner,expiresAt){const tx=(await offlineDatabase()).transaction("entries","readwrite"),name=key("download-lease",id);const lease=await tx.store.get(name) as {owner:string;expiresAt:number}|undefined;if(lease&&lease.owner!==owner&&lease.expiresAt>Date.now()){await tx.done;return false;}await tx.store.put({owner,expiresAt},name);await tx.done;return true;},
+  async release(id,owner){const tx=(await offlineDatabase()).transaction("entries","readwrite"),name=key("download-lease",id);const lease=await tx.store.get(name) as {owner:string}|undefined;if(lease?.owner===owner)await tx.store.delete(name);await tx.done;},
+ };
+}

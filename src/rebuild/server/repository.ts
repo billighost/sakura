@@ -1,6 +1,6 @@
 import { referenceKey } from "../core/identity";
 import type { CanonicalRecording, ProviderReference,ArtistCredit } from "../core/types";
-import { parseRecordingMetadata, isUuid } from "./input";
+import { parseRecordingMetadata, parseTrustedRecordingMetadata, isUuid } from "./input";
 import type { AudioLocator, RecordingRepository, StoredAudioAsset } from "./contracts";
 
 export const UNINITIALIZED_REPOSITORY: RecordingRepository = {
@@ -35,7 +35,7 @@ function recording(row: RecordingRow): CanonicalRecording {
     if(typeof credit.name!=="string"||(credit.role!=="primary"&&credit.role!=="featured"))return[];
     try{return[{name:credit.name,role:credit.role,...(credit.reference?{reference:references([credit.reference])[0]}:{})}];}catch{return[];}
   });
-  return { recordingId: row.id, metadata: parseRecordingMetadata(row.metadata), references: references(row.references),
+  return { recordingId: row.id, metadata: parseTrustedRecordingMetadata(row.metadata), references: references(row.references),
     coverUrl: typeof extra.coverUrl === "string" ? extra.coverUrl : undefined, albumTitle: typeof extra.albumTitle === "string" ? extra.albumTitle : undefined,
     artistImageUrl: typeof extra.artistImageUrl === "string" ? extra.artistImageUrl : undefined,
     artistReference: extra.artistReference as ProviderReference | undefined, albumReference: extra.albumReference as ProviderReference | undefined,
@@ -45,7 +45,10 @@ function locator(value: unknown): AudioLocator {
   if (!value || typeof value !== "object") throw new Error("Stored audio locator is malformed");
   const raw = value as Record<string, unknown>;
   if (raw.kind === "https" && typeof raw.url === "string") return { kind: "https", url: raw.url };
-  if (raw.kind === "telegram-worker" && typeof raw.messageId === "string" && /^[1-9]\d{0,14}$/.test(raw.messageId) && typeof raw.chatScope === "string" && raw.chatScope.trim()) return { kind: "telegram-worker", messageId: raw.messageId, chatScope: raw.chatScope, protocol: raw.protocol === "v2" ? "v2" : "v1" };
+  if (raw.kind === "telegram-worker" && typeof raw.messageId === "string" && /^[1-9]\d{0,14}$/.test(raw.messageId) && typeof raw.chatScope === "string" && raw.chatScope.trim()) {
+    if(raw.documentId!==undefined&&(typeof raw.documentId!=="string"||! /^-?\d{1,25}$/.test(raw.documentId)))throw new Error("Stored worker document identity is malformed");
+    return { kind: "telegram-worker", messageId: raw.messageId, chatScope: raw.chatScope, protocol: raw.protocol === "v2" ? "v2" : "v1",...(typeof raw.documentId==="string"?{documentId:raw.documentId}:{}) };
+  }
   throw new Error("Stored audio locator is malformed");
 }
 function asset(row: AssetRow): StoredAudioAsset {

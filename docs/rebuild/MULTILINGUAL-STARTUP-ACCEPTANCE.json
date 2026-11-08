@@ -1,0 +1,2391 @@
+{
+  "checkedAt": "2026-11-08T09:42:22.245Z",
+  "mode": "sakura-search-api-startup-only",
+  "base": "http://127.0.0.1:3015",
+  "seed": "sakura-nonenglish-2026-11-08",
+  "requested": 30,
+  "languageCounts": {
+    "Japanese": 4,
+    "Korean": 3,
+    "Mandarin": 3,
+    "Cantonese": 1,
+    "Spanish": 3,
+    "French": 3,
+    "Portuguese": 3,
+    "Hindi": 3,
+    "Arabic": 3,
+    "Turkish": 1,
+    "Swahili": 1,
+    "Yoruba": 1,
+    "Persian": 1
+  },
+  "genreCounts": {
+    "dream pop": 1,
+    "indie jazz pop": 1,
+    "alternative pop": 1,
+    "electronic pop": 1,
+    "ballad": 3,
+    "indie rock": 3,
+    "Mandopop": 1,
+    "indie folk": 2,
+    "Cantopop": 1,
+    "folk pop": 1,
+    "singer songwriter": 1,
+    "electro cumbia": 1,
+    "gypsy jazz pop": 1,
+    "psychedelic rock": 1,
+    "MPB": 1,
+    "bossa nova": 1,
+    "fado": 1,
+    "film ballad": 1,
+    "indie pop": 1,
+    "Arabic pop": 1,
+    "Arabic classic": 1,
+    "psychedelic folk": 1,
+    "Afropop": 1,
+    "Afrobeats": 1,
+    "avant folk": 1
+  },
+  "lesserKnownCount": 16,
+  "audioChunkBytes": 4096,
+  "maxAudioBytes": 122880,
+  "audioReservedBytes": 122880,
+  "audioReceivedBytes": 122880,
+  "catalogIndexRequests": 30,
+  "personalAccountMutations": 0,
+  "method": "Each target is first selected from a real Sakura GET /api/v2/search result. Where needed, the normal metadata-only POST /api/v2/recordings/index hydrates exact full credits and may index verified catalogue entries. Metadata-only source discovery then requests exactly4KiB via Range and cancels the body. No personal account/library/settings/listening mutations, resolve POST, audio job processing, promotion, image fetch or full-file transfer occurs. Startup checks do not certify full audio correctness.",
+  "results": [
+    {
+      "target": {
+        "key": "lamp-yume-utsutsu",
+        "title": "Yume Utsutsu",
+        "artist": "Lamp",
+        "query": "Yume Utsutsu Lamp",
+        "category": "multilingual",
+        "language": "Japanese",
+        "genre": "dream pop",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Yume Utsutsu Lamp",
+        "path": "/api/v2/search?kind=tracks&q=Yume%20Utsutsu%20Lamp",
+        "resultCount": 11,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "499360512"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Yume Utsutsu",
+          "artists": [
+            "Lamp"
+          ],
+          "durationMs": 315000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "d9060ea0-e9e7-4a60-9e52-aae49740d7c0",
+        "metadata": {
+          "title": "Yume Utsutsu",
+          "artists": [
+            "Lamp"
+          ],
+          "durationMs": 315000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Yume Utsutsu",
+        "artists": [
+          "Lamp"
+        ],
+        "durationMs": 315000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 13009140,
+        "receivedBytes": 4096,
+        "headersMs": 1866,
+        "totalMs": 1879
+      },
+      "elapsedMs": 21184
+    },
+    {
+      "target": {
+        "key": "lamp-rainy-night",
+        "title": "Ame Furu Yoru No Mukou",
+        "titleAliases": [
+          "雨降る夜の向こう"
+        ],
+        "artist": "Lamp",
+        "query": "雨降る夜の向こう Lamp",
+        "category": "multilingual",
+        "language": "Japanese",
+        "genre": "indie jazz pop",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "雨降る夜の向こう Lamp",
+        "path": "/api/v2/search?kind=tracks&q=%E9%9B%A8%E9%99%8D%E3%82%8B%E5%A4%9C%E3%81%AE%E5%90%91%E3%81%93%E3%81%86%20Lamp",
+        "resultCount": 10,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "24kobKjeJdJPXnqaf5hB93"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "雨降る夜の向こう",
+          "artists": [
+            "Lamp"
+          ],
+          "durationMs": 311920,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "4c1fc49f-5865-45bf-a2a0-47ae5d4cc5a6",
+        "metadata": {
+          "title": "雨降る夜の向こう",
+          "artists": [
+            "Lamp"
+          ],
+          "durationMs": 311920,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Ame Furu Yoru No Mukou",
+        "artists": [
+          "Lamp"
+        ],
+        "durationMs": 311000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "verifiedMetadata": {
+        "title": "雨降る夜の向こう",
+        "artists": [
+          "Lamp"
+        ],
+        "durationMs": 311920,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "Ame Furu Yoru No Mukou",
+              "artists": [
+                "Lamp"
+              ],
+              "artistsComplete": true,
+              "durationMs": 311000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "499360502"
+              },
+              {
+                "provider": "isrc",
+                "id": "JPG100800129"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "雨降る夜の向こう",
+              "artists": [
+                "Lamp"
+              ],
+              "artistsComplete": true,
+              "durationMs": 311920,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "24kobKjeJdJPXnqaf5hB93"
+              },
+              {
+                "provider": "isrc",
+                "id": "JPG100800129"
+              }
+            ]
+          }
+        ]
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 12859105,
+        "receivedBytes": 4096,
+        "headersMs": 1985,
+        "totalMs": 2034
+      },
+      "elapsedMs": 26900
+    },
+    {
+      "target": {
+        "key": "vaundy-odoriko",
+        "title": "odoriko",
+        "artist": "Vaundy",
+        "category": "multilingual",
+        "language": "Japanese",
+        "genre": "alternative pop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "odoriko Vaundy",
+        "path": "/api/v2/search?kind=tracks&q=odoriko%20Vaundy",
+        "resultCount": 26,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2450388445"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "odoriko",
+          "artists": [
+            "Vaundy"
+          ],
+          "durationMs": 230000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "11cd2a41-61cb-4ded-9d87-34309eea75d0",
+        "metadata": {
+          "title": "odoriko",
+          "artists": [
+            "Vaundy"
+          ],
+          "durationMs": 230000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "odoriko",
+        "artists": [
+          "Vaundy"
+        ],
+        "durationMs": 230000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9370590,
+        "receivedBytes": 4096,
+        "headersMs": 2026,
+        "totalMs": 2042
+      },
+      "elapsedMs": 13891
+    },
+    {
+      "target": {
+        "key": "yoasobi-night",
+        "title": "夜に駆ける",
+        "artist": "YOASOBI",
+        "category": "multilingual",
+        "language": "Japanese",
+        "genre": "electronic pop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "夜に駆ける YOASOBI",
+        "path": "/api/v2/search?kind=tracks&q=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B%20YOASOBI",
+        "resultCount": 26,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "824731152"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "夜に駆ける",
+          "artists": [
+            "YOASOBI"
+          ],
+          "durationMs": 261000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "4e85bb6c-41b0-4173-951b-30e3f3771664",
+        "metadata": {
+          "title": "夜に駆ける",
+          "artists": [
+            "YOASOBI"
+          ],
+          "durationMs": 261000,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "夜に駆ける",
+                "artists": [
+                  "YOASOBI"
+                ],
+                "durationMs": 261000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "824731152"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPP301900716"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "source": {
+        "title": "夜に駆ける",
+        "artists": [
+          "YOASOBI"
+        ],
+        "durationMs": 261000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "verifiedMetadata": {
+        "title": "夜に駆ける",
+        "artists": [
+          "YOASOBI"
+        ],
+        "durationMs": 261000,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "夜に駆ける",
+              "artists": [
+                "YOASOBI"
+              ],
+              "durationMs": 261000,
+              "artistsComplete": true,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "824731152"
+              },
+              {
+                "provider": "isrc",
+                "id": "JPP301900716"
+              }
+            ]
+          }
+        ]
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10642060,
+        "receivedBytes": 4096,
+        "headersMs": 2120,
+        "totalMs": 2144
+      },
+      "elapsedMs": 13961
+    },
+    {
+      "target": {
+        "key": "iu-through-night",
+        "title": "Through the Night",
+        "titleAliases": [
+          "밤편지"
+        ],
+        "artist": "IU",
+        "query": "밤편지 IU",
+        "category": "multilingual",
+        "language": "Korean",
+        "genre": "ballad",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "밤편지 IU",
+        "path": "/api/v2/search?kind=tracks&q=%EB%B0%A4%ED%8E%B8%EC%A7%80%20IU",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "3P3UA61WRQqwCXaoFOTENd"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Through the Night",
+          "artists": [
+            "IU"
+          ],
+          "durationMs": 253293,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "a0a7dbbf-0833-48f0-b025-ce76396a78ef",
+        "metadata": {
+          "title": "Through the Night",
+          "artists": [
+            "IU"
+          ],
+          "durationMs": 253293,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Through the Night",
+        "artists": [
+          "IU"
+        ],
+        "durationMs": 253000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10236963,
+        "receivedBytes": 4096,
+        "headersMs": 2028,
+        "totalMs": 2045
+      },
+      "elapsedMs": 13726
+    },
+    {
+      "target": {
+        "key": "hyukoh-wi-ing",
+        "title": "Wi Ing Wi Ing",
+        "titleAliases": [
+          "위잉위잉"
+        ],
+        "artist": "HYUKOH",
+        "query": "위잉위잉 HYUKOH",
+        "category": "multilingual",
+        "language": "Korean",
+        "genre": "indie rock",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "위잉위잉 HYUKOH",
+        "path": "/api/v2/search?kind=tracks&q=%EC%9C%84%EC%9E%89%EC%9C%84%EC%9E%89%20HYUKOH",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "625401062"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Wi Ing Wi Ing",
+          "artists": [
+            "Hyukoh"
+          ],
+          "durationMs": 194000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "a8b02342-8eb7-403f-b9d1-3b57a0dd49f3",
+        "metadata": {
+          "title": "Wi Ing Wi Ing",
+          "artists": [
+            "Hyukoh"
+          ],
+          "durationMs": 194000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Wi Ing Wi Ing",
+        "artists": [
+          "Hyukoh"
+        ],
+        "durationMs": 194000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8056792,
+        "receivedBytes": 4096,
+        "headersMs": 1253,
+        "totalMs": 1288
+      },
+      "elapsedMs": 14828
+    },
+    {
+      "target": {
+        "key": "iu-love-poem",
+        "title": "Love poem",
+        "artist": "IU",
+        "category": "multilingual",
+        "language": "Korean",
+        "genre": "ballad",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Love poem IU",
+        "path": "/api/v2/search?kind=tracks&q=Love%20poem%20IU",
+        "resultCount": 30,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1301761132"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Love poem",
+          "artists": [
+            "IU"
+          ],
+          "durationMs": 258000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "c268f8bd-6510-4f2c-8b8b-c5891f21a58c",
+        "metadata": {
+          "title": "Love poem",
+          "artists": [
+            "IU"
+          ],
+          "durationMs": 258000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Love poem",
+        "artists": [
+          "IU"
+        ],
+        "durationMs": 258000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10465467,
+        "receivedBytes": 4096,
+        "headersMs": 2065,
+        "totalMs": 2081
+      },
+      "elapsedMs": 12146
+    },
+    {
+      "target": {
+        "key": "jay-chou-qing-tian",
+        "title": "晴天",
+        "artist": "周杰倫",
+        "artistAliases": [
+          "Jay Chou"
+        ],
+        "query": "晴天 Jay Chou",
+        "category": "multilingual",
+        "language": "Mandarin",
+        "genre": "Mandopop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "晴天 Jay Chou",
+        "path": "/api/v2/search?kind=tracks&q=%E6%99%B4%E5%A4%A9%20Jay%20Chou",
+        "resultCount": 13,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "5pIcwtJYNJx93l420oR2Vm"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "晴天",
+          "artists": [
+            "Jay Chou"
+          ],
+          "durationMs": 269746,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "35c7cbd0-e104-402d-bbeb-4545afc200d6",
+        "metadata": {
+          "title": "晴天",
+          "artists": [
+            "Jay Chou"
+          ],
+          "durationMs": 269746,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "晴天",
+                "artists": [
+                  "Jay Chou"
+                ],
+                "durationMs": 269746,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "5pIcwtJYNJx93l420oR2Vm"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "TWK970300503"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "source": {
+        "title": "Sunny Day",
+        "artists": [
+          "周杰倫"
+        ],
+        "durationMs": 269000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "verifiedMetadata": {
+        "title": "晴天",
+        "artists": [
+          "Jay Chou"
+        ],
+        "durationMs": 269746,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "晴天",
+              "artists": [
+                "Jay Chou"
+              ],
+              "artistsComplete": true,
+              "durationMs": 269746,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "5pIcwtJYNJx93l420oR2Vm"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "Sunny Day",
+              "artists": [
+                "Jay Chou"
+              ],
+              "artistsComplete": true,
+              "durationMs": 270000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2602471112"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "Sunny Day",
+              "artists": [
+                "周杰倫"
+              ],
+              "artistsComplete": true,
+              "durationMs": 270000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2602471112"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "Sunny Day",
+              "artists": [
+                "ジェイ・チョウ"
+              ],
+              "artistsComplete": true,
+              "durationMs": 270000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2602471112"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "Sunny Day",
+              "artists": [
+                "周杰伦"
+              ],
+              "artistsComplete": true,
+              "durationMs": 270000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2602471112"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "Sunny Day",
+              "artists": [
+                "주걸륜"
+              ],
+              "artistsComplete": true,
+              "durationMs": 270000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2602471112"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "晴天",
+              "artists": [
+                "周杰倫"
+              ],
+              "artistsComplete": true,
+              "durationMs": 269746,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "5pIcwtJYNJx93l420oR2Vm"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "晴天",
+              "artists": [
+                "ジェイ・チョウ"
+              ],
+              "artistsComplete": true,
+              "durationMs": 269746,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "5pIcwtJYNJx93l420oR2Vm"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "晴天",
+              "artists": [
+                "周杰伦"
+              ],
+              "artistsComplete": true,
+              "durationMs": 269746,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "5pIcwtJYNJx93l420oR2Vm"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "晴天",
+              "artists": [
+                "주걸륜"
+              ],
+              "artistsComplete": true,
+              "durationMs": 269746,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "5pIcwtJYNJx93l420oR2Vm"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWK970300503"
+              }
+            ]
+          }
+        ]
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 11061268,
+        "receivedBytes": 4096,
+        "headersMs": 3803,
+        "totalMs": 3812
+      },
+      "elapsedMs": 41957
+    },
+    {
+      "target": {
+        "key": "faye-wong-red-bean",
+        "title": "紅豆",
+        "titleAliases": [
+          "红豆",
+          "Red Bean"
+        ],
+        "artist": "王菲",
+        "artistAliases": [
+          "Faye Wong"
+        ],
+        "query": "紅豆 王菲",
+        "category": "multilingual",
+        "language": "Mandarin",
+        "genre": "ballad",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "紅豆 王菲",
+        "path": "/api/v2/search?kind=tracks&q=%E7%B4%85%E8%B1%86%20%E7%8E%8B%E8%8F%B2",
+        "resultCount": 5,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "5l94Up12BJSjhH7Mhr2ji4"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "紅豆",
+          "artists": [
+            "Faye Wong"
+          ],
+          "durationMs": 256026,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "023cf950-16e2-4f83-9ded-dddd867087d6",
+        "metadata": {
+          "title": "紅豆",
+          "artists": [
+            "Faye Wong"
+          ],
+          "durationMs": 256026,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "紅豆",
+        "artists": [
+          "Faye Wong"
+        ],
+        "durationMs": 256000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10360716,
+        "receivedBytes": 4096,
+        "headersMs": 1361,
+        "totalMs": 1376
+      },
+      "elapsedMs": 10393
+    },
+    {
+      "target": {
+        "key": "cheer-chen-travel",
+        "title": "旅行的意義",
+        "artist": "陳綺貞",
+        "artistAliases": [
+          "Cheer Chen"
+        ],
+        "query": "旅行的意義 陳綺貞",
+        "category": "multilingual",
+        "language": "Mandarin",
+        "genre": "indie folk",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "旅行的意義 陳綺貞",
+        "path": "/api/v2/search?kind=tracks&q=%E6%97%85%E8%A1%8C%E7%9A%84%E6%84%8F%E7%BE%A9%20%E9%99%B3%E7%B6%BA%E8%B2%9E",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "0kcYzEvagMWsp9wL6RxW90"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "旅行的意義",
+          "artists": [
+            "Cheer Chen"
+          ],
+          "durationMs": 256706,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "c0a6cf4b-fb96-4396-9917-dd34d26d4eb4",
+        "metadata": {
+          "title": "旅行的意義",
+          "artists": [
+            "Cheer Chen"
+          ],
+          "durationMs": 256706,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "靈感 (Bonus Track)",
+        "artists": [
+          "Cheer Chen"
+        ],
+        "durationMs": 256000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "verifiedMetadata": {
+        "title": "旅行的意義",
+        "artists": [
+          "Cheer Chen"
+        ],
+        "durationMs": 256706,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "靈感 (Bonus Track)",
+              "artists": [
+                "Cheer Chen"
+              ],
+              "artistsComplete": true,
+              "durationMs": 256000,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "1405675452"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWH630500001"
+              }
+            ]
+          },
+          {
+            "metadata": {
+              "title": "旅行的意義",
+              "artists": [
+                "Cheer Chen"
+              ],
+              "artistsComplete": true,
+              "durationMs": 256706,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "spotify",
+                "id": "0kcYzEvagMWsp9wL6RxW90"
+              },
+              {
+                "provider": "isrc",
+                "id": "TWH630500001"
+              }
+            ]
+          }
+        ]
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10397204,
+        "receivedBytes": 4096,
+        "headersMs": 1759,
+        "totalMs": 1775
+      },
+      "elapsedMs": 13529
+    },
+    {
+      "target": {
+        "key": "kay-tse-wedding-street",
+        "title": "囍帖街",
+        "artist": "謝安琪",
+        "artistAliases": [
+          "Kay Tse"
+        ],
+        "query": "囍帖街 謝安琪",
+        "category": "multilingual",
+        "language": "Cantonese",
+        "genre": "Cantopop",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "囍帖街 謝安琪",
+        "path": "/api/v2/search?kind=tracks&q=%E5%9B%8D%E5%B8%96%E8%A1%97%20%E8%AC%9D%E5%AE%89%E7%90%AA",
+        "resultCount": 7,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3055034"
+        },
+        "attempts": 2,
+        "selectedMetadata": {
+          "title": "囍帖街",
+          "artists": [
+            "謝安琪"
+          ],
+          "durationMs": 212000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "2775f5b8-db56-4d25-a815-6a9f4d8aeecb",
+        "metadata": {
+          "title": "囍帖街",
+          "artists": [
+            "謝安琪"
+          ],
+          "durationMs": 212000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "囍帖街",
+        "artists": [
+          "謝安琪"
+        ],
+        "durationMs": 211000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8717184,
+        "receivedBytes": 4096,
+        "headersMs": 1243,
+        "totalMs": 1359
+      },
+      "elapsedMs": 28802
+    },
+    {
+      "target": {
+        "key": "natalia-hasta-raiz",
+        "title": "Hasta la Raíz",
+        "artist": "Natalia Lafourcade",
+        "category": "multilingual",
+        "language": "Spanish",
+        "genre": "folk pop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Hasta la Raíz Natalia Lafourcade",
+        "path": "/api/v2/search?kind=tracks&q=Hasta%20la%20Ra%C3%ADz%20Natalia%20Lafourcade",
+        "resultCount": 28,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "112662876"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Hasta la Raíz",
+          "artists": [
+            "Natalia Lafourcade"
+          ],
+          "durationMs": 222000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "45ceec4a-0cd3-4326-8778-aa9447e866bd",
+        "metadata": {
+          "title": "Hasta la Raíz",
+          "artists": [
+            "Natalia Lafourcade"
+          ],
+          "durationMs": 222000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Hasta la Raíz",
+        "artists": [
+          "Natalia Lafourcade"
+        ],
+        "durationMs": 221000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8974769,
+        "receivedBytes": 4096,
+        "headersMs": 1993,
+        "totalMs": 2013
+      },
+      "elapsedMs": 11759
+    },
+    {
+      "target": {
+        "key": "jorge-movimiento",
+        "title": "Movimiento",
+        "artist": "Jorge Drexler",
+        "category": "multilingual",
+        "language": "Spanish",
+        "genre": "singer songwriter",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Movimiento Jorge Drexler",
+        "path": "/api/v2/search?kind=tracks&q=Movimiento%20Jorge%20Drexler",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "404397802"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Movimiento",
+          "artists": [
+            "Jorge Drexler"
+          ],
+          "durationMs": 231000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "64448425-5623-4a16-8a85-d8f67e07b281",
+        "metadata": {
+          "title": "Movimiento",
+          "artists": [
+            "Jorge Drexler"
+          ],
+          "durationMs": 231000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Movimiento",
+        "artists": [
+          "Jorge Drexler"
+        ],
+        "durationMs": 231000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9432276,
+        "receivedBytes": 4096,
+        "headersMs": 1506,
+        "totalMs": 1525
+      },
+      "elapsedMs": 10345
+    },
+    {
+      "target": {
+        "key": "bomba-to-my-love",
+        "title": "To My Love",
+        "artist": "Bomba Estéreo",
+        "category": "multilingual",
+        "language": "Spanish",
+        "genre": "electro cumbia",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "To My Love Bomba Estéreo",
+        "path": "/api/v2/search?kind=tracks&q=To%20My%20Love%20Bomba%20Est%C3%A9reo",
+        "resultCount": 14,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "100115964"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "To My Love",
+          "artists": [
+            "Bomba Estéreo"
+          ],
+          "durationMs": 245000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "5cdad6aa-5fc6-4c92-9b98-cfdbc3d9b73c",
+        "metadata": {
+          "title": "To My Love",
+          "artists": [
+            "Bomba Estéreo"
+          ],
+          "durationMs": 245000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "To My Love",
+        "artists": [
+          "Bomba Estéreo"
+        ],
+        "durationMs": 239000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9863942,
+        "receivedBytes": 4096,
+        "headersMs": 1269,
+        "totalMs": 1278
+      },
+      "elapsedMs": 10760
+    },
+    {
+      "target": {
+        "key": "pomme-on-brulera",
+        "title": "On brûlera",
+        "artist": "Pomme",
+        "category": "multilingual",
+        "language": "French",
+        "genre": "indie folk",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "On brûlera Pomme",
+        "path": "/api/v2/search?kind=tracks&q=On%20br%C3%BBlera%20Pomme",
+        "resultCount": 8,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "412534502"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "On brûlera",
+          "artists": [
+            "Pomme"
+          ],
+          "durationMs": 207000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "cfd15929-f33a-4b11-9a05-32438aa04ae6",
+        "metadata": {
+          "title": "On brûlera",
+          "artists": [
+            "Pomme"
+          ],
+          "durationMs": 207000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "On brûlera",
+        "artists": [
+          "Pomme"
+        ],
+        "durationMs": 207000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8490257,
+        "receivedBytes": 4096,
+        "headersMs": 1355,
+        "totalMs": 1371
+      },
+      "elapsedMs": 9032
+    },
+    {
+      "target": {
+        "key": "zaz-je-veux",
+        "title": "Je veux",
+        "artist": "Zaz",
+        "category": "multilingual",
+        "language": "French",
+        "genre": "gypsy jazz pop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Je veux Zaz",
+        "path": "/api/v2/search?kind=tracks&q=Je%20veux%20Zaz",
+        "resultCount": 32,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "17199784"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Je veux",
+          "artists": [
+            "ZAZ"
+          ],
+          "durationMs": 215000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "99c2f39d-935d-45d1-ad21-44f7b4415430",
+        "metadata": {
+          "title": "Je veux",
+          "artists": [
+            "ZAZ"
+          ],
+          "durationMs": 215000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Je veux",
+        "artists": [
+          "ZAZ"
+        ],
+        "durationMs": 215000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8963213,
+        "receivedBytes": 4096,
+        "headersMs": 1695,
+        "totalMs": 1712
+      },
+      "elapsedMs": 10795
+    },
+    {
+      "target": {
+        "key": "la-femme-planche",
+        "title": "Sur la planche",
+        "titleAliases": [
+          "Sur la planche 2013"
+        ],
+        "artist": "La Femme",
+        "category": "multilingual",
+        "language": "French",
+        "genre": "psychedelic rock",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Sur la planche La Femme",
+        "path": "/api/v2/search?kind=tracks&q=Sur%20la%20planche%20La%20Femme",
+        "resultCount": 11,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2564215762"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Sur la planche",
+          "artists": [
+            "La Femme"
+          ],
+          "durationMs": 232000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "1f997882-9f7d-4f4f-a6a7-b02a5e27e8e7",
+        "metadata": {
+          "title": "Sur la planche",
+          "artists": [
+            "La Femme"
+          ],
+          "durationMs": 232000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Sur la planche",
+        "artists": [
+          "La Femme"
+        ],
+        "durationMs": 232000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9383857,
+        "receivedBytes": 4096,
+        "headersMs": 1353,
+        "totalMs": 1354
+      },
+      "elapsedMs": 9258
+    },
+    {
+      "target": {
+        "key": "marisa-ainda-bem",
+        "title": "Ainda Bem",
+        "artist": "Marisa Monte",
+        "category": "multilingual",
+        "language": "Portuguese",
+        "genre": "MPB",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Ainda Bem Marisa Monte",
+        "path": "/api/v2/search?kind=tracks&q=Ainda%20Bem%20Marisa%20Monte",
+        "resultCount": 30,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "950812822"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Ainda Bem",
+          "artists": [
+            "Marisa Monte"
+          ],
+          "durationMs": 215000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "a54d086f-9261-4d50-9a75-3a052d6d15c6",
+        "metadata": {
+          "title": "Ainda Bem",
+          "artists": [
+            "Marisa Monte"
+          ],
+          "durationMs": 215000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Ainda Bem",
+        "artists": [
+          "Marisa Monte"
+        ],
+        "durationMs": 215000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9092340,
+        "receivedBytes": 4096,
+        "headersMs": 1365,
+        "totalMs": 1382
+      },
+      "elapsedMs": 8245
+    },
+    {
+      "target": {
+        "key": "joao-chega-saudade",
+        "title": "Chega De Saudade",
+        "artist": "João Gilberto",
+        "category": "multilingual",
+        "language": "Portuguese",
+        "genre": "bossa nova",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Chega De Saudade João Gilberto",
+        "path": "/api/v2/search?kind=tracks&q=Chega%20De%20Saudade%20Jo%C3%A3o%20Gilberto",
+        "resultCount": 29,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "716533552"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Chega De Saudade",
+          "artists": [
+            "João Gilberto"
+          ],
+          "durationMs": 206000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "5958bd70-9b89-46d6-b441-6a7a4ca86472",
+        "metadata": {
+          "title": "Chega De Saudade",
+          "artists": [
+            "João Gilberto"
+          ],
+          "durationMs": 206000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Chega De Saudade",
+        "artists": [
+          "João Gilberto"
+        ],
+        "durationMs": 206000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8421763,
+        "receivedBytes": 4096,
+        "headersMs": 1477,
+        "totalMs": 1492
+      },
+      "elapsedMs": 8987
+    },
+    {
+      "target": {
+        "key": "ana-moura-desfado",
+        "title": "Desfado",
+        "artist": "Ana Moura",
+        "category": "multilingual",
+        "language": "Portuguese",
+        "genre": "fado",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Desfado Ana Moura",
+        "path": "/api/v2/search?kind=tracks&q=Desfado%20Ana%20Moura",
+        "resultCount": 21,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "62263917"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Desfado",
+          "artists": [
+            "Ana Moura"
+          ],
+          "durationMs": 155000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "9fb448b9-e980-4d53-b0ad-3d6e20fb3832",
+        "metadata": {
+          "title": "Desfado",
+          "artists": [
+            "Ana Moura"
+          ],
+          "durationMs": 155000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Desfado",
+        "artists": [
+          "Ana Moura"
+        ],
+        "durationMs": 155000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 6358279,
+        "receivedBytes": 4096,
+        "headersMs": 1342,
+        "totalMs": 1358
+      },
+      "elapsedMs": 9292
+    },
+    {
+      "target": {
+        "key": "agar-tum-saath-ho",
+        "title": "Agar Tum Saath Ho",
+        "artist": "Alka Yagnik",
+        "query": "Agar Tum Saath Ho Alka Yagnik Arijit Singh",
+        "category": "multilingual",
+        "language": "Hindi",
+        "genre": "film ballad",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Agar Tum Saath Ho Alka Yagnik Arijit Singh",
+        "path": "/api/v2/search?kind=tracks&q=Agar%20Tum%20Saath%20Ho%20Alka%20Yagnik%20Arijit%20Singh",
+        "resultCount": 13,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3180290701"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Agar Tum Saath Ho",
+          "artists": [
+            "Alka Yagnik"
+          ],
+          "durationMs": 341000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "945002dc-1bda-4583-8017-e0b6f7e030b2",
+        "metadata": {
+          "title": "Agar Tum Saath Ho",
+          "artists": [
+            "Alka Yagnik",
+            "Arijit Singh"
+          ],
+          "durationMs": 341000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Agar Tum Saath Ho",
+        "artists": [
+          "Alka Yagnik"
+        ],
+        "durationMs": 341000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 13862469,
+        "receivedBytes": 4096,
+        "headersMs": 1658,
+        "totalMs": 1670
+      },
+      "elapsedMs": 9718
+    },
+    {
+      "target": {
+        "key": "prateek-kasoor",
+        "title": "Kasoor",
+        "artist": "Prateek Kuhad",
+        "category": "multilingual",
+        "language": "Hindi",
+        "genre": "indie pop",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Kasoor Prateek Kuhad",
+        "path": "/api/v2/search?kind=tracks&q=Kasoor%20Prateek%20Kuhad",
+        "resultCount": 8,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "997494282"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Kasoor",
+          "artists": [
+            "Prateek Kuhad"
+          ],
+          "durationMs": 197000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "7beedee4-d413-4f1d-aef0-442784438980",
+        "metadata": {
+          "title": "Kasoor",
+          "artists": [
+            "Prateek Kuhad"
+          ],
+          "durationMs": 197000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Kasoor",
+        "artists": [
+          "Prateek Kuhad"
+        ],
+        "durationMs": 197000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8210273,
+        "receivedBytes": 4096,
+        "headersMs": 1343,
+        "totalMs": 1484
+      },
+      "elapsedMs": 11189
+    },
+    {
+      "target": {
+        "key": "local-train-choo-lo",
+        "title": "Choo Lo",
+        "artist": "The Local Train",
+        "category": "multilingual",
+        "language": "Hindi",
+        "genre": "indie rock",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Choo Lo The Local Train",
+        "path": "/api/v2/search?kind=tracks&q=Choo%20Lo%20The%20Local%20Train",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2484339821"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Choo Lo",
+          "artists": [
+            "The Local Train"
+          ],
+          "durationMs": 233000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "a2ab3d78-2b15-4cd6-ab8d-ea27bf516b01",
+        "metadata": {
+          "title": "Choo Lo",
+          "artists": [
+            "The Local Train"
+          ],
+          "durationMs": 233000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Choo Lo",
+        "artists": [
+          "The Local Train"
+        ],
+        "durationMs": 233000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9498838,
+        "receivedBytes": 4096,
+        "headersMs": 1690,
+        "totalMs": 1706
+      },
+      "elapsedMs": 11513
+    },
+    {
+      "target": {
+        "key": "nancy-ah-w-noss",
+        "title": "Ah W Noss",
+        "titleAliases": [
+          "آه ونص",
+          "Ah we nos"
+        ],
+        "artist": "Nancy Ajram",
+        "artistAliases": [
+          "نانسي عجرم"
+        ],
+        "query": "Ah W Noss Nancy Ajram",
+        "category": "multilingual",
+        "language": "Arabic",
+        "genre": "Arabic pop",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Ah W Noss Nancy Ajram",
+        "path": "/api/v2/search?kind=tracks&q=Ah%20W%20Noss%20Nancy%20Ajram",
+        "resultCount": 17,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3171731"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Ah W Noss",
+          "artists": [
+            "Nancy Ajram"
+          ],
+          "durationMs": 280000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "4025943d-6a71-4ad5-a641-b84dc36b6338",
+        "metadata": {
+          "title": "Ah W Noss",
+          "artists": [
+            "Nancy Ajram"
+          ],
+          "durationMs": 280000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Ah W Noss",
+        "artists": [
+          "Nancy Ajram"
+        ],
+        "durationMs": 280000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 11445550,
+        "receivedBytes": 4096,
+        "headersMs": 1289,
+        "totalMs": 1301
+      },
+      "elapsedMs": 23035
+    },
+    {
+      "target": {
+        "key": "fairuz-kifak-inta",
+        "title": "Kifak Inta",
+        "titleAliases": [
+          "كيفك إنت",
+          "كيفك انت"
+        ],
+        "artist": "Fairuz",
+        "artistAliases": [
+          "فيروز"
+        ],
+        "query": "Kifak Inta Fairuz",
+        "category": "multilingual",
+        "language": "Arabic",
+        "genre": "Arabic classic",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Kifak Inta Fairuz",
+        "path": "/api/v2/search?kind=tracks&q=Kifak%20Inta%20Fairuz",
+        "resultCount": 20,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "97733306"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Kifak Inta",
+          "artists": [
+            "Fairuz"
+          ],
+          "durationMs": 209000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "44a31c67-54da-4752-9016-61d45d193428",
+        "metadata": {
+          "title": "Kifak Inta",
+          "artists": [
+            "Fairuz"
+          ],
+          "durationMs": 209000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Kifak Inta",
+        "artists": [
+          "Fairuz"
+        ],
+        "durationMs": 209000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8568674,
+        "receivedBytes": 4096,
+        "headersMs": 1408,
+        "totalMs": 1422
+      },
+      "elapsedMs": 9491
+    },
+    {
+      "target": {
+        "key": "mashrou-fasateen",
+        "title": "Fasateen",
+        "titleAliases": [
+          "فساتين"
+        ],
+        "artist": "Mashrou' Leila",
+        "artistAliases": [
+          "Mashrou Leila",
+          "مشروع ليلى"
+        ],
+        "query": "Fasateen Mashrou Leila",
+        "category": "multilingual",
+        "language": "Arabic",
+        "genre": "indie rock",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Fasateen Mashrou Leila",
+        "path": "/api/v2/search?kind=tracks&q=Fasateen%20Mashrou%20Leila",
+        "resultCount": 3,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "635517642"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Fasateen",
+          "artists": [
+            "Mashrou' Leila"
+          ],
+          "durationMs": 183000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "0fde6135-a725-4fa2-bbe1-35f9cf809da4",
+        "metadata": {
+          "title": "Fasateen",
+          "artists": [
+            "Mashrou' Leila"
+          ],
+          "durationMs": 183000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Fasateen",
+        "artists": [
+          "Mashrou' Leila"
+        ],
+        "durationMs": 183000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 7732392,
+        "receivedBytes": 4096,
+        "headersMs": 1250,
+        "totalMs": 1267
+      },
+      "elapsedMs": 9231
+    },
+    {
+      "target": {
+        "key": "altin-gun-goca",
+        "title": "Goca Dünya",
+        "artist": "Altın Gün",
+        "artistAliases": [
+          "Altin Gün"
+        ],
+        "id": "469248492",
+        "provider": "deezer",
+        "category": "multilingual",
+        "language": "Turkish",
+        "genre": "psychedelic folk",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Goca Dünya Altın Gün",
+        "path": "/api/v2/search?kind=tracks&q=Goca%20D%C3%BCnya%20Alt%C4%B1n%20G%C3%BCn",
+        "resultCount": 6,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "469248492"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Goca Dünya",
+          "artists": [
+            "Altin Gün"
+          ],
+          "durationMs": 240000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "6adc7f32-273b-4f47-b963-f61ba1dee4e7",
+        "metadata": {
+          "title": "Goca Dünya",
+          "artists": [
+            "Altin Gün"
+          ],
+          "durationMs": 240000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Goca Dünya",
+        "artists": [
+          "Altin Gün"
+        ],
+        "durationMs": 240000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9866058,
+        "receivedBytes": 4096,
+        "headersMs": 1358,
+        "totalMs": 1370
+      },
+      "elapsedMs": 10645
+    },
+    {
+      "target": {
+        "key": "sauti-sol-suzanna",
+        "title": "Suzanna",
+        "artist": "Sauti Sol",
+        "category": "multilingual",
+        "language": "Swahili",
+        "genre": "Afropop",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Suzanna Sauti Sol",
+        "path": "/api/v2/search?kind=tracks&q=Suzanna%20Sauti%20Sol",
+        "resultCount": 7,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "866229942"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Suzanna",
+          "artists": [
+            "Sauti Sol"
+          ],
+          "durationMs": 231000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "d33d66a8-3d05-4321-9e5d-dba6750a377a",
+        "metadata": {
+          "title": "Suzanna",
+          "artists": [
+            "Sauti Sol"
+          ],
+          "durationMs": 231000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Suzanna",
+        "artists": [
+          "Sauti Sol"
+        ],
+        "durationMs": 231000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9580719,
+        "receivedBytes": 4096,
+        "headersMs": 1366,
+        "totalMs": 1402
+      },
+      "elapsedMs": 10733
+    },
+    {
+      "target": {
+        "key": "asake-lonely-top",
+        "title": "Lonely At The Top",
+        "artist": "Asake",
+        "category": "multilingual",
+        "language": "Yoruba",
+        "genre": "Afrobeats",
+        "lesserKnown": false
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Lonely At The Top Asake",
+        "path": "/api/v2/search?kind=tracks&q=Lonely%20At%20The%20Top%20Asake",
+        "resultCount": 15,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2324457305"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Lonely At The Top",
+          "artists": [
+            "Asake"
+          ],
+          "durationMs": 157000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "c94c65ed-f7bb-4b7b-ada7-f75a85646e44",
+        "metadata": {
+          "title": "Lonely At The Top",
+          "artists": [
+            "Asake"
+          ],
+          "durationMs": 157000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Lonely At The Top",
+        "artists": [
+          "Asake"
+        ],
+        "durationMs": 157000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 6512866,
+        "receivedBytes": 4096,
+        "headersMs": 1834,
+        "totalMs": 1848
+      },
+      "elapsedMs": 10671
+    },
+    {
+      "target": {
+        "key": "namjoo-toranj",
+        "title": "Toranj",
+        "artist": "Mohsen Namjoo",
+        "category": "multilingual",
+        "language": "Persian",
+        "genre": "avant folk",
+        "lesserKnown": true
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Toranj Mohsen Namjoo",
+        "path": "/api/v2/search?kind=tracks&q=Toranj%20Mohsen%20Namjoo",
+        "resultCount": 14,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1109340242"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Toranj",
+          "artists": [
+            "Mohsen Namjoo"
+          ],
+          "durationMs": 395000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "7e6a5ef0-fdfa-44c2-a84a-7ecff9a931f2",
+        "metadata": {
+          "title": "Toranj",
+          "artists": [
+            "Mohsen Namjoo"
+          ],
+          "durationMs": 395000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Toranj",
+        "artists": [
+          "Mohsen Namjoo"
+        ],
+        "durationMs": 395000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 16004762,
+        "receivedBytes": 4096,
+        "headersMs": 1332,
+        "totalMs": 1348
+      },
+      "elapsedMs": 10621
+    }
+  ]
+}

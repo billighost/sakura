@@ -42,7 +42,7 @@ export function getRebuildServices(): RebuildServices {
   });
   const existing = new RecordingResolver(repository,providers,(asset) => transport.directPlaybackUrl(asset));
   const ingestor = new RecordingIngestor(transaction,providers);
-  const discovery = new WorkerAudioDiscovery(workerUrl && workerSecret ? { url: workerUrl,secret: workerSecret,primaryBot: process.env.TELEGRAM_BOT_USERNAME?.trim() || "musicshuntersbot",fallbackBots: (process.env.TELEGRAM_FALLBACK_BOTS ?? "").split(",").map((bot) => bot.trim()).filter(Boolean) } : null);
+  const discovery = new WorkerAudioDiscovery(workerUrl && workerSecret ? { url: workerUrl,secret: workerSecret,primaryBot: process.env.TELEGRAM_BOT_USERNAME?.trim() || "musicshuntersbot",fallbackBots: (process.env.TELEGRAM_FALLBACK_BOTS ?? "").split(",").map((bot) => bot.trim()).filter(Boolean) } : null, fetch, providers);
   const targets=new PlaybackTargets(repository,transport);
   const publisher=process.env.CLOUDINARY_CLOUD_NAME&&process.env.CLOUDINARY_API_KEY&&process.env.CLOUDINARY_API_SECRET?new CloudinaryAudioPublisher({cloudName:process.env.CLOUDINARY_CLOUD_NAME,apiKey:process.env.CLOUDINARY_API_KEY,apiSecret:process.env.CLOUDINARY_API_SECRET}):undefined;
   const promotions=new AudioPromotions(transport,ingestor,publisher);

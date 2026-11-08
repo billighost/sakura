@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { assessAudioCandidate,type MatchRejection } from "../core/matching";
+import { assessAudioCandidate,verifiedRecordingAliases,type MatchRejection } from "../core/matching";
 import { referenceKey } from "../core/identity";
 import type { CanonicalRecording, ProviderReference,ArtistCredit } from "../core/types";
 import type { CatalogProvider, CatalogRecording, StoredAudioAsset } from "./contracts";
-import { parseRecordingMetadata, supportedAudioMime,isUuid } from "./input";
+import { parseRecordingMetadata,parseTrustedRecordingMetadata, supportedAudioMime,isUuid } from "./input";
 import type { ReadonlySql } from "./repository";
+import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
 
 export type SqlTransaction = <Value>(operation: (query: ReadonlySql) => Promise<Value>) => Promise<Value>;
 export class RecordingIdentityConflict extends Error {
@@ -21,14 +22,29 @@ function metadataWithArtwork(catalog: CatalogRecording) {
 
 /** Exact catalog ingestion is independent of audio discovery and offline downloads. */
 export class RecordingIngestor {
-  constructor(private readonly transaction: SqlTransaction, private readonly providers: readonly CatalogProvider[]) {}
+  private readonly metadataAliases:CatalogMetadataAliases;
+  constructor(private readonly transaction: SqlTransaction, private readonly providers: readonly CatalogProvider[]) {this.metadataAliases=new CatalogMetadataAliases(providers);}
+  async hydrateVerifiedAliases(recording:CanonicalRecording,signal?:AbortSignal):Promise<CanonicalRecording>{
+    const enriched=await this.metadataAliases.hydrate(recording,signal);
+    if(enriched!==recording)await this.persistVerifiedAliases(enriched);
+    return enriched;
+  }
+  async persistVerifiedAliases(recording:CanonicalRecording):Promise<void>{
+    const aliases=verifiedRecordingAliases(recording);if(!aliases.length)return;
+    await this.transaction(async query=>{await query(`UPDATE sakura_v2."Recording" SET metadata=jsonb_set(metadata,'{verifiedAliases}',$2::jsonb,true),updated_at=NOW() WHERE id=$1::uuid AND state='verified'`,[recording.recordingId,JSON.stringify(aliases)]);});
+  }
   async ensureRecording(reference: ProviderReference, expected?: CanonicalRecording["metadata"], signal?: AbortSignal): Promise<CanonicalRecording> {
     const provider = this.providers.find((entry) => entry.provider === reference.provider);
     if (!provider) throw new Error("Catalogue provider is not configured");
-    const catalog = await provider.getExact(reference, signal);
+    let catalog = await provider.getExact(reference, signal);
     if (!catalog) throw new Error("Catalogue recording was not found");
     if(expected){
-      const check=assessAudioCandidate({metadata:expected},{candidateId:"catalog",metadata:catalog.metadata,audioKind:"full"});
+      const display=parseRecordingMetadata(expected);
+      let check=assessAudioCandidate(catalog,{candidateId:"expected",metadata:display,references:[reference],audioKind:"full"});
+      if(!check.acceptable&&check.reasons.every(reason=>reason==="title"||reason==="artist")){
+        const enriched=await this.metadataAliases.hydrate({recordingId:referenceKey(reference),metadata:catalog.metadata,references:catalog.references},signal);
+        catalog={...catalog,metadata:enriched.metadata};check=assessAudioCandidate(catalog,{candidateId:"expected",metadata:display,references:[reference],audioKind:"full"});
+      }
       if(!check.acceptable)throw new RecordingIdentityConflict([{recordingId:"",metadata:catalog.metadata,references:catalog.references,coverUrl:catalog.coverUrl}],"catalog-mismatch",check.reasons);
     }
     return this.ensureCatalog(catalog);
@@ -41,13 +57,22 @@ export class RecordingIngestor {
       const matches = new Map<string, CanonicalRecording>();
       for (const ref of catalog.references) {
         const [provider, scope, id] = JSON.parse(referenceKey(ref)) as string[];
-        const existing = await query<{ id: string; metadata: unknown }>(`SELECT r.id,r.metadata FROM sakura_v2."ExternalReference" e JOIN sakura_v2."Recording" r ON r.id=e.recording_id
+        const existing = await query<{ id: string; metadata: unknown;references:readonly ProviderReference[] }>(`SELECT r.id,r.metadata,
+          COALESCE((SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object('provider',proof.provider,'id',proof.external_id,'scope',NULLIF(proof.scope,''))))
+            FROM sakura_v2."ExternalReference" proof WHERE proof.recording_id=r.id AND proof.verified_at IS NOT NULL),'[]'::jsonb) AS "references"
+          FROM sakura_v2."ExternalReference" e JOIN sakura_v2."Recording" r ON r.id=e.recording_id
           WHERE e.provider=$1 AND e.scope=$2 AND e.external_id=$3 AND e.verified_at IS NOT NULL`, [provider, scope, id]);
-        if (existing[0]) matches.set(existing[0].id, { recordingId: existing[0].id, metadata: parseRecordingMetadata(existing[0].metadata), references: catalog.references });
+        if (existing[0]) matches.set(existing[0].id, { recordingId: existing[0].id, metadata: parseTrustedRecordingMetadata(existing[0].metadata), references: existing[0].references??[] });
       }
       if (matches.size > 1) throw new RecordingIdentityConflict([...matches.values()]);
       const existing = [...matches.values()][0];
-      if (existing && !assessAudioCandidate(catalog, { candidateId: "existing", metadata: existing.metadata, references: catalog.references, audioKind: "full" }).acceptable) throw new RecordingIdentityConflict([existing]);
+      if(existing){
+        const priorAliases=verifiedRecordingAliases(existing).map(alias=>({...catalog,metadata:alias.metadata,references:alias.references}));
+        const metadata=withVerifiedCatalogAliases(catalog,[{...catalog,metadata:existing.metadata,references:existing.references??[]},...priorAliases]);
+        catalog={...catalog,metadata};
+        existing.metadata=withVerifiedCatalogAliases(existing,[catalog]);
+      }
+      if (existing && !assessAudioCandidate(existing, { candidateId: "catalog", metadata: catalog.metadata, references: catalog.references, audioKind: "full" }).acceptable) throw new RecordingIdentityConflict([existing]);
       const recordingId = existing?.recordingId ?? randomUUID();
       const metadata = metadataWithArtwork(catalog);
       if (!existing) await query(`INSERT INTO sakura_v2."Recording"(id,metadata,state,provenance) VALUES($1::uuid,$2::jsonb,'verified',$3::jsonb)`, [recordingId, JSON.stringify(metadata), JSON.stringify({ catalog, indexedAt: new Date().toISOString() })]);

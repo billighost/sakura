@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { normalizeMetadataText, normalizedRecording, parseRecordingTitle, RecordingAliases, referenceKey } from "./identity";
-import { assessAudioCandidate, selectAudioCandidate } from "./matching";
+import { assessAudioCandidate, selectAudioCandidate, verifiedRecordingAliases } from "./matching";
 import { downloadKey, downloadProgress, downloadedRecordings, reduceDownloads, type DownloadState } from "./downloads";
 import { EMPTY_QUEUE, isQueueEntryPlaying, reduceQueue } from "./queue";
 import { fetchAudioHeaders, parseByteRange, planPlayback } from "./streaming";
@@ -288,4 +288,127 @@ test("header deadline aborts a hung provider and caller cancellation remains act
 test("normalization never invents absent duration or primary artist", () => {
   assert.equal(normalizedRecording({ title: "Song", artists: [], durationMs: Number.NaN }).durationMs, null);
   assert.ok(assessAudioCandidate({ metadata: { title: "Song", artists: [], durationMs: 10000 } }, { candidateId: "bad", metadata: { title: "Song", artists: [], durationMs: 10000 }, audioKind: "full" }).reasons.includes("missing-metadata"));
+});
+
+test("generic structured versions and localized labels agree without merging named versions",()=>{
+ const request={metadata:{title:"夜に駆ける",artists:["YOASOBI"],durationMs:261000,version:{kinds:["remix" as const],labels:[]}}};
+ const candidate={candidateId:"ja",audioKind:"full" as const,metadata:{title:"夜に駆ける (リミックス)",artists:["YOASOBI"],durationMs:261000}};
+ assert.equal(assessAudioCandidate(request,candidate).acceptable,true);
+ assert.ok(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,title:"夜に駆ける (Ayase Remix)"}}).reasons.includes("version"));
+ assert.equal(assessAudioCandidate({...request,metadata:{...request.metadata,version:{kinds:["remix"],labels:["Ayase Remix"]}}},{...candidate,metadata:{...candidate.metadata,title:"夜に駆ける (Ayase リミックス)"}}).acceptable,true);
+ assert.ok(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,title:"夜に駆ける"}}).reasons.includes("version"));
+ assert.ok(assessAudioCandidate({...request,metadata:{...request.metadata,title:"群青"}},candidate).reasons.includes("title"));
+ const remaster={metadata:{title:"Song (2012 Remaster)",artists:["Artist"],durationMs:180000}};
+ const mastered={candidateId:"master",audioKind:"full" as const,metadata:{title:"Song (2012 Remastered)",artists:["Artist"],durationMs:180000}};
+ assert.equal(assessAudioCandidate(remaster,mastered).acceptable,true);
+ assert.ok(assessAudioCandidate(remaster,{...mastered,metadata:{...mastered.metadata,title:"Song (2013 Remastered)"}}).reasons.includes("version"));
+});
+
+function localizedFixture(title="咆哮 - HOKO",nativeTitle="HOKO",durationMs=209766):RecordingRequest{
+ const proof={provider:"isrc" as const,id:"JPB602501985"};
+ return {references:[{provider:"spotify",id:"1fPkUiufkRpzdYcBKXUP3s"},proof],metadata:{title,artists:["TOMONARI SORA"],artistsComplete:true,durationMs,verifiedAliases:[{references:[proof],metadata:{title:nativeTitle,artists:["友成空"],artistsComplete:true,durationMs}}]}};
+}
+
+test("provider-authorized native metadata fixes the actual Japanese rejection tuples",()=>{
+ for(const [title,nativeTitle,durationMs,sourceMs,provider,id,isrc] of [["咆哮 - HOKO","HOKO",209766,209000,"spotify","1fPkUiufkRpzdYcBKXUP3s","JPB602501985"],["睨めっ娘","睨めっ娘",158850,159000,"spotify","3dPrNa7YVisbRaBBr3xdBj","JPB602401364"],["鬼ノ宴","鬼ノ宴",175998,176000,"spotify","096KHkONhQm4MQNH35mU22","JPB602400319"],["文明開化 (East West)","East West",148000,148000,"deezer","3609044902",null]] as const){
+  const request=localizedFixture(title,nativeTitle,durationMs),ref={provider,id},proof=isrc?{provider:"isrc" as const,id:isrc}:ref;
+  request.references=[ref,proof];request.metadata.verifiedAliases=[{...request.metadata.verifiedAliases![0],references:[proof]}];
+  const candidate:AudioCandidate={candidateId:"native",audioKind:"full",metadata:{title:nativeTitle,artists:["友成空"],artistsComplete:false,durationMs:sourceMs},references:[{provider:"telegram",scope:"primary",id:"42"}]};
+  assert.equal(assessAudioCandidate({...request,metadata:{...request.metadata,verifiedAliases:undefined}},candidate).acceptable,false);
+  const actual=assessAudioCandidate(request,candidate);assert.equal(actual.acceptable,true);assert.equal(actual.authoritativeMatch,false,"catalog alias must not manufacture a source ISRC");
+ }
+});
+
+test("verified spelling matching works across scripts without transliterating unknown metadata",()=>{
+ const proof={provider:"isrc" as const,id:"KRA382000001"};
+ const request:RecordingRequest={references:[proof],metadata:{title:"Spring Day",artists:["BTS"],artistsComplete:true,durationMs:274000,verifiedAliases:[{references:[proof],metadata:{title:"봄날",artists:["방탄소년단"],artistsComplete:true,durationMs:274000}}]}};
+ const candidate:AudioCandidate={candidateId:"ko",audioKind:"full",metadata:{title:"봄날",artists:["방탄소년단"],artistsComplete:true,durationMs:274000}};
+ assert.equal(assessAudioCandidate(request,candidate).acceptable,true);
+ assert.equal(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,title:"Bomnal"}}).acceptable,false);
+});
+
+test("unbound, conflicting and source-only alias claims do not authorize metadata",()=>{
+ const request=localizedFixture(),candidate:AudioCandidate={candidateId:"native",audioKind:"full",metadata:{title:"HOKO",artists:["友成空"],durationMs:209000}};
+ const wrong={...request,metadata:{...request.metadata,verifiedAliases:request.metadata.verifiedAliases!.map(alias=>({...alias,references:[{provider:"isrc" as const,id:"JPB602501986"}]}))}};
+ assert.equal(verifiedRecordingAliases(wrong).length,0);assert.equal(assessAudioCandidate(wrong,candidate).acceptable,false);
+ assert.equal(assessAudioCandidate({...request,references:[]},candidate).acceptable,false);
+ const claimed={...candidate,metadata:{...candidate.metadata,verifiedAliases:request.metadata.verifiedAliases}};
+ assert.equal(assessAudioCandidate({...request,metadata:{...request.metadata,verifiedAliases:undefined}},claimed).acceptable,false);
+ assert.equal(assessAudioCandidate(request,{...candidate,references:[{provider:"isrc",id:"JPB602501986"}]}).acceptable,false);
+});
+
+test("localized spelling aliases retain requested version, explicit and duration guards",()=>{
+ const request=localizedFixture(),candidate:AudioCandidate={candidateId:"native",audioKind:"full",metadata:{title:"HOKO",artists:["友成空"],durationMs:209000}};
+ for(const patch of [{title:"HOKO (Live)"},{title:"HOKO (Ayase Remix)"},{title:"HOKO (2012 Remaster)"},{durationMs:195000},{durationMs:null}])assert.equal(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,...patch}}).acceptable,false);
+ assert.equal(assessAudioCandidate({...request,metadata:{...request.metadata,explicit:"explicit"}},{...candidate,metadata:{...candidate.metadata,explicit:"clean"}}).acceptable,false);
+ assert.equal(assessAudioCandidate(request,{...candidate,audioKind:"preview"}).acceptable,false);
+ assert.equal(assessAudioCandidate(request,{...candidate,audioKind:"unknown"}).acceptable,false);
+ const variantAlias={...request,metadata:{...request.metadata,verifiedAliases:request.metadata.verifiedAliases!.map(alias=>({...alias,metadata:{...alias.metadata,title:"HOKO (Remix)"}}))}};
+ assert.equal(verifiedRecordingAliases(variantAlias).length,0);
+ const chained=localizedFixture("Song","歌",200000);chained.metadata.verifiedAliases=[{...chained.metadata.verifiedAliases![0],metadata:{...chained.metadata.verifiedAliases![0].metadata,durationMs:204500}}];
+ assert.equal(assessAudioCandidate(chained,{...candidate,metadata:{title:"歌",artists:["友成空"],durationMs:209000}}).acceptable,false,"alias tolerances cannot accumulate beyond the original requested duration");
+});
+
+test("named localized remixes and guest credits stay exact",()=>{
+ const request=localizedFixture("Song (Ayase Remix)","歌 (Ayase リミックス)",200000);
+ request.metadata.artists=["TOMONARI SORA","Guest"];request.metadata.verifiedAliases=[{...request.metadata.verifiedAliases![0],metadata:{...request.metadata.verifiedAliases![0].metadata,artists:["友成空","ゲスト"]}}];
+ const candidate:AudioCandidate={candidateId:"remix",audioKind:"full",metadata:{title:"歌 (Ayase リミックス)",artists:["友成空","ゲスト"],artistsComplete:true,durationMs:200000}};
+ assert.equal(assessAudioCandidate(request,candidate).acceptable,true);
+ assert.equal(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,title:"歌 (Other Remix)"}}).acceptable,false);
+ assert.equal(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,artists:["友成空","Wrong Guest"]}}).acceptable,false);
+ const omitted={...request,metadata:{...request.metadata,verifiedAliases:request.metadata.verifiedAliases!.map(alias=>({...alias,metadata:{...alias.metadata,artists:["友成空"]}}))}};
+ assert.equal(verifiedRecordingAliases(omitted).length,0);
+ const incomplete={...request,metadata:{...request.metadata,verifiedAliases:request.metadata.verifiedAliases!.map(alias=>({...alias,metadata:{...alias.metadata,artistsComplete:false}}))}};
+ assert.equal(verifiedRecordingAliases(incomplete).length,0);
+});
+
+test("one exact catalogue row can authorize an official spelling while a Telegram row cannot",()=>{
+ const request=localizedFixture(),ref={provider:"spotify" as const,id:"1fPkUiufkRpzdYcBKXUP3s"};
+ request.references=[ref];request.metadata.verifiedAliases=[{...request.metadata.verifiedAliases![0],references:[ref]}];
+ assert.equal(verifiedRecordingAliases(request).length,1);
+ const sourceRef={provider:"telegram" as const,scope:"primary",id:"42"};request.references=[sourceRef];request.metadata.verifiedAliases=[{...request.metadata.verifiedAliases[0],references:[sourceRef]}];
+ assert.equal(verifiedRecordingAliases(request).length,0);
+ const invalid={provider:"spotify" as const,id:"not-a-catalog-id"};request.references=[invalid];request.metadata.verifiedAliases=[{...request.metadata.verifiedAliases[0],references:[invalid]}];
+ assert.equal(verifiedRecordingAliases(request).length,0);
+});
+
+test("trusted aliases are projected without recursively retaining nested alias claims",()=>{
+ const request=localizedFixture(),metadata=request.metadata.verifiedAliases![0].metadata as RecordingRequest["metadata"];
+ metadata.verifiedAliases=request.metadata.verifiedAliases;
+ const projected=verifiedRecordingAliases(request);
+ assert.equal(projected.length,1);assert.equal("verifiedAliases" in projected[0].metadata,false);
+ assert.doesNotThrow(()=>JSON.stringify(projected));
+});
+
+test("language-performance version labels cannot become original-song spelling aliases",()=>{
+ const request=localizedFixture();
+ for(const label of ["English ver.","Japanese ver.","日本語版","英語版","한국어 버전","일본어 버전","中文版","Versión en español"]){
+  const metadata={...request.metadata.verifiedAliases![0].metadata,title:`HOKO (${label})`};
+  const variant={...request,metadata:{...request.metadata,verifiedAliases:[{...request.metadata.verifiedAliases![0],metadata}]}};
+  assert.ok(parseRecordingTitle(metadata.title).version.kinds.includes("edit"),label);
+  assert.equal(verifiedRecordingAliases(variant).length,0,label);
+  assert.equal(assessAudioCandidate(variant,{candidateId:"language",audioKind:"full",metadata}).acceptable,false,label);
+ }
+ assert.deepEqual(parseRecordingTitle("咆哮 - HOKO").version.kinds,[]);
+ assert.deepEqual(parseRecordingTitle("咆哮 (HOKO)").version.kinds,[]);
+ assert.ok(parseRecordingTitle("Song English ver.").version.kinds.includes("edit"));
+ assert.ok(parseRecordingTitle("歌 日本語版").version.kinds.includes("edit"));
+ assert.ok(parseRecordingTitle("Song (Off Vocal)").version.kinds.includes("instrumental"));
+});
+
+test("explicit English version accepts its ver. spelling while Japanese performance stays distinct",()=>{
+ const request=localizedFixture("Song (English version)","歌 (English ver.)",200000);
+ const candidate:AudioCandidate={candidateId:"english",audioKind:"full",metadata:{title:"歌 (English ver.)",artists:["友成空"],durationMs:200000}};
+ assert.equal(assessAudioCandidate(request,candidate).acceptable,true);
+ assert.equal(assessAudioCandidate(request,{...candidate,metadata:{...candidate.metadata,title:"歌 (Japanese ver.)"}}).acceptable,false);
+});
+
+test("generic performance kind followed by ver. does not invent another edit",()=>{
+ for(const tag of ["Acoustic","Live","Instrumental","Remix","Demo","Radio Edit","Extended","Original","Off Vocal","Nightcore"]){
+  const request:RecordingRequest={metadata:{title:`Song (${tag})`,artists:["Artist"],durationMs:180000}};
+  const candidate:AudioCandidate={candidateId:tag,audioKind:"full",metadata:{title:`Song (${tag} ver.)`,artists:["Artist"],durationMs:180000}};
+  assert.equal(assessAudioCandidate(request,candidate).acceptable,true,tag);
+ }
+ const nightcore:RecordingRequest={metadata:{title:"Song (Nightcore)",artists:["Artist"],durationMs:180000}};
+ assert.equal(assessAudioCandidate(nightcore,{candidateId:"sped",audioKind:"full",metadata:{title:"Song (Sped Up)",artists:["Artist"],durationMs:180000}}).acceptable,false);
 });

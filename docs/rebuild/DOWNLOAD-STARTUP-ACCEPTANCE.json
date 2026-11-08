@@ -1,0 +1,1573 @@
+{
+  "checkedAt": "2026-11-08T06:16:22.071Z",
+  "mode": "sakura-search-api-startup-only",
+  "base": "http://127.0.0.1:3015",
+  "seed": "sakura-2026-11-08",
+  "requested": 30,
+  "audioChunkBytes": 4096,
+  "maxAudioBytes": 122880,
+  "audioReservedBytes": 122880,
+  "audioReceivedBytes": 122880,
+  "method": "Each fixed target was first selected from an actual Sakura GET /api/v2/search result. Three INERTIA versions used the normal metadata-only POST /api/v2/recordings/index to hydrate exact full credits. Metadata-only source discovery then requested exactly4KiB via Range and canceled the body. No resolve POST, audio job processing, promotion, image fetch or full-file transfer occurred. Catalogue indexing requests are recorded; no personal account/library/settings/listening mutations occurred. Startup checks do not certify full audio correctness.",
+  "results": [
+    {
+      "target": {
+        "key": "rolling-in-the-deep",
+        "title": "Rolling in the Deep",
+        "artist": "Adele",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Rolling in the Deep Adele",
+        "path": "/api/v2/search?kind=tracks&q=Rolling%20in%20the%20Deep%20Adele",
+        "resultCount": 31,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "8086126"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Rolling in the Deep",
+          "artists": [
+            "Adele"
+          ],
+          "durationMs": 228000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Rolling in the Deep",
+        "artists": [
+          "Adele"
+        ],
+        "durationMs": 228000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9295823,
+        "receivedBytes": 4096,
+        "headersMs": 2544,
+        "totalMs": 2547
+      },
+      "elapsedMs": 7048
+    },
+    {
+      "target": {
+        "key": "starboy",
+        "title": "Starboy",
+        "artist": "The Weeknd",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Starboy The Weeknd",
+        "path": "/api/v2/search?kind=tracks&q=Starboy%20The%20Weeknd",
+        "resultCount": 29,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "136889400"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Starboy",
+          "artists": [
+            "The Weeknd"
+          ],
+          "durationMs": 230000,
+          "artistsComplete": false,
+          "explicit": "explicit"
+        }
+      },
+      "source": {
+        "title": "Starboy",
+        "artists": [
+          "The Weeknd"
+        ],
+        "durationMs": 230000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9598677,
+        "receivedBytes": 4096,
+        "headersMs": 1333,
+        "totalMs": 1344
+      },
+      "elapsedMs": 4740
+    },
+    {
+      "target": {
+        "key": "uptown-funk",
+        "title": "Uptown Funk (feat. Bruno Mars)",
+        "artist": "Mark Ronson",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Uptown Funk (feat. Bruno Mars) Mark Ronson",
+        "path": "/api/v2/search?kind=tracks&q=Uptown%20Funk%20(feat.%20Bruno%20Mars)%20Mark%20Ronson",
+        "resultCount": 20,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "92734438"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Uptown Funk (feat. Bruno Mars)",
+          "artists": [
+            "Mark Ronson"
+          ],
+          "durationMs": 270000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Uptown Funk (feat. Bruno Mars)",
+        "artists": [
+          "Mark Ronson"
+        ],
+        "durationMs": 270000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10969786,
+        "receivedBytes": 4096,
+        "headersMs": 1381,
+        "totalMs": 1382
+      },
+      "elapsedMs": 3861
+    },
+    {
+      "target": {
+        "key": "billie-jean",
+        "title": "Billie Jean",
+        "artist": "Michael Jackson",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Billie Jean Michael Jackson",
+        "path": "/api/v2/search?kind=tracks&q=Billie%20Jean%20Michael%20Jackson",
+        "resultCount": 30,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "4603408"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Billie Jean",
+          "artists": [
+            "Michael Jackson"
+          ],
+          "durationMs": 293000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Billie Jean",
+        "artists": [
+          "Michael Jackson"
+        ],
+        "durationMs": 293000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 11844109,
+        "receivedBytes": 4096,
+        "headersMs": 1352,
+        "totalMs": 1362
+      },
+      "elapsedMs": 3932
+    },
+    {
+      "target": {
+        "key": "drivers-license",
+        "title": "drivers license",
+        "artist": "Olivia Rodrigo",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "drivers license Olivia Rodrigo",
+        "path": "/api/v2/search?kind=tracks&q=drivers%20license%20Olivia%20Rodrigo",
+        "resultCount": 28,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1667241882"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "drivers license",
+          "artists": [
+            "Olivia Rodrigo"
+          ],
+          "durationMs": 242000,
+          "artistsComplete": false,
+          "explicit": "explicit"
+        }
+      },
+      "source": {
+        "title": "drivers license",
+        "artists": [
+          "Olivia Rodrigo"
+        ],
+        "durationMs": 242000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9989730,
+        "receivedBytes": 4096,
+        "headersMs": 1826,
+        "totalMs": 1834
+      },
+      "elapsedMs": 4978
+    },
+    {
+      "target": {
+        "key": "flowers",
+        "title": "Flowers",
+        "artist": "Miley Cyrus",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Flowers Miley Cyrus",
+        "path": "/api/v2/search?kind=tracks&q=Flowers%20Miley%20Cyrus",
+        "resultCount": 31,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2105158337"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Flowers",
+          "artists": [
+            "Miley Cyrus"
+          ],
+          "durationMs": 200000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Flowers",
+        "artists": [
+          "Miley Cyrus"
+        ],
+        "durationMs": 200000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8095389,
+        "receivedBytes": 4096,
+        "headersMs": 1374,
+        "totalMs": 1374
+      },
+      "elapsedMs": 5288
+    },
+    {
+      "target": {
+        "key": "levitating",
+        "title": "Levitating",
+        "artist": "Dua Lipa",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Levitating Dua Lipa",
+        "path": "/api/v2/search?kind=tracks&q=Levitating%20Dua%20Lipa",
+        "resultCount": 28,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1124841682"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Levitating",
+          "artists": [
+            "Dua Lipa"
+          ],
+          "durationMs": 203000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Levitating",
+        "artists": [
+          "Dua Lipa"
+        ],
+        "durationMs": 203000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8348090,
+        "receivedBytes": 4096,
+        "headersMs": 1779,
+        "totalMs": 1780
+      },
+      "elapsedMs": 5203
+    },
+    {
+      "target": {
+        "key": "bad-guy",
+        "title": "bad guy",
+        "artist": "Billie Eilish",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "bad guy Billie Eilish",
+        "path": "/api/v2/search?kind=tracks&q=bad%20guy%20Billie%20Eilish",
+        "resultCount": 31,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "655095912"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "bad guy",
+          "artists": [
+            "Billie Eilish"
+          ],
+          "durationMs": 194000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "bad guy",
+        "artists": [
+          "Billie Eilish"
+        ],
+        "durationMs": 194000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 7860486,
+        "receivedBytes": 4096,
+        "headersMs": 8219,
+        "totalMs": 8219
+      },
+      "elapsedMs": 12530
+    },
+    {
+      "target": {
+        "key": "someone-like-you",
+        "title": "Someone Like You",
+        "artist": "Adele",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Someone Like You Adele",
+        "path": "/api/v2/search?kind=tracks&q=Someone%20Like%20You%20Adele",
+        "resultCount": 30,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "8086136"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Someone Like You",
+          "artists": [
+            "Adele"
+          ],
+          "durationMs": 285000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Someone Like You",
+        "artists": [
+          "Adele"
+        ],
+        "durationMs": 285000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 11581056,
+        "receivedBytes": 4096,
+        "headersMs": 1552,
+        "totalMs": 1553
+      },
+      "elapsedMs": 17413
+    },
+    {
+      "target": {
+        "key": "blinding-lights",
+        "title": "Blinding Lights",
+        "artist": "The Weeknd",
+        "category": "famous"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Blinding Lights The Weeknd",
+        "path": "/api/v2/search?kind=tracks&q=Blinding%20Lights%20The%20Weeknd",
+        "resultCount": 29,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "908604612"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Blinding Lights",
+          "artists": [
+            "The Weeknd"
+          ],
+          "durationMs": 200000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Blinding Lights",
+        "artists": [
+          "The Weeknd"
+        ],
+        "durationMs": 204000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8212302,
+        "receivedBytes": 4096,
+        "headersMs": 1645,
+        "totalMs": 1649
+      },
+      "elapsedMs": 6151
+    },
+    {
+      "target": {
+        "key": "roses-imanbek",
+        "title": "Roses (Imanbek Remix)",
+        "artist": "SAINt JHN",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Roses (Imanbek Remix) SAINt JHN",
+        "path": "/api/v2/search?kind=tracks&q=Roses%20(Imanbek%20Remix)%20SAINt%20JHN",
+        "resultCount": 11,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "770293952"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Roses (Imanbek Remix)",
+          "artists": [
+            "SAINt JHN"
+          ],
+          "durationMs": 176000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "remix"
+            ],
+            "labels": [
+              "imanbek remix"
+            ]
+          },
+          "explicit": "explicit"
+        }
+      },
+      "source": {
+        "title": "Roses (Imanbek Remix)",
+        "artists": [
+          "SAINt JHN"
+        ],
+        "durationMs": 176000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 7385602,
+        "receivedBytes": 4096,
+        "headersMs": 1739,
+        "totalMs": 1740
+      },
+      "elapsedMs": 6154
+    },
+    {
+      "target": {
+        "key": "inertia-instrumental",
+        "title": "INERTIA (instrumental)",
+        "artist": "SawanoHiroyuki[nZk]",
+        "id": "3388004441",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "INERTIA (instrumental) SawanoHiroyuki[nZk]",
+        "path": "/api/v2/search?kind=tracks&q=INERTIA%20(instrumental)%20SawanoHiroyuki%5BnZk%5D",
+        "resultCount": 5,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3388004441"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "INERTIA (instrumental)",
+          "artists": [
+            "SawanoHiroyuki[nZk]"
+          ],
+          "durationMs": 199000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "instrumental"
+            ],
+            "labels": [
+              "instrumental"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "INERTIA (instrumental)",
+        "artists": [
+          "SawanoHiroyuki[nZk]"
+        ],
+        "durationMs": 199000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8316286,
+        "receivedBytes": 4096,
+        "headersMs": 1572,
+        "totalMs": 1573
+      },
+      "elapsedMs": 4851
+    },
+    {
+      "target": {
+        "key": "inertia-tv",
+        "title": "INERTIA (TV size)",
+        "artist": "SawanoHiroyuki[nZk]",
+        "id": "3388004431",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "INERTIA (TV size) SawanoHiroyuki[nZk]",
+        "path": "/api/v2/search?kind=tracks&q=INERTIA%20(TV%20size)%20SawanoHiroyuki%5BnZk%5D",
+        "resultCount": 4,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3388004431"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "INERTIA (TV size)",
+          "artists": [
+            "SawanoHiroyuki[nZk]"
+          ],
+          "durationMs": 92000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "c29a0c61-89c1-4b97-9e7d-529308074bcd",
+        "metadata": {
+          "title": "INERTIA (TV size)",
+          "artists": [
+            "SawanoHiroyuki[nZk]",
+            "REI"
+          ],
+          "durationMs": 92000,
+          "artistsComplete": true,
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "INERTIA (TV size)",
+        "artists": [
+          "SawanoHiroyuki[nZk], REI"
+        ],
+        "durationMs": 92000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 4317676,
+        "receivedBytes": 4096,
+        "headersMs": 5621,
+        "totalMs": 5640
+      },
+      "elapsedMs": 19073
+    },
+    {
+      "target": {
+        "key": "blinding-lights-remix",
+        "title": "Blinding Lights (Remix)",
+        "artist": "The Weeknd",
+        "id": "1161752782",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Blinding Lights (Remix) The Weeknd",
+        "path": "/api/v2/search?kind=tracks&q=Blinding%20Lights%20(Remix)%20The%20Weeknd",
+        "resultCount": 10,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1161752782"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Blinding Lights (Remix)",
+          "artists": [
+            "The Weeknd"
+          ],
+          "durationMs": 216000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "remix"
+            ],
+            "labels": [
+              "remix"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Blinding Lights (Remix)",
+        "artists": [
+          "The Weeknd"
+        ],
+        "durationMs": 216000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8914143,
+        "receivedBytes": 4096,
+        "headersMs": 1401,
+        "totalMs": 1402
+      },
+      "elapsedMs": 3809
+    },
+    {
+      "target": {
+        "key": "finesse-cardi-remix",
+        "title": "Finesse (Remix; feat. Cardi B)",
+        "artist": "Bruno Mars",
+        "id": "444333332",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Finesse (Remix; feat. Cardi B) Bruno Mars",
+        "path": "/api/v2/search?kind=tracks&q=Finesse%20(Remix%3B%20feat.%20Cardi%20B)%20Bruno%20Mars",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "444333332"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Finesse (Remix; feat. Cardi B)",
+          "artists": [
+            "Bruno Mars"
+          ],
+          "durationMs": 217000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "remix"
+            ],
+            "labels": [
+              "remix"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Finesse (Remix; feat. Cardi B)",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 217000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8967525,
+        "receivedBytes": 4096,
+        "headersMs": 1428,
+        "totalMs": 1428
+      },
+      "elapsedMs": 4131
+    },
+    {
+      "target": {
+        "key": "perfect-acoustic",
+        "title": "Perfect (Acoustic)",
+        "artist": "Ed Sheeran",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Perfect (Acoustic) Ed Sheeran",
+        "path": "/api/v2/search?kind=tracks&q=Perfect%20(Acoustic)%20Ed%20Sheeran",
+        "resultCount": 13,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "424036432"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Perfect (Acoustic)",
+          "artists": [
+            "Ed Sheeran"
+          ],
+          "durationMs": 260000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "acoustic"
+            ],
+            "labels": [
+              "acoustic"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Perfect (Acoustic)",
+        "artists": [
+          "Ed Sheeran"
+        ],
+        "durationMs": 260000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10791930,
+        "receivedBytes": 4096,
+        "headersMs": 1218,
+        "totalMs": 1224
+      },
+      "elapsedMs": 4255
+    },
+    {
+      "target": {
+        "key": "ditto-remix-instrumental",
+        "title": "Ditto (250 Remix) (Instrumental)",
+        "artist": "NewJeans",
+        "id": "2585969732",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Ditto (250 Remix) (Instrumental) NewJeans",
+        "path": "/api/v2/search?kind=tracks&q=Ditto%20(250%20Remix)%20(Instrumental)%20NewJeans",
+        "resultCount": 3,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2585969732"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Ditto (250 Remix) (Instrumental)",
+          "artists": [
+            "NewJeans"
+          ],
+          "durationMs": 201000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Ditto (250 Remix) (Instrumental)",
+        "artists": [
+          "NewJeans"
+        ],
+        "durationMs": 201000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8428215,
+        "receivedBytes": 4096,
+        "headersMs": 1570,
+        "totalMs": 1571
+      },
+      "elapsedMs": 6327
+    },
+    {
+      "target": {
+        "key": "inertia-studio-live",
+        "title": "INERTIA (Studio Live Version)",
+        "artist": "SawanoHiroyuki[nZk]",
+        "id": "3460977611",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "INERTIA (Studio Live Version) SawanoHiroyuki[nZk]",
+        "path": "/api/v2/search?kind=tracks&q=INERTIA%20(Studio%20Live%20Version)%20SawanoHiroyuki%5BnZk%5D",
+        "resultCount": 5,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3460977611"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "INERTIA (Studio Live Version)",
+          "artists": [
+            "SawanoHiroyuki[nZk]"
+          ],
+          "durationMs": 202000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "edit",
+              "live"
+            ],
+            "labels": [
+              "studio live version"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "7e41f8cd-e64f-4d60-9209-fcecb5f6578f",
+        "metadata": {
+          "title": "INERTIA (Studio Live Version)",
+          "artists": [
+            "SawanoHiroyuki[nZk]",
+            "REI"
+          ],
+          "durationMs": 202000,
+          "artistsComplete": true,
+          "version": {
+            "kinds": [
+              "edit",
+              "live"
+            ],
+            "labels": [
+              "studio live version"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "INERTIA (Studio Live Version)",
+        "artists": [
+          "SawanoHiroyuki[nZk], REI"
+        ],
+        "durationMs": 202000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8708532,
+        "receivedBytes": 4096,
+        "headersMs": 1742,
+        "totalMs": 1744
+      },
+      "elapsedMs": 11827
+    },
+    {
+      "target": {
+        "key": "blinding-lights-live",
+        "title": "Blinding Lights (Live)",
+        "artist": "The Weeknd",
+        "id": "2166259437",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Blinding Lights (Live) The Weeknd",
+        "path": "/api/v2/search?kind=tracks&q=Blinding%20Lights%20(Live)%20The%20Weeknd",
+        "resultCount": 10,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2166259437"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Blinding Lights (Live)",
+          "artists": [
+            "The Weeknd"
+          ],
+          "durationMs": 253000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "live"
+            ],
+            "labels": [
+              "live"
+            ]
+          },
+          "explicit": "explicit"
+        }
+      },
+      "source": {
+        "title": "Blinding Lights (Live)",
+        "artists": [
+          "The Weeknd"
+        ],
+        "durationMs": 253000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10266330,
+        "receivedBytes": 4096,
+        "headersMs": 1437,
+        "totalMs": 1441
+      },
+      "elapsedMs": 4652
+    },
+    {
+      "target": {
+        "key": "finesse-pink-panda",
+        "title": "Finesse (Pink Panda Remix; feat. Cardi B)",
+        "artist": "Bruno Mars",
+        "id": "475689612",
+        "category": "variants"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Finesse (Pink Panda Remix; feat. Cardi B) Bruno Mars",
+        "path": "/api/v2/search?kind=tracks&q=Finesse%20(Pink%20Panda%20Remix%3B%20feat.%20Cardi%20B)%20Bruno%20Mars",
+        "resultCount": 5,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "475689612"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Finesse (Pink Panda Remix; feat. Cardi B)",
+          "artists": [
+            "Bruno Mars"
+          ],
+          "durationMs": 148000,
+          "artistsComplete": false,
+          "version": {
+            "kinds": [
+              "remix"
+            ],
+            "labels": [
+              "pink panda remix"
+            ]
+          },
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Finesse (Pink Panda Remix; feat. Cardi B)",
+        "artists": [
+          "Bruno Mars"
+        ],
+        "durationMs": 148000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 6192878,
+        "receivedBytes": 4096,
+        "headersMs": 1361,
+        "totalMs": 1361
+      },
+      "elapsedMs": 4214
+    },
+    {
+      "target": {
+        "key": "lamp-yume-utsutsu",
+        "title": "Yume Utsutsu",
+        "artist": "Lamp",
+        "id": "499360512",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Yume Utsutsu Lamp",
+        "path": "/api/v2/search?kind=tracks&q=Yume%20Utsutsu%20Lamp",
+        "resultCount": 11,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "499360512"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Yume Utsutsu",
+          "artists": [
+            "Lamp"
+          ],
+          "durationMs": 315000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Yume Utsutsu",
+        "artists": [
+          "Lamp"
+        ],
+        "durationMs": 315000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 13009140,
+        "receivedBytes": 4096,
+        "headersMs": 1469,
+        "totalMs": 1470
+      },
+      "elapsedMs": 5819
+    },
+    {
+      "target": {
+        "key": "inertia",
+        "title": "INERTIA",
+        "artist": "SawanoHiroyuki[nZk]",
+        "id": "3284976751",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "INERTIA SawanoHiroyuki[nZk]",
+        "path": "/api/v2/search?kind=tracks&q=INERTIA%20SawanoHiroyuki%5BnZk%5D",
+        "resultCount": 6,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "3284976751"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "INERTIA",
+          "artists": [
+            "SawanoHiroyuki[nZk]"
+          ],
+          "durationMs": 199000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "index": {
+        "recordingId": "a1642bbc-bd43-44ff-972a-f4732dd8d3bc",
+        "metadata": {
+          "title": "INERTIA",
+          "artists": [
+            "SawanoHiroyuki[nZk]",
+            "REI"
+          ],
+          "durationMs": 199000,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "INERTIA",
+        "artists": [
+          "SawanoHiroyuki[nZk], REI"
+        ],
+        "durationMs": 199000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8316270,
+        "receivedBytes": 4096,
+        "headersMs": 2492,
+        "totalMs": 2510
+      },
+      "elapsedMs": 14527
+    },
+    {
+      "target": {
+        "key": "yoru-ni-kakeru",
+        "title": "夜に駆ける",
+        "artist": "YOASOBI",
+        "id": "824731152",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "夜に駆ける YOASOBI",
+        "path": "/api/v2/search?kind=tracks&q=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B%20YOASOBI",
+        "resultCount": 26,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "824731152"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "夜に駆ける",
+          "artists": [
+            "YOASOBI"
+          ],
+          "durationMs": 261000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "夜に駆ける",
+        "artists": [
+          "YOASOBI"
+        ],
+        "durationMs": 261000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 10642060,
+        "receivedBytes": 4096,
+        "headersMs": 1424,
+        "totalMs": 1426
+      },
+      "elapsedMs": 4317
+    },
+    {
+      "target": {
+        "key": "odoriko",
+        "title": "odoriko",
+        "artist": "Vaundy",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "odoriko Vaundy",
+        "path": "/api/v2/search?kind=tracks&q=odoriko%20Vaundy",
+        "resultCount": 26,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2450388445"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "odoriko",
+          "artists": [
+            "Vaundy"
+          ],
+          "durationMs": 230000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "odoriko",
+        "artists": [
+          "Vaundy"
+        ],
+        "durationMs": 230000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9370590,
+        "receivedBytes": 4096,
+        "headersMs": 1141,
+        "totalMs": 1142
+      },
+      "elapsedMs": 4154
+    },
+    {
+      "target": {
+        "key": "eight",
+        "title": "eight(Prod.&Feat. SUGA of BTS)",
+        "artist": "IU",
+        "query": "eight IU SUGA",
+        "language": "Korean",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "eight IU SUGA",
+        "path": "/api/v2/search?kind=tracks&q=eight%20IU%20SUGA",
+        "resultCount": 10,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "952261162"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "eight(Prod.&Feat. SUGA of BTS)",
+          "artists": [
+            "IU"
+          ],
+          "durationMs": 167000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "eight(Prod.&Feat. SUGA of BTS)",
+        "artists": [
+          "IU"
+        ],
+        "durationMs": 167000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 6920593,
+        "receivedBytes": 4096,
+        "headersMs": 1305,
+        "totalMs": 1305
+      },
+      "elapsedMs": 4979
+    },
+    {
+      "target": {
+        "key": "tout-oublier",
+        "title": "Tout oublier",
+        "artist": "Angèle",
+        "language": "French",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Tout oublier Angèle",
+        "path": "/api/v2/search?kind=tracks&q=Tout%20oublier%20Ang%C3%A8le",
+        "resultCount": 10,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "546875592"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Tout oublier",
+          "artists": [
+            "Angèle"
+          ],
+          "durationMs": 202000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Tout oublier",
+        "artists": [
+          "Angèle"
+        ],
+        "durationMs": 202000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8350643,
+        "receivedBytes": 4096,
+        "headersMs": 1602,
+        "totalMs": 1604
+      },
+      "elapsedMs": 4828
+    },
+    {
+      "target": {
+        "key": "idol",
+        "title": "アイドル",
+        "artist": "YOASOBI",
+        "id": "2210493097",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "アイドル YOASOBI",
+        "path": "/api/v2/search?kind=tracks&q=%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB%20YOASOBI",
+        "resultCount": 21,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2210493097"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "アイドル",
+          "artists": [
+            "YOASOBI"
+          ],
+          "durationMs": 213000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "アイドル",
+        "artists": [
+          "YOASOBI"
+        ],
+        "durationMs": 213000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 8737710,
+        "receivedBytes": 4096,
+        "headersMs": 1198,
+        "totalMs": 1199
+      },
+      "elapsedMs": 5755
+    },
+    {
+      "target": {
+        "key": "mitsuha-theme",
+        "title": "Theme Of Mitsuha",
+        "artist": "Radwimps",
+        "id": "1017605462",
+        "language": "Japanese instrumental",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Theme Of Mitsuha Radwimps",
+        "path": "/api/v2/search?kind=tracks&q=Theme%20Of%20Mitsuha%20Radwimps",
+        "resultCount": 9,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "1017605462"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Theme Of Mitsuha",
+          "artists": [
+            "Radwimps"
+          ],
+          "durationMs": 246000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Theme Of Mitsuha",
+        "artists": [
+          "Radwimps"
+        ],
+        "durationMs": 246000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9986945,
+        "receivedBytes": 4096,
+        "headersMs": 1362,
+        "totalMs": 1363
+      },
+      "elapsedMs": 5856
+    },
+    {
+      "target": {
+        "key": "ye",
+        "title": "Ye",
+        "artist": "Burna Boy",
+        "provider": "spotify",
+        "id": "2lEl1iNGpz9r2B7R5BqXSD",
+        "language": "English/Yoruba",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": false,
+      "search": {
+        "query": "Ye Burna Boy",
+        "path": "/api/v2/search?kind=tracks&q=Ye%20Burna%20Boy",
+        "resultCount": 31,
+        "selectedReference": {
+          "provider": "spotify",
+          "id": "2lEl1iNGpz9r2B7R5BqXSD"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Ye",
+          "artists": [
+            "Burna Boy"
+          ],
+          "durationMs": 231618,
+          "artistsComplete": true,
+          "explicit": "explicit"
+        }
+      },
+      "source": {
+        "title": "Ye",
+        "artists": [
+          "Burna Boy"
+        ],
+        "durationMs": 231000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 9342273,
+        "receivedBytes": 4096,
+        "headersMs": 2179,
+        "totalMs": 2179
+      },
+      "elapsedMs": 6777
+    },
+    {
+      "target": {
+        "key": "shinunoga-e-wa",
+        "title": "Shinunoga E-Wa",
+        "artist": "Fujii Kaze",
+        "language": "Japanese",
+        "category": "multilingual"
+      },
+      "status": "started",
+      "priorFullFileVerified": true,
+      "search": {
+        "query": "Shinunoga E-Wa Fujii Kaze",
+        "path": "/api/v2/search?kind=tracks&q=Shinunoga%20E-Wa%20Fujii%20Kaze",
+        "resultCount": 26,
+        "selectedReference": {
+          "provider": "deezer",
+          "id": "2952536301"
+        },
+        "attempts": 1,
+        "selectedMetadata": {
+          "title": "Shinunoga E-Wa",
+          "artists": [
+            "Fujii Kaze"
+          ],
+          "durationMs": 185000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        }
+      },
+      "source": {
+        "title": "Shinunoga E-Wa",
+        "artists": [
+          "Fujii Kaze"
+        ],
+        "durationMs": 185000,
+        "explicit": "unknown",
+        "artistsComplete": false
+      },
+      "audio": {
+        "range": "bytes=0-4095",
+        "mime": "audio/mpeg",
+        "expectedSize": 7577355,
+        "receivedBytes": 4096,
+        "headersMs": 2010,
+        "totalMs": 2010
+      },
+      "elapsedMs": 7743
+    }
+  ],
+  "catalogIndexRequests": 3,
+  "personalAccountMutations": 0
+}

@@ -1,5 +1,34 @@
 # Sakura Telegram Worker
 
+The rebuilt `/v2/resolve` keeps the requested recording's title, native writing,
+ordered credits, version and duration intact. It tries exact catalogue links,
+then exact metadata queries, and continues to another supported bot when an
+earlier result has the wrong tags. A rejected result is never made playable.
+Duplicate requests share one search; verified recent documents and successful
+resolutions avoid repeat bot messages. Conversations serialize per bot chat,
+while independent chats and audio ranges run concurrently.
+
+Localized title and artist spellings can arrive as server-verified metadata
+aliases. Each complete alias must share an exact catalogue row or an
+authoritative recording identifier with the request; version, credits, known
+explicit edition and duration remain checked. The worker never creates guessed
+transliterations or treats an album title as a song title. Capabilities report
+`verified-metadata-aliases` when this matching support is deployed.
+
+`POST /v2/capabilities` returns the deployed protocol and supported bot scopes;
+`/health` includes the same capability summary. Unsupported fallback scopes do
+not disable a supported primary chat. Waiting jobs have deadlines, so an expired
+request never sends a later bot query.
+
+Audio `GET`/`HEAD` responses include a strong document `ETag`. `If-Match` rejects
+replaced documents with 412, and `If-Range` only returns partial bytes for the
+same document. Expired Telegram file references refresh and resume at the last
+emitted byte; a changed document ID, size or MIME stops the transfer. Caller
+disconnects destroy the byte stream.
+
+Run `npm --prefix worker test` from the repository root. These tests use fake
+Telegram documents and clients, and never connect a second MTProto session.
+
 The single process that owns the Telegram MTProto session.
 
 ## Why this exists

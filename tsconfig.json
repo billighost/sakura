@@ -42,7 +42,9 @@
     ".next-bloom-verify/types/**/*.ts",
     ".next-bloom-verify/dev/types/**/*.ts",
     ".next-bloom-build/types/**/*.ts",
-    ".next-bloom-build/dev/types/**/*.ts"
+    ".next-bloom-build/dev/types/**/*.ts",
+    ".next-track-ui/types/**/*.ts",
+    ".next-track-ui/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

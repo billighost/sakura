@@ -10,7 +10,7 @@ import {supportedAudioMime,normalizedAudioMime} from "./input";
 
 const MAX_BYTES=120*1024*1024;
 export class AudioPromotionError extends Error {
- constructor(readonly reason:"quota"|"provider"|"integrity"|"size"|"busy",message:string){super(message);this.name="AudioPromotionError";}
+ constructor(readonly reason:"quota"|"provider"|"integrity"|"cdn-integrity"|"size"|"busy",message:string){super(message);this.name="AudioPromotionError";}
 }
 export interface CdnUsage {checkedAt:string;plan?:string;credits?:{usage:number;limit:number;usedPercent:number};storageBytes?:number;bandwidthBytes?:number}
 export interface AudioPublisher {publish(recording:CanonicalRecording,source:StoredAudioAsset,bytes:Buffer,signal?:AbortSignal):Promise<StoredAudioAsset>}
@@ -18,14 +18,19 @@ export interface AudioPublisher {publish(recording:CanonicalRecording,source:Sto
 /** Complete bytes and digest are checked before publishing and after CDN delivery.
  * This is separate from immediate playback: unpublished sources remain preparing. */
 export async function completeAudio(response:Response,expectedBytes:number,signal?:AbortSignal):Promise<Buffer>{
- if(response.status!==200||!response.body||!supportedAudioMime(response.headers.get("Content-Type")||""))throw new AudioPromotionError("integrity","Full audio delivery was not valid");
+ signal?.throwIfAborted();
+ if(response.status!==200||!response.body){await response.body?.cancel();throw new AudioPromotionError("provider","Full audio delivery did not start");}
+ if(!supportedAudioMime(response.headers.get("Content-Type")||"")){await response.body.cancel();throw new AudioPromotionError("integrity","Full audio delivery was not valid");}
  if(!Number.isSafeInteger(expectedBytes)||expectedBytes<=0||expectedBytes>MAX_BYTES){await response.body.cancel();throw new AudioPromotionError("size","This audio exceeds the configured full-file preparation limit");}
  const reader=response.body.getReader(),parts:Uint8Array[]=[];let received=0;
+ const abort=()=>{void reader.cancel(signal?.reason).catch(()=>{});};signal?.addEventListener("abort",abort,{once:true});if(signal?.aborted)abort();
  try{while(true){signal?.throwIfAborted();let timer:ReturnType<typeof setTimeout>|undefined;
   const chunk=await Promise.race([reader.read(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new AudioPromotionError("provider","Audio preparation stopped receiving bytes")),15000);})]).finally(()=>clearTimeout(timer));
-  if(chunk.done)break;received+=chunk.value.byteLength;if(received>expectedBytes)throw new AudioPromotionError("integrity","Full audio delivery exceeded its verified size");parts.push(chunk.value);
- }}catch(error){await reader.cancel(error).catch(()=>{});throw error;}finally{reader.releaseLock();}
- if(received!==expectedBytes)throw new AudioPromotionError("integrity","Full audio delivery ended before its verified size");
+  signal?.throwIfAborted();if(chunk.done)break;received+=chunk.value.byteLength;if(received>expectedBytes)throw new AudioPromotionError("integrity","Full audio delivery exceeded its verified size");parts.push(chunk.value);
+ }}catch(error){await reader.cancel(error).catch(()=>{});throw error;}finally{signal?.removeEventListener("abort",abort);reader.releaseLock();}
+ // A disconnected transfer says nothing about the identity of the source. It
+ // must be retried as a connection failure, not poison the recording as a remix.
+ if(received!==expectedBytes)throw new AudioPromotionError("provider","Full audio delivery ended before its verified size");
  return Buffer.concat(parts,received);
 }
 function digest(bytes:Buffer){return createHash("sha256").update(bytes).digest("hex");}
@@ -82,14 +87,14 @@ export class AudioPromotions {
  private running=new Map<string,Promise<StoredAudioAsset>>();
  private failures=new Map<string,{until:number;reason:string}>();
  constructor(private readonly transport:AudioTransport,private readonly ingestor:RecordingIngestor,private readonly publisher?:AudioPublisher){}
- get configured(){return Boolean(this.publisher);}
- needsPreparation(asset:StoredAudioAsset){const failure=this.failures.get(asset.recordingId);return this.configured&&asset.locator.kind==="telegram-worker"&&asset.ownerAccountId===null&&(!failure||failure.until<=Date.now());}
+ get configured(){return true;}
+ needsPreparation(asset:StoredAudioAsset){const failure=this.failures.get(asset.recordingId);return Boolean(asset.ownerAccountId===null&&(!asset.sha256||(this.publisher&&asset.locator.kind==="telegram-worker"))&&(!failure||failure.until<=Date.now()));}
  failureReason(recordingId:string){const failure=this.failures.get(recordingId);return failure&&failure.until>Date.now()?failure.reason:undefined;}
  prepare(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal):Promise<StoredAudioAsset>{
-  if(!this.publisher||source.locator.kind==="https")return Promise.resolve(source);
+  if(source.sha256&&(!this.publisher||source.locator.kind==="https"))return Promise.resolve(source);
   const key=recording.recordingId+":"+(source.sha256||JSON.stringify(source.locator)),existing=this.running.get(key);if(existing)return existing;
   if(this.running.size>=2){this.failures.set(recording.recordingId,{until:Date.now()+10000,reason:"busy"});return Promise.reject(new AudioPromotionError("busy","Audio preparation is at its transfer limit"));}
-  const work=this.execute(recording,source,signal).catch(error=>{if(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);this.failures.set(recording.recordingId,{until:Date.now()+5*60000,reason:error instanceof AudioPromotionError?error.reason:"provider"});throw error;}).finally(()=>this.running.delete(key));
+  const work=this.execute(recording,source,signal).catch(error=>{if(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);const reason=error instanceof AudioPromotionError?error.reason:"provider";this.failures.set(recording.recordingId,{until:Date.now()+(reason==="provider"&&!source.sha256?2000:5*60000),reason});throw error;}).finally(()=>this.running.delete(key));
   this.running.set(key,work);return work;
  }
  private async execute(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal){
@@ -98,6 +103,12 @@ export class AudioPromotions {
   const bytes=await completeAudio(await this.transport.open(source,null,controllerSignal),source.sizeBytes,controllerSignal),sha256=digest(bytes);
   if(source.sha256&&source.sha256!==sha256)throw new AudioPromotionError("integrity","The worker file checksum changed");
   const checked={...source,sha256};await this.ingestor.persistAudio(recording,checked);
-  const published=await this.publisher!.publish(recording,checked,bytes,controllerSignal);await this.ingestor.persistAudio(recording,published);this.failures.delete(recording.recordingId);return published;
+  if(!this.publisher||source.locator.kind==="https"){this.failures.delete(recording.recordingId);return checked;}
+  let published:StoredAudioAsset;
+  try{published=await this.publisher.publish(recording,checked,bytes,controllerSignal);}catch(error){
+   // CDN delivery failure cannot revoke the independently verified original.
+   if(error instanceof AudioPromotionError&&error.reason==="integrity")throw new AudioPromotionError("cdn-integrity","Published delivery did not match the verified original");throw error;
+  }
+  await this.ingestor.persistAudio(recording,published);this.failures.delete(recording.recordingId);return published;
  }
 }

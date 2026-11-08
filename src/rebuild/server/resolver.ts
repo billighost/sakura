@@ -3,6 +3,7 @@ import { referenceKey } from "../core/identity";
 import type { CanonicalRecording, RecordingMetadata, ProviderReference, RecordingRequest } from "../core/types";
 import type { CatalogProvider, CatalogRecording, RecordingRepository, ResolveRecordingInput, ResolveRecordingResult, ReviewCandidate, StoredAudioAsset } from "./contracts";
 import { supportedAudioMime } from "./input";
+import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
 
 function reviewCandidate(metadata: RecordingMetadata, reasons: readonly string[], extras: { reference?: ProviderReference; assetId?: string } = {}): ReviewCandidate {
   return { title: metadata.title, artists: metadata.artists, durationMs: metadata.durationMs ?? null, reasons, ...extras };
@@ -18,7 +19,8 @@ function assetAllowed(asset: StoredAudioAsset, recordingId: string, accountId: s
 
 /** This service resolves metadata and ready assets. It does not start bot searches or download bytes. */
 export class RecordingResolver {
-  constructor(private readonly repository: RecordingRepository, private readonly providers: readonly CatalogProvider[], private readonly directPlaybackUrl?: (asset: StoredAudioAsset) => string | undefined) {}
+  private readonly metadataAliases:CatalogMetadataAliases;
+  constructor(private readonly repository: RecordingRepository, private readonly providers: readonly CatalogProvider[], private readonly directPlaybackUrl?: (asset: StoredAudioAsset) => string | undefined) {this.metadataAliases=new CatalogMetadataAliases(providers);}
 
   async resolve(input: ResolveRecordingInput, accountId: string, signal?: AbortSignal): Promise<ResolveRecordingResult> {
     signal?.throwIfAborted();
@@ -37,7 +39,11 @@ export class RecordingResolver {
       if (!catalog) return { status: "unavailable", reason: "catalog-not-found", retryable: false };
       if (referenceKey(catalog.reference) !== referenceKey(input.reference)) return { status: "unavailable", reason: "provider-unavailable", retryable: true };
       if (input.expected) {
-        const evidence = metadataAssessment({ metadata: input.expected }, catalog.metadata);
+        let evidence = metadataAssessment(catalog,input.expected,[input.reference]);
+        if(!evidence.acceptable&&evidence.reasons.every(reason=>reason==="title"||reason==="artist")){
+          const enriched=await this.metadataAliases.hydrate({recordingId:referenceKey(input.reference),metadata:catalog.metadata,references:catalog.references},signal);
+          catalog={...catalog,metadata:enriched.metadata};evidence=metadataAssessment(catalog,input.expected,[input.reference]);
+        }
         if (!evidence.acceptable) return { status: "review", reason: "catalog-mismatch", candidates: [reviewCandidate(catalog.metadata, evidence.reasons, { reference: catalog.reference })] };
       }
       if (!this.repository.initialized) return { status: "unavailable", reason: "backend-not-initialized", catalog, retryable: false };
@@ -49,10 +55,11 @@ export class RecordingResolver {
       if (found.size > 1) return { status: "review", reason: "identity-conflict", candidates: [...found.values()].map((item) => reviewCandidate(item.metadata, ["identifier-conflict"])) };
       recording = [...found.values()][0] ?? null;
       if (!recording) return { status: "unavailable", reason: "recording-not-indexed", catalog, retryable: false };
-      const verified = metadataAssessment(catalog, recording.metadata, recording.references);
+      recording={...recording,metadata:withVerifiedCatalogAliases(recording,[catalog])};
+      const verified = metadataAssessment(recording, catalog.metadata, catalog.references);
       if (!verified.acceptable) return { status: "review", reason: "catalog-mismatch", recordingId: recording.recordingId, candidates: [reviewCandidate(recording.metadata, verified.reasons)] };
     } else if (input.expected) {
-      const expected = metadataAssessment({ metadata: input.expected }, recording.metadata);
+      const expected = metadataAssessment(recording, input.expected,[input.reference]);
       if (!expected.acceptable) return { status: "review", reason: "catalog-mismatch", recordingId: recording.recordingId, candidates: [reviewCandidate(recording.metadata, expected.reasons)] };
     }
     signal?.throwIfAborted();

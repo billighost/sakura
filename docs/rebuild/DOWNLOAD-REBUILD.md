@@ -1,0 +1,21 @@
+# Download and playback rebuild
+
+The Telegram worker and audio adapters now continue past rejected results, try exact alternate references and native-script queries, share duplicate searches, and isolate each bot conversation. Unknown optional bot scopes no longer disable the working primary bot. Published alternate titles and artist names can recover a match through exact ISRC records and reciprocal catalogue artist identities. Remixes, live recordings, named versions and featured credits remain distinct. Interrupted audio is treated as a connection failure; a verified original remains usable when optional CDN preparation fails.
+
+Device downloads persist individual 256 KiB chunks in account-scoped IndexedDB. One canonical recording has one job across provider aliases and tabs. Four chunks can transfer globally, with two per song. Current playback and the upcoming queue take priority, and queue changes preserve unrelated explicit downloads. Retries, pause, cancellation and late responses are fenced so canceled jobs cannot resurrect their files.
+
+Upcoming songs cache approximately 22 seconds. A private service-worker media URL joins those saved chunks to missing ranges of the same asset while playing. Pausing, skipping, reopening or failing playback preserves the automatic prefix and stops automatic full-file work. Retry preserves the listening position even when the fallback fails before its metadata arrives. Explicit downloads finish independently. A complete song enters Downloads only after its full size and SHA-256 match; final audio publication and partial cleanup are atomic. Explicitly saving an automatic cache waits for the requested flag to commit, so the song remains Saved after reopening. Automatic full and partial caches are limited to 48 MiB, twelve songs and seven days, protecting the current song, the next three and all explicit downloads.
+
+Downloads opens on completed songs, with activity in a separate optional view. Library and track collections support saved List, Cards and Compact layouts, search and sorting. Progress uses botanical rings and vines; individual failures have retry and dismiss controls. The miniplayer shows the current synced lyric and shares lyric loads with the fullscreen view.
+
+## Verification
+
+- Core, server, application, account-sync and download suites pass. The worker has 34 passing behavior tests. Production TypeScript and the application build pass; lint has zero errors.
+- [Browser verification](DOWNLOAD-BROWSER-VERIFICATION.md) covers actual built pages using generated local audio, tab closure/resume, deduplication, queue priority, cancellation, verified offline artifacts, layouts and synced lyrics.
+- [Partial playback verification](PARTIAL-PLAYBACK-VERIFICATION.md) covers real Chrome media ranges, worker restarts, account isolation and revocation races.
+- [Live startup acceptance](DOWNLOAD-ACCEPTANCE.md) passed all thirty fixed songs after searching Sakura's actual API first: ten famous, ten tricky versions and ten multilingual or lesser-known recordings. Each audio response was canceled after 4 KiB, totaling 120 KiB. These startup checks do not certify full-file or acoustic correctness. Twenty-six files verified before the low-data instruction remain available in the local listening review.
+- [Multilingual acceptance](MULTILINGUAL-DOWNLOAD-ACCEPTANCE.md) passed all thirty fixed non-English starts across thirteen language labels and twenty-five genre labels, including sixteen lesser-known targets. The four reported Tomonari Sora recordings also passed. The continuation used only the final 4 KiB reservation and reused all earlier startup evidence.
+
+Review the existing files at `http://127.0.0.1:3097`, mark **Correct recording** or **Wrong / uncertain**, and export the notes. Playback there reads local files.
+
+The worker changes are implemented and tested locally. The live tests used the existing deployed worker; publishing the rebuilt worker still requires deployment through the project's hosting setup. No additional Telegram session was started. Progressive playback requires a controlled production service worker; unsupported browsers use the ordinary verified audio source. Physical Safari has not been certified by the Chrome fixtures.

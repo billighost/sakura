@@ -21,6 +21,10 @@ test("account conflicts, uncertain recordings and expired recaps give different 
  assert.equal(responseIssue(410,{}).href,"/bloom");
  assert.match(responseIssue(404,{},"lyrics").title,/lyrics/);
 });
+test("missing audio has an availability recovery while an identity mismatch stays a version review",()=>{
+ assert.equal(responseIssue(503,{reason:"no-ready-audio"},"download").kind,"missing");
+ assert.equal(responseIssue(409,{status:"review",reason:"asset-mismatch"},"download").kind,"version");
+});
 test("network rejection is normalized while explicit caller cancellation stays cancelable",async t=>{
  t.mock.method(globalThis,"fetch",async()=>{throw new TypeError("Failed to fetch internal-host");});
  await assert.rejects(()=>requestJson("https://fixture.invalid",{},{context:"save"}),e=>e instanceof UserFacingError&&!e.message.includes("internal-host"));

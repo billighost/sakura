@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
 import { JAPANESE_READING_VERSION, VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
 import { requestJson, userMessage } from "../app/errors";
+import { LyricFlights } from "./lyricFlight";
 
 export interface PlayerLyricLine extends TimedLyric { romanized?: string; readingReviewNeeded?: boolean; readingEngine?: string }
 export interface PlayerLyrics {
@@ -16,8 +17,16 @@ export interface PlayerLyrics {
   hasJapanese: boolean;
 }
 type CacheValue = { key: string; savedAt: number; data: PlayerLyrics };
+type LyricInput = Pick<MusicTrack, "id" | "title" | "artists" | "albumTitle" | "durationMs">;
 const memory = new Map<string, CacheValue>();
+const flights = new LyricFlights<PlayerLyrics>();
 let database: Promise<IDBDatabase> | undefined;
+function validLines(value: unknown): value is PlayerLyricLine[] {
+  return Array.isArray(value) && value.length <= 4000 && value.every((line, index) =>
+    line && typeof line.text === "string" && Number.isFinite(line.start) && line.start >= 0 &&
+    (line.end === undefined || Number.isFinite(line.end) && line.end >= line.start) &&
+    (index === 0 || value[index - 1].start <= line.start));
+}
 function openDatabase() {
   if (!database) database = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === "undefined") { reject(new Error("Lyrics storage unavailable")); return; }
@@ -35,7 +44,10 @@ async function readCache(key: string) {
     const db = await openDatabase();
     return await new Promise<CacheValue | undefined>((resolve) => {
       const request = db.transaction("lyrics", "readonly").objectStore("lyrics").get(key);
-      request.onsuccess = () => resolve(request.result as CacheValue | undefined);
+      request.onsuccess = () => {
+        const value = request.result as CacheValue | undefined;
+        resolve(value?.key === key && Number.isFinite(value.savedAt) && validLines(value.data?.lines) ? value : undefined);
+      };
       request.onerror = () => resolve(undefined);
     });
   } catch { return undefined; }
@@ -61,17 +73,25 @@ async function writeCache(value: CacheValue) {
     });
   } catch { /* Lyrics still work when device storage is full or disabled. */ }
 }
-export function lyricInputKey(track: MusicTrack) {
+export function lyricInputKey(track: LyricInput) {
   return JSON.stringify([VERIFIED_LYRICS_VERSION, JAPANESE_READING_VERSION, track.id, track.title, track.artists, track.albumTitle, track.durationMs]);
 }
 export function useLyrics(track: MusicTrack | null) {
   const [retryVersion,setRetryVersion]=useState(0);
   const [result, setResult] = useState<{ key: string; data: PlayerLyrics | null; error: string | null; loading: boolean }>({ key: "", data: null, error: null, loading: false });
   const key = track ? lyricInputKey(track) : "";
+  // The player can replace a catalog object while resolving it. Equal lyric
+  // metadata must keep the same subscription instead of canceling and fetching.
+  const input = useMemo<LyricInput | null>(() => {
+    if (!key) return null;
+    const [, , id, title, artists, albumTitle, durationMs] = JSON.parse(key) as [string, string, string, string, string[], string | null, number];
+    return { id, title, artists, albumTitle, durationMs };
+  }, [key]);
   useEffect(() => {
-    if (!track) return;
+    if (!input) return;
     const controller = new AbortController();
-    const thisKey = lyricInputKey(track);
+    let release: (() => void) | undefined;
+    const thisKey = lyricInputKey(input);
     void (async () => {
       const cached = await readCache(thisKey);
       if (controller.signal.aborted) return;
@@ -79,23 +99,29 @@ export function useLyrics(track: MusicTrack | null) {
       if (cached && retryVersion===0 && Date.now() - cached.savedAt < 7 * 24 * 60 * 60 * 1000) return;
       if (!cached) setResult({ key: thisKey, data: null, error: null, loading: true });
       try {
-        const query = new URLSearchParams({ recordingId: track.id, title: track.title, artist: track.artists[0] || "" });
-        if (track.durationMs > 0) query.set("duration", String(track.durationMs / 1000));
-        if (track.albumTitle) query.set("album", track.albumTitle);
-        const payload = await requestJson<PlayerLyrics>(`/api/v2/lyrics?${query}`, { signal: controller.signal },{context:"lyrics"});
-        if (!Array.isArray(payload.lines)) throw new Error("Lyrics provider returned an invalid response.");
-        const data: PlayerLyrics = { lines: payload.lines, timing: payload.timing, provider: payload.provider, providerTrackId: payload.providerTrackId, instrumental: payload.instrumental, schemaVersion: payload.schemaVersion,
-          hasJapanese: payload.lines.some((line: PlayerLyricLine) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) };
+        const request = flights.acquire(thisKey, async signal => {
+          const query = new URLSearchParams({ recordingId: input.id, title: input.title, artist: input.artists[0] || "" });
+          if (input.durationMs > 0) query.set("duration", String(input.durationMs / 1000));
+          if (input.albumTitle) query.set("album", input.albumTitle);
+          const payload = await requestJson<PlayerLyrics>(`/api/v2/lyrics?${query}`, { signal },{context:"lyrics"});
+          if (!validLines(payload.lines)) throw new Error("Lyrics provider returned an invalid response.");
+          const data: PlayerLyrics = { lines: payload.lines, timing: payload.timing, provider: payload.provider, providerTrackId: payload.providerTrackId, instrumental: payload.instrumental, schemaVersion: payload.schemaVersion,
+            hasJapanese: payload.lines.some((line: PlayerLyricLine) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) };
+          signal.throwIfAborted();
+          void writeCache({ key: thisKey, savedAt: Date.now(), data });
+          return data;
+        });
+        release = request.release;
+        const data = await request.promise;
         if (controller.signal.aborted) return;
         setResult({ key: thisKey, data, error: null, loading: false });
-        await writeCache({ key: thisKey, savedAt: Date.now(), data });
       } catch (error) {
         if (controller.signal.aborted) return;
         setResult({ key: thisKey, data: cached?.data || null, error: cached ? null : userMessage(error,"lyrics"), loading: false });
       }
     })();
-    return () => controller.abort();
-  }, [key, track, retryVersion]);
+    return () => { controller.abort(); release?.(); };
+  }, [key, input, retryVersion]);
   async function getJapaneseReadings() {
     if (!track || result.key !== key || !result.data) return;
     if (result.data.lines.every((line) => !line.text || line.romanized !== undefined)) return;

@@ -1,7 +1,8 @@
 import { InputError } from "./contracts";
 import type { ResolveRecordingInput } from "./contracts";
-import type { RecordingMetadata, RecordingVersion, RecordingVersionKind } from "../core/types";
+import type { RecordingMetadata, RecordingVersion, RecordingVersionKind, ProviderReference, VerifiedRecordingAlias } from "../core/types";
 import { sameRequestOrigin } from "../requestOrigin";
+import { referenceKey } from "../core/identity";
 
 const KINDS = new Set<RecordingVersionKind>(["remix", "live", "acoustic", "instrumental", "karaoke", "demo", "sped-up", "slowed", "edit", "remaster"]);
 function object(value: unknown): Record<string, unknown> {
@@ -37,6 +38,28 @@ export function parseRecordingMetadata(value: unknown): RecordingMetadata {
   }
   if (input.explicit !== undefined && !["unknown", "clean", "explicit"].includes(String(input.explicit))) throw new InputError("explicit must be unknown, clean or explicit");
   return { title, artists, durationMs,...(input.artistsComplete!==undefined?{artistsComplete:input.artistsComplete as boolean}:{}),...(version ? { version } : {}), explicit: input.explicit as RecordingMetadata["explicit"] ?? "unknown" };
+}
+
+/** Only persisted server proof uses this parser. Public expected/source metadata
+ * continues through parseRecordingMetadata, which discards caller aliases. */
+export function parseTrustedRecordingMetadata(value:unknown):RecordingMetadata{
+ const metadata=parseRecordingMetadata(value),raw=object(value);
+ if(!Array.isArray(raw.verifiedAliases))return metadata;
+ const aliases:VerifiedRecordingAlias[]=[];
+ for(const value of raw.verifiedAliases.slice(0,16)){
+  try{
+   const alias=object(value);if(!Array.isArray(alias.references)||alias.references.length>16)continue;
+   const references:ProviderReference[]=alias.references.map(value=>{
+    const ref=object(value),provider=ref.provider;
+    if(provider!=="deezer"&&provider!=="spotify"&&provider!=="isrc"&&provider!=="musicbrainz")throw new InputError("Alias needs an exact recording reference");
+    const id=text(ref.id,"alias ID",128);
+    if(provider==="deezer"&&!/^[1-9]\d{0,17}$/.test(id)||provider==="spotify"&&!/^[A-Za-z0-9]{22}$/.test(id)||provider==="musicbrainz"&&!isUuid(id))throw new InputError("Alias recording reference is invalid");
+    const result:ProviderReference={provider,id};referenceKey(result);return result;
+   });
+   aliases.push({metadata:parseRecordingMetadata(alias.metadata),references});
+  }catch{/* Malformed optional proof is excluded rather than trusted. */}
+ }
+ return aliases.length?{...metadata,verifiedAliases:aliases}:metadata;
 }
 
 export function parseResolveInput(value: unknown): ResolveRecordingInput {

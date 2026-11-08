@@ -25,8 +25,10 @@ export interface Account { id:string;username:string;email:string;avatarUrl?:str
 export type PlaybackStatus = "idle"|"resolving"|"buffering"|"playing"|"paused"|"error";
 export interface QueueEntry {entryId:string;track:MusicTrack;priority?:"manual"|"automatic"}
 export interface DownloadEntry {
- recordingId:string;track:MusicTrack;status:"queued"|"resolving"|"downloading"|"ready"|"failed";
+ recordingId:string;track:MusicTrack;status:"queued"|"resolving"|"downloading"|"paused"|"prepared"|"ready"|"failed";
  downloadedBytes:number;totalBytes:number|null;error?:string;operationId:string;sha256?:string;
+ /** Prefix preparation stays out of the explicit download list. */
+ requested?:boolean;cachedSeconds?:number;activeChunks?:number;updatedAt?:number;
 }
 export type PlayerModal = "queue"|"share"|"lyrics"|"player"|null;
 export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";audioTechnology?:AudioTechnology;privateSession:boolean;discovery:number;reducedMotion:boolean;openingAnimation:number;bloomPerformance?:"auto"|"1"|"2"|"3"|"4"|"5";seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean;volume?:number;shuffle?:boolean;repeat?:"off"|"one"|"all";previewVolume?:number;previewLoop?:boolean;sleepTimerMinutes?:number; }

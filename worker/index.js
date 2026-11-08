@@ -49,7 +49,7 @@ const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-  "Access-Control-Allow-Headers": "Range, Authorization",
+  "Access-Control-Allow-Headers": "Range, If-Range, If-Match, Authorization",
   "Access-Control-Expose-Headers":
     "Content-Length, Content-Range, Accept-Ranges, X-Audio-Size, X-Audio-Duration",
   "Access-Control-Max-Age": "86400",
@@ -70,7 +70,8 @@ const client = new TelegramWorkerClient({
   sessionFile: SESSION_FILE,
 });
 const rebuild = new RebuildAudioService({ telegram: () => client.client, api: Api, bigInt,
-  bots: [DEFAULT_BOT, ...(process.env.TELEGRAM_FALLBACK_BOTS || "").split(",").map(bot => bot.trim()).filter(Boolean)], queue: client.botQueue });
+  bots: [DEFAULT_BOT, ...(process.env.TELEGRAM_FALLBACK_BOTS || "").split(",").map(bot => bot.trim()).filter(Boolean)],
+  queue: client.botQueue, queueFor: bot => client.queueFor(bot), ensureConnected: () => client._ensureConnected(),onFatal: error => client._goFatal(error) });
 
 function scopedSignature(bot,messageId,expires) {
   return crypto.createHmac("sha256",WORKER_SECRET).update(JSON.stringify([bot.toLowerCase(),String(messageId),expires])).digest("hex");
@@ -356,7 +357,7 @@ const server = http.createServer(async (req, res) => {
    */
   if (pathname === "/health" || pathname === "/healthz" || pathname === "/") {
     const h = client.health();
-    sendJson(res, h.ok ? 200 : 503, h);
+    sendJson(res, h.ok ? 200 : 503, {...h,audioProtocol:"v2",botScopes:[...rebuild.bots],features:["exact-metadata-search","verified-metadata-aliases","resumable-ranges","document-etag"]});
     return;
   }
 
@@ -416,13 +417,17 @@ const server = http.createServer(async (req, res) => {
     const body = await readJsonBody(req);
 
     switch (pathname) {
+      case "/v2/capabilities": {
+        sendJson(res,200,{protocol:"v2",botScopes:[...rebuild.bots],features:["exact-metadata-search","verified-metadata-aliases","resumable-ranges","document-etag"]});
+        return;
+      }
       case "/v2/resolve": {
         const result=await rebuild.resolve(body);
         sendJson(res,result.status==="review"?409:200,result);
         return;
       }
       case "/v2/audio-info": {
-        const {audio}=await rebuild.info(body.chatScope,String(body.messageId));
+        const {audio}=await rebuild.info(body.chatScope,String(body.messageId),body.refresh===true);
         sendJson(res,200,{...audio,title:audio.metadata.title,artist:audio.metadata.artists[0],duration:audio.metadata.durationMs/1000});
         return;
       }
@@ -453,6 +458,8 @@ const server = http.createServer(async (req, res) => {
           selectTimeoutMs: body.selectTimeoutMs ?? 60000,
           expectedTitle: body.expectedTitle,
           expectedArtist: body.expectedArtist,
+          expectedMetadata: body.expectedMetadata,
+          references: body.references,
           botUsername: body.botUsername,
         });
         sendJson(res, 200, out);

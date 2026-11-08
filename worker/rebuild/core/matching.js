@@ -1,6 +1,7 @@
 // Generated from src/rebuild/core; run node scripts/build-rebuild-worker.cjs.
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.verifiedRecordingAliases = verifiedRecordingAliases;
 exports.assessAudioCandidate = assessAudioCandidate;
 exports.selectAudioCandidate = selectAudioCandidate;
 const identity_1 = require("./identity.js");
@@ -21,8 +22,51 @@ function identifierEvidence(request, candidate) {
     }
     return { shared, conflict };
 }
+/** A generic label repeats its kind; a named mix, venue or year adds evidence.
+ * Providers often expose `kinds:["remix"]` while ID3 exposes `(Remix)`. */
+function versionEvidence(version) {
+    const generic = /^(?:remix|mix|live|acoustic|instrumental|karaoke|demo|sped up|speed up|slowed|remaster|remastered|リミックス|ライブ|アコースティック|インストゥルメンタル|カラオケ|リマスター|混音|现场|現場)$/u;
+    const labels = version.labels.map(label => label.replace(/リミックス|混音/gu, " remix ").replace(/ライブ|现场|現場/gu, " live ").replace(/アコースティック/gu, " acoustic ").replace(/インストゥルメンタル/gu, " instrumental ").replace(/カラオケ/gu, " karaoke ").replace(/リマスター/gu, " remaster ").replace(/\bremastered\b/gu, "remaster").replace(/\bver\b/gu, "version").trim().replace(/\s+/gu, " "));
+    return { kinds: version.kinds, labels: [...new Set(labels.filter(label => !generic.test(label)))].sort() };
+}
+/** Alternate writing is evidence only when a trusted catalogue read binds it
+ * to this exact row or an authoritative recording ID. Variants, missing credit
+ * information and changed duration cannot become spelling aliases. */
+function verifiedRecordingAliases(request) {
+    const want = (0, identity_1.normalizedRecording)(request.metadata), aliases = request.metadata.verifiedAliases;
+    if (!Array.isArray(aliases) || !want.title || !want.primaryArtist || !want.durationMs)
+        return [];
+    return aliases.slice(0, 32).filter(alias => {
+        try {
+            if (!alias || !alias.metadata || !Array.isArray(alias.metadata.artists) || alias.metadata.artistsComplete !== true || !Array.isArray(alias.references))
+                return false;
+            const identity = identifierEvidence(request, { metadata: alias.metadata, references: alias.references });
+            if (!identity.shared || identity.conflict)
+                return false;
+            const sharedRecordingRef = (request.references ?? []).some(wantRef => (0, identity_1.isRecordingProofReference)(wantRef) && alias.references.some((gotRef) => (0, identity_1.isRecordingProofReference)(gotRef) && (0, identity_1.referenceKey)(wantRef) === (0, identity_1.referenceKey)(gotRef)));
+            if (!sharedRecordingRef)
+                return false;
+            const got = (0, identity_1.normalizedRecording)(alias.metadata);
+            if (!got.title || !got.primaryArtist || !got.durationMs || Math.abs(want.durationMs - got.durationMs) > Math.max(5000, want.durationMs * .025))
+                return false;
+            if (request.metadata.artistsComplete !== false && want.artists.length !== got.artists.length)
+                return false;
+            if (want.explicit !== "unknown" && got.explicit !== "unknown" && want.explicit !== got.explicit)
+                return false;
+            return JSON.stringify(versionEvidence(want.version)) === JSON.stringify(versionEvidence(got.version));
+        }
+        catch {
+            return false;
+        }
+    }).map(alias => ({
+        metadata: { title: alias.metadata.title, artists: [...alias.metadata.artists], artistsComplete: true, durationMs: alias.metadata.durationMs,
+            ...(alias.metadata.explicit !== undefined ? { explicit: alias.metadata.explicit } : {}),
+            ...(alias.metadata.version ? { version: { kinds: [...(alias.metadata.version.kinds ?? [])], labels: [...(alias.metadata.version.labels ?? [])] } } : {}) },
+        references: alias.references.map((ref) => ({ provider: ref.provider, id: ref.id, ...(ref.scope ? { scope: ref.scope } : {}) })),
+    }));
+}
 /** Hard gates establish correctness before duration and audio quality can affect ranking. */
-function assessAudioCandidate(request, candidate) {
+function assessStrictAudioCandidate(request, candidate) {
     const want = (0, identity_1.normalizedRecording)(request.metadata);
     const got = (0, identity_1.normalizedRecording)(candidate.metadata, want.artists);
     const identity = identifierEvidence(request, candidate);
@@ -42,7 +86,7 @@ function assessAudioCandidate(request, candidate) {
             : JSON.stringify([...want.artists].sort()) === JSON.stringify([...got.artists].sort());
     if (want.primaryArtist !== got.primaryArtist || !creditsMatch)
         reasons.push("artist");
-    if (JSON.stringify(want.version) !== JSON.stringify(got.version))
+    if (JSON.stringify(versionEvidence(want.version)) !== JSON.stringify(versionEvidence(got.version)))
         reasons.push("version");
     if (want.explicit !== "unknown" && got.explicit !== "unknown" && want.explicit !== got.explicit)
         reasons.push("explicit");
@@ -56,6 +100,19 @@ function assessAudioCandidate(request, candidate) {
     const acceptable = reasons.length === 0;
     const durationScore = difference === null ? 0 : Math.max(0, 20 - difference / 500);
     return { candidate, acceptable, score: acceptable ? 80 + durationScore + (identity.shared ? 200 : 0) : 0, reasons, authoritativeMatch: identity.shared && !identity.conflict };
+}
+/** Match one complete, provider-authorized spelling at a time. A localized
+ * title/artist can change; the requested file's other safety gates cannot. */
+function assessAudioCandidate(request, candidate) {
+    const canonical = assessStrictAudioCandidate(request, candidate);
+    if (canonical.acceptable || canonical.reasons.some(reason => reason !== "title" && reason !== "artist"))
+        return canonical;
+    for (const alias of verifiedRecordingAliases(request)) {
+        const assessment = assessStrictAudioCandidate({ metadata: alias.metadata, references: request.references }, candidate);
+        if (assessment.acceptable)
+            return assessment;
+    }
+    return canonical;
 }
 /** Never return the first result solely because the provider found something. */
 function selectAudioCandidate(request, candidates) {

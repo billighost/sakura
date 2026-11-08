@@ -19,6 +19,8 @@
 /.next-refine/
 /.next-bloom-verify/
 /.next-bloom-build/
+/.next-download-ui/
+/.next-track-ui/
 /out/
 
 # production

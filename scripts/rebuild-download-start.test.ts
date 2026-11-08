@@ -1,0 +1,7 @@
+import { strict as assert } from "node:assert";
+import { test } from "node:test";
+import { readTinyAudio } from "./rebuild-download-start";
+const headers={"Content-Type":"audio/mpeg","Content-Range":"bytes 0-4095/9000000","Content-Length":"4096"};
+test("startup probe cancels immediately after the exact4KiB range",async()=>{let canceled=false;const response=new Response(new ReadableStream({start(controller){controller.enqueue(new Uint8Array(4096));},cancel(){canceled=true;}}),{status:206,headers});assert.equal(await readTinyAudio(response,9000000,"audio/mpeg"),4096);assert.equal(canceled,true);});
+test("startup probe rejects and cancels a full-file200 response",async()=>{let canceled=false;const response=new Response(new ReadableStream({cancel(){canceled=true;}}),{status:200,headers:{"Content-Type":"audio/mpeg","Content-Length":"9000000"}});await assert.rejects(()=>readTinyAudio(response,9000000,"audio/mpeg"),/range-not-exact/);assert.equal(canceled,true);});
+test("startup probe cancels oversized or truncated ranged bodies",async()=>{let canceled=false;const oversized=new Response(new ReadableStream({start(controller){controller.enqueue(new Uint8Array(4097));},cancel(){canceled=true;}}),{status:206,headers});await assert.rejects(()=>readTinyAudio(oversized,9000000,"audio/mpeg"),/range-body-exceeded/);assert.equal(canceled,true);const truncated=new Response(new Uint8Array(3000),{status:206,headers});await assert.rejects(()=>readTinyAudio(truncated,9000000,"audio/mpeg"),/range-body-truncated/);});

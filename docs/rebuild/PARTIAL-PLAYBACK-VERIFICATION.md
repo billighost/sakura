@@ -1,0 +1,17 @@
+# Progressive playback from saved chunks
+
+The production service worker serves a private media URL for one account, canonical recording, asset ID, byte size and SHA-256. Each URL is bound to the requesting browser tab. It reads saved, individually hashed 256 KiB chunks from the download database, then joins the download manager's existing work for missing chunks. This lets the browser play a continuous file without switching from a short Blob to another media source.
+
+Only the same canonical asset's authenticated, same-origin audio gateway can provide an emergency missing range. Byte offsets, total size, MIME type and response length must match. The worker never guesses a different recording or stores signed source URLs. Finished audio remains the download manager's responsibility; partial playback does not publish an incomplete song as an offline download.
+
+Capabilities persist their expiring metadata in IndexedDB because service workers can stop while a page remains open. A new worker checks the original tab ID before restoring a capability. Account changes revoke persisted grants and abort their open streams. Registration and revocation generations prevent late storage writes or acknowledgements from restoring an old account's grant. Unsupported or uncontrolled browsers use ordinary playback sources.
+
+## Verification
+
+`node --import tsx --test scripts/rebuild-partial-playback.test.ts` passes 12 cases covering saved prefix consumption, shared missing-chunk work, tab isolation, completed offline audio, corrupted chunks, changed fingerprints, invalid ranges, request cancellation, account revocation, invalid upstream offsets, idle worker restoration, registration pending during revocation, and a late client acknowledgement after account change.
+
+`node scripts/rebuild-partial-playback-browser.mjs` passes six checks in actual Chrome with the production worker and client bridge. It verifies real 206 responses from persisted chunks, explicitly stops and restarts the worker through Chrome DevTools, rejects another tab's URL, plays a generated WAV through a real `HTMLAudioElement`, retains later chunks after reload, and invalidates a revoked URL. Missing chunks join the fixture's manager callback; there are no gateway fetches or page errors. This isolated fixture writes only its browser storage and makes no production account or server database changes.
+
+The browser report is `.local/partial-playback-browser-report.json`. Physical iOS Safari and third-party audio providers are outside this fixture's scope; full application download and live recording acceptance are verified separately.
+
+The actual `MusicProvider` also has five isolated behavioral checks in `scripts/rebuild-playback-integration.test.ts`. Deterministic React-host, media, storage and transport adapters run its unmodified production code without external requests. These checks cover terminal media errors and startup rejection stopping automatic full-file work while explicit downloads continue, pause during pending capability registration, progressive pause/resume, and a fallback failing before metadata arrives. Failed playback keeps its last position, saved chunks and fresh-capability retry; time updates and listening snapshots retain the pending restore position until the replacement source has metadata. Actual browser failure/retry checks are maintained in the application download suite.

@@ -3,18 +3,20 @@ import { openDB } from "idb";
 import type { MusicTrack, Account } from "./types";
 let database:ReturnType<typeof openDB>|null=null;
 const db=()=>database||(database=openDB("sakura-ink-v1",1,{upgrade(db){db.createObjectStore("entries");}}));
+/** Shared database for atomic download chunk and manifest transactions. */
+export const offlineDatabase=db;
 const key=(accountId:string,name:string)=>"account:"+accountId+":"+name;
 export async function localRead<T>(accountId:string,name:string):Promise<T|undefined>{return (await db()).get("entries",key(accountId,name));}
 export async function localWrite(accountId:string,name:string,value:unknown){await (await db()).put("entries",value,key(accountId,name));}
 export async function localDelete(accountId:string,name:string){await (await db()).delete("entries",key(accountId,name));}
-export interface OfflineAudio {track:MusicTrack;blob:Blob;sha256:string;sizeBytes:number;savedAt:number}
+export interface OfflineAudio {track:MusicTrack;blob:Blob;sha256:string;sizeBytes:number;savedAt:number;requested?:boolean}
 export function validOfflineAudio(value:unknown):value is OfflineAudio {
  const saved=value as Partial<OfflineAudio>|null;
  return !!saved&&saved.blob instanceof Blob&&saved.blob.type.startsWith("audio/")&&typeof saved.sizeBytes==="number"&&Number.isSafeInteger(saved.sizeBytes)&&saved.sizeBytes>0&&saved.sizeBytes<=120*1024*1024&&saved.blob.size===saved.sizeBytes&&typeof saved.sha256==="string"&&/^[a-f0-9]{64}$/i.test(saved.sha256)&&typeof saved.track?.id==="string"&&!!saved.track.id;
 }
-export async function savedAudio(accountId:string):Promise<OfflineAudio[]>{const result:OfflineAudio[]=[];let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){if(String(cursor.key).startsWith(key(accountId,"audio:"))&&validOfflineAudio(cursor.value)&&String(cursor.key)===key(accountId,"audio:"+cursor.value.track.id))result.push(cursor.value);cursor=await cursor.continue();}return result;}
+export async function savedAudio(accountId:string):Promise<OfflineAudio[]>{const result:OfflineAudio[]=[];const prefix=key(accountId,"audio:");let cursor=await (await db()).transaction("entries").store.openCursor(IDBKeyRange.bound(prefix,prefix+"\uffff"));while(cursor){if(validOfflineAudio(cursor.value)&&String(cursor.key)===key(accountId,"audio:"+cursor.value.track.id))result.push(cursor.value);cursor=await cursor.continue();}return result;}
 /** Cached account data may be discarded without deleting this account's downloaded songs. */
-export async function removeAccountCache(accountId:string,options:{includeDownloads?:boolean}={}){const database=await db(),tx=database.transaction("entries","readwrite");let cursor=await tx.store.openCursor();while(cursor){const name=String(cursor.key);if(name.startsWith(key(accountId,""))&&(options.includeDownloads||!name.startsWith(key(accountId,"audio:"))))await cursor.delete();cursor=await cursor.continue();}await tx.done;const active=await database.get("entries","last-account") as Account|undefined;if(active?.id===accountId)await forgetActiveAccount();}
+export async function removeAccountCache(accountId:string,options:{includeDownloads?:boolean}={}){const database=await db(),tx=database.transaction("entries","readwrite");let cursor=await tx.store.openCursor();while(cursor){const name=String(cursor.key);const audio=["audio:","download:","chunk:"].some(prefix=>name.startsWith(key(accountId,prefix)));if(name.startsWith(key(accountId,""))&&(options.includeDownloads||!audio))await cursor.delete();cursor=await cursor.continue();}await tx.done;const active=await database.get("entries","last-account") as Account|undefined;if(active?.id===accountId)await forgetActiveAccount();}
 export async function forgetActiveAccount(){try{localStorage.removeItem("sakura-v2-active-account");localStorage.removeItem("sakura-v2-theme");}catch{}await (await db()).delete("entries","last-account");}
 export async function rememberAccount(account:Account){try{localStorage.setItem("sakura-v2-active-account",account.id);}catch{}await (await db()).put("entries",account,"last-account");}
 export async function lastAccount():Promise<Account|undefined>{return (await db()).get("entries","last-account");}

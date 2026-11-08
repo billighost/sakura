@@ -56,7 +56,7 @@ export class AudioResolutionJobs {
     if (!job) return;
     let result: ResolveRecordingResult;
     try {
-      const recording = await this.repository.findById(job.recordingId);
+      let recording = await this.repository.findById(job.recordingId);
       if (!recording) result = { status: "unavailable",reason: "recording-not-indexed",retryable: false };
       else {
         const reference=recording.references!.find((ref) => ref.provider === "deezer" || ref.provider === "spotify")!;
@@ -68,11 +68,12 @@ export class AudioResolutionJobs {
         else {
           const discovered = await this.discovery.discover(recording,AbortSignal.timeout(50000));
           if (discovered.status === "ready") {
+            if(discovered.verifiedMetadata){recording={...recording,metadata:discovered.verifiedMetadata};await this.ingestor.persistVerifiedAliases(recording);}
             await this.ingestor.persistAudio(recording,discovered.asset);
             if(this.promotions?.needsPreparation(discovered.asset))try{await this.promotions.prepare(recording,discovered.asset,AbortSignal.timeout(60000));}catch{/* Optional CDN preparation failure never recanonicalizes or replaces the worker recording. */}
             result = this.decoratePreparation(await this.resolver.resolve({ reference },job.accountId));
           } else if (discovered.status === "review") result = { status: "review",reason: "asset-mismatch",recordingId: recording.recordingId,candidates: discovered.candidates };
-          else result = { status: "unavailable",reason: "no-ready-audio",recordingId: recording.recordingId,retryable: discovered.retryable };
+          else result = { status: "unavailable",reason: "no-ready-audio",recordingId: recording.recordingId,retryable: discovered.retryable,sourceReason:/^[a-z0-9-]{1,80}$/.test(discovered.reason)?discovered.reason:"audio-source-unavailable" };
         }
       }
     } catch { result = { status: "unavailable",reason: "provider-unavailable",recordingId: job.recordingId,retryable: true }; }

@@ -27,7 +27,16 @@ export interface RecordingMetadata {
   durationMs?: number | null;
   version?: RecordingVersion;
   explicit?: "unknown" | "clean" | "explicit";
+  /** Trusted server-only catalogue spellings, each bound to verified recording
+   * references. Public expected metadata must never populate this field. */
+  verifiedAliases?: readonly VerifiedRecordingMetadataAlias[];
 }
+
+export interface VerifiedRecordingMetadataAlias {
+  metadata: Omit<RecordingMetadata, "verifiedAliases">;
+  references: readonly ProviderReference[];
+}
+export type VerifiedRecordingAlias = VerifiedRecordingMetadataAlias;
 
 export interface RecordingRequest {
   metadata: RecordingMetadata;

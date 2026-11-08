@@ -9,7 +9,7 @@ async function serve(request: Request, context: { params: Promise<{ recordingId:
     if (!account) return new Response(null, { status: 401, headers: { "Cache-Control": "private, no-store" } });
     const { recordingId } = await context.params;
     const assetId = new URL(request.url).searchParams.get("assetId") ?? "";
-    return await getRebuildServices().gateway.serve({ recordingId, assetId, accountId: account.id, range: request.headers.get("Range"), method, signal: request.signal });
+    return await getRebuildServices().gateway.serve({ recordingId, assetId, accountId: account.id, range: request.headers.get("Range"), ifRange: request.headers.get("If-Range"), method, signal: request.signal });
   } catch {
     if (request.signal.aborted) return new Response(null, { status: 499 });
     return Response.json({ status: "unavailable", reason: "backend-unavailable" }, { status: 503, headers: { "Cache-Control": "private, no-store" } });

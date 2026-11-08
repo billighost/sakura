@@ -1,0 +1,1406 @@
+{
+  "checkedAt": "2026-11-08T07:11:10.674Z",
+  "mode": "search-api-metadata-only",
+  "base": "http://127.0.0.1:3015",
+  "targets": 4,
+  "maxAudioBytes": 16384,
+  "audioReservedBytes": 0,
+  "audioReceivedBytes": 0,
+  "method": "Actual Sakura search API selects exact user-named song and artist; metadata-only indexing hydrates canonical references and credits; source discovery captures raw rejection tuples. Optional startup is one exactly4KiB range with immediate body cancellation. No resolve jobs, promotions or full audio transfers.",
+  "results": [
+    {
+      "target": {
+        "key": "east-west",
+        "requested": "文明開化 (East West)",
+        "queries": [
+          "文明開化 Tomonari Sora",
+          "文明開化 友成空",
+          "East West Tomonari Sora"
+        ],
+        "titles": [
+          "文明開化",
+          "East West",
+          "文明開化 (East West)"
+        ],
+        "id": "3609044902"
+      },
+      "status": "metadata-ready",
+      "queries": [
+        {
+          "query": "文明開化 Tomonari Sora",
+          "resultCount": 9,
+          "matches": []
+        },
+        {
+          "query": "文明開化 友成空",
+          "resultCount": 11,
+          "matches": [
+            {
+              "reference": {
+                "provider": "deezer",
+                "id": "3609044902"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "3609044902"
+                }
+              ],
+              "metadata": {
+                "title": "East West",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 148000,
+                "artistsComplete": false,
+                "explicit": "unknown"
+              },
+              "coverUrl": "https://cdn-images.dzcdn.net/images/cover/db68eae2a5ac61e42ea3706215077f9b/1000x1000-000000-80-0-0.jpg",
+              "artistImageUrl": "https://cdn-images.dzcdn.net/images/artist/b1c561d9370a080c3b1e203e0e882c84/500x500-000000-80-0-0.jpg",
+              "albumTitle": "East West",
+              "artistReference": {
+                "provider": "deezer",
+                "id": "224043425"
+              },
+              "albumReference": {
+                "provider": "deezer",
+                "id": "840363552"
+              },
+              "artistId": "deezer:224043425",
+              "albumId": "deezer:840363552",
+              "artistCredits": [
+                {
+                  "name": "友成空",
+                  "role": "primary",
+                  "reference": {
+                    "provider": "deezer",
+                    "id": "224043425"
+                  }
+                }
+              ],
+              "popularity": 21758
+            }
+          ]
+        }
+      ],
+      "workerObservations": [
+        {
+          "path": "/v2/resolve",
+          "status": 500,
+          "payload": {
+            "error": "Unknown worker chat scope"
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 200,
+          "payload": {
+            "status": "ready",
+            "audio": {
+              "messageId": "14432",
+              "chatScope": "musicshuntersbot",
+              "metadata": {
+                "title": "East West",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 148000
+              },
+              "mimeType": "audio/mpeg",
+              "size": 6061096,
+              "fileId": "6017123008441755560"
+            }
+          }
+        }
+      ],
+      "selected": {
+        "reference": {
+          "provider": "deezer",
+          "id": "3609044902"
+        },
+        "references": [
+          {
+            "provider": "deezer",
+            "id": "3609044902"
+          }
+        ],
+        "metadata": {
+          "title": "East West",
+          "artists": [
+            "友成空"
+          ],
+          "durationMs": 148000,
+          "artistsComplete": false,
+          "explicit": "unknown"
+        },
+        "coverUrl": "https://cdn-images.dzcdn.net/images/cover/db68eae2a5ac61e42ea3706215077f9b/1000x1000-000000-80-0-0.jpg",
+        "artistImageUrl": "https://cdn-images.dzcdn.net/images/artist/b1c561d9370a080c3b1e203e0e882c84/500x500-000000-80-0-0.jpg",
+        "albumTitle": "East West",
+        "artistReference": {
+          "provider": "deezer",
+          "id": "224043425"
+        },
+        "albumReference": {
+          "provider": "deezer",
+          "id": "840363552"
+        },
+        "artistId": "deezer:224043425",
+        "albumId": "deezer:840363552",
+        "artistCredits": [
+          {
+            "name": "友成空",
+            "role": "primary",
+            "reference": {
+              "provider": "deezer",
+              "id": "224043425"
+            }
+          }
+        ],
+        "popularity": 21758
+      },
+      "canonical": {
+        "recordingId": "6c98d9af-7045-4171-9a15-937a914de2e6",
+        "metadata": {
+          "title": "East West",
+          "artists": [
+            "友成空"
+          ],
+          "durationMs": 148000,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "East West",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 148000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "id": "3609044902",
+                  "provider": "deezer"
+                },
+                {
+                  "id": "JPB602503623",
+                  "provider": "isrc"
+                }
+              ]
+            }
+          ]
+        },
+        "references": [
+          {
+            "provider": "deezer",
+            "id": "3609044902"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602503623"
+          }
+        ],
+        "coverUrl": "https://cdn-images.dzcdn.net/images/cover/db68eae2a5ac61e42ea3706215077f9b/1000x1000-000000-80-0-0.jpg",
+        "artistImageUrl": "https://cdn-images.dzcdn.net/images/artist/b1c561d9370a080c3b1e203e0e882c84/500x500-000000-80-0-0.jpg",
+        "albumTitle": "East West",
+        "artistReference": {
+          "provider": "deezer",
+          "id": "224043425"
+        },
+        "albumReference": {
+          "provider": "deezer",
+          "id": "840363552"
+        },
+        "artistCredits": [
+          {
+            "name": "友成空",
+            "role": "primary",
+            "reference": {
+              "provider": "deezer",
+              "id": "224043425"
+            }
+          }
+        ],
+        "artistId": "3ecb96e2-75f6-47ea-8035-124f9c8694a5",
+        "albumId": "0b856239-bed3-4ef7-b23b-65b53d84fbc9"
+      },
+      "source": {
+        "status": "ready",
+        "verifiedMetadata": {
+          "title": "East West",
+          "artists": [
+            "友成空"
+          ],
+          "durationMs": 148000,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "East West",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 148000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "3609044902"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602503623"
+                }
+              ]
+            }
+          ]
+        },
+        "asset": {
+          "assetId": "490f024e-9628-54a2-8a6d-e3b683580f3a",
+          "recordingId": "6c98d9af-7045-4171-9a15-937a914de2e6",
+          "candidate": {
+            "candidateId": "490f024e-9628-54a2-8a6d-e3b683580f3a",
+            "metadata": {
+              "title": "East West",
+              "artists": [
+                "友成空"
+              ],
+              "durationMs": 148000,
+              "explicit": "unknown",
+              "artistsComplete": false
+            },
+            "references": [
+              {
+                "provider": "telegram",
+                "id": "14432",
+                "scope": "musicshuntersbot"
+              }
+            ],
+            "audioKind": "full"
+          },
+          "locator": {
+            "kind": "telegram-worker",
+            "messageId": "14432",
+            "chatScope": "musicshuntersbot",
+            "protocol": "v2",
+            "documentId": "6017123008441755560"
+          },
+          "state": "ready",
+          "verifiedAt": "2026-11-08T07:10:19.087Z",
+          "mimeType": "audio/mpeg",
+          "sizeBytes": 6061096,
+          "ownerAccountId": null
+        }
+      },
+      "elapsedMs": 19657
+    },
+    {
+      "target": {
+        "key": "hoko",
+        "requested": "咆哮 (HOKO)",
+        "queries": [
+          "咆哮 Tomonari Sora"
+        ],
+        "titles": [
+          "咆哮 - HOKO"
+        ],
+        "id": "1fPkUiufkRpzdYcBKXUP3s"
+      },
+      "status": "metadata-ready",
+      "queries": [
+        {
+          "query": "咆哮 Tomonari Sora",
+          "resultCount": 8,
+          "matches": [
+            {
+              "reference": {
+                "provider": "spotify",
+                "id": "1fPkUiufkRpzdYcBKXUP3s"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "1fPkUiufkRpzdYcBKXUP3s"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602501985"
+                }
+              ],
+              "metadata": {
+                "title": "咆哮 - HOKO",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 209766,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "artistCredits": [
+                {
+                  "name": "TOMONARI SORA\t",
+                  "role": "primary",
+                  "reference": {
+                    "provider": "spotify",
+                    "id": "2UMMVk4WPg6pKXQGvufnuG"
+                  }
+                }
+              ],
+              "albumTitle": "咆哮 (HOKO)",
+              "coverUrl": "https://i.scdn.co/image/ab67616d0000b273a730b909ded2596e1ae5a61c",
+              "artistReference": {
+                "provider": "spotify",
+                "id": "2UMMVk4WPg6pKXQGvufnuG"
+              },
+              "albumReference": {
+                "provider": "spotify",
+                "id": "10zv8Z1MZv4eL8z914Q3TL"
+              },
+              "popularity": 0,
+              "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+              "albumId": "spotify:10zv8Z1MZv4eL8z914Q3TL"
+            }
+          ]
+        }
+      ],
+      "workerObservations": [
+        {
+          "path": "/v2/resolve",
+          "status": 500,
+          "payload": {
+            "error": "Unknown worker chat scope"
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "HOKO",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 209000,
+                "reasons": [
+                  "title",
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "HOKO",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 209000,
+                "reasons": [
+                  "title",
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 200,
+          "payload": {
+            "status": "ready",
+            "audio": {
+              "messageId": "14442",
+              "chatScope": "musicshuntersbot",
+              "metadata": {
+                "title": "HOKO",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 209000
+              },
+              "mimeType": "audio/mpeg",
+              "size": 8828274,
+              "fileId": "6041756651634045580"
+            }
+          }
+        }
+      ],
+      "selected": {
+        "reference": {
+          "provider": "spotify",
+          "id": "1fPkUiufkRpzdYcBKXUP3s"
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "1fPkUiufkRpzdYcBKXUP3s"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602501985"
+          }
+        ],
+        "metadata": {
+          "title": "咆哮 - HOKO",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 209766,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "albumTitle": "咆哮 (HOKO)",
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273a730b909ded2596e1ae5a61c",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "10zv8Z1MZv4eL8z914Q3TL"
+        },
+        "popularity": 0,
+        "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+        "albumId": "spotify:10zv8Z1MZv4eL8z914Q3TL"
+      },
+      "canonical": {
+        "recordingId": "6e9e1881-12b4-4892-8aa7-39baea79e89b",
+        "metadata": {
+          "title": "咆哮 - HOKO",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 209766,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "咆哮 - HOKO",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 209766,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "id": "1fPkUiufkRpzdYcBKXUP3s",
+                  "provider": "spotify"
+                },
+                {
+                  "id": "JPB602501985",
+                  "provider": "isrc"
+                }
+              ]
+            }
+          ]
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "1fPkUiufkRpzdYcBKXUP3s"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602501985"
+          }
+        ],
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273a730b909ded2596e1ae5a61c",
+        "albumTitle": "咆哮 (HOKO)",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "10zv8Z1MZv4eL8z914Q3TL"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "artistId": "b77ee8a6-1d44-4a04-a915-78b8c9792325",
+        "albumId": "5593fd0e-7442-4cad-941d-c65f01306335"
+      },
+      "source": {
+        "status": "ready",
+        "verifiedMetadata": {
+          "title": "咆哮 - HOKO",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 209766,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "咆哮 - HOKO",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 209766,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "1fPkUiufkRpzdYcBKXUP3s"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602501985"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "HOKO",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 209000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "3559573421"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602501985"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "咆哮",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 209398,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "7rc79XVkUIvmK4TINjXhl1"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602501985"
+                }
+              ]
+            }
+          ]
+        },
+        "asset": {
+          "assetId": "629d571a-be20-5f2a-8049-e421acdc3594",
+          "recordingId": "6e9e1881-12b4-4892-8aa7-39baea79e89b",
+          "candidate": {
+            "candidateId": "629d571a-be20-5f2a-8049-e421acdc3594",
+            "metadata": {
+              "title": "HOKO",
+              "artists": [
+                "友成空"
+              ],
+              "durationMs": 209000,
+              "explicit": "unknown",
+              "artistsComplete": false
+            },
+            "references": [
+              {
+                "provider": "telegram",
+                "id": "14442",
+                "scope": "musicshuntersbot"
+              }
+            ],
+            "audioKind": "full"
+          },
+          "locator": {
+            "kind": "telegram-worker",
+            "messageId": "14442",
+            "chatScope": "musicshuntersbot",
+            "protocol": "v2",
+            "documentId": "6041756651634045580"
+          },
+          "state": "ready",
+          "verifiedAt": "2026-11-08T07:10:39.626Z",
+          "mimeType": "audio/mpeg",
+          "sizeBytes": 8828274,
+          "ownerAccountId": null
+        }
+      },
+      "elapsedMs": 20533
+    },
+    {
+      "target": {
+        "key": "niramekko",
+        "requested": "睨めっ娘",
+        "queries": [
+          "睨めっ娘 Tomonari Sora"
+        ],
+        "titles": [
+          "睨めっ娘"
+        ],
+        "id": "3dPrNa7YVisbRaBBr3xdBj"
+      },
+      "status": "metadata-ready",
+      "queries": [
+        {
+          "query": "睨めっ娘 Tomonari Sora",
+          "resultCount": 6,
+          "matches": [
+            {
+              "reference": {
+                "provider": "spotify",
+                "id": "3dPrNa7YVisbRaBBr3xdBj"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "3dPrNa7YVisbRaBBr3xdBj"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602401364"
+                }
+              ],
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 158850,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "artistCredits": [
+                {
+                  "name": "TOMONARI SORA\t",
+                  "role": "primary",
+                  "reference": {
+                    "provider": "spotify",
+                    "id": "2UMMVk4WPg6pKXQGvufnuG"
+                  }
+                }
+              ],
+              "albumTitle": "文明開化 (East West)",
+              "coverUrl": "https://i.scdn.co/image/ab67616d0000b273256aaa1f02e77e922b12f01e",
+              "artistReference": {
+                "provider": "spotify",
+                "id": "2UMMVk4WPg6pKXQGvufnuG"
+              },
+              "albumReference": {
+                "provider": "spotify",
+                "id": "7lAe4jZ69BXoVe6vBaKVMX"
+              },
+              "popularity": 0,
+              "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+              "albumId": "spotify:7lAe4jZ69BXoVe6vBaKVMX"
+            }
+          ]
+        }
+      ],
+      "workerObservations": [
+        {
+          "path": "/v2/resolve",
+          "status": 500,
+          "payload": {
+            "error": "Unknown worker chat scope"
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "睨めっ娘",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 159000,
+                "reasons": [
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "睨めっ娘",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 159000,
+                "reasons": [
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 200,
+          "payload": {
+            "status": "ready",
+            "audio": {
+              "messageId": "14446",
+              "chatScope": "musicshuntersbot",
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 159000
+              },
+              "mimeType": "audio/mpeg",
+              "size": 6635057,
+              "fileId": "5931639866327580067"
+            }
+          }
+        }
+      ],
+      "selected": {
+        "reference": {
+          "provider": "spotify",
+          "id": "3dPrNa7YVisbRaBBr3xdBj"
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "3dPrNa7YVisbRaBBr3xdBj"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602401364"
+          }
+        ],
+        "metadata": {
+          "title": "睨めっ娘",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 158850,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "albumTitle": "文明開化 (East West)",
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273256aaa1f02e77e922b12f01e",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "7lAe4jZ69BXoVe6vBaKVMX"
+        },
+        "popularity": 0,
+        "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+        "albumId": "spotify:7lAe4jZ69BXoVe6vBaKVMX"
+      },
+      "canonical": {
+        "recordingId": "350b835c-61b8-4a23-82f3-6184ad88bb19",
+        "metadata": {
+          "title": "睨めっ娘",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 158850,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 158850,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "id": "3dPrNa7YVisbRaBBr3xdBj",
+                  "provider": "spotify"
+                },
+                {
+                  "id": "JPB602401364",
+                  "provider": "isrc"
+                }
+              ]
+            }
+          ]
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "3dPrNa7YVisbRaBBr3xdBj"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602401364"
+          }
+        ],
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273256aaa1f02e77e922b12f01e",
+        "albumTitle": "文明開化 (East West)",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "7lAe4jZ69BXoVe6vBaKVMX"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "artistId": "b77ee8a6-1d44-4a04-a915-78b8c9792325",
+        "albumId": "60026bd5-de7a-4beb-86a9-b35178a9860f"
+      },
+      "source": {
+        "status": "ready",
+        "verifiedMetadata": {
+          "title": "睨めっ娘",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 158850,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 158850,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "3dPrNa7YVisbRaBBr3xdBj"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602401364"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 159000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "2768894811"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602401364"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "睨めっ娘",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 159000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "2SL6pRmKNyug2DqhoVjVXq"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602401364"
+                }
+              ]
+            }
+          ]
+        },
+        "asset": {
+          "assetId": "e04e4f87-d8fc-5ea1-808e-cf634a3fea97",
+          "recordingId": "350b835c-61b8-4a23-82f3-6184ad88bb19",
+          "candidate": {
+            "candidateId": "e04e4f87-d8fc-5ea1-808e-cf634a3fea97",
+            "metadata": {
+              "title": "睨めっ娘",
+              "artists": [
+                "友成空"
+              ],
+              "durationMs": 159000,
+              "explicit": "unknown",
+              "artistsComplete": false
+            },
+            "references": [
+              {
+                "provider": "telegram",
+                "id": "14446",
+                "scope": "musicshuntersbot"
+              }
+            ],
+            "audioKind": "full"
+          },
+          "locator": {
+            "kind": "telegram-worker",
+            "messageId": "14446",
+            "chatScope": "musicshuntersbot",
+            "protocol": "v2",
+            "documentId": "5931639866327580067"
+          },
+          "state": "ready",
+          "verifiedAt": "2026-11-08T07:10:53.347Z",
+          "mimeType": "audio/mpeg",
+          "sizeBytes": 6635057,
+          "ownerAccountId": null
+        }
+      },
+      "elapsedMs": 13717
+    },
+    {
+      "target": {
+        "key": "onino-utage",
+        "requested": "鬼ノ宴",
+        "queries": [
+          "鬼ノ宴 Tomonari Sora"
+        ],
+        "titles": [
+          "鬼ノ宴"
+        ],
+        "id": "096KHkONhQm4MQNH35mU22"
+      },
+      "status": "metadata-ready",
+      "queries": [
+        {
+          "query": "鬼ノ宴 Tomonari Sora",
+          "resultCount": 9,
+          "matches": [
+            {
+              "reference": {
+                "provider": "spotify",
+                "id": "096KHkONhQm4MQNH35mU22"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "096KHkONhQm4MQNH35mU22"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602400319"
+                }
+              ],
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 175998,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "artistCredits": [
+                {
+                  "name": "TOMONARI SORA\t",
+                  "role": "primary",
+                  "reference": {
+                    "provider": "spotify",
+                    "id": "2UMMVk4WPg6pKXQGvufnuG"
+                  }
+                }
+              ],
+              "albumTitle": "鬼ノ宴",
+              "coverUrl": "https://i.scdn.co/image/ab67616d0000b273b31680ab85031d2be2a3df6b",
+              "artistReference": {
+                "provider": "spotify",
+                "id": "2UMMVk4WPg6pKXQGvufnuG"
+              },
+              "albumReference": {
+                "provider": "spotify",
+                "id": "4hHgHqD2J1D4bvlzmzzCeT"
+              },
+              "popularity": 0,
+              "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+              "albumId": "spotify:4hHgHqD2J1D4bvlzmzzCeT"
+            }
+          ]
+        }
+      ],
+      "workerObservations": [
+        {
+          "path": "/v2/resolve",
+          "status": 500,
+          "payload": {
+            "error": "Unknown worker chat scope"
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 176000,
+                "reasons": [
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 409,
+          "payload": {
+            "status": "review",
+            "candidates": [
+              {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 176000,
+                "reasons": [
+                  "artist"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "/v2/resolve",
+          "status": 200,
+          "payload": {
+            "status": "ready",
+            "audio": {
+              "messageId": "14450",
+              "chatScope": "musicshuntersbot",
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 176000
+              },
+              "mimeType": "audio/mpeg",
+              "size": 7176588,
+              "fileId": "6006027316914827576"
+            }
+          }
+        }
+      ],
+      "selected": {
+        "reference": {
+          "provider": "spotify",
+          "id": "096KHkONhQm4MQNH35mU22"
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "096KHkONhQm4MQNH35mU22"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602400319"
+          }
+        ],
+        "metadata": {
+          "title": "鬼ノ宴",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 175998,
+          "artistsComplete": true,
+          "explicit": "unknown"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "albumTitle": "鬼ノ宴",
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273b31680ab85031d2be2a3df6b",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "4hHgHqD2J1D4bvlzmzzCeT"
+        },
+        "popularity": 0,
+        "artistId": "spotify:2UMMVk4WPg6pKXQGvufnuG",
+        "albumId": "spotify:4hHgHqD2J1D4bvlzmzzCeT"
+      },
+      "canonical": {
+        "recordingId": "ebaaa3ae-fd3b-4b15-acb0-d0a9cf514961",
+        "metadata": {
+          "title": "鬼ノ宴",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 175998,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 175998,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "id": "096KHkONhQm4MQNH35mU22",
+                  "provider": "spotify"
+                },
+                {
+                  "id": "JPB602400319",
+                  "provider": "isrc"
+                }
+              ]
+            }
+          ]
+        },
+        "references": [
+          {
+            "provider": "spotify",
+            "id": "096KHkONhQm4MQNH35mU22"
+          },
+          {
+            "provider": "isrc",
+            "id": "JPB602400319"
+          }
+        ],
+        "coverUrl": "https://i.scdn.co/image/ab67616d0000b273b31680ab85031d2be2a3df6b",
+        "albumTitle": "鬼ノ宴",
+        "artistReference": {
+          "provider": "spotify",
+          "id": "2UMMVk4WPg6pKXQGvufnuG"
+        },
+        "albumReference": {
+          "provider": "spotify",
+          "id": "4hHgHqD2J1D4bvlzmzzCeT"
+        },
+        "artistCredits": [
+          {
+            "name": "TOMONARI SORA\t",
+            "role": "primary",
+            "reference": {
+              "provider": "spotify",
+              "id": "2UMMVk4WPg6pKXQGvufnuG"
+            }
+          }
+        ],
+        "artistId": "b77ee8a6-1d44-4a04-a915-78b8c9792325",
+        "albumId": "9d9ab7f0-7f67-49a5-a253-0d928fd55b05"
+      },
+      "source": {
+        "status": "ready",
+        "verifiedMetadata": {
+          "title": "鬼ノ宴",
+          "artists": [
+            "TOMONARI SORA"
+          ],
+          "durationMs": 175998,
+          "artistsComplete": true,
+          "explicit": "unknown",
+          "verifiedAliases": [
+            {
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 175998,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "096KHkONhQm4MQNH35mU22"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602400319"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "友成空"
+                ],
+                "durationMs": 176000,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "deezer",
+                  "id": "2600418932"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602400319"
+                }
+              ]
+            },
+            {
+              "metadata": {
+                "title": "鬼ノ宴",
+                "artists": [
+                  "TOMONARI SORA"
+                ],
+                "durationMs": 174789,
+                "artistsComplete": true,
+                "explicit": "unknown"
+              },
+              "references": [
+                {
+                  "provider": "spotify",
+                  "id": "2sPRalfPv1RNhjaEftbBZi"
+                },
+                {
+                  "provider": "isrc",
+                  "id": "JPB602400319"
+                }
+              ]
+            }
+          ]
+        },
+        "asset": {
+          "assetId": "c6edecd3-7c72-5198-8b65-a29d0b78cb8b",
+          "recordingId": "ebaaa3ae-fd3b-4b15-acb0-d0a9cf514961",
+          "candidate": {
+            "candidateId": "c6edecd3-7c72-5198-8b65-a29d0b78cb8b",
+            "metadata": {
+              "title": "鬼ノ宴",
+              "artists": [
+                "友成空"
+              ],
+              "durationMs": 176000,
+              "explicit": "unknown",
+              "artistsComplete": false
+            },
+            "references": [
+              {
+                "provider": "telegram",
+                "id": "14450",
+                "scope": "musicshuntersbot"
+              }
+            ],
+            "audioKind": "full"
+          },
+          "locator": {
+            "kind": "telegram-worker",
+            "messageId": "14450",
+            "chatScope": "musicshuntersbot",
+            "protocol": "v2",
+            "documentId": "6006027316914827576"
+          },
+          "state": "ready",
+          "verifiedAt": "2026-11-08T07:11:10.674Z",
+          "mimeType": "audio/mpeg",
+          "sizeBytes": 7176588,
+          "ownerAccountId": null
+        }
+      },
+      "elapsedMs": 17323
+    }
+  ]
+}

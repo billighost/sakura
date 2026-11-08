@@ -8,9 +8,16 @@ export class ProductionRecordingResolver {
   constructor(private readonly repository: RecordingRepository,private readonly ingestor: RecordingIngestor,private readonly existing: RecordingResolver,private readonly jobs: AudioResolutionJobs,private readonly targets?:PlaybackTargets) {}
   async resolve(input: ResolveRecordingInput,accountId: string,signal?: AbortSignal): Promise<ResolveRecordingResult> {
     try {
-      const existing = await this.existing.resolve(input,accountId,signal);
+      let existing = await this.existing.resolve(input,accountId,signal);
+      if(existing.status==="review"&&(existing.reason==="asset-mismatch"||existing.reason==="catalog-mismatch")&&existing.recordingId){
+        const recording=await this.repository.findById(existing.recordingId);
+        if(recording){const enriched=await this.ingestor.hydrateVerifiedAliases(recording,signal);if(enriched!==recording)existing=await this.existing.resolve(input,accountId,signal);}
+      }
       if(existing.status==="resolved"&&await this.jobs.needsPreparation(existing,accountId))return this.jobs.enqueue(existing.recording,accountId,"preparing-audio");
-      if (existing.status === "resolved" || existing.status === "review") {const result=this.jobs.decoratePreparation(existing);return this.targets?this.targets.decorate(result,accountId):result;}
+      // A stale/rejected stored source is recoverable by finding another exact
+      // file. Catalogue conflicts and genuinely ambiguous valid files still need
+      // the listener to choose their intended recording.
+      if (existing.status === "resolved" || (existing.status === "review" && existing.reason !== "asset-mismatch")) {const result=this.jobs.decoratePreparation(existing);return this.targets?this.targets.decorate(result,accountId):result;}
       let recording = await this.repository.findByReference(input.reference);
       if (!recording) recording = await this.ingestor.ensureRecording(input.reference,input.expected,signal);
       return this.jobs.enqueue(recording,accountId);

@@ -2,7 +2,7 @@ import type { PoolClient, QueryResultRow } from "pg";
 import { getRebuildPool } from "./db";
 import type { ProviderReference } from "../core/types";
 import { assessAudioCandidate } from "../core/matching";
-import { isUuid,parseRecordingMetadata,supportedAudioMime } from "../server/input";
+import { isUuid,parseRecordingMetadata,parseTrustedRecordingMetadata,supportedAudioMime } from "../server/input";
 
 export interface ReadyPlayback {
   kind:"stream";delivery:"cdn";assetId:string;sizeBytes:number;sha256:string;url:string;fallbackUrl:string;mimeType:string;durationMs:number|null;
@@ -35,7 +35,7 @@ function readyPlayback(row:QueryResultRow,metadata:Record<string,unknown>,refere
   try{
     const url=new URL(proof.url),path=new RegExp(`^/${cloud}/video/upload/v[1-9]\\d*/sakura/v2/audio/${row.id}/${proof.sha256}\\.mp3$`);
     if(url.origin!=="https://res.cloudinary.com"||url.username||url.password||url.search||url.hash||!path.test(url.pathname))return;
-    const parsed=parseRecordingMetadata(metadata),candidate=parseRecordingMetadata(proof.metadata);
+    const parsed=parseTrustedRecordingMetadata(metadata),candidate=parseRecordingMetadata(proof.metadata);
     if(!assessAudioCandidate({metadata:parsed,references},{candidateId:String(proof.assetId),metadata:candidate,references:Array.isArray(proof.references)?proof.references as ProviderReference[]:[],audioKind:"full"}).acceptable)return;
     return {kind:"stream",delivery:"cdn",assetId:String(proof.assetId),sizeBytes,sha256:proof.sha256,url:url.href,
       fallbackUrl:`/api/v2/recordings/${row.id}/audio?assetId=${proof.assetId}`,mimeType:proof.mimeType,durationMs:parsed.durationMs??null};
