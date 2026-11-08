@@ -3,7 +3,7 @@ import {randomUUID} from "node:crypto";
 import {test} from "node:test";
 import {sessionPatch} from "../src/rebuild/data/session";
 import {sessionState,SESSION_QUEUE_LIMIT} from "../src/rebuild/app/sessionState";
-import {preferencesPatch,ProductError} from "../src/rebuild/data/validation";
+import {preferencesPatch,ProductError,DEFAULT_SETTINGS} from "../src/rebuild/data/validation";
 import type {MusicTrack} from "../src/rebuild/app/types";
 import {settingsFields,unacknowledgedPreferences} from "../src/rebuild/app/preferences";
 import {readFileSync} from "node:fs";
@@ -34,6 +34,11 @@ test("all persisted playback preferences validate and device downloads are exclu
 test("malformed cached preferences cannot break player hydration or leak unsupported state",()=>{
  assert.deepEqual(settingsFields({theme:"unknown",volume:2,previewVolume:NaN,shuffle:"false",onboarded:"true",seedArtists:[null],sleepTimerMinutes:-1,openingAnimation:7,timeZone:"invalid",downloads:[track],revision:99}),{});
  assert.deepEqual(settingsFields({theme:"dark",volume:0,onboarded:true,shuffle:false,previewLoop:false,sleepTimerMinutes:180,timeZone:"Africa/Lagos"}),{theme:"dark",timeZone:"Africa/Lagos",onboarded:true,volume:0,shuffle:false,previewLoop:false,sleepTimerMinutes:180});
+});
+test("Sakura opening defaults on only when the preference is unset",()=>{
+ assert.equal(DEFAULT_SETTINGS.openingAnimation,1);
+ assert.deepEqual(settingsFields({openingAnimation:0}),{openingAnimation:0});
+ assert.deepEqual({...DEFAULT_SETTINGS,...settingsFields({openingAnimation:0})},{...DEFAULT_SETTINGS,openingAnimation:0});
 });
 test("preference acknowledgement removes sent fields while preserving newer edits",()=>{
  assert.deepEqual(unacknowledgedPreferences({volume:.2,theme:"dark",repeat:"all"},{volume:.8,theme:"dark"}),{volume:.2,repeat:"all"});

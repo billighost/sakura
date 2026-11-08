@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       plainLyrics: track.plainLyrics || null,
       lines: track.syncedLyrics ? parseTimedLyrics(track.syncedLyrics) : (track.plainLyrics || "").split(/\r?\n/).map((text) => ({ text, start: 0 })),
       timing: track.syncedLyrics ? "synced" : "plain",
-      schemaVersion: "verified-lyrics-v1",
+      schemaVersion: "verified-lyrics-v2",
     }, { headers: { "Cache-Control": "private, max-age=3600" } });
   } catch (error) {
     if (error instanceof LyricRequestError) return NextResponse.json({ error: error.message }, { status: error.status });

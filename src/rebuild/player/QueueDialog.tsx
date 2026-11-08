@@ -42,7 +42,7 @@ export function QueueDialog({ onClose }: { onClose: () => void }) {
       </li>)}</ol>
     </section>;
   }
-  return <PlayerDialog title="Let the listening unfold." subtitle="YOUR QUEUE" onClose={onClose} footer={<PlayerButton secondary onClick={onClose}>Back to listening</PlayerButton>}>
+  return <PlayerDialog title="Let the listening unfold." subtitle="YOUR QUEUE" onClose={onClose} className={s.queueDialog} footer={<PlayerButton secondary onClick={onClose}>Back to listening</PlayerButton>}>
     {music.track&&<div className={`${s.queueNow} ${s.currentQueue}`} aria-current="true"><Artwork url={music.track.coverUrl} title={music.track.title}/><div><p className={s.eyebrow}>NOW PLAYING</p><strong>{music.track.title}</strong><p onClick={onClose}><ArtistLinks track={music.track}/></p><small>{music.track.versionLabel}</small></div><IconButton icon={music.status==="playing"?"pause":"play"} label={music.status==="playing"?"Pause":"Play"} onClick={music.togglePlay}/></div>}
     <div className={s.queueHeading}><div><h3>The next chapter</h3><p>{upcoming.length} songs · {formatPlaybackTime(upcoming.reduce((sum,entry)=>sum+entry.track.durationMs,0))}</p></div>{upcoming.length>0&&<PlayerButton secondary onClick={music.clearQueue}>Clear queue</PlayerButton>}</div>
     {!upcoming.length&&<div className={s.empty}><p>A little space for your next favourite.</p><PlayerButton secondary onClick={onClose}>Keep exploring</PlayerButton></div>}

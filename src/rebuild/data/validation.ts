@@ -31,7 +31,7 @@ export function ids(value: unknown, limit = 200): string[] {
 }
 export const DEFAULT_SETTINGS = {
   theme: "system", audioQuality: "high", audioTechnology: "none", privateSession: false, discovery: 0.35,
-  reducedMotion: false, openingAnimation: 0, bloomPerformance: "auto", explicitContent: true,
+  reducedMotion: false, openingAnimation: 1, bloomPerformance: "auto", explicitContent: true,
   timeZone: "Africa/Lagos", seedArtistSelections: [],volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15,
 } as const;
 export function preferencesPatch(value: unknown): Record<string,unknown> {

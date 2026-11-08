@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const signal = AbortSignal.timeout(8000);
     let response: Response | undefined;
     for (let redirects = 0; redirects < 4; redirects++) {
-      response = await fetch(url, { signal, redirect: "manual", headers: { "User-Agent": "Sakura/2.0 artwork", Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif" } });
+      response = await fetch(url, { signal, redirect: "manual", cache: "force-cache", next: { revalidate: 604800 }, headers: { "User-Agent": "Sakura/2.0 artwork", Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif" } });
       if (response.status < 300 || response.status > 399) break;
       const location = response.headers.get("Location");
       if (!location) throw new Error("Artwork redirect is missing");
@@ -34,8 +34,9 @@ export async function GET(request: NextRequest) {
     }
     const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), length);
     const etag = `"${createHash("sha256").update(bytes).digest("hex")}"`;
-    if (request.headers.get("If-None-Match") === etag) return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": "public, max-age=86400" } });
-    return new NextResponse(bytes, { headers: { "Content-Type": type, "Content-Length": String(length), "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800", ETag: etag, "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "same-origin" } });
+    const cacheControl = "public, max-age=604800, stale-while-revalidate=2592000, stale-if-error=2592000";
+    if (request.headers.get("If-None-Match") === etag) return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": cacheControl } });
+    return new NextResponse(bytes, { headers: { "Content-Type": type, "Content-Length": String(length), "Cache-Control": cacheControl, ETag: etag, "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "same-origin" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error && error.message === "Unsupported artwork host" ? "Artwork host is unsupported" : "Artwork could not be loaded" }, { status: error instanceof Error && error.message === "Unsupported artwork host" ? 400 : 502 });
   }

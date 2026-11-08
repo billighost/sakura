@@ -16,7 +16,9 @@ const boundedString = (value: unknown, name: string, maximum = 200, optional = f
 
 export function parseLyricIdentity(query: URLSearchParams): LyricIdentity {
   const title = boundedString(query.get("title"), "title")!;
-  const artist = boundedString(query.get("artist"), "artist")!;
+  const artists = query.getAll("artist").map((value) => boundedString(value, "artist")!);
+  const artist = artists[0];
+  if (!artist) throw new LyricRequestError("artist is required");
   const album = boundedString(query.get("album"), "album", 200, true);
   const recordingId = boundedString(query.get("recordingId"), "recordingId", 100, true);
   const language = boundedString(query.get("language"), "language", 12, true);
@@ -25,7 +27,7 @@ export function parseLyricIdentity(query: URLSearchParams): LyricIdentity {
   if (durationSeconds !== undefined && (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > 24 * 60 * 60)) {
     throw new LyricRequestError("duration must be a positive number of seconds");
   }
-  return { title, artist, album, recordingId, durationSeconds, language };
+  return { title, artist, artists: [...new Set(artists)], album, recordingId, durationSeconds, language };
 }
 
 const time = (value: unknown, name: string, fallback?: number) => {

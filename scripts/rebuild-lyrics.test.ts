@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { japaneseReadingCacheKey, romanizeJapanese, romanizeJapaneseLines, romanizeKana } from "../src/rebuild/lyrics/japanese";
 import { activeLyricIndex, mergeVerifiedWordTimings, parseTimedLyrics } from "../src/rebuild/lyrics/parse";
-import { fetchLrcLibLyrics, lyricCacheKey, selectLyricsCandidate, type LrcLibTrack } from "../src/rebuild/lyrics/provider";
+import { fetchLrcLibLyrics, lyricCacheKey, lyricIdentityVariants, selectLyricsCandidate, type LrcLibTrack } from "../src/rebuild/lyrics/provider";
+import { lyricInputKey } from "../src/rebuild/player/useLyrics";
 import { createLyricsResolver } from "../src/rebuild/lyrics/service";
 import { LyricRequestError, parseLyricIdentity, parseReadingRequest } from "../src/rebuild/lyrics/request";
 
@@ -107,6 +108,19 @@ test("Lyrics refuse original/remix, wrong artist and duration mismatches", () =>
   assert.equal(selectLyricsCandidate(identity, [remix, original]).status, "matched");
 });
 
+test("Featured-artist formatting does not hide the correct duration-verified lyrics", () => {
+  const result = selectLyricsCandidate({ title: "Finesse", artist: "Bruno Mars", artists: ["Bruno Mars", "Cardi B"], durationSeconds: 217 }, [
+    { ...original, id: 2, artistName: "Bruno Mars feat. Cardi B", duration: 217 },
+  ]);
+  assert.equal(result.status, "matched");
+});
+
+test("Known native and romanized Japanese titles become verified lookup variants", () => {
+  const variants = lyricIdentityVariants({ title: "Idol", artist: "YOASOBI", durationSeconds: 213 });
+  assert.ok(variants.titles.some(title => title === "Idol"));
+  assert.ok(variants.titles.length > 1);
+});
+
 test("Translated English text cannot satisfy a Japanese lyric request", () => {
   const candidate = { id: 2, trackName: "Idol", artistName: "YOASOBI", duration: 213, plainLyrics: "translated English words" };
   assert.equal(selectLyricsCandidate({ title: "Idol", artist: "YOASOBI", durationSeconds: 213, language: "ja" }, [candidate]).status, "missing");
@@ -143,6 +157,14 @@ test("Verified exact lookup returns after one request and does not wait on other
   assert.equal(requests.length, 1);
 });
 
+test("Search fallback survives a transient exact-lookup outage", async () => {
+  const fakeFetch: typeof fetch = async (url) => String(url).includes("/api/search?")
+    ? Response.json([original])
+    : new Response("offline", { status: 503 });
+  const result = await fetchLrcLibLyrics({ title: "Finesse", artist: "Bruno Mars", durationSeconds: 191 }, { fetch: fakeFetch, timeoutMs: 10_000 });
+  assert.equal(result.status, "matched");
+});
+
 test("Provider outage is an explicit unavailable result", async () => {
   const fakeFetch: typeof fetch = async () => new Response("offline", { status: 503 });
   const result = await fetchLrcLibLyrics({ title: "Idol", artist: "YOASOBI" }, { fetch: fakeFetch });
@@ -162,6 +184,16 @@ test("Lyrics requests validate duration instead of allowing NaN cache collisions
   assert.throws(() => parseLyricIdentity(new URLSearchParams({ title: "Idol", artist: "YOASOBI", duration: "NaN" })), LyricRequestError);
   assert.throws(() => parseLyricIdentity(new URLSearchParams({ title: "Idol", artist: "YOASOBI", duration: "-1" })), LyricRequestError);
   assert.equal(parseLyricIdentity(new URLSearchParams({ title: "Idol", artist: "YOASOBI", duration: "213" })).durationSeconds, 213);
+});
+
+test("Lyrics request retains all credited artists", () => {
+  const identity = parseLyricIdentity(new URLSearchParams([["title", "Finesse"], ["artist", "Bruno Mars"], ["artist", "Cardi B"]]));
+  assert.deepEqual(identity.artists, ["Bruno Mars", "Cardi B"]);
+});
+
+test("Browser lyric cache survives a temporary-to-canonical recording ID swap", () => {
+  const base = { title: "Finesse", artists: ["Bruno Mars"], albumTitle: "24K Magic", durationMs: 191_200 };
+  assert.equal(lyricInputKey({ ...base, id: "deezer:123" }), lyricInputKey({ ...base, id: "9e6382ea-b571-4c07-8943-bc0c773f2993" }));
 });
 
 test("Concurrent identical lyric loads share one request and reuse the verified result", async () => {

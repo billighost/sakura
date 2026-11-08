@@ -46,7 +46,8 @@ async function readCache(key: string) {
       const request = db.transaction("lyrics", "readonly").objectStore("lyrics").get(key);
       request.onsuccess = () => {
         const value = request.result as CacheValue | undefined;
-        resolve(value?.key === key && Number.isFinite(value.savedAt) && validLines(value.data?.lines) ? value : undefined);
+        if (value?.key === key && Number.isFinite(value.savedAt) && validLines(value.data?.lines)) { memory.set(key, value); resolve(value); }
+        else resolve(undefined);
       };
       request.onerror = () => resolve(undefined);
     });
@@ -74,7 +75,8 @@ async function writeCache(value: CacheValue) {
   } catch { /* Lyrics still work when device storage is full or disabled. */ }
 }
 export function lyricInputKey(track: LyricInput) {
-  return JSON.stringify([VERIFIED_LYRICS_VERSION, JAPANESE_READING_VERSION, track.id, track.title, track.artists, track.albumTitle, track.durationMs]);
+  const normalize = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
+  return JSON.stringify([VERIFIED_LYRICS_VERSION, JAPANESE_READING_VERSION, normalize(track.title), [...new Set(track.artists.map(normalize))].sort(), normalize(track.albumTitle || ""), Math.round(track.durationMs / 1000)]);
 }
 export function useLyrics(track: MusicTrack | null) {
   const [retryVersion,setRetryVersion]=useState(0);
@@ -84,8 +86,10 @@ export function useLyrics(track: MusicTrack | null) {
   // metadata must keep the same subscription instead of canceling and fetching.
   const input = useMemo<LyricInput | null>(() => {
     if (!key) return null;
-    const [, , id, title, artists, albumTitle, durationMs] = JSON.parse(key) as [string, string, string, string, string[], string | null, number];
-    return { id, title, artists, albumTitle, durationMs };
+    return { id: track!.id, title: track!.title, artists: [...track!.artists], albumTitle: track!.albumTitle, durationMs: track!.durationMs };
+  // The normalized key intentionally keeps this object stable when catalog
+  // resolution only replaces a temporary recording ID.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   useEffect(() => {
     if (!input) return;
@@ -100,7 +104,8 @@ export function useLyrics(track: MusicTrack | null) {
       if (!cached) setResult({ key: thisKey, data: null, error: null, loading: true });
       try {
         const request = flights.acquire(thisKey, async signal => {
-          const query = new URLSearchParams({ recordingId: input.id, title: input.title, artist: input.artists[0] || "" });
+          const query = new URLSearchParams({ recordingId: input.id, title: input.title });
+          for (const artist of input.artists.length ? input.artists : [""]) query.append("artist", artist);
           if (input.durationMs > 0) query.set("duration", String(input.durationMs / 1000));
           if (input.albumTitle) query.set("album", input.albumTitle);
           const payload = await requestJson<PlayerLyrics>(`/api/v2/lyrics?${query}`, { signal },{context:"lyrics"});

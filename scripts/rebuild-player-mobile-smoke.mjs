@@ -29,23 +29,24 @@ try{
   await page.getByRole('button',{name:'Open now playing'}).click();
   await page.locator('dialog').getByRole('button',{name:'Pause',exact:true}).click();
   async function inspect(name){
-   const dialog=page.locator('dialog[open]');await dialog.waitFor();
+   const dialog=page.locator('dialog[open]').last();await dialog.waitFor();
    const result=await dialog.evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth,bodyOverflow:document.body.style.overflow,focusedInside:e.contains(document.activeElement),theme:document.documentElement.dataset.inkTheme,color:getComputedStyle(e).backgroundColor};});
    assert.ok(result.left>=-1&&result.right<=width+1,`${name} fits ${width}px`);assert.ok(result.top>=-1&&result.bottom<=845,`${name} fits height`);assert.ok(result.scrollWidth<=result.clientWidth+1,`${name} has no horizontal overflow`);assert.equal(result.bodyOverflow,'hidden');assert.equal(result.focusedInside,true);assert.equal(result.theme,theme);
    await page.screenshot({path:`.local/rebuild-${name}-${width}-${theme}.png`});return {name,...result};
   }
   const dialogs=[await inspect('player')];
-  await page.getByRole('button',{name:'Up next',exact:true}).click();dialogs.push(await inspect('queue'));
-  assert.equal(await page.locator('dialog ol>li').count(),39);
-  await page.locator('dialog [data-player-scroll]').evaluate(element=>{element.scrollTop=160;});
-  await page.locator('dialog').getByRole('button',{name:'Move A long song title for a narrow phone 2 earlier',exact:true}).click();
-  await page.locator('dialog').getByRole('button',{name:'Remove A long song title for a narrow phone 3 from queue',exact:true}).click();assert.equal(await page.locator('dialog ol>li').count(),38);
-  const currentCount=await page.locator('dialog [aria-current="true"]').count();assert.equal(currentCount,1);
-  await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'detached'});
-  await page.getByRole('button',{name:'Open now playing'}).click();await page.locator('dialog').getByRole('button',{name:'Lyrics',exact:true}).click();dialogs.push(await inspect('lyrics'));
-  await page.locator('dialog').getByRole('button',{name:'Share lyrics',exact:true}).click();await page.locator('dialog').getByRole('button',{name:'東京へ行く',exact:true}).click();await page.locator('dialog').getByRole('button',{name:'Share 1 lines',exact:true}).click();dialogs.push(await inspect('share'));
-  await page.locator('dialog img').waitFor({timeout:30000});assert.ok((await page.locator('dialog img').getAttribute('alt')).includes('東京へ行く'));
-  await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>document.body.style.overflow),'');
+  await page.getByRole('button',{name:'Up next',exact:true}).click();dialogs.push(await inspect('queue'));assert.equal(await page.locator('dialog[open]').count(),2);
+  assert.equal(await page.locator('dialog[open]').last().locator('ol>li').count(),39);
+  await page.locator('dialog[open]').last().locator('[data-player-scroll]').evaluate(element=>{element.scrollTop=160;});
+  await page.locator('dialog[open]').last().getByRole('button',{name:'Move A long song title for a narrow phone 2 earlier',exact:true}).click();
+  await page.locator('dialog[open]').last().getByRole('button',{name:'Remove A long song title for a narrow phone 3 from queue',exact:true}).click();assert.equal(await page.locator('dialog[open]').last().locator('ol>li').count(),38);
+  const currentCount=await page.locator('dialog[open]').last().locator('[aria-current="true"]').count();assert.equal(currentCount,1);
+  await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor();assert.equal(await page.locator('dialog[open]').count(),1);
+  await page.locator('dialog[open]').getByRole('button',{name:'Lyrics',exact:true}).click();dialogs.push(await inspect('lyrics'));assert.equal(await page.locator('dialog[open]').count(),2);
+  await page.locator('dialog[open]').last().getByRole('button',{name:'Share lyrics',exact:true}).click();await page.locator('dialog[open]').last().getByRole('button',{name:'東京へ行く',exact:true}).click();await page.locator('dialog[open]').last().getByRole('button',{name:'Share 1 lines',exact:true}).click();dialogs.push(await inspect('share'));
+  await page.locator('dialog[open]').last().locator('img').waitFor({timeout:30000});assert.ok((await page.locator('dialog[open]').last().locator('img').getAttribute('alt')).includes('東京へ行く'));
+  await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor();assert.equal(await page.locator('dialog[open]').count(),1);
+  await page.locator('dialog[open]').getByRole('button',{name:'Close',exact:true}).click();await page.locator('dialog[open]').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>document.body.style.overflow),'');
   assert.deepEqual(errors,[]);report.push({width,theme,dialogs,upcomingCount:38,oneCurrentOccurrence:true,auth:'live synthetic account',catalogAndMedia:'explicit browser fixtures'});await context.close();
  }
  await fs.writeFile('.local/rebuild-player-mobile-report.json',JSON.stringify({checkedAt:new Date().toISOString(),checks:report},null,2));console.log(JSON.stringify({variants:report.length,dialogs:report.length*4,queue:'current + 39 upcoming entries, exact move/remove',overflow:false,focus:true,themes:['light','dark'],catalogAndMedia:'explicit browser fixtures'}));

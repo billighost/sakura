@@ -21,6 +21,7 @@
 /.next-bloom-build/
 /.next-download-ui/
 /.next-track-ui/
+/.next-player-overlays/
 /out/
 
 # production

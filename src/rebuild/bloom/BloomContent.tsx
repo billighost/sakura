@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Original covers use the authenticated image proxy, intrinsic sizes and an illustrated error fallback. */
 import {useState} from "react";
 import {ArtistLinks} from "../app/ArtistLinks";
+import {Icon} from "../app/Icon";
 import {musicTrack} from "../app/types";
 import {chapterScene} from "./story";
 import {listeningDuration} from "./comparisons";
@@ -12,7 +13,7 @@ export function BloomArtwork({url,title,className}:{url:unknown;title:string;cla
 
 function Recording({entry,onPlay}:{entry:BloomRankedRecording;onPlay?:(recording:Record<string,unknown>)=>void}){
  const metadata=(entry.recording.metadata||entry.recording) as Record<string,unknown>;const title=String(entry.recording.title||metadata.title||"Recording");let track=null;try{track=musicTrack(entry.recording);}catch{}
- return <article className={s.recording} data-rank={entry.rank}><div className={s.recordingImage}><BloomArtwork url={entry.recording.coverUrl||metadata.coverUrl} title={title}/><span className={s.rank}>{String(entry.rank).padStart(2,"0")}</span>{onPlay&&<button className={s.playArtwork} aria-label={`Play ${title}`} onClick={()=>onPlay(entry.recording)}>▶</button>}</div><h3>{title}</h3><p className={s.credits}>{track?<ArtistLinks track={track}/>:Array.isArray(metadata.artists)?metadata.artists.join(" · "):""}</p><small>{listeningDuration(entry.audibleMs)} listened · {entry.plays} {entry.plays===1?"play":"plays"}</small></article>;
+ return <article className={s.recording} data-rank={entry.rank}><div className={s.recordingImage}><BloomArtwork url={entry.recording.coverUrl||metadata.coverUrl} title={title}/><span className={s.rank}>{String(entry.rank).padStart(2,"0")}</span>{onPlay&&<button className={s.playArtwork} aria-label={`Play ${title}`} onClick={()=>onPlay(entry.recording)}><Icon name="play" size={17}/></button>}</div><h3>{title}</h3><p className={s.credits}>{track?<ArtistLinks track={track}/>:Array.isArray(metadata.artists)?metadata.artists.join(" · "):""}</p><small>{listeningDuration(entry.audibleMs)} listened · {entry.plays} {entry.plays===1?"play":"plays"}</small></article>;
 }
 function Artist({artist}:{artist:BloomArtistInsight}){return <article className={`${s.artist} bloom-artist`}><BloomArtwork url={artist.imageUrl} title={artist.name} className={s.artistPortrait}/><div><span className={s.eyebrow}>A VOICE IN YOUR STORY</span><h3>{artist.name}</h3><p>{listeningDuration(artist.audibleMs)} of listening</p></div></article>;}
 
@@ -21,7 +22,7 @@ export function BloomChapterContent({chapter,onPlay,compact=false}:{chapter:Bloo
  const music=kind==="songs"||kind==="song-winner"||kind==="artist-songs"||kind==="discoveries"||kind==="returns";
  return <section className={`bloom-content ${s.chapterContent}`} data-kind={kind} aria-live={compact?undefined:"polite"}><span className={s.eyebrow}>{kind==="song-winner"?"YOUR NUMBER ONE":"YOUR LISTENING STORY"}</span><h2 className={`bloom-heading ${s.chapterHeading}`}>{chapter.title}</h2>{chapter.revealed&&chapter.stat?<>
   {(!music||!entries.length)&&kind!=="artist"&&kind!=="artists"&&<div className={`bloom-stat ${s.stat}`}><strong>{chapter.stat.value}</strong>{chapter.stat.unit&&<span>{chapter.stat.unit}</span>}<p>{chapter.stat.label}</p></div>}
-  {chapter.comparison&&<div className={s.comparison}><h3>{chapter.comparison.title}</h3><p>{chapter.comparison.detail}</p><button onClick={()=>setSources(value=>!value)} aria-expanded={sources}>The little calculation</button>{sources&&<small>{chapter.comparison.reference}{chapter.comparison.referenceUrl&&<> <a href={chapter.comparison.referenceUrl} target="_blank" rel="noreferrer">Reference ↗</a></>}</small>}</div>}
+  {chapter.comparison&&<div className={s.comparison}><h3>{chapter.comparison.title}</h3><p>{chapter.comparison.detail}</p><button onClick={()=>setSources(value=>!value)} aria-expanded={sources}>The little calculation</button>{sources&&<small>{chapter.comparison.reference}{chapter.comparison.referenceUrl&&<> <a href={chapter.comparison.referenceUrl} target="_blank" rel="noreferrer">Reference <Icon name="external" size={12}/></a></>}</small>}</div>}
   {chapter.artists?.length&&kind!=="artist-songs"?<div className={`${s.artists} bloom-artists`}>{chapter.artists.map(artist=><Artist key={artist.key} artist={artist}/>)}</div>:null}
   {kind==="artist-songs"&&chapter.artists?.[0]&&<p className={s.detail}>By {chapter.artists[0].name} ? your own most-listened recordings</p>}
   {music&&entries.length>0?<div className={`${s.artworks} bloom-artworks`} data-count={entries.length}>{entries.map(entry=><Recording key={String(entry.recording.id||entry.recording.recordingId)} entry={entry} onPlay={onPlay}/>)}</div>:null}
