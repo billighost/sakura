@@ -31,7 +31,7 @@ export function TrackList({tracks,showVersion=true,downloaded=false}:{tracks:Mus
    <button className={s.iconButton} type="button" aria-haspopup="menu" aria-expanded={menu?.track===t} aria-label={"More options for "+t.title} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setMenu({track:t,anchor:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}});}}><Icon name="more"/></button>
  </SongGesture>;})}{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>}</div>;
 }
-export function TrackMenu({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){return <TrackActions track={track} onClose={onClose} anchor={anchor}/>;}
+export function TrackMenu({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){return <TrackActions key={track.id} track={track} onClose={onClose} anchor={anchor}/>;}
 export function PlayerBar(){
  const p=useMusic();if(!p.track)return null;const active=p.status==="playing"||p.status==="buffering"||p.status==="resolving";
  return <footer className={s.playerBar}>

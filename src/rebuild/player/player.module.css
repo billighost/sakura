@@ -46,5 +46,6 @@
 @media(max-width:760px){.queueCoverButton{width:42px}}@media(max-width:380px){.queueCoverButton{width:32px}}
 
 .button,.secondaryButton{border-radius:18px 5px 18px 5px}.chips>button{border-radius:18px 5px 18px 5px;border-color:color-mix(in srgb,var(--p-petal) 50%,var(--p-line))}.chips>button[aria-pressed=true]{background:var(--p-accent);color:var(--p-bg)}.sharePreview,.shareLink,.lyricChoice{border-radius:22px 6px 22px 6px}.lyricLine{border-radius:18px 5px 18px 5px}.dialog select{border-radius:15px 5px 15px 5px}
+.shareField input[type=number]{border-radius:18px 5px 18px 5px;border-color:color-mix(in srgb,var(--p-petal) 40%,var(--p-line))}.videoProgress{height:5px}
 
 .dialog{--p-petal:var(--ink-petal,#d5ada8)}

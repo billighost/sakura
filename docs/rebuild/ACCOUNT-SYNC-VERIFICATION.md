@@ -33,3 +33,62 @@ Local screenshots and machine-readable evidence are in ignored `.local/sync-brow
 The final combined production build, TypeScript check and full ESLint completed
 successfully after all ten Bloom worlds were integrated. ESLint reports zero
 errors and 11 warnings. See [cinematic release verification](BLOOM-CINEMATIC-VERIFICATION.md).
+
+## Follow-up verification on 2026-11-08
+
+The follow-up fixes actual gaps in the first implementation. Chrome now renders
+4px scrollbars because both standard scrollbar properties are reset before the
+WebKit sizing rules apply. Home vines pause while the opening covers the page,
+then grow visibly. Search clear buttons have 44px targets; Library, liked songs,
+and collection pages now have clearable filters. Remaining progress, checkbox,
+form, and disclosure controls share the botanical styling, with keyboard feedback
+on sliders and no rectangular pointer-focus border.
+
+Listening intent retains its original timestamp through passive checkpoints.
+Server clock calibration and monotonic timing prevent a sleeping device or a
+clock change from replacing newer listening. Preference acknowledgements retain
+edits made during an earlier save. Invalid cached settings and sessions are
+ignored. Account-scoped favorite drafts preserve offline likes, replay their
+explicit desired state on reconnect, and acknowledge only the matching operation.
+
+Canceled downloads remove queued rows and stop stalled reads promptly. Canonical
+download/removal guards prevent alias races. Both accounts on the same phone keep
+their own saved audio across sign-out and repeated switching. History delivery has
+deadlines, coalesces exact chunks, and preserves unsent data. Logout gives flushing
+up to five seconds before signing out.
+
+Screen operations are locked synchronously and reject results after navigation or
+account changes. Import previews belong to the submitted URL; editing it cancels
+the preview. Registration retries avoid recreating an already created account.
+Sharing and exporting guard duplicate presses. Full playlists accept repeated
+additions without exceeding capacity or advancing revision for unchanged state.
+
+| Final check | Result |
+| --- | --- |
+| `npm test` | 187 passed |
+| `npm run test:sync` | 35 passed |
+| `npm run test:sync:db` | 6 passed in an isolated schema |
+| `npm run test:sync:browser` | 23 passed; zero page errors |
+| Isolated artistic-control browser checks | 4 passed |
+| Production Home, Search, and Settings browser checks | 5 passed; zero page errors |
+| TypeScript | Passed |
+| Full ESLint | Zero errors; 11 existing warnings |
+| Production build, `.next-bloom-build` | Passed; 50 pages generated |
+
+The database suite covers exact concurrent history receipts, independent account
+settings, listening compare-and-swap, request-ID playlist creation, and repeated
+mutations at the 2000-song playlist limit. A cold connection timeout occurred on
+one run; the final suite passed after warming the connection through the existing
+bounded read-only retry. Test cleanup also handles setup failure safely.
+
+Browser fixtures generate their own tone and authentication token and intercept
+account APIs; they do not depend on private audio or a real test account. The final
+checks exercise two separate devices and two shared-phone accounts. Production
+styling was checked at 1280px, 390px, and 320px. Local evidence is in
+`.local/sync-browser-report.json`, `.local/artistic-ui-report.json`, and
+`.local/sync-production-report.json`. The temporary test route was removed.
+
+Library filters search loaded pages; Show more stays available when a filter has
+no matches. Listening sessions retain a bounded 80-entry queue snapshot around the
+current song; the listening journal is saved separately in the database. Restored
+audio stays paused until the listener presses play. Downloads stay on their device.

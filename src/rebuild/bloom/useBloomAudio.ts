@@ -7,11 +7,13 @@ import {waitForRecording} from "../app/recordingJob";
 import {localRead,deliverListen,type OfflineAudio} from "../app/offline";
 import {requestJson} from "../app/errors";
 import type {ResolveRecordingResult} from "../server/contracts";
+import {MediaAudioEngine} from "../audio/engine";
 
 /** Recap sound accompanies a chapter without replacing the listener's queue. */
 export function useBloomAudio(){
  const music=useMusic();const latest=useRef(music);useEffect(()=>{latest.current=music;},[music]);
  const media=useRef<HTMLAudioElement|null>(null),controller=useRef<AbortController|null>(null),objectUrl=useRef<string|null>(null);
+ const engine=useRef<MediaAudioEngine|null>(null);
  const paused=useRef(false);
  const returning=useRef<{accountId:string;entryId:string|null;trackId:string;resume:boolean}|null>(null);
  const receipt=useRef<{id:string;accountId:string;recordingId:string;sequence:number;ms:number;last:number;wall:number}|null>(null);
@@ -32,11 +34,12 @@ export function useBloomAudio(){
  function dispose(){
   controller.current?.abort();controller.current=null;flush(true);media.current?.pause();
   if(media.current){media.current.removeAttribute("src");media.current.load();media.current=null;}
+  engine.current?.dispose();engine.current=null;
   receipt.current=null;if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current=null;}
  }
  function stop(paint=true){dispose();if(paint)setMessage("");}
  function pause(){paused.current=true;flush();media.current?.pause();}
- function resume(){paused.current=false;const audio=media.current;if(audio&&!audio.ended&&audio.paused)void audio.play().catch(()=>{if(media.current===audio)setMessage("Tap Sound to resume this chapter's soundtrack.");});}
+ function resume(){paused.current=false;const audio=media.current;if(audio&&!audio.ended&&audio.paused){void engine.current?.resume().catch(()=>{});void audio.play().catch(()=>{if(media.current===audio)setMessage("Tap Sound to resume this chapter's soundtrack.");});}}
  function close(paint=true){
   stop(paint);const original=returning.current;returning.current=null;const p=latest.current;
   if(original?.resume&&p.account?.id===original.accountId&&p.currentEntryId===original.entryId&&p.track?.id===original.trackId&&p.status==="paused")p.togglePlay();
@@ -45,20 +48,29 @@ export function useBloomAudio(){
   stop();const p=latest.current,accountId=p.account?.id;if(!accountId)return;
   if(!returning.current&&p.track)returning.current={accountId,entryId:p.currentEntryId,trackId:p.track.id,resume:p.status==="playing"};
   p.pause();const request=new AbortController();controller.current=request;
+  // Unlock iOS audio during the Sound gesture, before storage/network awaits.
+  const audio=new Audio();audio.preload="auto";media.current=audio;
+  const sound=new MediaAudioEngine(audio);engine.current=sound;sound.setVolume(p.volume);
+  const unlocked=sound.setMode("none");void unlocked.catch(()=>{});
   const current=()=>controller.current===request&&!request.signal.aborted&&latest.current.account?.id===accountId;
   setMessage("Finding this chapter’s soundtrack…");
   void(async()=>{try{
-   const track=musicTrack(raw);let recordingId=track.id,url:string;
+   await unlocked;if(!current())return;
+   const track=musicTrack(raw);let recordingId=track.id,url:string,fallback:string|undefined;
    const local=await localRead<OfflineAudio>(accountId,"audio:"+track.id).catch(()=>undefined);if(!current())return;
    const ready=readyPlaybackFor(track);
    if(local&&local.track.id===track.id&&local.blob.size===local.sizeBytes){url=URL.createObjectURL(local.blob);objectUrl.current=url;}
-   else if(ready){url=ready.url;}
+   else if(ready){url=ready.url;fallback=ready.fallbackUrl;}
    else{
     let result=await requestJson<ResolveRecordingResult>("/api/v2/recordings/resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:track.reference,expected:{title:track.title,artists:track.artists,artistsComplete:track.artistsComplete,version:track.version,durationMs:track.durationMs||undefined}}),signal:request.signal},{context:"playback",accountId});
     result=await waitForRecording(result,{signal:request.signal,accountId,origin:location.origin});
-    if(result.status!=="resolved")throw new Error("Sound unavailable");recordingId=result.recording.recordingId;url=result.playback.url;
+    if(result.status!=="resolved")throw new Error("Sound unavailable");recordingId=result.recording.recordingId;url=result.playback.url;fallback=result.playback.fallbackUrl;
    }
-   if(!current())return;const audio=new Audio(url);audio.volume=latest.current.volume;audio.preload="auto";media.current=audio;
+   if(!current())return;
+   if(sound.initialized&&!url.startsWith("blob:")&&new URL(url,location.href).origin!==location.origin){
+    if(!fallback||new URL(fallback,location.href).origin!==location.origin)throw new Error("Sound unavailable");url=fallback;
+   }
+   sound.setVolume(latest.current.volume);audio.src=url;
    receipt.current={id:crypto.randomUUID(),accountId,recordingId,sequence:0,ms:0,last:0,wall:performance.now()};
    audio.addEventListener("timeupdate",()=>{if(current()&&media.current===audio)collect();});
    audio.addEventListener("pause",()=>{if(current()&&media.current===audio)flush();});
@@ -67,7 +79,7 @@ export function useBloomAudio(){
    if(!paused.current)await audio.play();if(current())setMessage("");
   }catch{if(current())setMessage("This chapter’s song isn’t available right now. Continue your story, or tap Sound to try again.");}})();
  }
- useEffect(()=>{if(media.current)media.current.volume=music.volume;},[music.volume]);
+ useEffect(()=>{engine.current?.setVolume(music.volume);},[music.volume]);
  useEffect(()=>{dispose();returning.current=null;paused.current=false;
  // Account changes cancel chapter audio before requests or receipts can reach another account.
  // eslint-disable-next-line react-hooks/exhaustive-deps

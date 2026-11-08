@@ -71,15 +71,18 @@ export async function updatePlaylist(accountId:string,rawId:string,value:unknown
   const name=input.name===undefined?null:text(input.name,"playlist name",120),description=input.description===undefined?null:text(input.description,"description",2000,true);
   const order=input.recordingIds===undefined?null:ids(input.recordingIds,2000);
   await inTransaction(async client=>{
-    const row=await client.query(`SELECT id FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id]);
+    const row=await client.query(`SELECT id,name,description FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id]);
     if(!row.rowCount)throw new ProductError(404,"Playlist not found");
+    let changed=(name!==null&&name!==row.rows[0].name)||(description!==null&&description!==row.rows[0].description);
     if(order){
-      const current=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid`,[id])).rows.map(r=>r.recording_id);
+      const current=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.recording_id);
       if(current.length!==order.length||current.some(x=>!order.includes(x)))throw new ProductError(409,"Playlist membership changed; refresh before reordering");
-      await client.query(`UPDATE sakura_v2."PlaylistRecording" SET position=ordered.position-1 FROM
+      const reordered=current.some((x,index)=>x!==order[index]);
+      changed ||= reordered;
+      if(reordered)await client.query(`UPDATE sakura_v2."PlaylistRecording" SET position=ordered.position-1 FROM
         unnest($2::uuid[]) WITH ORDINALITY ordered(id,position) WHERE playlist_id=$1::uuid AND recording_id=ordered.id`,[id,order]);
     }
-    await client.query(`UPDATE sakura_v2."Playlist" SET name=COALESCE($3,name),description=COALESCE($4,description),revision=revision+1,updated_at=now()
+    if(changed)await client.query(`UPDATE sakura_v2."Playlist" SET name=COALESCE($3,name),description=COALESCE($4,description),revision=revision+1,updated_at=now()
       WHERE account_id=$1::uuid AND id=$2::uuid`,[accountId,id,name,description]);
   });
   return getPlaylist(accountId,id);
@@ -95,17 +98,20 @@ export async function mutatePlaylistTracks(accountId:string,rawId:string,value:u
   const recordingIds=remove?[uuid(input.recordingId,"recording ID")]:ids(input.recordingIds??[input.recordingId],200);
   await inTransaction(async client=>{
     if(!(await client.query(`SELECT id FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id])).rowCount)throw new ProductError(404,"Playlist not found");
-    if(remove)await client.query(`DELETE FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid AND recording_id=ANY($2::uuid[])`,[id,recordingIds]);
+    let changed=false;
+    if(remove)changed=Boolean((await client.query(`DELETE FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid AND recording_id=ANY($2::uuid[])`,[id,recordingIds])).rowCount);
     else{
-      const recordings=await cardsForIds(accountId,recordingIds,client);
-      if(recordings.length!==recordingIds.length)throw new ProductError(404,"A selected recording is unavailable");
-      const count=Number((await client.query(`SELECT COUNT(*) n FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid`,[id])).rows[0].n);
-      if(count+recordingIds.length>2000)throw new ProductError(400,"Playlist supports up to 2000 songs");
-      await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
+      const current=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid`,[id])).rows;
+      const existing=new Set(current.map(row=>row.recording_id));
+      const additions=recordingIds.filter(recordingId=>!existing.has(recordingId));
+      const recordings=await cardsForIds(accountId,additions,client);
+      if(recordings.length!==additions.length)throw new ProductError(404,"A selected recording is unavailable");
+      if(current.length+additions.length>2000)throw new ProductError(400,"Playlist supports up to 2000 songs");
+      if(additions.length)changed=Boolean((await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
         SELECT $1::uuid,x.id,(SELECT COALESCE(MAX(position)+1,0) FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid)+x.position-1
-        FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position) ON CONFLICT(playlist_id,recording_id) DO NOTHING`,[id,recordingIds]);
+        FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position) ON CONFLICT(playlist_id,recording_id) DO NOTHING`,[id,additions])).rowCount);
     }
-    await client.query(`UPDATE sakura_v2."Playlist" SET revision=revision+1,updated_at=now() WHERE id=$1::uuid`,[id]);
+    if(changed)await client.query(`UPDATE sakura_v2."Playlist" SET revision=revision+1,updated_at=now() WHERE id=$1::uuid`,[id]);
   });
   return getPlaylist(accountId,id);
 }

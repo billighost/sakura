@@ -35,12 +35,13 @@ function record(row:Record<string,unknown>|undefined):SessionRecord|null {
  return row?{state:row.state as ListeningSession,revision:Number(row.revision),deviceId:String(row.device_id),updatedAt:new Date(String(row.updated_at)).getTime()}:null;
 }
 export async function getSession(accountId:string){
- return {session:record((await getRebuildPool().query('SELECT * FROM sakura_v2."ListeningSession" WHERE account_id=$1::uuid',[accountId])).rows[0])};
+ const session=record((await getRebuildPool().query('SELECT * FROM sakura_v2."ListeningSession" WHERE account_id=$1::uuid',[accountId])).rows[0]);
+ return {session,serverTime:Date.now()};
 }
 /** Compare-and-swap stops a sleeping device or a retry overwriting a newer session. */
 export async function putSession(accountId:string,value:unknown){
  const patch=sessionPatch(value);
- return inIdempotentTransaction(async client=>{
+ const result=await inIdempotentTransaction(async client=>{
   await client.query("SELECT pg_advisory_xact_lock(hashtext('listening-session:'||$1))",[accountId]);
   const previous=record((await client.query('SELECT * FROM sakura_v2."ListeningSession" WHERE account_id=$1::uuid',[accountId])).rows[0]);
   if((previous?.revision||0)!==patch.revision){
@@ -52,4 +53,5 @@ export async function putSession(accountId:string,value:unknown){
    device_id=EXCLUDED.device_id,revision=sakura_v2."ListeningSession".revision+1,updated_at=now() RETURNING *`,[accountId,JSON.stringify(patch.state),patch.deviceId]);
   return {accepted:true,session:record(result.rows[0])};
  });
+ return {...result,serverTime:Date.now()};
 }

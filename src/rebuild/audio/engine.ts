@@ -92,6 +92,10 @@ export async function renderAudio(buffer: AudioBuffer, mode: AudioTechnology, op
 }
 
 interface Branch { graph: AudioGraph; fader: GainNode; timer?: ReturnType<typeof setTimeout> }
+/** iOS keeps HTMLMediaElement.volume fixed; a dry Web Audio gain controls listening level. */
+export function needsMediaVolumeGain(device: Pick<Navigator, "userAgent" | "platform" | "maxTouchPoints"> = navigator) {
+  return /iPad|iPhone|iPod/i.test(device.userAgent) || device.platform === "MacIntel" && device.maxTouchPoints > 1;
+}
 /** A media element can have only one source node for its lifetime. Reuse this controller. */
 export class MediaAudioEngine {
   private context: AudioContext | null = null;
@@ -101,7 +105,11 @@ export class MediaAudioEngine {
   private branches = new Set<Branch>();
   private mode: AudioTechnology = "none";
   private closed = false;
-  constructor(private readonly element: HTMLMediaElement) { this.volume = element.volume; }
+  readonly requiresVolumeGraph: boolean;
+  constructor(private readonly element: HTMLMediaElement, options: { requiresVolumeGraph?: boolean } = {}) {
+    this.volume = element.volume;
+    this.requiresVolumeGraph = options.requiresVolumeGraph ?? needsMediaVolumeGain();
+  }
   get initialized() { return this.context !== null; }
   get currentMode() { return this.mode; }
   async resume(): Promise<void> { if (this.context && ["suspended", "interrupted"].includes(this.context.state as string)) await this.context.resume(); }
@@ -118,7 +126,7 @@ export class MediaAudioEngine {
   async setMode(value: AudioTechnology): Promise<void> {
     if (this.closed) return;
     const mode = audioTechnology(value);
-    if (!this.context && mode === "none") { this.mode = mode; return; }
+    if (!this.context && mode === "none" && !this.requiresVolumeGraph) { this.mode = mode; return; }
     if (!this.context) {
       // src reflects a deliberate source migration immediately; currentSrc may
       // still name the preceding CDN resource until the new load is selected.
@@ -132,7 +140,7 @@ export class MediaAudioEngine {
       this.context = new Constructor({ latencyHint: "playback" });
       try { this.source = this.context.createMediaElementSource(this.element); }
       catch (error) { void this.context.close(); this.context = null; throw error; }
-      this.volume = this.element.volume;
+      // Keep the requested level: on iOS the element getter always returns 1.
       this.master = this.context.createGain(); this.master.gain.value = this.volume; this.master.connect(this.context.destination);
       this.element.volume = 1;
       // Preserve dry playback immediately when media routing changes.

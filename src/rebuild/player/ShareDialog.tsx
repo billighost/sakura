@@ -8,15 +8,18 @@ import { renderShareCard, renderShareVideo, videoExportMime, type ShareCardInput
 import { useLyrics } from "./useLyrics";
 import { requestJson, userMessage } from "../app/errors";
 import { RecoveryNotice } from "../app/RecoveryNotice";
+import {useScreenActions,type ScreenActionScope} from "../app/screenActions";
 import s from "./player.module.css";
 
+const recentSaves=new WeakMap<File,number>();
 function saveFile(file: File) {
+  const now=Date.now();if(now-(recentSaves.get(file)||0)<750)return;recentSaves.set(file,now);
   const url = URL.createObjectURL(file);
   const anchor = document.createElement("a");anchor.href = url;anchor.download = file.name;anchor.rel = "noopener";anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () => void; track?: MusicTrack | null }) {
-  const music = useMusic();
+  const music = useMusic();const actions=useScreenActions(music.account?.id);const nativeShareLock=useRef(false);
   const [track] = useState(inspectedTrack || music.track);
   const lyrics = useLyrics(track);
   const initial = getShareSelection(track?.id);
@@ -30,15 +33,17 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
   const [imageRetry,setImageRetry]=useState(0);
   const [video, setVideo] = useState<{ key: string; url: string; file: File } | null>(null);
   const [videoAvailable, setVideoAvailable] = useState(false);
-  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoFlightScope, setVideoFlightScope] = useState<ScreenActionScope|null>(null);
   const [progress, setProgress] = useState(0);
   const [seconds, setSeconds] = useState(8);
   const [link, setLink] = useState<{ key: string; url: string } | null>(null);
-  const [linkBusy, setLinkBusy] = useState(false);const linkLock=useRef(false);const videoLock=useRef(false);
+  const [linkFlightScope, setLinkFlightScope] = useState<ScreenActionScope|null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const abortVideo = useRef<AbortController | null>(null);
   const cardKey = JSON.stringify([track?.id, kind, selected.map((line) => [line.text, line.start]), colorMode, layout]);
   const videoKey = `${cardKey}:${seconds}`;
+  const linkActions=useScreenActions(music.account?.id,cardKey),videoActions=useScreenActions(music.account?.id,videoKey);
+  const linkBusy=linkFlightScope===linkActions,videoBusy=videoFlightScope===videoActions;
   const readyImage = image?.key === cardKey ? image : null;
   const readyVideo = video?.key === videoKey ? video : null;
   const readyLink = link?.key === cardKey ? link : null;
@@ -73,44 +78,45 @@ export function ShareDialog({ onClose, track: inspectedTrack }: { onClose: () =>
     setKind("lyric");setMessage(null);abortVideo.current?.abort();
   }
   function shareReady(file: File, title: string) {
-    // Keep navigator.share in the click handler. All rendering has already
-    // finished; awaiting an encoder here would lose activation on iPhone.
+    // Rendering finishes before this click, preserving iPhone share activation.
+    if(nativeShareLock.current)return;
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      void navigator.share({ title, text: track ? `${track.title} · ${track.artists.join(", ")}` : "A little music from Sakura", files: [file] }).then(() => setMessage("Your little moment was shared.")).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setMessage("Sharing could not open here. Use Save to keep the ready file."); });
+      const controller=actions.begin("native-share");if(!controller)return;nativeShareLock.current=true;
+      void navigator.share({ title, text: track ? `${track.title} · ${track.artists.join(", ")}` : "A little music from Sakura", files: [file] }).then(() => {if(actions.current("native-share",controller))setMessage("Your little moment was shared.");}).catch((error: unknown) => { if (actions.current("native-share",controller)&&!(error instanceof DOMException && error.name === "AbortError")) setMessage("Sharing could not open here. Use Save to keep the ready file."); }).finally(()=>{nativeShareLock.current=false;actions.finish("native-share",controller);});
     } else { saveFile(file);setMessage("The ready file has been saved. You can share it from your photos or files."); }
   }
   async function prepareLink() {
-    if (!track || linkLock.current || readyLink || (kind === "lyric" && !selected.length)) return;linkLock.current=true;
-    setLinkBusy(true);setMessage(null);
+    if (!track || readyLink || (kind === "lyric" && !selected.length)) return;
+    const controller=linkActions.begin("link");if(!controller)return;setLinkFlightScope(linkActions);setMessage(null);
     try {
-      const payload = await requestJson<{url?:string;slug?:string}>("/api/v2/shares", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: track.id, reference: track.reference, kind, lines: kind === "lyric" ? selected : [], colorMode }) },{context:"share",accountId:music.account?.id});
+      const payload = await requestJson<{url?:string;slug?:string}>("/api/v2/shares", { method: "POST", signal:controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: track.id, reference: track.reference, kind, lines: kind === "lyric" ? selected : [], colorMode }) },{context:"share",accountId:music.account?.id});
+      if(!linkActions.current("link",controller))return;
       if(!payload.url)throw new Error("Share link unavailable");const address=new URL(payload.url, location.origin);if(address.origin!==location.origin||!address.pathname.startsWith("/s/"))throw new Error("Share link unavailable");const url=address.toString();
       setLink({ key: cardKey, url });setMessage("Your link is ready. Copy it or open Share link.");
-    } catch (error) { music.reportError(error,"share",()=>void prepareLink()); }
-    finally { linkLock.current=false;setLinkBusy(false); }
+    } catch (error) { if(linkActions.current("link",controller))music.reportError(error,"share",()=>void prepareLink()); }
+    finally { if(linkActions.finish("link",controller))setLinkFlightScope(null); }
   }
   function shareLink() {
-    if (!readyLink) return;
-    if (navigator.share) void navigator.share({ title: track?.title || "Sakura", text: track?.artists.join(", "), url: readyLink.url }).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setMessage("Use Copy link to share this address."); });
+    if (!readyLink||nativeShareLock.current) return;
+    if (navigator.share){const controller=actions.begin("native-share");if(!controller)return;nativeShareLock.current=true;void navigator.share({ title: track?.title || "Sakura", text: track?.artists.join(", "), url: readyLink.url }).catch((error: unknown) => { if (actions.current("native-share",controller)&&!(error instanceof DOMException && error.name === "AbortError")) setMessage("Use Copy link to share this address."); }).finally(()=>{nativeShareLock.current=false;actions.finish("native-share",controller);});}
     else void copyLink();
   }
   async function copyLink() {
-    if (!readyLink) return;
-    try { await navigator.clipboard.writeText(readyLink.url);setMessage("Link copied."); }
-    catch { setMessage("Select the link below and copy it from your browser."); }
+    if (!readyLink) return;const controller=actions.begin("copy");if(!controller)return;
+    try { await navigator.clipboard.writeText(readyLink.url);if(actions.current("copy",controller))setMessage("Link copied."); }
+    catch { if(actions.current("copy",controller))setMessage("Select the link below and copy it from your browser."); }
+    finally{actions.finish("copy",controller);}
   }
   async function prepareVideo() {
-    if (!usableAudioTrack || !readyImage || videoLock.current) return;videoLock.current=true;
-    abortVideo.current?.abort();
-    const controller = new AbortController();abortVideo.current = controller;
-    setVideoBusy(true);setProgress(0);setMessage(null);
+    if (!usableAudioTrack || !readyImage) return;const controller=videoActions.begin("video");if(!controller)return;
+    abortVideo.current?.abort();abortVideo.current=controller;setVideoFlightScope(videoActions);setProgress(0);setMessage(null);
     try {
       const input: ShareCardInput = { track: usableAudioTrack, lines: kind === "lyric" ? selected : [], colorMode, layout };
-      const result = await renderShareVideo(input, { seconds, startSeconds: kind === "lyric" && selected.length ? selected[0].start : music.positionMs / 1000, signal: controller.signal, onProgress: setProgress });
-      if (controller.signal.aborted) return;
+      const result = await renderShareVideo(input, { seconds, startSeconds: kind === "lyric" && selected.length ? selected[0].start : music.positionMs / 1000, signal: controller.signal, onProgress:value=>{if(videoActions.current("video",controller))setProgress(value);} });
+      if (!videoActions.current("video",controller)) return;
       setVideo({ key: videoKey, url: URL.createObjectURL(result.blob), file: result.file });setMessage("Your video and its exact recording are ready to save or share.");
-    } catch (error) { if (!controller.signal.aborted) music.reportError(error,"share",()=>void prepareVideo()); }
-    finally { videoLock.current=false;if (abortVideo.current === controller) setVideoBusy(false); }
+    } catch (error) { if (videoActions.current("video",controller)) music.reportError(error,"share",()=>void prepareVideo()); }
+    finally { if(videoActions.finish("video",controller))setVideoFlightScope(null);if(abortVideo.current===controller)abortVideo.current=null; }
   }
   return <PlayerDialog title="Pass the feeling along." subtitle="SHARING STUDIO" onClose={() => { abortVideo.current?.abort();onClose(); }} wide>
     {!track ? <div className={s.empty}><p>Choose a song to make a shared moment.</p><PlayerButton secondary onClick={onClose}>Back to music</PlayerButton></div> : <><p className={s.shareDescription}>Your song, or the exact words that stayed with you. Make a little piece of it your own.</p><div className={s.chips}><button type="button" aria-pressed={kind === "track"} onClick={() => { setKind("track");abortVideo.current?.abort(); }}>Song card</button><button type="button" aria-pressed={kind === "lyric"} onClick={() => { setKind("lyric");abortVideo.current?.abort(); }}>Lyric card</button></div><div className={s.shareGrid}>

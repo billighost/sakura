@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import {after,before,test} from "node:test";
-import {getRebuildPool} from "../src/rebuild/data/db";
+import {getRebuildPool,readAccountById} from "../src/rebuild/data/db";
 import {getSession,putSession} from "../src/rebuild/data/session";
 import {getSettings,patchSettings} from "../src/rebuild/data/settings";
-import {createPlaylist,listPlaylists} from "../src/rebuild/data/collections";
+import {createPlaylist,listPlaylists,getPlaylist,mutatePlaylistTracks,updatePlaylist} from "../src/rebuild/data/collections";
+import {recordHistory,getHistory} from "../src/rebuild/data/history";
 
 const accounts=[randomUUID(),randomUUID()],deviceA=randomUUID(),deviceB=randomUUID(),schema="sakura_sync_test_"+randomUUID().replaceAll("-","");
 const pool=getRebuildPool(),rewrite=(text:unknown)=>typeof text==="string"?text.replaceAll("sakura_v2",schema):text;
@@ -17,10 +18,12 @@ const scoped=new Proxy(pool,{get(target,key){
 }});
 (globalThis as unknown as {sakuraV2ProductPool:typeof pool}).sakuraV2ProductPool=scoped;
 before(async()=>{
+ // Warm a cold remote connection through the app's bounded read-only retry.
+ await readAccountById(accounts[0]);
  for(const path of ["src/rebuild/server/schema-proposal.sql","src/rebuild/data/schema.sql"])await pool.query((await readFile(path,"utf8")).replaceAll("sakura_v2",schema));
  for(const id of accounts)await pool.query('INSERT INTO public."User"(id,username,email,"passwordHash","createdAt") VALUES($1::uuid,$2,$3,\'test-only\',now())',[id,"sync_"+id.slice(0,16),id+"@example.invalid"]);
 });
-after(async()=>{await pool.query('DELETE FROM public."User" WHERE id=ANY($1::uuid[])',[accounts]);await pool.query(`DROP SCHEMA "${schema}" CASCADE`);await pool.end();});
+after(async()=>{try{await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await pool.query('DELETE FROM public."User" WHERE id=ANY($1::uuid[])',[accounts]);}finally{await pool.end();}});
 const state={queue:[],currentEntryId:null,positionMs:0,sleepUntil:null};
 test("account session compare-and-swap rejects stale devices and accepts exact retries",async()=>{
  assert.equal((await getSession(accounts[0])).session,null);
@@ -38,4 +41,35 @@ test("account playback settings persist independently",async()=>{
 });
 test("retried playlist creation creates one account-owned collection",async()=>{
  const requestId=randomUUID();const results=await Promise.all(Array.from({length:4},()=>createPlaylist(accounts[0],{name:"A shared device",requestId})));assert.equal(new Set(results.map(p=>p.id)).size,1);assert.equal((await listPlaylists(accounts[0])).length,1);await assert.rejects(()=>createPlaylist(accounts[1],{name:"A shared device",requestId}));
+});
+test("a full playlist accepts repeated additions and only changes revision for new state",async()=>{
+ const ids=Array.from({length:2001},()=>randomUUID());
+ const fixtures=ids.map((id,index)=>({id,metadata:{title:"Sync fixture "+index,artists:["Synthetic Artist"],durationMs:180000}}));
+ await scoped.query(`INSERT INTO sakura_v2."Recording"(id,metadata,state) SELECT id::uuid,metadata,'verified' FROM jsonb_to_recordset($1::jsonb) x(id text,metadata jsonb)`,[JSON.stringify(fixtures)]);
+ await scoped.query(`INSERT INTO sakura_v2."ExternalReference"(provider,external_id,recording_id,verified_at) SELECT 'deezer',x.id::text,x.id,now() FROM unnest($1::uuid[]) x(id)`,[ids]);
+ const playlist=await createPlaylist(accounts[0],{name:"Full collection"});
+ await scoped.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position) SELECT $1::uuid,x.id,x.position-1 FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position)`,[playlist.id,ids.slice(0,2000)]);
+ const before=await getPlaylist(accounts[0],playlist.id);
+ const repeated=await Promise.all(Array.from({length:4},()=>mutatePlaylistTracks(accounts[0],playlist.id,{recordingIds:ids.slice(0,4)})));
+ assert.ok(repeated.every(result=>result.trackCount===2000&&result.revision===before.revision));
+ await assert.rejects(()=>mutatePlaylistTracks(accounts[0],playlist.id,{recordingIds:[ids[0],ids[2000]]}),{status:400});
+ const same=await updatePlaylist(accounts[0],playlist.id,{name:"Full collection",recordingIds:ids.slice(0,2000)});
+ assert.equal(same.revision,before.revision);
+ const removed=await mutatePlaylistTracks(accounts[0],playlist.id,{recordingId:ids[1]},true);
+ const retried=await mutatePlaylistTracks(accounts[0],playlist.id,{recordingId:ids[1]},true);
+ assert.equal(retried.revision,removed.revision);
+ assert.equal(retried.trackCount,1999);
+ await assert.rejects(()=>mutatePlaylistTracks(accounts[1],playlist.id,{recordingId:ids[0]}),{status:404});
+});
+test("two devices deliver history chunks exactly once and retain account ownership",async()=>{
+ const row=await scoped.query('SELECT id FROM sakura_v2."Recording" ORDER BY id LIMIT 1');
+ const recordingId=row.rows[0].id,eventId=randomUUID();
+ const chunk={eventId,recordingId,sequence:0,msPlayed:4000,positionMs:4000,occurredAt:new Date(Date.now()-20000).toISOString()};
+ const results=await Promise.all(Array.from({length:4},()=>recordHistory(accounts[0],chunk)));
+ assert.equal(results.filter(result=>"duplicate" in result&&result.duplicate).length,3);
+ await recordHistory(accounts[0],{...chunk,sequence:1,msPlayed:2500,positionMs:6500,finished:true});
+ const history=await getHistory(accounts[0],new URL("http://localhost/api?limit=10"));
+ assert.equal(history.events.length,1);assert.equal(history.events[0].audibleMs,6500);
+ assert.equal((await getHistory(accounts[1],new URL("http://localhost/api"))).events.length,0);
+ await assert.rejects(()=>recordHistory(accounts[0],{...chunk,msPlayed:4500}),{status:409});
 });

@@ -1,12 +1,16 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+import {memo} from "react";
 import type {BloomDesign} from "./uiTypes";
-import type {BloomQuality} from "./worlds/types";
-import {WorldStage} from "./worlds/WorldStage";
 import {bloomWorld} from "./worlds/registry";
+import {bloomCoverImage} from "./coverAssets";
 import s from "./cinema.module.css";
-export function BloomCover({design,quality,theme}:{design:BloomDesign;quality:BloomQuality;theme:"light"|"dark"}){
- const element=useRef<HTMLDivElement>(null),[visible,setVisible]=useState(false);const world=bloomWorld(design);
- useEffect(()=>{const node=element.current;if(!node)return;if(!("IntersectionObserver" in window)){const frame=requestAnimationFrame(()=>setVisible(true));return()=>cancelAnimationFrame(frame);}const observer=new IntersectionObserver(entries=>setVisible(entries[0].isIntersecting),{rootMargin:"180px"});observer.observe(node);return()=>observer.disconnect();},[]);
- return <div ref={element} className={s.cardArt} style={{background:world.colours[0]}} aria-label={`${world.name} illustrated cover`}>{visible&&<WorldStage design={design} scene="opening" stage={0} progress={.14} quality={quality} reducedMotion view="cover" theme={theme}/>}</div>;
-}
+
+/** A persistent bitmap of the authored world; scroll never mounts a cinematic scene. */
+export const BloomCover=memo(function BloomCover({design,theme}:{design:BloomDesign;theme:"light"|"dark"}){
+ const world=bloomWorld(design),image=bloomCoverImage(design,theme);
+ return <div className={s.cardArt} data-bloom-cover={world.id} data-theme={theme} style={{background:world.colours[0]}}>
+  {/* These pre-rendered WebPs are already bounded and supplied in two sizes. */}
+  {/* eslint-disable-next-line @next/next/no-img-element */}
+  <img {...image} alt={`${world.name} illustrated cover`} sizes="(max-width:750px) calc(100vw - 48px), 50vw" loading="eager" decoding="async" fetchPriority="low"/>
+ </div>;
+});

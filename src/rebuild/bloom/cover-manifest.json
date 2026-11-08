@@ -1,0 +1,439 @@
+{
+  "generator": "scripts/rebuild-bloom-covers.mjs",
+  "source": "Original WorldStage opening/cover at maximum authored detail, reduced motion.",
+  "dimensions": {
+    "480": [
+      480,
+      360
+    ],
+    "960": [
+      960,
+      720
+    ]
+  },
+  "quality": 86,
+  "assets": [
+    {
+      "world": "sakura",
+      "theme": "light",
+      "sourceHash": "2d65471568b4b4534b7399fa6733bd60038b46bd409c53f14a2701ea26ee03e1",
+      "files": [
+        {
+          "path": "/bloom/covers/sakura-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 24358,
+          "sha256": "1b44df8f1bc8fd69816ca114613f640e3ba9c5b3064b772aacfc96b048095b10"
+        },
+        {
+          "path": "/bloom/covers/sakura-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 63514,
+          "sha256": "ec1c9751cee729ff4192e9bb5f23f115122185181e2da6cefa2f3d4cf3927e4c"
+        }
+      ]
+    },
+    {
+      "world": "sakura",
+      "theme": "dark",
+      "sourceHash": "2d65471568b4b4534b7399fa6733bd60038b46bd409c53f14a2701ea26ee03e1",
+      "files": [
+        {
+          "path": "/bloom/covers/sakura-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 26104,
+          "sha256": "1810c76c962ae3ecc117c9742f3fb7101a3540e3315b9a96a788c214671cfdd0"
+        },
+        {
+          "path": "/bloom/covers/sakura-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 64904,
+          "sha256": "38e73090449711273546ca3d780aacd9ac7afcb6c01eda9d5691dc1267bcdd73"
+        }
+      ]
+    },
+    {
+      "world": "jungle",
+      "theme": "light",
+      "sourceHash": "db1a9ca1b9b9841028733fc31c898024d6434083f5f47129f27a2c20bf1bcec3",
+      "files": [
+        {
+          "path": "/bloom/covers/jungle-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 19674,
+          "sha256": "24a0ee5fad10bc065ec3dd8aabb04ad8b1d9a098be8e4f3754764b8039a27349"
+        },
+        {
+          "path": "/bloom/covers/jungle-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 50696,
+          "sha256": "d64e09a378557c78b492df0b518a674018f75a646e43bce891a49697f379d1e8"
+        }
+      ]
+    },
+    {
+      "world": "jungle",
+      "theme": "dark",
+      "sourceHash": "db1a9ca1b9b9841028733fc31c898024d6434083f5f47129f27a2c20bf1bcec3",
+      "files": [
+        {
+          "path": "/bloom/covers/jungle-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 18958,
+          "sha256": "5574052cdeac49f379d61a46f33e68098a0b5b11844a6875e47687d248811889"
+        },
+        {
+          "path": "/bloom/covers/jungle-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 47858,
+          "sha256": "e2512c883f34572bb03f054c1c031dc912b1765b3fe7ef4c305035ef6feedce9"
+        }
+      ]
+    },
+    {
+      "world": "disco",
+      "theme": "light",
+      "sourceHash": "901499574fbb610b37a36463204698b9f6dbc0f1c9d554bfb15a21ed3dccf881",
+      "files": [
+        {
+          "path": "/bloom/covers/disco-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 16848,
+          "sha256": "a6afa709c777a5e5b58514a57695f5998a98232ba9a57ef9a60bd6acdc06c2cc"
+        },
+        {
+          "path": "/bloom/covers/disco-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 45602,
+          "sha256": "c94679eab2872726996d4f4c885bbcd129a639569d1e759f734189ec33468189"
+        }
+      ]
+    },
+    {
+      "world": "disco",
+      "theme": "dark",
+      "sourceHash": "901499574fbb610b37a36463204698b9f6dbc0f1c9d554bfb15a21ed3dccf881",
+      "files": [
+        {
+          "path": "/bloom/covers/disco-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 17182,
+          "sha256": "c93751bae1f7033da9cc6cb27e8dfe7d696fe7ada4227756819c50d4f5a10c2d"
+        },
+        {
+          "path": "/bloom/covers/disco-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 46072,
+          "sha256": "9014f928a935a53b9d47803cc3bd474ca47d19cdceaa421ccbeb40a270e871f0"
+        }
+      ]
+    },
+    {
+      "world": "japan",
+      "theme": "light",
+      "sourceHash": "b8d15abace0557ffac72b28c19357a35c9024b022c5bcf3738f1d0702b823c25",
+      "files": [
+        {
+          "path": "/bloom/covers/japan-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 18250,
+          "sha256": "03fd4e2d7ee982b9abff41209b5041d8decda0a5f5bb5f0ef49df2b50bab2ef1"
+        },
+        {
+          "path": "/bloom/covers/japan-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 47426,
+          "sha256": "a5b11e15c703bb7d525454a447e63df43fd1d8af53ea26dcaa933b0de062ad26"
+        }
+      ]
+    },
+    {
+      "world": "japan",
+      "theme": "dark",
+      "sourceHash": "b8d15abace0557ffac72b28c19357a35c9024b022c5bcf3738f1d0702b823c25",
+      "files": [
+        {
+          "path": "/bloom/covers/japan-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 18262,
+          "sha256": "67c191ae0677e8cf69ee2fee1378b18511b58cb66a74a27b63f94e4c0a1bb044"
+        },
+        {
+          "path": "/bloom/covers/japan-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 47230,
+          "sha256": "d28c78f5cd4cfbae618051b0736849cffe5dc448d370ec30ec86ddbf7bbefa32"
+        }
+      ]
+    },
+    {
+      "world": "china",
+      "theme": "light",
+      "sourceHash": "331098b77e8efb0fe27084a76c6ceb2253d141323555e3fb39e79a9994abe985",
+      "files": [
+        {
+          "path": "/bloom/covers/china-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 13066,
+          "sha256": "dd839fb29d07d3cd84eaa599837620705dd01ef4fa233652ec4471d36daf7ded"
+        },
+        {
+          "path": "/bloom/covers/china-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 32234,
+          "sha256": "071b1857378b4847bb3e3c100d21e09a1e3e51cf99080fc6730031ab27a8a7fb"
+        }
+      ]
+    },
+    {
+      "world": "china",
+      "theme": "dark",
+      "sourceHash": "331098b77e8efb0fe27084a76c6ceb2253d141323555e3fb39e79a9994abe985",
+      "files": [
+        {
+          "path": "/bloom/covers/china-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 13384,
+          "sha256": "cc9cef465528c688a67b6b74fc79560ba35a7ee15acdda63fa0137515bd80716"
+        },
+        {
+          "path": "/bloom/covers/china-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 33190,
+          "sha256": "9a11602f9a11a532e786cb68a5a75e36ce7a02cb879ccf34b3ad26d737988629"
+        }
+      ]
+    },
+    {
+      "world": "korea",
+      "theme": "light",
+      "sourceHash": "243fdab88c3d4ef9565332a041a86a9f577b9ad58cd52445af1a84115545dc30",
+      "files": [
+        {
+          "path": "/bloom/covers/korea-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 23040,
+          "sha256": "f4ce7ee3bae7c33e2c13897604631b302505096ea385b5048c232e42666f1549"
+        },
+        {
+          "path": "/bloom/covers/korea-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 60596,
+          "sha256": "75ca23f89a2c74f918a3cac6307a2b0c345a5914e5b1e5f0062903035e32d74d"
+        }
+      ]
+    },
+    {
+      "world": "korea",
+      "theme": "dark",
+      "sourceHash": "243fdab88c3d4ef9565332a041a86a9f577b9ad58cd52445af1a84115545dc30",
+      "files": [
+        {
+          "path": "/bloom/covers/korea-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 20980,
+          "sha256": "873b79545da30171ad83a8511c8fe4aef0e67bd0cc1c9ac6d3ebec9b230be4e8"
+        },
+        {
+          "path": "/bloom/covers/korea-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 53936,
+          "sha256": "7c98748eb097ec17930d1ff1056d8d2159145a1e60126fac114a4518e5660524"
+        }
+      ]
+    },
+    {
+      "world": "india",
+      "theme": "light",
+      "sourceHash": "be3ba637dbeb20d03460fa022a3f2527ab75ba551dca409706780830bc8b8a26",
+      "files": [
+        {
+          "path": "/bloom/covers/india-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 22832,
+          "sha256": "c021ea4acbee2edbc2b956b0646660971269a1a14799552aa88e63d144195c6d"
+        },
+        {
+          "path": "/bloom/covers/india-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 57598,
+          "sha256": "b17007e564b574ef92da435be97ac317113209a5721606be40e7fd7528dca7e9"
+        }
+      ]
+    },
+    {
+      "world": "india",
+      "theme": "dark",
+      "sourceHash": "be3ba637dbeb20d03460fa022a3f2527ab75ba551dca409706780830bc8b8a26",
+      "files": [
+        {
+          "path": "/bloom/covers/india-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 21934,
+          "sha256": "70a8440d1a9053ba7c3606a2ae19c22b2b8da726436fdaa7c62adc6d25efa0b7"
+        },
+        {
+          "path": "/bloom/covers/india-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 57440,
+          "sha256": "f46ea0b42259f7f51f4687d58c83a34f77f460486188c09190bd2cc9faeb070a"
+        }
+      ]
+    },
+    {
+      "world": "ocean",
+      "theme": "light",
+      "sourceHash": "d17cfb14bbc3c54ef578671a47cf726e8556ae1d1a87412aed6cbd5820e1f422",
+      "files": [
+        {
+          "path": "/bloom/covers/ocean-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 12814,
+          "sha256": "78c933a901532cb184585a91d07a9496f3a13ddc84f0a6d082775b174fde8581"
+        },
+        {
+          "path": "/bloom/covers/ocean-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 31564,
+          "sha256": "23a17f7a218142ca1d2cebc3dda0ca84cdd8c04f49f32dda3749fa7d7f602351"
+        }
+      ]
+    },
+    {
+      "world": "ocean",
+      "theme": "dark",
+      "sourceHash": "d17cfb14bbc3c54ef578671a47cf726e8556ae1d1a87412aed6cbd5820e1f422",
+      "files": [
+        {
+          "path": "/bloom/covers/ocean-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 13480,
+          "sha256": "1ce4b380875f05cff3dd043231546b76dbab2417f32c51a53c3e9ea99ae08898"
+        },
+        {
+          "path": "/bloom/covers/ocean-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 33994,
+          "sha256": "ddb82e6b390cb22f2c40d9ba58e5767f26a2924ab480ad30be5fe2760876080d"
+        }
+      ]
+    },
+    {
+      "world": "cosmos",
+      "theme": "light",
+      "sourceHash": "8ced6c7a3ed60fc7eb3cdded6d31be8497c6b2ce454a62137b313e7fda387c73",
+      "files": [
+        {
+          "path": "/bloom/covers/cosmos-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 23592,
+          "sha256": "c21f8349edd5fbbc7c6b88cb1dacdf92c86356392926035df06a1858a0e6599f"
+        },
+        {
+          "path": "/bloom/covers/cosmos-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 58998,
+          "sha256": "1b78f2a5272dd221443d55e8b3789c17bf7b2f50c0ec1baf3e9e2fa1e5d0c52c"
+        }
+      ]
+    },
+    {
+      "world": "cosmos",
+      "theme": "dark",
+      "sourceHash": "8ced6c7a3ed60fc7eb3cdded6d31be8497c6b2ce454a62137b313e7fda387c73",
+      "files": [
+        {
+          "path": "/bloom/covers/cosmos-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 23688,
+          "sha256": "15fb0b7f277200d8607562b201cba172308375529490123ad506a70ed63750f3"
+        },
+        {
+          "path": "/bloom/covers/cosmos-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 59310,
+          "sha256": "c803f9e967c1a53424d878a6445efae670b9a1cca967ab55e90d03089792bf95"
+        }
+      ]
+    },
+    {
+      "world": "glass",
+      "theme": "light",
+      "sourceHash": "019fe06d80625d57e153337a8dd8db040ff568f8e95bac7dc59d1b280d395fb3",
+      "files": [
+        {
+          "path": "/bloom/covers/glass-light-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 26046,
+          "sha256": "5f260e552b150d3ab775ebe017bc0d43083dc6494fa5e5893554e41556c0cc69"
+        },
+        {
+          "path": "/bloom/covers/glass-light-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 68526,
+          "sha256": "07e531cedf7bbc7c0c74c5bf25bb8595988bb3202889fde44733913d662cba99"
+        }
+      ]
+    },
+    {
+      "world": "glass",
+      "theme": "dark",
+      "sourceHash": "019fe06d80625d57e153337a8dd8db040ff568f8e95bac7dc59d1b280d395fb3",
+      "files": [
+        {
+          "path": "/bloom/covers/glass-dark-480.webp",
+          "width": 480,
+          "height": 360,
+          "bytes": 25030,
+          "sha256": "39f08353570d395b17676b8e714449bb0a03423b7ad341d943ae99174238878b"
+        },
+        {
+          "path": "/bloom/covers/glass-dark-960.webp",
+          "width": 960,
+          "height": 720,
+          "bytes": 66964,
+          "sha256": "dac5aa83e54cd274e06b43a82eb81989c13e568ac8eee1bdc7da438df87547bd"
+        }
+      ]
+    }
+  ],
+  "totalBytes": 1427174,
+  "revision": "5f4ac801f0dc"
+}

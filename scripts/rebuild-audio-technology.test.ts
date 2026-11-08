@@ -5,6 +5,14 @@ import ts from "typescript";
 import { chromium } from "@playwright/test";
 import { analyseAudio, comparisonGains, audioWaveform, encodeAudioWav, type SampleBuffer } from "../src/rebuild/audio/analysis";
 import { AUDIO_TECHNOLOGIES, audioTechnology } from "../src/rebuild/audio/presets";
+import { needsMediaVolumeGain } from "../src/rebuild/audio/engine";
+
+test("Fixed media volume detection covers iPhone and desktop-mode iPad", () => {
+  assert.equal(needsMediaVolumeGain({ userAgent: "iPhone", platform: "iPhone", maxTouchPoints: 5 }), true);
+  assert.equal(needsMediaVolumeGain({ userAgent: "Macintosh Safari", platform: "MacIntel", maxTouchPoints: 5 }), true);
+  assert.equal(needsMediaVolumeGain({ userAgent: "Macintosh Safari", platform: "MacIntel", maxTouchPoints: 0 }), false);
+  assert.equal(needsMediaVolumeGain({ userAgent: "Android", platform: "Linux", maxTouchPoints: 5 }), false);
+});
 
 function tone(amplitude = 0.1, channels = 2, seconds = 3, sampleRate = 48000): SampleBuffer {
   const length = Math.round(sampleRate * seconds), data = Array.from({ length: channels }, () => Float32Array.from({ length }, (_, i) => amplitude * Math.sin(2 * Math.PI * 1000 * i / sampleRate)));
@@ -42,6 +50,43 @@ async function browserModule(file: string, dependencies: Record<string, string> 
   for (const [name, url] of Object.entries(dependencies)) code = code.replaceAll(`"${name}"`, JSON.stringify(url));
   return "data:text/javascript;base64," + Buffer.from(code).toString("base64");
 }
+test("iPhone fixed element volume still produces the saved level, mute and dry bypass", { timeout: 60000 }, async () => {
+  const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets });
+  const wav = Buffer.from(encodeAudioWav(tone(0.1, 1, 8))).toString("base64");
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  try {
+    const page = await browser.newPage(); await page.evaluate("globalThis.__name = (fn) => fn");
+    const result = await page.evaluate(async ({ engine, wav }) => {
+      const { MediaAudioEngine } = await import(engine);
+      const media = new Audio("data:audio/wav;base64," + wav); media.loop = true;
+      Object.defineProperty(media, "volume", { get: () => 1, set: () => {} });
+      const controller = new MediaAudioEngine(media, { requiresVolumeGraph: true });
+      controller.setVolume(0.3); const beforeGesture = controller.initialized;
+      await controller.setMode("none"); const source = controller.source;
+      const live: AudioContext = controller.context, meter = live.createAnalyser(); meter.fftSize = 2048;
+      controller.master.connect(meter); await media.play();
+      const rms = () => { const data = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(data); return Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length); };
+      const deadline = performance.now() + 5000;
+      while ((media.currentTime < 0.6 || rms() < 0.001) && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 30));
+      const saved = rms(); controller.setVolume(1); await new Promise(resolve => setTimeout(resolve, 200)); const full = rms();
+      controller.setVolume(0); await new Promise(resolve => setTimeout(resolve, 120)); const muted = rms();
+      controller.setVolume(0.3); await controller.setMode("night"); await new Promise(resolve => setTimeout(resolve, 150)); const enhanced = rms();
+      await controller.setMode("none"); await new Promise(resolve => setTimeout(resolve, 150)); const restored = rms(), sameSource = controller.source === source, branches = controller.branches.size;
+      await live.suspend(); await controller.setMode("none"); const resumed = live.state;
+      media.pause(); controller.dispose();
+      const direct = new MediaAudioEngine(new Audio(), { requiresVolumeGraph: false }); await direct.setMode("none"); const desktopDirect = !direct.initialized; direct.dispose();
+      const incompatible = new MediaAudioEngine(new Audio("https://example.invalid/no-cors.mp3"), { requiresVolumeGraph: true });
+      let rejectedUnsafe = false; try { await incompatible.setMode("none"); } catch { rejectedUnsafe = !incompatible.initialized; } incompatible.dispose();
+      return { beforeGesture, elementVolume: media.volume, savedRatio: saved / full, restoredRatio: restored / full, muted, enhanced, sameSource, branches, resumed, desktopDirect, rejectedUnsafe };
+    }, { engine, wav });
+    assert.equal(result.beforeGesture, false); assert.equal(result.elementVolume, 1);
+    assert.ok(Math.abs(result.savedRatio - 0.3) < 0.015, JSON.stringify(result));
+    assert.ok(Math.abs(result.restoredRatio - 0.3) < 0.015, JSON.stringify(result));
+    assert.ok(result.muted < 0.000001); assert.ok(result.enhanced > 0.001);
+    assert.equal(result.sameSource, true); assert.equal(result.branches, 1); assert.equal(result.resumed, "running");
+    assert.equal(result.desktopDirect, true); assert.equal(result.rejectedUnsafe, true);
+  } finally { await browser.close(); }
+});
 test("Actual browser renders preserve None, safe peaks, crossfeed mono and comparison timing", { timeout: 60000 }, async () => {
   const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets }), analysis = await browserModule("src/rebuild/audio/analysis.ts", { "./presets": presets }), preview = await browserModule("src/rebuild/audio/preview.ts", { "./presets": presets, "./engine": engine, "./analysis": analysis });
   const browser = await chromium.launch({ channel: "chrome", headless: true });

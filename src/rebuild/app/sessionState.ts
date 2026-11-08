@@ -9,7 +9,7 @@ export interface ListeningSession {
  sleepUntil:number|null;
 }
 export interface SessionRecord {state:ListeningSession;revision:number;deviceId:string;updatedAt:number}
-export interface SessionDraft extends SessionRecord {pending:boolean;savedAt:number;intent?:boolean}
+export interface SessionDraft extends SessionRecord {pending:boolean;savedAt:number;intent?:boolean;intentAt?:number;clockOffset?:number}
 
 /** Persist catalog identity, never expiring stream addresses or device blob URLs. */
 export function portableTrack(track:MusicTrack):MusicTrack {
