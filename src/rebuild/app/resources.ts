@@ -55,7 +55,9 @@ export function useResource<T>(accountId:string|null,path:string|null){const key
  const subscribe=useCallback((listener:()=>void)=>{if(!key)return()=>{};const item=resource(key);item.listeners.add(listener);return()=>{item.listeners.delete(listener);};},[key]);
  const snapshot=useCallback(()=>accountId&&path?resourceSnapshot<T>(accountId,path):EMPTY,[accountId,path]);const result=useSyncExternalStore(subscribe,snapshot,()=>EMPTY) as ResourceState<T>;
  useEffect(()=>{if(accountId&&path)void loadResource(accountId,path);},[accountId,path]);
- return {...result,retry:()=>{if(accountId&&path)void loadResource(accountId,path,true);}};
+ // Effects start fetching after the first paint. An eligible empty snapshot is
+ // already pending, so show its loading UI instead of flashing an empty room.
+ return {...result,loading:result.loading||!!(accountId&&path&&result.data===undefined&&!result.error),retry:()=>{if(accountId&&path)void loadResource(accountId,path,true);}};
 }
 export function invalidateResources(accountId:string,prefix="/api/v2/"){for(const [key,item]of entries){if(key.startsWith(accountId+":"+prefix)){const path=key.slice(accountId.length+1);invalidate(item,accountId,path);if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}}}
 export function clearResources(accountId:string){for(const [key,item] of entries)if(key.startsWith(accountId+":")){item.generation++;item.reload=false;item.controller?.abort();entries.delete(key);update(item,EMPTY);}}

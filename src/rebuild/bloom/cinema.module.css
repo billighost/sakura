@@ -15,12 +15,16 @@
 .cardArt>img{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}
 .coverCard{min-width:0}
 
-.story[open]{animation:storyArrive .28s ease-out both}
+.story[open][data-dialog-phase="opening"]{animation:storyAperture .62s cubic-bezier(.18,.74,.22,1) both}
+.story[open][data-dialog-phase="closing"]{animation:storyClose .24s cubic-bezier(.45,0,.8,.35) both;pointer-events:none}
+.story[data-dialog-phase="opening"]>.header,.story[data-dialog-phase="opening"]>.progress{animation:storyMargin .45s .16s ease-out backwards}
 .footer button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .comparison a{display:inline-flex;align-items:center;gap:4px}
-@keyframes storyArrive{from{opacity:0}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.story{animation:none}}
-.story[data-motion="still"]{animation:none}
+@keyframes storyAperture{0%{opacity:.18;clip-path:ellipse(18% 5% at 50% 58%)}40%{opacity:1}100%{opacity:1;clip-path:ellipse(110% 110% at 50% 50%)}}
+@keyframes storyClose{from{opacity:1;clip-path:ellipse(110% 110% at 50% 50%)}to{opacity:0;clip-path:ellipse(40% 8% at 50% 58%)}}
+@keyframes storyMargin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.story[open][data-dialog-phase],.story[data-dialog-phase]> .header,.story[data-dialog-phase]> .progress{animation:none}}
+.story[open][data-motion="still"],.story[data-motion="still"]>.header,.story[data-motion="still"]>.progress{animation:none}
 .performanceSettings,.autoChoice,.autoChoice>span{min-width:0}.autoChoice select{min-width:0;max-width:100%;min-height:44px}.performanceSettings p,.autoChoice b,.autoChoice small,.qualityChoices b,.qualityChoices small{overflow-wrap:anywhere}.qualityChoices{grid-template-columns:repeat(5,minmax(0,1fr))}.qualityChoices>button{min-width:0}
 @media(max-width:750px){.qualityChoices{grid-template-columns:repeat(3,minmax(0,1fr))}.autoChoice{width:100%}.autoChoice select{width:100%}}
 @media(max-width:480px){.qualityChoices{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.qualityChoices>button{padding:14px 12px}.autoChoice{gap:14px}}

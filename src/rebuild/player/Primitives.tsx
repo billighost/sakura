@@ -6,6 +6,7 @@ import { retainArtwork } from "./imageCache";
 import { useMusic } from "../app/MusicContext";
 import { RecoveryNotice } from "../app/RecoveryNotice";
 import { UserFacingError } from "../app/errors";
+import { useDialogLifecycle } from "../app/dialogLifecycle";
 
 export type PlayerIconName = "play" | "pause" | "next" | "previous" | "close" | "up" | "down" | "heart" | "queue" | "lyrics" | "share" | "download" | "shuffle" | "repeat" | "volume" | "check" | "link" | "image" | "video" | "back";
 const paths: Record<PlayerIconName, ReactNode> = {
@@ -45,28 +46,23 @@ export function Artwork({ url, title, className = "", priority = false }: { url:
     {src && failedUrl !== src ? <img src={src} alt={`${title} artwork`} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding="async" onError={() => setFailedUrl(src)}/> : <svg viewBox="0 0 300 300" aria-label={`${title}: artwork unavailable`} role="img"><rect width="300" height="300" fill="currentColor" opacity=".08"/><g fill="none" stroke="currentColor" strokeWidth="1.7" opacity=".5"><path d="M55 252C122 224 194 138 213 51M125 199C76 172 75 133 62 109c41 8 81 23 94 50M169 140c-6-55 17-88 35-104 4 37 10 65-21 90M202 89c23-24 51-25 72-22-13 25-29 40-66 33"/><path d="M101 199c29-39 51-41 77-48M161 150c37 7 49 16 67 41-39 2-64-8-65-32"/></g><text x="150" y="269" textAnchor="middle" fill="currentColor" opacity=".55" fontSize="17" fontFamily="Georgia,serif">a little good sound.</text></svg>}
   </div>;
 }
-export function PlayerDialog({ title, subtitle, children, footer, onClose, wide = false, fullscreen = false, className = "" }: { title: string; subtitle?: string; children: ReactNode; footer?: ReactNode; onClose: () => void; wide?: boolean; fullscreen?: boolean; className?: string }) {
+export function PlayerDialog({ title, subtitle, children, footer, onClose, wide = false, fullscreen = false, className = "", appearance = "note", closeDisabled = false }: { title: string; subtitle?: string; children: ReactNode; footer?: ReactNode; onClose: () => void; wide?: boolean; fullscreen?: boolean; className?: string; appearance?: "player" | "lyrics" | "queue" | "share" | "note"; closeDisabled?: boolean }) {
   const music = useMusic();
   const ref = useRef<HTMLDialogElement>(null);
+  const backdropPress = useRef(false);
   const titleId = useId();
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    const focused = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    if (!dialog.open) dialog.showModal();
-    return () => {
-      dialog.close();
-      document.body.style.overflow = previousOverflow;
-      if (focused instanceof HTMLElement && focused.isConnected) focused.focus({ preventScroll: true });
-    };
-  }, []);
-  return <dialog ref={ref} className={`${s.dialog} ${wide ? s.wide : ""} ${fullscreen ? s.fullscreen : ""} ${className}`} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => {
-    if (event.target !== event.currentTarget) return;
+  const animateClose = useDialogLifecycle(ref, onClose, music.settings.reducedMotion);
+  const requestClose = () => { if (!closeDisabled) animateClose(); };
+  return <dialog ref={ref} className={`${s.dialog} ${wide ? s.wide : ""} ${fullscreen ? s.fullscreen : ""} ${className}`} data-dialog-appearance={appearance} data-reduced-motion={music.settings.reducedMotion || undefined} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); requestClose(); }} onPointerDown={(event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
-  }}><section className={s.dialogInner}><header className={s.dialogHeader}><div>{subtitle && <p className={s.eyebrow}>{subtitle}</p>}<h2 id={titleId}>{title}</h2></div><IconButton icon="close" label="Close" onClick={onClose}/></header><div className={s.dialogBody} data-player-scroll>{music.notice&&<div className={s.dialogNotice}><RecoveryNotice error={new UserFacingError(music.notice.issue)} retry={music.notice.retry} compact/><IconButton icon="close" label="Dismiss message" onClick={music.dismissNotice}/></div>}{children}</div>{footer && <footer className={s.dialogFooter}>{footer}</footer>}</section></dialog>;
+    backdropPress.current = event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom);
+  }} onClick={(event) => {
+    const beganOnBackdrop = backdropPress.current;
+    backdropPress.current = false;
+    if (event.target !== event.currentTarget || !beganOnBackdrop) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose();
+  }}><section className={s.dialogInner}><header className={s.dialogHeader}><div>{subtitle && <p className={s.eyebrow}>{subtitle}</p>}<h2 id={titleId}>{title}</h2></div><IconButton icon="close" label="Close" onClick={requestClose} disabled={closeDisabled}/></header><div className={s.dialogBody} data-player-scroll>{music.notice&&<div className={s.dialogNotice}><RecoveryNotice error={new UserFacingError(music.notice.issue)} retry={music.notice.retry} compact/><IconButton icon="close" label="Dismiss message" onClick={music.dismissNotice}/></div>}{children}</div>{footer && <footer className={s.dialogFooter}>{footer}</footer>}</section></dialog>;
 }
 export function formatPlaybackTime(milliseconds: number) {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));

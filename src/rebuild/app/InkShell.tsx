@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMusic } from "./MusicContext";
@@ -18,7 +18,7 @@ export function InkShell({children}:{children:ReactNode}){
  const openFromPlayer=(modal:"lyrics"|"queue"|"share")=>{setPlayerUnderlay(true);p.openModal(modal);};
  const closeOverlay=()=>{if(playerUnderlay){setPlayerUnderlay(false);p.openModal("player");}else p.closeModal();};
  useEffect(()=>{if(!p.booting&&!p.account&&!p.error&&pathname!=="/offline")router.replace("/login?next="+encodeURIComponent(pathname));},[p.booting,p.account,p.error,pathname,router]);
- useEffect(()=>{if(main.current)main.current.scrollTop=scrolls.current.get(pathname)||0;},[pathname]);
+ useLayoutEffect(()=>{if(main.current)main.current.scrollTop=scrolls.current.get(pathname)||0;},[pathname]);
  useEffect(()=>{try{const saved=localStorage.getItem("sakura-sidebar-mode");if(saved==="expanded"||saved==="collapsed")setSidebarMode(saved);}catch{}const media=matchMedia("(min-width: 651px) and (max-height: 760px)");const sync=()=>setShortSidebar(media.matches);sync();media.addEventListener("change",sync);return()=>media.removeEventListener("change",sync);},[]);
  useEffect(()=>{if(p.booting&&!p.account)return;const choice=p.settings.theme;const dark=choice==="dark"||choice==="system"&&matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.dataset.inkTheme=dark?"dark":"light";try{localStorage.setItem("sakura-v2-theme",choice);}catch{}const media=matchMedia("(prefers-color-scheme: dark)");const listener=()=>{if(choice==="system")document.documentElement.dataset.inkTheme=media.matches?"dark":"light";};media.addEventListener("change",listener);return()=>media.removeEventListener("change",listener);},[p.settings.theme,p.booting,p.account]);
  useEffect(()=>{function key(e:KeyboardEvent){if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||e.target instanceof HTMLSelectElement||p.modal)return;if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();router.push("/search");}if(e.code==="Space"&&!(e.target instanceof HTMLButtonElement)&&!(e.target instanceof HTMLAnchorElement)){e.preventDefault();p.togglePlay();}}window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key);},[p,router]);

@@ -5,8 +5,17 @@ import { sameOriginArtworkUrl } from "../src/rebuild/player/imageUrl";
 import { approvedArtworkUrl } from "../src/rebuild/player/imagePolicy";
 import {readyPlaybackFor} from "../src/rebuild/app/playbackSource";
 import {musicTrack} from "../src/rebuild/app/types";
+import {boundedSeekPosition} from "../src/rebuild/app/seekPosition";
 
 const source = [{ text: "first words", start: 1, end: 3 }, { text: "second words", start: 3, end: 5 }, { text: "third words", start: 5, end: 8 }];
+test("lyric seeking uses the loaded media when catalog duration is missing",()=>{
+ assert.equal(boundedSeekPosition(60000,0,120000),60000);
+ assert.equal(boundedSeekPosition(180000,0,120000),120000);
+ assert.equal(boundedSeekPosition(-100,0,120000),0);
+ assert.equal(boundedSeekPosition(Number.NaN,0,120000),0);
+ assert.equal(boundedSeekPosition(60000,0,Number.NaN),0);
+ assert.equal(boundedSeekPosition(60000,120000,10000),60000,"Known full-song duration remains available while progressive media loads");
+});
 test("ready CDN playback retains exact recording, checksum and same-origin recovery",()=>{
  const id="10000000-0000-4000-8000-000000000001",assetId="10000000-0000-4000-8000-000000000002",sha256="a".repeat(64);
  const ready={kind:"stream",delivery:"cdn",assetId,sha256,sizeBytes:5000,mimeType:"audio/mpeg",durationMs:1000,url:`https://res.cloudinary.com/sakura/video/upload/v123/sakura/v2/audio/${id}/${sha256}.mp3`,fallbackUrl:`/api/v2/recordings/${id}/audio?assetId=${assetId}`} as const;

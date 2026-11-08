@@ -1,4 +1,4 @@
-.songPopover{position:fixed;inset:auto;margin:0;width:280px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--ink-line,#d7dfd3);border-radius:4px 18px 6px 18px;background:var(--ink-card,#f9faf5);color:var(--ink-text,#273b34);box-shadow:0 14px 50px #13251c28;padding:9px;font:12px/1.4 var(--font-inter),Arial,sans-serif;scrollbar-width:thin;animation:menuUnfold .16s ease-out;box-sizing:border-box}
+.songPopover{position:fixed;inset:auto;margin:0;width:280px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--ink-line,#d7dfd3);border-radius:4px 18px 6px 18px;background:var(--ink-card,#f9faf5);color:var(--ink-text,#273b34);box-shadow:0 14px 50px #13251c28;padding:9px;font:12px/1.4 var(--font-inter),Arial,sans-serif;scrollbar-width:thin;animation:menuUnfold .38s cubic-bezier(.18,.8,.24,1) both;transform-origin:right top;box-sizing:border-box}
 .songPopover{z-index:9999}.songPopover::backdrop{background:transparent}
 .popoverHeading{padding:14px 13px 16px;margin-bottom:5px;border-bottom:1px solid var(--ink-line,#d7dfd3);position:relative}
 .popoverHeading:after{content:"";position:absolute;right:13px;top:17px;width:13px;height:19px;transform:rotate(35deg);border-radius:80% 15% 70% 20%;background:var(--ink-petal,#c68c95);opacity:.35}
@@ -11,5 +11,12 @@
 .songPopover button:disabled{opacity:.4;cursor:default}.songPopover svg{width:18px;height:18px;flex-shrink:0;color:var(--ink-muted,#69786d)}
 .popoverHeading small a{display:inline-flex;width:auto;min-height:32px;gap:0;padding:3px 0;font:inherit}
 .popoverNote{padding:14px;color:var(--ink-muted,#69786d);font-size:11px}
-@keyframes menuUnfold{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-@media(prefers-reduced-motion:reduce){.songPopover{animation:none}}
+.songPopover>.popoverHeading{animation:menuInk .42s .07s ease-out backwards}
+.songPopover>button,.songPopover>a{animation:menuInk .28s .1s ease-out backwards}
+.songPopover>button:nth-of-type(2),.songPopover>a:nth-of-type(2){animation-delay:.13s}
+.songPopover>button:nth-of-type(3),.songPopover>a:nth-of-type(3){animation-delay:.16s}
+.songPopover>button:nth-of-type(n+4),.songPopover>a:nth-of-type(n+4){animation-delay:.19s}
+@keyframes menuUnfold{0%{opacity:0;clip-path:inset(0 0 88% 0 round 4px 18px 6px 18px);transform:rotate(-2deg) translateY(-4px)}45%{opacity:1}100%{opacity:1;clip-path:inset(0 round 4px 18px 6px 18px);transform:none}}
+@keyframes menuInk{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+.songPopover[data-motion=still],.songPopover[data-motion=still]>*{animation:none}
+@media(prefers-reduced-motion:reduce){.songPopover,.songPopover>*{animation:none}}

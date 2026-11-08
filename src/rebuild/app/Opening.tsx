@@ -1,15 +1,17 @@
 "use client";
-import { useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { openingSession } from "./openingSession";
 import s from "./ink.module.css";
 const motionSubscribe=(listener:()=>void)=>{const media=matchMedia("(prefers-reduced-motion: reduce)");media.addEventListener("change",listener);return()=>media.removeEventListener("change",listener);};
 const motionSnapshot=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
 export function SakuraOpening({reduced=false,autoPlay=true,preview=false}:{reduced?:boolean;autoPlay?:boolean;preview?:boolean}){
- const [mounted,setMounted]=useState(false);const [open,setOpen]=useState(false);const [epoch,setEpoch]=useState(0);const systemReduced=useSyncExternalStore(motionSubscribe,motionSnapshot,()=>false);const gentle=reduced||systemReduced;
- const show=useCallback(()=>{document.documentElement.style.setProperty("--sakura-opening-display","flex");setOpen(true);},[]);
- const close=useCallback(()=>{setOpen(false);if(typeof document!=="undefined"){delete document.documentElement.dataset.sakuraOpening;document.documentElement.style.removeProperty("--sakura-opening-display");}},[]);
- useEffect(()=>{setMounted(true);if(document.documentElement.dataset.sakuraOpening==="pending"){try{sessionStorage.setItem("sakura-ink-opening","1");}catch{}show();}},[show]);
+ const [mounted,setMounted]=useState(false);const [open,setOpen]=useState(false);const [epoch,setEpoch]=useState(0);const visible=useRef(false);const systemReduced=useSyncExternalStore(motionSubscribe,motionSnapshot,()=>false);const gentle=reduced||systemReduced;
+ const show=useCallback(()=>{visible.current=true;document.documentElement.style.setProperty("--sakura-opening-display","flex");setOpen(true);},[]);
+ const close=useCallback(()=>{openingSession.claim();visible.current=false;setOpen(false);if(typeof document!=="undefined"){delete document.documentElement.dataset.sakuraOpening;document.documentElement.style.removeProperty("--sakura-opening-display");}},[]);
+ useLayoutEffect(()=>()=>{if(visible.current)close();},[close]);
  useEffect(()=>{if(open)delete document.documentElement.dataset.sakuraOpening;},[open]);
- useEffect(()=>{const replay=()=>{setEpoch(n=>n+1);show();};const timer=setTimeout(()=>{if(!autoPlay)return;try{if(sessionStorage.getItem("sakura-ink-opening")!=="1"){sessionStorage.setItem("sakura-ink-opening","1");show();}}catch{show();}},0);window.addEventListener("sakura-replay-opening",replay);return()=>{clearTimeout(timer);window.removeEventListener("sakura-replay-opening",replay);};},[autoPlay,show]);
+ useEffect(()=>{const timer=setTimeout(()=>{const pending=document.documentElement.dataset.sakuraOpening==="pending";setMounted(true);if((pending||autoPlay)&&openingSession.claim())show();else if(pending)close();},0);return()=>clearTimeout(timer);},[autoPlay,show,close]);
+ useEffect(()=>{const replay=()=>{setEpoch(n=>n+1);show();};window.addEventListener("sakura-replay-opening",replay);return()=>window.removeEventListener("sakura-replay-opening",replay);},[show]);
  useEffect(()=>{if(!open||!gentle)return;const timer=setTimeout(close,500);return()=>clearTimeout(timer);},[open,epoch,gentle,close]);
  useEffect(()=>{if(!open||gentle)return;const timer=setTimeout(close,3400);return()=>clearTimeout(timer);},[open,epoch,gentle,close]);
  useEffect(()=>{if(!open)return;const key=(event:KeyboardEvent)=>{if(event.key==="Escape")close();};window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key);},[open,close]);

@@ -14,6 +14,7 @@ import {sessionState,type ListeningSession} from "./sessionState";
 import {MediaAudioEngine} from "../audio/engine";
 import {audioTechnology,type AudioTechnology} from "../audio/presets";
 import {readyPlaybackFor} from "./playbackSource";
+import {boundedSeekPosition} from "./seekPosition";
 import {waitForRecording} from "./recordingJob";
 import { clearResources, invalidateResources } from "./resources";
 import { appendManual, clearUpcoming, moveUpcoming, nextUpcoming, reorderUpcoming, upcomingQueue } from "./listeningQueue";
@@ -199,7 +200,7 @@ export function MusicProvider({children}:{children:ReactNode}){
  function next(){const r=runtime.current;if(!r.queue.length)return;const upcoming=upcomingQueue(r.queue,r.currentEntryId);const target=nextUpcoming(r.queue,r.currentEntryId,r.shuffle)||(r.repeat==="all"?r.queue[0]:undefined);if(target){if(r.shuffle&&target.priority!=="manual"&&upcoming.length&&target.entryId!==upcoming[0].entryId&&upcoming.some(entry=>entry.entryId===target.entryId))updateQueue(reorderUpcoming(r.queue,r.currentEntryId,target.entryId,upcoming[0].entryId));void startEntry(target);}else pause();}
  nextRef.current=next;
  function previous(){const a=audio.current;const r=runtime.current;const i=r.queue.findIndex(e=>e.entryId===r.currentEntryId);if(i>0)void startEntry(r.queue[i-1]);else if(a)seek(0);}
- function seek(ms:number){const a=audio.current;const bounded=Math.max(0,Math.min(Number.isFinite(ms)?ms:0,runtime.current.track?.durationMs||0));restoredPosition.current=bounded;setPosition(bounded);if(a?.src&&Number.isFinite(a.duration)){collectAudible();a.currentTime=Math.min(bounded/1000,a.duration);audible.current.last=performance.now();audible.current.media=a.currentTime;}saveListening();}
+ function seek(ms:number){const a=audio.current;const bounded=boundedSeekPosition(ms,runtime.current.track?.durationMs||0,a?.src?a.duration*1000:0);restoredPosition.current=bounded;setPosition(bounded);if(a?.src&&Number.isFinite(a.duration)){collectAudible();a.currentTime=Math.min(bounded/1000,a.duration);audible.current.last=performance.now();audible.current.media=a.currentTime;}saveListening();}
  function setVolume(v:number){if(!Number.isFinite(v))return;const bounded=Math.max(0,Math.min(1,v));runtime.current.volume=bounded;setVolumeState(bounded);if(audioEngine.current){audioEngine.current.setVolume(bounded);if(audioEngine.current.requiresVolumeGraph)void applyAudioTechnology(audioTechnology(runtime.current.settings.audioTechnology)).catch(error=>notify(error instanceof Error?error.message:"Volume could not be changed. Tap play to try again."));}else if(audio.current)audio.current.volume=bounded;void updateSettings({volume:bounded}).catch(e=>reportError(e,"save"));}
  function setShuffle(value:boolean){runtime.current.shuffle=value;setShuffleState(value);void updateSettings({shuffle:value}).catch(e=>reportError(e,"save"));}
  function setRepeat(value:"off"|"one"|"all"){runtime.current.repeat=value;setRepeatState(value);void updateSettings({repeat:value}).catch(e=>reportError(e,"save"));}

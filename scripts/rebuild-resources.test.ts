@@ -1,9 +1,21 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {loadResource,resourceSnapshot,invalidateResources,clearResources} from "../src/rebuild/app/resources";
+import {loadResource,resourceSnapshot,invalidateResources,clearResources,useResource} from "../src/rebuild/app/resources";
+import {createElement} from "react";
+import {renderToStaticMarkup} from "react-dom/server";
 import {responseIssue,userMessage,UserFacingError} from "../src/rebuild/app/errors";
 import {settingsFields} from "../src/rebuild/app/preferences";
 import {preferencesPatch,DEFAULT_SETTINGS} from "../src/rebuild/data/validation";
+
+test("an uncached room shows loading from its first paint, before effects fetch",()=>{
+ function Room({account,path}:{account:string|null;path:string|null}){
+  const state=useResource(account,path);
+  return createElement("span",null,state.loading?"loading":"idle");
+ }
+ assert.equal(renderToStaticMarkup(createElement(Room,{account:"first-paint",path:"/api/v2/first-paint"})),"<span>loading</span>");
+ assert.equal(renderToStaticMarkup(createElement(Room,{account:null,path:"/api/v2/first-paint"})),"<span>idle</span>");
+ assert.equal(renderToStaticMarkup(createElement(Room,{account:"first-paint",path:null})),"<span>idle</span>");
+});
 
 test("invalidation discards a response already in flight and reads the new server state",async t=>{
  const account="resource-race",path="/api/v2/race";let calls=0,release!:(response:Response)=>void,started!:()=>void;

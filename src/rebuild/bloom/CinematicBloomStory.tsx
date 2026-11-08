@@ -3,6 +3,7 @@ import {useEffect,useRef,useState,type CSSProperties} from "react";
 import {Blossom} from "../app/Brand";
 import {Icon} from "../app/Icon";
 import {RecoveryNotice} from "../app/RecoveryNotice";
+import {useDialogLifecycle} from "../app/dialogLifecycle";
 import {WorldStage} from "./worlds/WorldStage";
 import {BLOOM_WORLDS,bloomWorld} from "./worlds/registry";
 import {useBloomPerformance} from "./useBloomPerformance";
@@ -25,11 +26,11 @@ export function BloomStory({initial,design="sakura",theme="light",reducedMotion=
  useEffect(()=>{audio.current={onPlay,onStopSound,onPauseSound,onResumeSound};},[onPlay,onStopSound,onPauseSound,onResumeSound]);
  const still=reducedMotion||systemStill||quality===1;
  useEffect(()=>{const query=matchMedia("(prefers-reduced-motion: reduce)");const change=()=>setSystemStill(query.matches);change();query.addEventListener("change",change);return()=>query.removeEventListener("change",change);},[]);
- useEffect(()=>{const node=dialog.current;if(!node)return;const focus=document.activeElement,old=document.body.style.overflow;document.body.style.overflow="hidden";if(!node.open)node.showModal();return()=>{node.close();document.body.style.overflow=old;if(focus instanceof HTMLElement&&focus.isConnected)focus.focus();};},[]);
+ const requestClose=useDialogLifecycle(dialog,onClose,still);
  useEffect(()=>{if(!sound||finished){audio.current.onStopSound?.();lastTrack.current=null;return;}const recording=chapter?.relatedRecording;if(!begun||!chapter?.revealed||!recording)return;const key=String(recording.recordingId||recording.id||"recording");if(lastTrack.current!==key){lastTrack.current=key;audio.current.onPlay?.(recording);}},[sound,finished,begun,chapter?.id,chapter?.revealed,chapter?.relatedRecording]);
  useEffect(()=>{const node=dialog.current;if(!node)return;const active=document.activeElement;if(active instanceof HTMLElement&&node.contains(active)&&!(active instanceof HTMLButtonElement&&active.disabled))return;node.querySelector<HTMLButtonElement>(finished?'[data-bloom-action="save"]':begun?'[data-bloom-action="next"]':'[data-bloom-action="begin"]')?.focus({preventScroll:true});},[begun,finished,busy]);
  useEffect(()=>{if(!begun||!sound||finished)return;if(director.motionPaused)audio.current.onPauseSound?.();else audio.current.onResumeSound?.();},[begun,sound,finished,director.motionPaused]);
- function close(){audio.current.onStopSound?.();onClose();}
+ function close(){audio.current.onStopSound?.();requestClose();}
  function play(recording:Record<string,unknown>){setSound(true);lastTrack.current=String(recording.recordingId||recording.id||"recording");audio.current.onPlay?.(recording);}
  async function save(){if(saveLock.current)return;saveLock.current=true;setSaveBusy(true);setSaveError(null);try{const file=await exportBloomCard(recap,worldId,theme,false,undefined,quality);const url=URL.createObjectURL(file);const anchor=document.createElement("a");anchor.href=url;anchor.download=file.name;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(problem){setSaveError(problem);}finally{saveLock.current=false;setSaveBusy(false);}}
  const winning=recap.chapters.find(item=>item.id==="top-song"),leadingArtist=recap.chapters.find(item=>item.id==="top-artist");

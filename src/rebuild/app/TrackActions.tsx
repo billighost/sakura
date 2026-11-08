@@ -30,6 +30,8 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
       if(!element)return;const gap=8;const width=element.offsetWidth;const height=element.offsetHeight;
       element.style.left=`${Math.max(gap,Math.min(innerWidth-width-gap,origin.left+origin.width-width))}px`;
       element.style.top=`${Math.max(gap,Math.min(innerHeight-height-gap,origin.top+origin.height+gap))}px`;
+      const rect=element.getBoundingClientRect();
+      element.style.transformOrigin=`${Math.max(0,Math.min(width,origin.left+origin.width/2-rect.left))}px ${origin.top>rect.top+height/2?"bottom":"top"}`;
     }
     if(typeof element.showPopover==="function")element.showPopover();else element.style.display="block";
     place();element.querySelector<HTMLElement>('[role="menuitem"]')?.focus({preventScroll:true});
@@ -52,7 +54,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   const download=music.downloads[id];
   const saved=download?.requested!==false&&download?.status==="ready";
   const saving=download?.requested!==false&&["queued","downloading","resolving"].includes(download?.status||"");
-  const content=<div ref={menu} popover="auto" role="menu" aria-label={`Options for ${track.title}`} className={s.songPopover} onKeyDown={keyboard} onToggle={event=>{if(event.newState==="closed")onClose();}}>
+  const content=<div ref={menu} popover="auto" role="menu" aria-label={`Options for ${track.title}`} data-motion={music.settings.reducedMotion?"still":undefined} className={s.songPopover} onKeyDown={keyboard} onToggle={event=>{if(event.newState==="closed")onClose();}}>
     <div className={s.popoverHeading}><span>a little more music</span><strong>{track.title}</strong><small onClick={onClose}><ArtistLinks track={track}/></small></div>
     {failure&&<><p className={s.popoverNote} role="alert">{failure.issue.message}</p>{failure.issue.kind!=="session"&&<button role="menuitem" disabled={busy} onClick={failure.retry}><Icon name="repeat"/>{failure.issue.action}</button>}{failure.issue.href&&<Link role="menuitem" href={failure.issue.href} onClick={onClose}><Icon name="arrow"/>{failure.issue.linkLabel||"Return to music"}</Link>}</>}
     {playlists?<>{playlists.map(list=><button role="menuitem" key={list.id} disabled={busy} onClick={()=>void choose(list)}><Icon name="library"/>{list.name}</button>)}{!playlists.length&&<p className={s.popoverNote}>Your first collection can begin with this song.</p>}<Link role="menuitem" href="/library" onClick={onClose}><Icon name="plus"/>Create a playlist</Link><button role="menuitem" onClick={()=>setPlaylists(null)}><Icon name="back"/>Back to song options</button></>:<>
