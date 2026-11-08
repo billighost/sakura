@@ -88,7 +88,28 @@ CREATE TABLE IF NOT EXISTS sakura_v2."ListeningChunk" (
 CREATE INDEX IF NOT EXISTS v2_listening_recent ON sakura_v2."ListeningEventLedger"(account_id,started_at DESC,event_id DESC);
 -- Additive timestamps retain the existing retry ledger and listening totals.
 ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS occurred_at timestamptz;
+-- Playback positions are evidence of where an event ended, never listening time.
+ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS last_position_ms integer NOT NULL DEFAULT 0 CHECK(last_position_ms BETWEEN 0 AND 21600000);
+ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS max_position_ms integer NOT NULL DEFAULT 0 CHECK(max_position_ms BETWEEN 0 AND 21600000);
+ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS last_sequence integer NOT NULL DEFAULT -1;
+ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS position_ms integer;
+ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS completed boolean;
+ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS skipped boolean;
+ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS finished boolean;
 CREATE INDEX IF NOT EXISTS v2_listening_period ON sakura_v2."ListeningChunk"(account_id,(COALESCE(occurred_at,created_at)));
+-- These minimal deletion receipts prevent another device replaying erased data.
+-- They retain dates and event IDs, but no recording or listening measurements.
+CREATE TABLE IF NOT EXISTS sakura_v2."HistoryDeletion" (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+ period_start timestamptz, cleared_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS v2_history_deletion_owner ON sakura_v2."HistoryDeletion"(account_id,cleared_at DESC);
+CREATE TABLE IF NOT EXISTS sakura_v2."ClearedListeningEvent" (
+ account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+ event_id uuid NOT NULL, cleared_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(account_id,event_id)
+);
 CREATE TABLE IF NOT EXISTS sakura_v2."BloomRecap" (
   account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
   recap_id text NOT NULL CHECK(recap_id ~ '^(weekly|monthly|yearly)-[0-9-]+$'),
@@ -112,6 +133,9 @@ CREATE TABLE IF NOT EXISTS sakura_v2."TasteFeedback" (
   expires_at timestamptz, updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY(account_id,target,target_id)
 );
+-- A retained imported aggregate may have no recoverable last-play date after
+-- selected sessions are erased. Keep that date unknown rather than inventing it.
+ALTER TABLE sakura_v2."ListeningRecordingSummary" ALTER COLUMN last_played_at DROP NOT NULL;
 CREATE TABLE IF NOT EXISTS sakura_v2."Mix" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
@@ -128,6 +152,18 @@ CREATE TABLE IF NOT EXISTS sakura_v2."MixRecording" (
   position integer NOT NULL CHECK(position >= 0),
   PRIMARY KEY(mix_id,recording_id), UNIQUE(mix_id,position)
 );
+CREATE TABLE IF NOT EXISTS sakura_v2."FeedSession" (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+ surface text NOT NULL CHECK(surface IN ('home','discover')),
+ mode text NOT NULL CHECK(mode IN ('balanced','familiar','explore')),
+ entries jsonb NOT NULL CHECK(jsonb_typeof(entries)='array'),
+ cursor_secret text NOT NULL CHECK(cursor_secret ~ '^[a-f0-9]{64}$'),
+ settings_signature text NOT NULL,
+ generated_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS v2_feed_session_owner ON sakura_v2."FeedSession"(account_id,expires_at);
+ALTER TABLE sakura_v2."FeedSession" ADD COLUMN IF NOT EXISTS personalized boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS sakura_v2."Share" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL UNIQUE CHECK(slug ~ '^[A-Za-z0-9_-]{8,64}$'),
   account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,

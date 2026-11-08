@@ -59,6 +59,8 @@ export async function listBloom(accountId:string,rawPeriod:string|null,now=new D
 export async function getBloom(accountId:string,id:string,now=new Date()){
   const timeZone=await zone(accountId);
   return inTransaction(async client=>{
+    // A story cannot persist measurements while their owner is erasing them.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-bloom:${accountId}:${id}`]);
     let row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,id])).rows[0];
     const item=window(id,now,row?.time_zone||timeZone);requireAvailable(item);

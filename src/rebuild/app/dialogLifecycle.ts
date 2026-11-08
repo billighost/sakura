@@ -63,6 +63,7 @@ export function useDialogLifecycle(dialogRef: RefObject<HTMLDialogElement | null
     lockPage(dialog);
     dialog.dataset.dialogPhase = "opening";
     if (!dialog.open) dialog.showModal();
+    dialog.querySelector<HTMLElement>("[data-dialog-autofocus]:not(:disabled),[autofocus]:not(:disabled)")?.focus({preventScroll:true});
 
     const still = () => reducedRef.current || matchMedia("(prefers-reduced-motion: reduce)").matches;
     const ownAnimations = () => dialog.getAnimations().filter(animation => {

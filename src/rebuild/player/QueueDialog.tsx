@@ -6,6 +6,7 @@ import type { QueueEntry } from "../app/types";
 import { ArtistLinks } from "../app/ArtistLinks";
 import { Artwork, formatPlaybackTime, IconButton, PlayerButton, PlayerDialog } from "./Primitives";
 import { requestDialogClose } from "../app/dialogLifecycle";
+import {SmartQueueButton} from "../app/SmartQueueButton";
 import s from "./player.module.css";
 
 export function QueueDialog({ onClose }: { onClose: () => void }) {
@@ -44,11 +45,12 @@ export function QueueDialog({ onClose }: { onClose: () => void }) {
       </li>)}</ol>
     </section>;
   }
-  return <PlayerDialog title="Let the listening unfold." subtitle="YOUR QUEUE" onClose={onClose} className={s.queueDialog} appearance="queue" footer={<PlayerButton secondary onClick={close}>Back to listening</PlayerButton>}>
+  return <PlayerDialog title="Your next songs." subtitle="YOUR QUEUE" onClose={onClose} className={s.queueDialog} appearance="queue" footer={<PlayerButton secondary onClick={close}>Back to listening</PlayerButton>}>
     {music.track&&<div className={`${s.queueNow} ${s.currentQueue}`} aria-current="true"><Artwork url={music.track.coverUrl} title={music.track.title}/><div><p className={s.eyebrow}>NOW PLAYING</p><strong>{music.track.title}</strong><p onClick={close}><ArtistLinks track={music.track}/></p><small>{music.track.versionLabel}</small></div><IconButton icon={music.status==="playing"?"pause":"play"} label={music.status==="playing"?"Pause":"Play"} onClick={music.togglePlay}/></div>}
-    <div className={s.queueHeading}><div><h3>The next chapter</h3><p>{upcoming.length} songs · {formatPlaybackTime(upcoming.reduce((sum,entry)=>sum+entry.track.durationMs,0))}</p></div>{upcoming.length>0&&<PlayerButton secondary onClick={music.clearQueue}>Clear queue</PlayerButton>}</div>
-    {!upcoming.length&&<div className={s.empty}><p>A little space for your next favourite.</p><PlayerButton secondary onClick={close}>Keep exploring</PlayerButton></div>}
+    <div className={s.queueHeading}><div><h3>Up next</h3><p>{upcoming.length} songs · {formatPlaybackTime(upcoming.reduce((sum,entry)=>sum+entry.track.durationMs,0))}</p></div><SmartQueueButton scope={music.offline?"downloads":"all"} append iconOnly label="Find songs for my queue"/>{upcoming.length>0&&<PlayerButton secondary onClick={music.clearQueue}>Clear queue</PlayerButton>}</div>
+    {!upcoming.length&&<div className={s.empty}><p>No songs queued.</p><PlayerButton secondary onClick={close}>Browse music</PlayerButton></div>}
     {group(manual,"Added by you")}
     {group(automatic,"Continuing your listening")}
+    {music.parkedPicks.length>0&&<section className={s.queueSection} aria-label="Your picks, kept for later"><div className={s.queueSectionHeading}><h3>Your picks, kept for later</h3><span>{music.parkedPicks.length}</span></div><p>These picks are waiting while your offline soundtrack plays.</p><ol className={s.queueList}>{music.parkedPicks.slice(0,3).map(entry=><li className={s.queueItem} key={entry.entryId}><div className={s.queueSong}><Artwork url={entry.track.coverUrl} title={entry.track.title}/><span><strong>{entry.track.title}</strong><small><ArtistLinks track={entry.track}/></small></span></div></li>)}</ol>{music.parkedPicks.length>3&&<p>And {music.parkedPicks.length-3} more of your picks.</p>}<PlayerButton secondary disabled={music.offline} onClick={music.restoreParkedPicks}>Bring back my picks</PlayerButton>{music.offline&&<p>Reconnect to bring your picks back into the queue.</p>}</section>}
   </PlayerDialog>;
 }

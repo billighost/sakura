@@ -178,7 +178,7 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     await assert.rejects(revealBloom(first,previous.id,recap.chapters[1].id,now),e=>e instanceof ProductError&&e.status===409);
     await assert.rejects(completeBloom(first,previous.id,now),e=>e instanceof ProductError&&e.status===409);
     for(const chapter of recap.chapters)recap=await revealBloom(first,previous.id,chapter.id,now);
-    assert.equal(recap.chapters[0].stat?.value,1);assert.ok(recap.chapters[1].relatedRecording);
+    assert.equal(recap.chapters[0].stat?.value,"1 min");assert.ok(recap.chapters[1].relatedRecording);
     const completed=await completeBloom(first,previous.id,now);assert.equal(completed.completed,true);
     assert.equal((await getBloom(second,previous.id,now)).status,"empty");
     await assert.rejects(getBloom(first,previous.id,new Date(previous.expiresAt)),e=>e instanceof ProductError&&e.status===410);

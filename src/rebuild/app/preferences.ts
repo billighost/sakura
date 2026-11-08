@@ -2,19 +2,20 @@ import {localRead,localWrite} from "./offline";
 import type {UserSettings} from "./types";
 import {AUDIO_TECHNOLOGIES} from "../audio/presets";
 import {validTimeZone} from "../bloom/calendar";
+import {FEED_NUMERIC_FIELDS,FEED_BOOLEAN_FIELDS} from "./feedPreferences";
 export interface PreferenceDraft {settings:UserSettings;pending:boolean;pendingPatch?:Partial<UserSettings>;savedAt:number}
-const supported=["theme","audioQuality","audioTechnology","privateSession","discovery","reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
+const supported=["theme","audioQuality","audioTechnology","privateSession",...FEED_NUMERIC_FIELDS,...FEED_BOOLEAN_FIELDS,"reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
 export function cachedPreferences(accountId?:string):Partial<UserSettings>{try{const id=accountId||localStorage.getItem("sakura-v2-active-account");if(!id)return {};const raw=localStorage.getItem("sakura-v2-preferences:"+id);return raw?settingsFields(JSON.parse(raw).settings):{};}catch{return {};}}
 /** Local caches can outlive an app version, or contain a partial failed write. */
 export function settingsFields(value:unknown):Partial<UserSettings>{
  const object=value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
  const choices:Record<string,readonly string[]>={theme:["system","light","dark"],audioQuality:["high","balanced","data-saver"],audioTechnology:AUDIO_TECHNOLOGIES.map(mode=>mode.id),bloomPerformance:["auto","1","2","3","4","5"],repeat:["off","one","all"]};
- const booleans=["privateSession","reducedMotion","explicitContent","onboarded","shuffle","previewLoop"];
+ const booleans=["privateSession","reducedMotion","explicitContent","onboarded","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
  const result:Record<string,unknown>={};
  for(const key of supported){const field=object[key];if(field===undefined)continue;
   if(choices[key]){if(typeof field==="string"&&choices[key].includes(field))result[key]=field;}
   else if(booleans.includes(key)){if(typeof field==="boolean")result[key]=field;}
-  else if(["discovery","volume","previewVolume"].includes(key)){if(typeof field==="number"&&Number.isFinite(field)&&field>=0&&field<=1)result[key]=field;}
+  else if([...FEED_NUMERIC_FIELDS,"volume","previewVolume"].includes(key)){if(typeof field==="number"&&Number.isFinite(field)&&field>=0&&field<=1)result[key]=field;}
   else if(key==="openingAnimation"||key==="sleepTimerMinutes"){if(typeof field==="number"&&Number.isInteger(field)&&field>=(key==="openingAnimation"?0:1)&&field<=(key==="openingAnimation"?4:180))result[key]=field;}
   else if(key==="timeZone"){if(validTimeZone(field))result[key]=field;}
   else if(key==="seedArtists"||key==="seedGenres"){if(Array.isArray(field)&&field.length<=(key==="seedArtists"?20:12)&&field.every(item=>typeof item==="string"&&item.trim()&&item.length<=(key==="seedArtists"?120:80)))result[key]=[...new Set(field)];}

@@ -51,7 +51,7 @@ export function AudioTechnologySettings() {
 
   return <section className={s.settings} aria-labelledby={name + "-title"}>
     <div className={s.sectionHeading}>
-      <div><span className={s.eyebrow}>A LITTLE MORE IN EVERY NOTE</span><h2 id={name + "-title"}>Audio technology</h2><p>Give your music a different feeling. Listen, compare, and find your favorite.</p></div>
+      <div><span className={s.eyebrow}>A LITTLE MORE IN EVERY NOTE</span><h2 id={name + "-title"}>Audio technology</h2><p>Adjust the sound. Compare styles and choose what you prefer.</p></div>
       <SoundMark mode={selected} large/>
     </div>
     <fieldset className={s.presets}>
@@ -366,9 +366,9 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
     event.stopPropagation();
     const control = event.target instanceof Element && event.target.closest("button,input,select,textarea,a,[contenteditable=true]");
     if (!control) { event.preventDefault(); if (!event.repeat) void play(lastAudition.current); }
-  }}><PlayerDialog title="Hear the difference." subtitle="Your own little listening test" wide className={s.dialog} onClose={onClose} footer={<><button className={s.textButton} type="button" onClick={onClose}>Keep listening</button><button type="button" className={s.applyButton} disabled={saving || !context} onClick={() => void apply()}><PlayerIcon name="check" size={17}/>{saving ? "Saving your sound…" : "Use " + preset.name}</button></>}>
+  }}><PlayerDialog title="Hear the difference." subtitle="A listening comparison" wide className={s.dialog} onClose={onClose} footer={<><button className={s.textButton} type="button" onClick={onClose}>Keep listening</button><button type="button" className={s.applyButton} disabled={saving || !context} onClick={() => void apply()}><PlayerIcon name="check" size={17}/>{saving ? "Saving your sound…" : "Use " + preset.name}</button></>}>
     <div className={s.intro}><p>Listen to one passage, two ways. Switch sides while it plays to catch the details.</p><span className={s.localBadge}><PlayerIcon name="volume" size={14}/>Processed on this device</span></div>
-    <div className={s.sourceRow}><div className={s.songTitle}><span className={s.eyebrow}>YOUR COMPARISON SONG</span><b>{title || "Choose something you love"}</b><small>{comparison ? `${Math.round(duration)} second passage` : "A short passage from your song"}</small></div><div className={s.sourceActions}>
+    <div className={s.sourceRow}><div className={s.songTitle}><span className={s.eyebrow}>YOUR COMPARISON SONG</span><b>{title || "Choose a comparison song"}</b><small>{comparison ? `${Math.round(duration)} second passage` : "A short passage from your song"}</small></div><div className={s.sourceActions}>
       {example && <button type="button" onClick={() => void remote(example)} disabled={!context}>Example song</button>}
       {(music.track?.audioUrl || music.track?.readyPlayback) && <button type="button" onClick={playCurrentSong} disabled={!context}>Current song</button>}
       <button type="button" onClick={() => input.current?.click()} disabled={!context}><PlayerIcon name="up" size={14}/>Choose audio file</button>

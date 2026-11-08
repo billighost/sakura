@@ -44,7 +44,11 @@
     ".next-bloom-build/types/**/*.ts",
     ".next-bloom-build/dev/types/**/*.ts",
     ".next-track-ui/types/**/*.ts",
-    ".next-track-ui/dev/types/**/*.ts"
+    ".next-track-ui/dev/types/**/*.ts",
+    ".next-personalized/types/**/*.ts",
+    ".next-personalized/dev/types/**/*.ts",
+    ".next-personalized-build/types/**/*.ts",
+    ".next-personalized-build/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

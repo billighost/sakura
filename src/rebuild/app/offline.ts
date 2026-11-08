@@ -1,6 +1,7 @@
 "use client";
 import { openDB } from "idb";
 import type { MusicTrack, Account } from "./types";
+import {listeningTimeFallsInPeriod} from "./listeningEvidence";
 let database:ReturnType<typeof openDB>|null=null;
 const db=()=>database||(database=openDB("sakura-ink-v1",1,{upgrade(db){db.createObjectStore("entries");}}));
 /** Shared database for atomic download chunk and manifest transactions. */
@@ -31,14 +32,30 @@ export async function verifiedAudio(response:Response,expectedBytes:number,signa
  if(bytes!==expectedBytes)throw new Error("The connection ended before the complete song arrived.");
  const blob=new Blob(parts,{type:mime});const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());const sha256=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,"0")).join("");if(signal.aborted)throw new DOMException("Canceled","AbortError");if(expectedSha&&sha256!==expectedSha.toLowerCase())throw new Error("The audio file did not match this verified recording. Try again.");onProgress(bytes);return {blob,sha256};
 }
-export interface ListenChunk {eventId:string;recordingId:string;sequence:number;msPlayed:number;positionMs:number;completed:boolean;context:string;finished?:boolean;occurredAt?:string}
+export interface ListenChunk {eventId:string;recordingId:string;sequence:number;msPlayed:number;positionMs:number;completed:boolean;skipped?:boolean;context:string;contextId?:string|null;finished?:boolean;occurredAt?:string}
 const listenFlights=new Map<string,Promise<boolean>>();
+const listenControllers=new Map<string,AbortController>();
+const listenGeneration=new Map<string,number>();
+const listenClearRanges=new Map<string,{period:"week"|"month"|"all";cutoffMs:number}[]>();
+const listenFlightChunks=new Map<string,ListenChunk>();
+/** Clear only listening evidence; saved audio and collection choices stay on this device. */
+export async function clearListeningOutbox(accountId:string,period:"week"|"month"|"all"="all",cutoffMs=Date.now()) {
+ listenGeneration.set(accountId,(listenGeneration.get(accountId)||0)+1);
+ listenClearRanges.set(accountId,[...(listenClearRanges.get(accountId)||[]),{period,cutoffMs}]);
+ const prefix="sakura-v2-outbox:"+accountId+":";
+ const matches=(name:string)=>name.startsWith(prefix)&&listeningTimeFallsInPeriod(listenFlightChunks.get(name)?.occurredAt,period,cutoffMs);
+ for(const [name,controller]of listenControllers)if(matches(name))controller.abort();
+ await Promise.allSettled([...listenFlights].filter(([name])=>matches(name)).map(([,flight])=>flight));
+ const tx=(await db()).transaction("entries","readwrite");let cursor=await tx.store.openCursor(IDBKeyRange.bound(key(accountId,"listen:"),key(accountId,"listen:")+"\uffff"));while(cursor){const chunk=cursor.value as ListenChunk;if(listeningTimeFallsInPeriod(chunk?.occurredAt,period,cutoffMs))await cursor.delete();cursor=await cursor.continue();}await tx.done;
+ try{const names:string[]=[];for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith(prefix))names.push(name);}for(const name of names){let chunk:ListenChunk|undefined;try{chunk=JSON.parse(localStorage.getItem(name)||"null");}catch{}if(listeningTimeFallsInPeriod(chunk?.occurredAt,period,cutoffMs))localStorage.removeItem(name);}}catch{}
+}
 export async function deliverListen(accountId:string,chunk:ListenChunk,timeoutMs=10000):Promise<boolean>{
  const name="listen:"+chunk.eventId+":"+chunk.sequence,mirror="sakura-v2-outbox:"+accountId+":"+chunk.eventId+":"+chunk.sequence;
  const pending=listenFlights.get(mirror);if(pending)return pending;
  let mirrored=false;try{localStorage.setItem(mirror,JSON.stringify(chunk));mirrored=true;}catch{}
- const flight=(async()=>{await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});if(response.ok){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}return false;}catch{/* The exact sequence remains queued for a later connection. */return false;}finally{clearTimeout(timer);}})();
- listenFlights.set(mirror,flight);try{return await flight;}finally{if(listenFlights.get(mirror)===flight)listenFlights.delete(mirror);}
+ const generation=listenGeneration.get(accountId)||0;
+ const flight=(async()=>{await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});if((listenClearRanges.get(accountId)||[]).slice(generation).some(range=>listeningTimeFallsInPeriod(chunk.occurredAt,range.period,range.cutoffMs))){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return false;}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);listenControllers.set(mirror,controller);try{const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});if(response.ok){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}return false;}catch{/* The exact sequence remains queued for a later connection. */return false;}finally{clearTimeout(timer);if(listenControllers.get(mirror)===controller)listenControllers.delete(mirror);}})();
+ listenFlights.set(mirror,flight);listenFlightChunks.set(mirror,chunk);try{return await flight;}finally{if(listenFlights.get(mirror)===flight){listenFlights.delete(mirror);listenFlightChunks.delete(mirror);}}
 }
 export async function drainListen(accountId:string,options:{timeoutMs?:number;maxDurationMs?:number;maxChunks?:number}={}){
  const deadline=performance.now()+(options.maxDurationMs??10000);

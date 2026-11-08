@@ -11,6 +11,7 @@ export function historyChunk(value:unknown) {
   const finished=raw.finished===undefined?completed||skipped:raw.finished;
   if(typeof completed!=="boolean"||typeof skipped!=="boolean"||typeof finished!=="boolean")throw new ProductError(400,"Invalid playback flags");
   if(completed&&skipped)throw new ProductError(400,"A play cannot be completed and skipped");
+  if((completed||skipped)&&!finished)throw new ProductError(400,"A completed or skipped play must be finished");
   const context=raw.context===undefined?"direct":text(raw.context,"playback context",40);
   const contextId=raw.contextId===undefined||raw.contextId===null?null:text(raw.contextId,"context ID",120);
   let occurredAt:string|undefined;
@@ -29,8 +30,17 @@ export function historyChunk(value:unknown) {
 export async function recordHistory(accountId:string,value:unknown) {
   const chunk=historyChunk(value);
   return inIdempotentTransaction(async client=>{
+    // Clearing data and recording increments serialize on the same account lock.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     const prefs=(await client.query(`SELECT preferences FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid`,[accountId])).rows[0];
     if(prefs?.preferences?.privateSession)return {accepted:false,privateSession:true};
+    if(prefs?.preferences?.learnFromListening===false)return {accepted:false,learningPaused:true};
+    const erased=(await client.query(`SELECT
+      EXISTS(SELECT 1 FROM sakura_v2."ClearedListeningEvent" WHERE account_id=$1::uuid AND event_id=$2::uuid) OR
+      EXISTS(SELECT 1 FROM sakura_v2."HistoryDeletion" WHERE account_id=$1::uuid AND
+        ($3::timestamptz IS NULL OR ($3::timestamptz<=cleared_at AND (period_start IS NULL OR $3::timestamptz>=period_start)))) AS erased`,
+      [accountId,chunk.eventId,chunk.occurredAt||null])).rows[0];
+    if(erased?.erased)return {accepted:false,cleared:true};
     const recording=(await client.query(`SELECT r.id,r.metadata FROM sakura_v2."Recording" r WHERE r.id=$1::uuid AND ${VERIFIED}`,[chunk.recordingId])).rows[0];
     if(!recording)throw new ProductError(404,"Recording not found");
     const duration=Number(recording.metadata.durationMs)||21600000;
@@ -50,11 +60,15 @@ export async function recordHistory(accountId:string,value:unknown) {
     if((ledger.completed&&chunk.skipped)||(ledger.skipped&&chunk.completed))throw new ProductError(409,"Conflicting playback completion");
     const playDelta=Number(ledger.audible_ms)===0&&chunk.msPlayed>0?1:0;
     const completeDelta=chunk.completed&&!ledger.completed?1:0,skipDelta=chunk.skipped&&!ledger.skipped?1:0;
-    await client.query(`INSERT INTO sakura_v2."ListeningChunk"(account_id,event_id,sequence,audible_ms,payload_hash,occurred_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6::timestamptz)`,
-      [accountId,chunk.eventId,chunk.sequence,chunk.msPlayed,chunk.payloadHash,chunk.occurredAt||null]);
+    await client.query(`INSERT INTO sakura_v2."ListeningChunk"(account_id,event_id,sequence,audible_ms,payload_hash,occurred_at,position_ms,completed,skipped,finished)
+      VALUES($1::uuid,$2::uuid,$3,$4,$5,$6::timestamptz,$7,$8,$9,$10)`,
+      [accountId,chunk.eventId,chunk.sequence,chunk.msPlayed,chunk.payloadHash,chunk.occurredAt||null,chunk.positionMs,chunk.completed,chunk.skipped,chunk.finished]);
     await client.query(`UPDATE sakura_v2."ListeningEventLedger" SET audible_ms=audible_ms+$3,completed=completed OR $4,skipped=skipped OR $5,
-      finished=finished OR $6,started_at=LEAST(started_at,COALESCE($7::timestamptz,started_at)),updated_at=now() WHERE account_id=$1::uuid AND event_id=$2::uuid`,
-      [accountId,chunk.eventId,chunk.msPlayed,chunk.completed,chunk.skipped,chunk.finished,chunk.occurredAt||null]);
+      finished=finished OR $6,started_at=LEAST(started_at,COALESCE($7::timestamptz,started_at)),
+      last_position_ms=CASE WHEN $8>=last_sequence THEN $9 ELSE last_position_ms END,
+      max_position_ms=GREATEST(max_position_ms,$9),last_sequence=GREATEST(last_sequence,$8),updated_at=now()
+      WHERE account_id=$1::uuid AND event_id=$2::uuid`,
+      [accountId,chunk.eventId,chunk.msPlayed,chunk.completed,chunk.skipped,chunk.finished,chunk.occurredAt||null,chunk.sequence,chunk.positionMs]);
     await client.query(`INSERT INTO sakura_v2."ListeningEvent"(account_id,event_id,context,context_id) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT DO NOTHING`,
       [accountId,chunk.eventId,chunk.context,chunk.contextId]);
     await client.query(`INSERT INTO sakura_v2."LifetimeListeningSummary"(account_id,audible_ms,play_count,completed_count,skipped_count)
@@ -79,14 +93,16 @@ export async function recordHistory(accountId:string,value:unknown) {
 export async function getHistory(accountId:string,url:URL) {
   const {limit,cursor}=pageInput(url);
   const rows=await getRebuildPool().query(`${CARD_SELECT.replace('FROM sakura_v2."Recording" r',`,l.event_id AS "eventId",l.started_at AS "playedAt",
-    l.audible_ms AS "audibleMs",l.completed,l.skipped,h.context,h.context_id AS "contextId" FROM sakura_v2."Recording" r`)}
+    l.audible_ms AS "audibleMs",l.completed,l.skipped,l.last_position_ms AS "positionMs",l.max_position_ms AS "maxPositionMs",
+    l.finished,h.context,h.context_id AS "contextId" FROM sakura_v2."Recording" r`)}
     JOIN sakura_v2."ListeningEventLedger" l ON l.recording_id=r.id AND l.account_id=$1::uuid
     JOIN sakura_v2."ListeningEvent" h ON h.account_id=l.account_id AND h.event_id=l.event_id
     WHERE ${VERIFIED} AND l.audible_ms>0 AND ($2::timestamptz IS NULL OR (l.started_at,l.event_id)<($2::timestamptz,$3::uuid))
     ORDER BY l.started_at DESC,l.event_id DESC LIMIT $4`,[accountId,cursor?.timestamp??null,cursor?.id??null,limit+1]);
   const selected=rows.rows.slice(0,limit),last=selected.at(-1);
   const events=selected.map(row=>({eventId:row.eventId,playedAt:row.playedAt,audibleMs:Number(row.audibleMs),completed:row.completed,
-    skipped:row.skipped,context:row.context,contextId:row.contextId,recording:card(row),track:card(row)}));
+    skipped:row.skipped,finished:row.finished,positionMs:Number(row.positionMs||0),maxPositionMs:Number(row.maxPositionMs||0),
+    context:row.context,contextId:row.contextId,recording:card(row),track:card(row)}));
   return {events,history:events,nextCursor:rows.rows.length>limit&&last?encodeCursor(last.playedAt,last.eventId):null};
 }
 

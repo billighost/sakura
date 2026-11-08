@@ -33,7 +33,7 @@ export function IconButton({ icon, label, active, className = "", ...props }: Bu
   return <button type="button" {...props} aria-label={label} title={label} aria-pressed={active} className={`${s.iconButton} ${active ? s.active : ""} ${className}`}><PlayerIcon name={icon}/></button>;
 }
 export function PlayerButton({ icon, children, secondary, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: PlayerIconName; secondary?: boolean }) {
-  return <button type="button" {...props} className={`${s.button} ${secondary ? s.secondary : ""} ${props.className || ""}`}>{icon && <PlayerIcon name={icon} size={18}/>}<span>{children}</span></button>;
+  return <button type="button" {...props} data-dialog-autofocus={props.autoFocus||undefined} className={`${s.button} ${secondary ? s.secondary : ""} ${props.className || ""}`}>{icon && <PlayerIcon name={icon} size={18}/>}<span>{children}</span></button>;
 }
 export function Artwork({ url, title, className = "", priority = false }: { url: string | null | undefined; title: string; className?: string; priority?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);

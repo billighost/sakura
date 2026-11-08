@@ -6,13 +6,14 @@ import { ensureMixes } from "../recommendations/service";
 import { ProductError,object,text } from "./validation";
 import { artistEntity,albumEntity } from "./entities";
 import { groupArtistCards } from "./artistSelection";
+import { getListeningInsights } from "./listeningInsights";
 
 export async function getHome(accountId:string) {
   const settings=await getSettings(accountId);
   const mixes=await ensureMixes(accountId);
   const pool=getRebuildPool();
   const [recentRows,favorites,featuredRows,playlists]=await Promise.all([
-    pool.query(`SELECT recording_id FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0 ORDER BY last_played_at DESC LIMIT 12`,[accountId]),
+    pool.query(`SELECT recording_id FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0 AND last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT 12`,[accountId]),
     pool.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid ORDER BY created_at DESC LIMIT 12`,[accountId]),
     pool.query(`${CARD_SELECT} WHERE ${VERIFIED} AND ($2::boolean OR COALESCE(r.metadata->>'explicit','unknown')<>'explicit')
       ORDER BY COALESCE((r.metadata->>'popularity')::numeric,0.5) DESC,r.created_at DESC LIMIT 24`,[accountId,settings.explicitContent]),
@@ -40,7 +41,10 @@ export async function getProfile(accountId:string) {
   const totals=summary.rows[0];
   const stats={audibleMs:Number(totals?.audible_ms||0),listeningHours:Number(totals?.audible_ms||0)/3600000,
     playCount:Number(totals?.play_count||0),completedCount:Number(totals?.completed_count||0),skippedCount:Number(totals?.skipped_count||0),...counts.rows[0]};
-  return {profile:user.rows[0],stats,topArtists:artists.rows.map(a=>({...a,audibleMs:Number(a.audibleMs)})),onboarding:{onboarded:settings.onboarded,seedArtists:settings.seedArtists,seedGenres:settings.seedGenres}};
+  const insights=await getListeningInsights(accountId,settings.timeZone);
+  return {profile:user.rows[0],stats,topArtists:artists.rows.map(a=>({...a,audibleMs:Number(a.audibleMs)})),insights,
+    tasteEvidence:insights.tasteEvidence,tasteFeedback:insights.tasteFeedback,
+    onboarding:{onboarded:settings.onboarded,seedArtists:settings.seedArtists,seedGenres:settings.seedGenres}};
 }
 export async function patchProfile(accountId:string,value:unknown) {
   const raw=object(value);

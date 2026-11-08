@@ -41,6 +41,10 @@ Main routes: `/home`, `/discover`, `/search`, `/library`, `/liked`, `/library/do
 
 Sakura Bloom has weekly, monthly and yearly listening stories. Completed years remain in the archive, and the three artistic directions rotate through production stories. Home and Discover offer 20 situational mix definitions; Downloads builds 18 situations exclusively from complete device files. Sparse collections explain what is missing rather than repeating songs to fill them.
 
+Home and Discover also offer personalized scrolling song feeds with recommendation reasons, artist/release shelves and configurable familiarity, artist variety, repeats and discovery. Smart soundtracks use the same listening evidence in Home, collections, liked songs and the queue; downloads soundtracks use only verified device files and work offline. Profile shows listening charts and genre/hour habits. Listeners can pause learning, exclude songs temporarily or indefinitely, export their personalization data, or clear selected history and taste choices with confirmation. These features use an additive migration and preserve existing libraries.
+
+See [the discovery research](docs/rebuild/PERSONALIZED-FEED-RESEARCH.md), [implementation details](docs/rebuild/PERSONALIZED-FEED-IMPLEMENTATION.md), [verification results](docs/rebuild/PERSONALIZED-FEED-VERIFICATION.md), and [Sakura's voice guide](docs/rebuild/SAKURA-VOICE.md).
+
 A canonical recording UUID identifies the exact recording; external provider appearances are references. Queue occurrences have their own IDs. Favorites and playlists can index catalog metadata without waiting for an audio download. A device download becomes ready only after complete-byte verification and SHA-256 hashing. Device data and cached resources are scoped to the account. Paused and buffering time is excluded from listening receipts.
 
 Public playlist import previews metadata before creating a collection. Sharing prepares actual PNG images, public links, and WebCodecs video with actual selected audio when the browser supports the encoders. Unsupported video stays unavailable.
@@ -50,6 +54,8 @@ Public playlist import previews metadata before creating a collection. Sharing p
 ```sh
 npm test
 npm run test:product
+npm run test:personalization:db
+npm run test:personalization:browser
 node scripts/rebuild-export-smoke.mjs
 ```
 

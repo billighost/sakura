@@ -6,26 +6,26 @@ const base={genres:[],size:14,minimum:4,maxPerArtist:2,maximumOverlap:0.2,surfac
 /** These labels use published genres, exact version metadata or audible history.
  * Tempo, energy and inferred moods are deliberately not invented. */
 export const SITUATIONAL_MIXES:readonly SituationalMixSpec[]=[
-  {...base,id:"daily",kind:"daily",name:"Your daily canvas",description:"Familiar sounds and a fresh order around your taste.",size:16,minimum:6,situation:"everyday",surfaces:["home","discover","downloads"],rules:["taste-affinity","artist-variety"]},
-  {...base,id:"discover",kind:"discover",name:"Beyond the familiar",description:"Unheard recordings from artists outside your listening history.",size:16,minimum:6,situation:"discovery",surfaces:["home","discover"],rules:["unheard-recordings","unfamiliar-artists"]},
-  {...base,id:"deep-cuts",kind:"deep-cuts",name:"Hidden brushstrokes",description:"Recordings you have not heard from familiar artists.",size:12,minimum:5,situation:"familiar-artists",surfaces:["home","discover"],rules:["unheard-recordings","familiar-artists"]},
-  {...base,id:"repeat",kind:"repeat",name:"Worth another listen",description:"Recordings you have actually spent time hearing.",size:12,maxPerArtist:3,situation:"repeat",surfaces:["home","discover","downloads"],rules:["audible-history"]},
-  {...base,id:"afrobeats",kind:"daily",name:"Afrobeats in bloom",description:"Published Afrobeats and Afro-pop credits with artist variety.",situation:"afrobeats",rules:["catalog-genre"]},
-  {...base,id:"japanese-pop",kind:"daily",name:"Tokyo paper lanterns",description:"J-pop and Japanese-pop recordings from catalog genre tags.",situation:"japanese-pop",rules:["catalog-genre"]},
-  {...base,id:"rnb-soul",kind:"daily",name:"Velvet voices",description:"A selection of catalog-tagged R&B and soul.",situation:"rnb-soul",rules:["catalog-genre"]},
-  {...base,id:"jazz",kind:"daily",name:"Blue ink sessions",description:"Jazz recordings, selected from published genre metadata.",situation:"jazz",rules:["catalog-genre"]},
-  {...base,id:"hip-hop",kind:"daily",name:"Lines and rhythm",description:"Hip-hop and rap with distinct artists across the queue.",situation:"hip-hop",rules:["catalog-genre"]},
-  {...base,id:"alternative",kind:"daily",name:"Outside the frame",description:"Alternative and indie recordings beyond the main canvas.",situation:"alternative",rules:["catalog-genre"]},
-  {...base,id:"electronic",kind:"daily",name:"Electric pigments",description:"Catalog-tagged electronic and dance recordings.",situation:"electronic",rules:["catalog-genre"]},
-  {...base,id:"rock",kind:"daily",name:"Guitar sketches",description:"Published rock and hard-rock recordings.",situation:"rock",rules:["catalog-genre"]},
+  {...base,id:"daily",kind:"daily",name:"Your daily canvas",description:"Familiar songs and new discoveries, selected from your preferences.",size:16,minimum:6,situation:"everyday",surfaces:["home","discover","downloads"],rules:["taste-affinity","artist-variety"]},
+  {...base,id:"discover",kind:"discover",name:"Beyond the familiar",description:"Unheard songs from artists you have not listened to here.",size:16,minimum:6,situation:"discovery",surfaces:["home","discover"],rules:["unheard-recordings","unfamiliar-artists"]},
+  {...base,id:"deep-cuts",kind:"deep-cuts",name:"Hidden brushstrokes",description:"Unheard songs from artists you already listen to.",size:12,minimum:5,situation:"familiar-artists",surfaces:["home","discover"],rules:["unheard-recordings","familiar-artists"]},
+  {...base,id:"repeat",kind:"repeat",name:"Worth another listen",description:"Songs from your recorded listening history.",size:12,maxPerArtist:3,situation:"repeat",surfaces:["home","discover","downloads"],rules:["audible-history"]},
+  {...base,id:"afrobeats",kind:"daily",name:"Afrobeats in bloom",description:"Afrobeats and Afro-pop, with a mix of artists.",situation:"afrobeats",rules:["catalog-genre"]},
+  {...base,id:"japanese-pop",kind:"daily",name:"Tokyo paper lanterns",description:"J-pop and Japanese pop from the catalog.",situation:"japanese-pop",rules:["catalog-genre"]},
+  {...base,id:"rnb-soul",kind:"daily",name:"Velvet voices",description:"R&B and soul, across familiar and new artists.",situation:"rnb-soul",rules:["catalog-genre"]},
+  {...base,id:"jazz",kind:"daily",name:"Blue ink sessions",description:"Jazz, selected from the catalog.",situation:"jazz",rules:["catalog-genre"]},
+  {...base,id:"hip-hop",kind:"daily",name:"Lines and rhythm",description:"Hip-hop and rap, with a mix of artists.",situation:"hip-hop",rules:["catalog-genre"]},
+  {...base,id:"alternative",kind:"daily",name:"Outside the frame",description:"Alternative and indie music.",situation:"alternative",rules:["catalog-genre"]},
+  {...base,id:"electronic",kind:"daily",name:"Electric pigments",description:"Electronic and dance music.",situation:"electronic",rules:["catalog-genre"]},
+  {...base,id:"rock",kind:"daily",name:"Guitar sketches",description:"Rock and hard rock from the catalog.",situation:"rock",rules:["catalog-genre"]},
   {...base,id:"short-break",kind:"daily",name:"A small interlude",description:"A varied queue that fits within twenty minutes.",size:7,minimum:3,maximumDurationMs:1200000,situation:"short-break",rules:["verified-duration","twenty-minute-cap"]},
-  {...base,id:"acoustic",kind:"daily",name:"Wood and strings",description:"Official acoustic versions and catalog-tagged acoustic music.",situation:"acoustic",rules:["catalog-genre-or-acoustic-version"]},
-  {...base,id:"instrumental",kind:"daily",name:"Space to think",description:"Official instrumental versions and instrumental genre tags.",situation:"instrumental",rules:["instrumental-version-or-genre"]},
-  {...base,id:"live",kind:"daily",name:"From the stage",description:"Live recordings with an explicit live-version credit.",situation:"live",rules:["verified-live-version"]},
-  {...base,id:"favorites",kind:"daily",name:"Songs you kept",description:"Your liked recordings arranged with artist variety.",situation:"favorites",rules:["explicit-like"]},
-  {...base,id:"forgotten",kind:"repeat",name:"Found in the margins",description:"Liked songs you heard before, last played over a month ago.",situation:"forgotten-favorites",rules:["explicit-like","audible-history","thirty-day-gap"]},
-  {...base,id:"recent-discoveries",kind:"repeat",name:"New leaves",description:"Songs first heard in your last seven days of listening.",situation:"recent-discoveries",rules:["first-audible-history","seven-day-window"]},
-  {...base,id:"late-night",kind:"repeat",name:"After the lights",description:"Songs you actually heard between 10 pm and 4 am locally.",situation:"late-night-history",rules:["actual-local-listening-hours"]},
+  {...base,id:"acoustic",kind:"daily",name:"Wood and strings",description:"Acoustic songs and acoustic versions.",situation:"acoustic",rules:["catalog-genre-or-acoustic-version"]},
+  {...base,id:"instrumental",kind:"daily",name:"Space to think",description:"Instrumental songs and versions.",situation:"instrumental",rules:["instrumental-version-or-genre"]},
+  {...base,id:"live",kind:"daily",name:"From the stage",description:"Live versions from the catalog.",situation:"live",rules:["verified-live-version"]},
+  {...base,id:"favorites",kind:"daily",name:"Songs you kept",description:"Your liked songs, arranged across artists.",situation:"favorites",rules:["explicit-like"]},
+  {...base,id:"forgotten",kind:"repeat",name:"Found in the margins",description:"Liked songs you have not played for more than a month.",situation:"forgotten-favorites",rules:["explicit-like","audible-history","thirty-day-gap"]},
+  {...base,id:"recent-discoveries",kind:"repeat",name:"New leaves",description:"Songs you first played here in the last seven days.",situation:"recent-discoveries",rules:["first-audible-history","seven-day-window"]},
+  {...base,id:"late-night",kind:"repeat",name:"After the lights",description:"Songs from your recorded listening between 10 pm and 4 am.",situation:"late-night-history",rules:["actual-local-listening-hours"]},
 ];
 export interface SituationRecording {id:string;artists:readonly string[];genres?:readonly string[];durationMs?:number|null;metadata?:Record<string,unknown>;liked?:boolean;popularity?:number;version?:{kinds:readonly string[]};explicit?:boolean;coverUrl?:string|null}
 export interface SituationHistory {audibleMs?:number;lastPlayedAt?:number;firstPlayedAt?:number;lateNight?:boolean}
@@ -62,8 +62,8 @@ export function planOfflineMixes(recordings:readonly SituationRecording[],option
     blockedRecordings:new Set(),blockedArtists:new Set(),snoozedUntil:new Map(),recentPlays:new Map(),recentWindowMs:0};
   const specs=SITUATIONAL_MIXES.filter(spec=>spec.surfaces.includes("downloads")),planned=planMixes(specs,candidates,context),byId=new Map(cards.map(r=>[r.id,r]));
   return planned.map((mix,i)=>({...specs[i],...mix,id:`offline:${mix.id}`,slot:mix.id,offline:true,
-    name:mix.id==="daily"?"Your downloaded canvas":specs[i].name,
-    description:mix.id==="daily"?"A varied queue from the recordings saved on this device.":specs[i].description,
+    name:mix.id==="daily"?"Your offline mix":specs[i].name,
+    description:mix.id==="daily"?"A mix made from songs downloaded on this device.":specs[i].description,
     trackCount:mix.recordingIds.length,coverUrls:mix.recordingIds.slice(0,4).flatMap(id=>{const cover=byId.get(id)?.coverUrl||byId.get(id)?.metadata?.coverUrl;return typeof cover==="string"?[cover]:[];}),
     playability:mix.status==="ready"?"ready":"unavailable"}));
 }

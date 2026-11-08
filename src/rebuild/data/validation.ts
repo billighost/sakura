@@ -1,5 +1,6 @@
 import { validTimeZone } from "../bloom/calendar";
 import { AUDIO_TECHNOLOGIES } from "../audio/presets";
+import { FEED_DEFAULTS, FEED_NUMERIC_FIELDS, FEED_BOOLEAN_FIELDS } from "../app/feedPreferences";
 export class ProductError extends Error {
   constructor(readonly status: number, message: string) { super(message); this.name = "ProductError"; }
 }
@@ -30,15 +31,15 @@ export function ids(value: unknown, limit = 200): string[] {
   return parsed;
 }
 export const DEFAULT_SETTINGS = {
-  theme: "system", audioQuality: "high", audioTechnology: "none", privateSession: false, discovery: 0.35,
+  theme: "system", audioQuality: "high", audioTechnology: "none", privateSession: false, ...FEED_DEFAULTS,
   reducedMotion: false, openingAnimation: 1, bloomPerformance: "auto", explicitContent: true,
   timeZone: "Africa/Lagos", seedArtistSelections: [],volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15,
 } as const;
 export function preferencesPatch(value: unknown): Record<string,unknown> {
   const raw = object(value), result: Record<string,unknown> = {};
   const choices: Record<string,readonly string[]> = { theme:["system","dark","light"], bloomPerformance:["auto","1","2","3","4","5"], audioQuality:["high","balanced","data-saver"], audioTechnology:AUDIO_TECHNOLOGIES.map(mode=>mode.id),repeat:["off","one","all"] };
-  const booleans = ["privateSession","reducedMotion","explicitContent","shuffle","previewLoop"];
-  const allowed = new Set([...Object.keys(choices),...booleans,"discovery","openingAnimation","seedArtists","seedArtistSelections","seedGenres","onboarded","timeZone","volume","previewVolume","sleepTimerMinutes"]);
+  const booleans = ["privateSession","reducedMotion","explicitContent","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
+  const allowed = new Set([...Object.keys(choices),...booleans,...FEED_NUMERIC_FIELDS,"openingAnimation","seedArtists","seedArtistSelections","seedGenres","onboarded","timeZone","volume","previewVolume","sleepTimerMinutes"]);
   if (Object.keys(raw).some(key=>!allowed.has(key))) throw new ProductError(400,"Unsupported setting");
   for (const [key,values] of Object.entries(choices)) if (raw[key] !== undefined) {
     if (typeof raw[key] !== "string" || !values.includes(raw[key] as string)) throw new ProductError(400,`Invalid ${key}`);
@@ -48,9 +49,10 @@ export function preferencesPatch(value: unknown): Record<string,unknown> {
     if (typeof raw[key] !== "boolean") throw new ProductError(400,`Invalid ${key}`);
     result[key] = raw[key];
   }
-  if (raw.discovery !== undefined) {
-    if (typeof raw.discovery !== "number" || !Number.isFinite(raw.discovery) || raw.discovery < 0 || raw.discovery > 1) throw new ProductError(400,"Invalid discovery preference");
-    result.discovery = raw.discovery;
+  for (const key of FEED_NUMERIC_FIELDS) if (raw[key] !== undefined) {
+    const value = raw[key];
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) throw new ProductError(400,`Invalid ${key} preference`);
+    result[key] = value;
   }
   if (raw.openingAnimation !== undefined) result.openingAnimation = integer(raw.openingAnimation,"opening animation",0,4);
   for(const key of ["volume","previewVolume"])if(raw[key]!==undefined){if(typeof raw[key]!=="number"||!Number.isFinite(raw[key])||raw[key]<0||raw[key]>1)throw new ProductError(400,`Invalid ${key}`);result[key]=raw[key];}

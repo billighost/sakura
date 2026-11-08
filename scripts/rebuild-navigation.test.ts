@@ -2,8 +2,30 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createOpeningSession } from "../src/rebuild/app/openingSession";
+import {fragmentId,scrollToFragment,waitForFragment,type FragmentScrollEnvironment} from "../src/rebuild/app/fragmentScroll";
 
 const read=(path:string)=>readFileSync(path,"utf8");
+function fragmentFixture(){
+ const location={pathname:"/settings",hash:"#your-feed"},frames=new Set<()=>void>();let observe=()=>{},expiry=()=>{},watching=false;const nodes:HTMLElement[]=[];
+ const container={id:"music-main",scrollTop:80,clientTop:2,getClientRects:()=>[{}],getBoundingClientRect:()=>({top:100}),querySelectorAll:()=>nodes} as unknown as HTMLElement;
+ const target=(id="your-feed",visible=true,top=1200)=>({id,getClientRects:()=>visible?[{}]:[],getBoundingClientRect:()=>({top:100+top-container.scrollTop+container.clientTop})}) as unknown as HTMLElement;
+ const environment:FragmentScrollEnvironment={location:()=>location,frame:callback=>{frames.add(callback);return()=>{frames.delete(callback);};},observe:(_container,callback)=>{watching=true;observe=callback;return()=>{watching=false;};},expire:callback=>{expiry=callback;return()=>{expiry=()=>{};};}};
+ return {container,nodes,target,environment,location,get watching(){return watching;},flush(){for(const frame of [...frames]){frames.delete(frame);frame();}},mutate(){if(watching)observe();},expire(){expiry();}};
+}
+
+test("fragment scrolling selects the visible route target inside the music scroller",()=>{
+ const f=fragmentFixture();f.nodes.push(f.target("your-feed",false,100),f.target());assert.equal(scrollToFragment(f.container,"#your-feed"),true);assert.equal(f.container.scrollTop,1200);
+ assert.equal(fragmentId("#your%20feed"),"your feed");assert.equal(fragmentId("#%E0"),null);assert.equal(scrollToFragment(f.container,"#missing"),false);assert.equal(f.container.scrollTop,1200);
+});
+test("fragment navigation waits for streamed target mount and cleans up after scrolling",()=>{
+ const f=fragmentFixture(),stop=waitForFragment(f.container,"/settings","#your-feed",f.environment);f.flush();assert.equal(f.container.scrollTop,80);assert.equal(f.watching,true);f.nodes.push(f.target());f.mutate();f.flush();assert.equal(f.container.scrollTop,1200);assert.equal(f.watching,false);stop();
+});
+test("leaving a route cancels pending fragment navigation without changing its saved scroll",()=>{
+ const f=fragmentFixture();waitForFragment(f.container,"/settings","#your-feed",f.environment);f.location.pathname="/home";f.nodes.push(f.target());f.flush();assert.equal(f.container.scrollTop,80);assert.equal(f.watching,false);
+});
+test("cancelled fragment observers cannot scroll after a late target appears",()=>{
+ const f=fragmentFixture(),stop=waitForFragment(f.container,"/settings","#your-feed",f.environment);stop();f.nodes.push(f.target());f.mutate();f.flush();assert.equal(f.container.scrollTop,80);assert.equal(f.watching,false);
+});
 
 test("music routes keep an instant loading shell and page-local transition",()=>{
  const layout=read("src/app/(music)/layout.tsx"),loading=read("src/app/(music)/loading.tsx"),ux=read("src/rebuild/app/NavigationUX.tsx"),css=read("src/rebuild/app/ink.module.css");

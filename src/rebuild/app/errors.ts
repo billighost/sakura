@@ -4,12 +4,12 @@ export interface UserIssue { kind: FailureKind; title: string; message: string; 
 const issues: Record<FailureKind, UserIssue> = {
  connection: {kind:"connection",title:"We can’t reach Sakura right now.",message:"The connection to Sakura was interrupted. Reconnect and try again, or listen to songs saved on this device.",action:"Reconnect",href:"/library/downloaded",linkLabel:"Open downloads"},
  offline: {kind:"offline",title:"You’re offline for a moment.",message:"Connect to the internet to continue. Your downloaded songs are ready to play on this device.",action:"Check connection",href:"/library/downloaded",linkLabel:"Play downloads"},
- session: {kind:"session",title:"Let’s reconnect your account.",message:"Your session has ended. Sign in again to continue with your library.",action:"Sign in",href:"/login",linkLabel:"Sign in again"},
- version: {kind:"version",title:"Let’s find the version you meant.",message:"We couldn’t verify audio for this exact recording. Open its other versions and choose one to play.",action:"Check again",href:"/search",linkLabel:"Find other versions"},
+ session: {kind:"session",title:"Sign in to continue.",message:"Your session has ended. Sign in again to continue with your library.",action:"Sign in",href:"/login",linkLabel:"Sign in again"},
+ version: {kind:"version",title:"This recording could not be verified.",message:"We couldn’t verify audio for this exact recording. Open its other versions and choose one to play.",action:"Check again",href:"/search",linkLabel:"Find other versions"},
  missing: {kind:"missing",title:"This isn’t available here yet.",message:"This item could not be found. Search for it again or return to your library.",action:"Check again",href:"/search",linkLabel:"Search music"},
- busy: {kind:"busy",title:"A little pause, then another try.",message:"Sakura is receiving too many requests. Wait a moment, then try again.",action:"Try again shortly",href:"/library/downloaded",linkLabel:"Play downloads"},
- validation: {kind:"validation",title:"A small detail needs your attention.",message:"Check the information you entered, then try again.",action:"Try again"},
- storage: {kind:"storage",title:"Your device needs a little room.",message:"This device couldn’t save the song. Free some storage or allow browser storage, then try again. You can still stream online.",action:"Retry download",href:"/library/downloaded",linkLabel:"Manage downloads"},
+ busy: {kind:"busy",title:"Please try again shortly.",message:"Sakura is receiving too many requests. Wait a moment, then try again.",action:"Try again shortly",href:"/library/downloaded",linkLabel:"Play downloads"},
+ validation: {kind:"validation",title:"Check your details.",message:"Check the information you entered, then try again.",action:"Try again"},
+ storage: {kind:"storage",title:"Your device needs storage space.",message:"This device couldn’t save the song. Free some storage or allow browser storage, then try again. You can still stream online.",action:"Retry download",href:"/library/downloaded",linkLabel:"Manage downloads"},
  unknown: {kind:"unknown",title:"That didn’t finish this time.",message:"Something interrupted this step. Try again, or return to your music and come back later.",action:"Try again",href:"/home",linkLabel:"Return to music"},
 };
 const audioUnavailableIssue:UserIssue={...issues.missing,title:"Audio is still being found for this song.",message:"We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",action:"Check again",linkLabel:"Find other versions"};
@@ -35,7 +35,7 @@ export function userIssue(error: unknown, context: ErrorContext = "page"): UserI
  if(known)return known;
  if(name==="QuotaExceededError"||name==="SecurityError"||name==="InvalidStateError")return issues.storage;
  if(/different or uncertain recording|recording.+(match|verify)|identity-conflict|ambiguous-audio|asset-mismatch|catalog-mismatch/.test(message))return issues.version;
- if(/lyrics.+(not available|not found)|no-lyrics|not-found/.test(message)&&context==="lyrics")return {...issues.missing,title:"No lyrics for this recording yet.",message:"The lyrics provider has no verified words for this version yet. Keep listening, or check again later.",action:"Check for lyrics",href:undefined,linkLabel:undefined};
+ if(/lyrics.+(not available|not found)|no-lyrics|not-found/.test(message)&&context==="lyrics")return {...issues.missing,title:"No lyrics for this recording yet.",message:"Lyrics are not available for this version yet. You can check again later.",action:"Check for lyrics",href:undefined,linkLabel:undefined};
  if(/reading guide.+(match|unavailable)/i.test(message))return {...fallbacks.lyrics,title:"The reading guide needs another try.",message:"The reading guide couldn’t be matched to these lyrics. You can read the original words while we try again."};
  if(/offline|failed to fetch|networkerror|internet disconnected|err_internet_disconnected/i.test(message))return issues.offline;
  if(/connection ended|audio file size|incomplete song|audio.+response|audio source stopped/i.test(message))return fallbacks[context];
@@ -46,9 +46,9 @@ export function responseIssue(status:number, payload:unknown, context:ErrorConte
  const value=payload&&typeof payload==="object"?payload as Record<string,unknown>:{};
  const reason=String(value.reason||"");
  if(status===401)return issues.session;
- if(status===409&&context==="account")return {...issues.validation,title:"That account already has a home here.",message:"That username or email is already in use. Sign in, or choose different account details."};
+ if(status===409&&context==="account")return {...issues.validation,title:"An account already uses these details.",message:"That username or email is already in use. Sign in, or choose different account details."};
  if(status===409||value.status==="review")return issues.version;
- if(status===423)return {...issues.missing,title:"This Bloom is still growing.",message:"Your listening story opens on its release date. Keep listening and come back when it’s ready.",href:"/bloom",linkLabel:"View Bloom dates"};
+ if(status===423)return {...issues.missing,title:"This Bloom is still growing.",message:"This listening story is not available yet. Check its opening date in Sakura Bloom.",href:"/bloom",linkLabel:"View Bloom dates"};
  if(status===410)return {...issues.missing,title:"This Bloom’s season has passed.",message:"The viewing window for this recap has closed. Open Sakura Bloom to see your next listening story.",href:"/bloom",linkLabel:"Open Sakura Bloom"};
  if(status===429)return issues.busy;
  if(status===404||reason==="catalog-not-found"||reason==="recording-not-indexed")return context==="lyrics"?userIssue("no-lyrics",context):issues.missing;

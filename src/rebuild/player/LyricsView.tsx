@@ -68,7 +68,7 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
     } catch (error) {
       if (disposed.current) return;
       music.reportError(error, "lyrics", () => void toggleReading());
-      setMessage("The reading guide is taking a little pause. You can try again.");
+      setMessage("The reading guide is unavailable. Try again.");
     } finally {
       readingLock.current = false;
       if (!disposed.current) setReadingBusy(false);

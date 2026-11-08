@@ -26,7 +26,7 @@ export interface MusicTrack {
 }
 export interface Account { id:string;username:string;email:string;avatarUrl?:string|null; }
 export type PlaybackStatus = "idle"|"resolving"|"buffering"|"playing"|"paused"|"error";
-export interface QueueEntry {entryId:string;track:MusicTrack;priority?:"manual"|"automatic"}
+export interface QueueEntry {entryId:string;track:MusicTrack;priority?:"manual"|"automatic";localOnly?:boolean;context?:string;contextId?:string}
 export interface DownloadEntry {
  recordingId:string;track:MusicTrack;status:"queued"|"resolving"|"downloading"|"paused"|"prepared"|"ready"|"failed";
  downloadedBytes:number;totalBytes:number|null;error?:string;operationId:string;sha256?:string;
@@ -34,7 +34,7 @@ export interface DownloadEntry {
  requested?:boolean;cachedSeconds?:number;activeChunks?:number;updatedAt?:number;
 }
 export type PlayerModal = "queue"|"share"|"lyrics"|"player"|null;
-export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";audioTechnology?:AudioTechnology;privateSession:boolean;discovery:number;reducedMotion:boolean;openingAnimation:number;bloomPerformance?:"auto"|"1"|"2"|"3"|"4"|"5";seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean;volume?:number;shuffle?:boolean;repeat?:"off"|"one"|"all";previewVolume?:number;previewLoop?:boolean;sleepTimerMinutes?:number; }
+export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";audioTechnology?:AudioTechnology;privateSession:boolean;discovery:number;artistVariety?:number;repeatTolerance?:number;newReleaseBias?:number;deepCutBias?:number;timeAware?:boolean;learnFromListening?:boolean;reducedMotion:boolean;openingAnimation:number;bloomPerformance?:"auto"|"1"|"2"|"3"|"4"|"5";seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean;volume?:number;shuffle?:boolean;repeat?:"off"|"one"|"all";previewVolume?:number;previewLoop?:boolean;sleepTimerMinutes?:number; }
 /** Normalize catalog and persisted cards at the API boundary, never by fuzzy title identity. */
 export function musicTrack(raw:Record<string,unknown>):MusicTrack {
  const metadata=(raw.metadata&&typeof raw.metadata==="object"?raw.metadata:raw) as Record<string,unknown>;

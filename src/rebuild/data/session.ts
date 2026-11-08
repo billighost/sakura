@@ -20,8 +20,10 @@ export function sessionPatch(value:unknown){
   integer(card.durationMs,"song duration",0,21600000);
   if(card.coverUrl!=null&&(typeof card.coverUrl!=="string"||card.coverUrl.length>2000||!/^https?:\/\//.test(card.coverUrl)))throw new ProductError(400,"Invalid cover URL");
   if(entry.priority!==undefined&&entry.priority!=="manual"&&entry.priority!=="automatic")throw new ProductError(400,"Invalid queue priority");
+  if(entry.localOnly!==undefined&&typeof entry.localOnly!=="boolean")throw new ProductError(400,"Invalid queue playback source");
+  const context=entry.context===undefined?undefined:text(entry.context,"queue context",40),contextId=entry.contextId===undefined?undefined:text(entry.contextId,"queue context ID",120);
   const track=musicTrack({...card,explicit:card.explicit===true?"explicit":card.explicit,readyPlayback:undefined,audioUrl:undefined});
-  return {entryId,track,priority:entry.priority as "manual"|"automatic"|undefined};
+  return {entryId,track,priority:entry.priority as "manual"|"automatic"|undefined,...(entry.localOnly===true?{localOnly:true}:{}),...(context?{context}:{}),...(contextId?{contextId}:{})};
  });
  const currentEntryId=state.currentEntryId===null?null:uuid(state.currentEntryId,"current entry");
  if(currentEntryId&&!seen.has(currentEntryId))throw new ProductError(400,"Current song is missing from queue");
