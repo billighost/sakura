@@ -63,6 +63,7 @@
 .world[data-shot=lagoon] .travellingLeaf{bottom:5%;left:62%}
 .waterFrame{position:absolute;bottom:-3px;left:0;width:100%;height:10%;pointer-events:none;z-index:1}
 .waterDrift{animation:waterPassing 13s ease-in-out infinite alternate;transform-origin:center}
+.listeningCurrents,.listeningLilies{opacity:.88}
 .waterDriftSlow{animation:waterPassing 19s ease-in-out infinite alternate-reverse;transform-origin:center}
 .mist{animation:mistPassing 24s ease-in-out infinite alternate}
 .sway{animation:leafSway 10s ease-in-out var(--delay,0s) infinite alternate;transform-box:fill-box;transform-origin:25% 80%}
@@ -99,3 +100,11 @@
 @media(max-width:520px){.world{padding:28px 22px 48px;min-height:520px;align-items:center}.foreground{width:55%;height:108%;top:-3%;opacity:.8}.foregroundLeft{left:-27%}.foregroundRight{right:-27%}.landscape{width:155%;max-width:none;position:absolute;left:-27.5%;transform:scale(1.04)}.world[data-shot=river] .landscape{transform:scale(1.11) translate(1%,1%)}.world[data-shot=river] .clearing{margin-left:0;width:100%;text-align:center;align-items:center}.clearing,.world[data-shot=pool] .clearing,.world[data-shot=lagoon] .clearing{width:100%;margin-top:-22px}.clearing::before,.world[data-shot=pool] .clearing::before,.world[data-shot=river] .clearing::before,.world[data-shot=lagoon] .clearing::before{inset:-55px -35px;background:radial-gradient(ellipse closest-side,#173f35ed 0%,#173f35c4 46%,#173f3578 66%,#173f3500 82%)}.world[data-shot=clearing] .foreground,.world[data-shot=pool] .foreground{height:92%;opacity:.7}.world[data-shot=clearing] .foregroundLeft,.world[data-shot=pool] .foregroundLeft{transform:translateX(-62%)}.world[data-shot=clearing] .foregroundRight,.world[data-shot=pool] .foregroundRight{transform:translateX(62%)}.coverTitle{width:100%;margin-bottom:20px}.titleSecond{margin-top:9px}.world[data-view=cover]{min-height:350px;padding:28px 27px 37px}.world[data-view=cover] .clearing{width:100%;margin-top:-7px}.world[data-view=cover] .foreground{width:65%}.world[data-view=cover] .foregroundLeft{left:-32%}.world[data-view=cover] .foregroundRight{right:-32%}.world[data-view=cover] .coverTitle{width:100%;margin-bottom:9px}.world[data-view=cover] .landscape{transform:scale(1.16)}.signature{width:96px;left:17px;bottom:15px;opacity:.63}.travellingLeaf{width:48px;bottom:4%}.world[data-shot=river] .travellingLeaf{bottom:6%}.content :global(.bloom-artworks){gap:12px}.content :global(.bloom-artworks)>*::after{bottom:-9px;height:7px}.world[data-shot=pool] .content :global(.bloom-artworks)>*:nth-child(2),.world[data-scene=artist-songs] .content :global(.bloom-artworks)>*:nth-child(odd){transform:none}}
 @media(max-height:600px) and (min-width:521px){.world{min-height:400px;padding-top:22px;padding-bottom:35px}.coverTitle{width:360px;margin-bottom:16px}.signature{width:90px;bottom:12px}.clearing{margin-top:0}.world[data-shot=pool] .clearing,.world[data-shot=lagoon] .clearing{margin-top:0}}
 @media(prefers-reduced-motion:reduce){.world *{animation:none!important;transition:none!important}.world .pollen i{opacity:.34}.world .shotLight{opacity:0}}
+
+/* Intrinsic height keeps a long chapter from centering outside the viewport. */
+.world[data-view="story"] {
+ height:auto;min-height:inherit;
+ padding-top:calc(145px + env(safe-area-inset-top));
+ padding-bottom:calc(140px + env(safe-area-inset-bottom));
+}
+.world[data-view="story"] .clearing { margin-top:0; }

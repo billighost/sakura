@@ -2,6 +2,8 @@
 
 import { useId, type CSSProperties } from "react";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 const detail = {
@@ -68,7 +70,7 @@ function Kelp({ index, quality, side }: { index: number; quality: BloomQuality; 
       <path d={`M0 0C${bent} ${-length * .3} ${-bent * .55} ${-length * .7} ${bent * .72} ${-length}`} fill="none" stroke="var(--ocean-kelp)" strokeWidth={4 + index % 3} strokeLinecap="round" />
       {Array.from({ length: count }, (_, i) => {
         const y = -(i + 1) / (count + 1) * length;
-        const x = Math.sin(i / count * 4.2) * bent * .5;
+        const x = stableSin(i / count * 4.2) * bent * .5;
         const dir = i % 2 ? 1 : -1;
         const width = 20 + (i * 11 + index * 7) % 29;
         const leafLength = 36 + (i * 17 + index * 13) % 33;
@@ -94,8 +96,10 @@ function Contours({ quality, shore }: { quality: BloomQuality; shore: boolean })
   </g>;
 }
 
-function SeaPainting({ id, quality, shore, deep, poster }: { id: string; quality: BloomQuality; shore: boolean; deep: boolean; poster: boolean }) {
+function SeaPainting({ id, quality, shore, deep, poster, listening }: { id: string; quality: BloomQuality; shore: boolean; deep: boolean; poster: boolean; listening?: BloomListeningProfile }) {
   const count = detail[quality];
+  const shells = listening?.discoveredRecordingCount == null ? count.shells : Math.min(quality + 3,Math.max(0,listening.discoveredRecordingCount));
+  const daylight = listening?.peakHour != null && listening.peakHour >= 6 && listening.peakHour < 18;
   return <svg className={s.painting} viewBox="0 0 1200 900" preserveAspectRatio={poster ? "none" : "xMidYMid slice"} fill="none" aria-hidden="true">
     <defs>
       <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1"><stop stopColor="var(--ocean-sky)" /><stop offset="1" stopColor="var(--ocean-horizon)" /></linearGradient>
@@ -110,7 +114,7 @@ function SeaPainting({ id, quality, shore, deep, poster }: { id: string; quality
     {!deep && !poster && <g className={s.moon} transform={`translate(${shore ? 992 : 996} ${shore ? 206 : 144})`}>
       <circle r={shore ? 69 : 54} fill="var(--ocean-moon)" opacity=".1" />
       <circle r={shore ? 49 : 39} fill="var(--ocean-moon)" opacity=".15" />
-      <path d="M-24-18Q-34 8-14 24Q7 37 26 17Q37-3 23-20Q5-34-14-25Q-20-23-24-18Z" fill="var(--ocean-moon)" />
+      {daylight ? <circle r="27" fill="var(--ocean-moon)"/> : <path d="M-24-18Q-34 8-14 24Q7 37 26 17Q37-3 23-20Q5-34-14-25Q-20-23-24-18Z" fill="var(--ocean-moon)" />}
       <path d="M-15-18q13-11 25-2M-20 2q5-9 12-10M7 17q9-1 13-8M-5 2q4-5 8-1" stroke="var(--ocean-moon-ink)" strokeWidth="1.4" opacity=".36" />
     </g>}
     <path d="M-40 270Q97 245 231 268Q345 295 463 269Q702 229 873 270Q1041 300 1240 258L1230 920H-30Z" fill={`url(#${id}-sea)`} />
@@ -118,7 +122,7 @@ function SeaPainting({ id, quality, shore, deep, poster }: { id: string; quality
       {Array.from({length:quality * 9 + 10}, (_, i) => {
         const y = 276 + i * 7.9;
         const width = 25 + i * 2.9 + i % 4 * 12;
-        const x = 996 - width / 2 + Math.sin(i * 2.5) * 12;
+        const x = 996 - width / 2 + stableSin(i * 2.5) * 12;
         return <path key={i} d={`M${x} ${y}q${width * .27} ${i % 2 ? -3 : 2} ${width * .45} 0t${width * .55} 1`} stroke="var(--ocean-pearl)" strokeWidth={i % 4 === 0 ? 4 : 1.5} strokeLinecap="round" opacity={.6 - i / (quality * 9 + 10) * .5} />;
       })}
     </g>}
@@ -139,8 +143,9 @@ function SeaPainting({ id, quality, shore, deep, poster }: { id: string; quality
       <path d="M-25 625Q194 569 368 696Q539 841 786 784Q967 718 1235 818" stroke="var(--ocean-foam)" strokeWidth="9" opacity=".7" />
       <path d="M-27 619Q194 562 377 688Q542 824 788 775Q969 708 1238 810" stroke="var(--ocean-foam)" strokeWidth="1.8" opacity=".8" />
       <path d="M-11 687Q195 632 350 757Q516 887 802 838Q982 788 1222 864" stroke="var(--ocean-sand-ink)" opacity=".27" />
-      {Array.from({ length: count.shells }, (_, i) => <Shell key={i} x={80 + (i * 167) % 1070} y={789 + i * 37 % 104} size={.32 + i % 4 * .12} turn={i * 31 % 140 - 70} variant={i} />)}
+      {Array.from({ length: shells }, (_, i) => <Shell key={i} x={80 + (i * 167) % 1070} y={789 + i * 37 % 104} size={.32 + i % 4 * .12} turn={i * 31 % 140 - 70} variant={i} />)}
     </g>}
+    {!shore && listening?.discoveredRecordingCount != null && <g className={s.foundShells} data-listening-motif="first-listen-shells" opacity=".75">{Array.from({length:shells},(_,i)=><Shell key={i} x={i % 2 ? 1106 - i * 9 : 82 + i * 12} y={716 + i * 21} size={.55 + i % 3 * .13} turn={i * 29 - 40} variant={i}/>)}</g>}
     <g opacity={shore ? .46 : .8}>
       {Array.from({ length: count.plants }, (_, i) => <Kelp key={i} index={Math.floor(i / 2)} quality={quality} side={i % 2 ? "right" : "left"} />)}
     </g>
@@ -159,28 +164,38 @@ function SeaPainting({ id, quality, shore, deep, poster }: { id: string; quality
   </svg>;
 }
 
+function ReturningCurrents({ amount, portrait = false }: { amount: number; portrait?: boolean }) {
+  return <g className={s.returningCurrents} data-listening-motif={amount > 0 ? "returning-currents" : undefined} fill="none" stroke="var(--ocean-ribbon)" strokeLinecap="round">
+    {Array.from({length:amount},(_,n)=><path key={n} d={portrait ? `M-24 ${360 + n * 55}Q${78 + n * 2} ${297 + n * 55} 43 ${409 + n * 45}Q-1 ${456 + n * 39} 91 ${467 + n * 38}M416 ${481 + n * 48}Q320 ${409 + n * 48} 346 ${508 + n * 46}Q391 ${559 + n * 43} 301 ${581 + n * 40}` : `M-30 ${365 + n * 49}Q${251 + n * 9} ${288 + n * 47} 139 ${443 + n * 34}Q28 ${513 + n * 32} 283 ${531 + n * 28}M1240 ${452 + n * 43}Q${948 - n * 5} ${346 + n * 43} 1079 ${510 + n * 32}Q1207 ${591 + n * 32} 920 ${611 + n * 25}`} strokeWidth={n % 2 ? 1 : 2.3} opacity={.25 + n % 3 * .1}/>)}
+  </g>;
+}
+
 const sceneShots: Partial<Record<BloomSceneKind, string>> = {
   opening: "surface", time: "deep", comparison: "terrace", days: "terrace", breadth: "surface",
   songs: "gallery", "song-winner": "portrait", artist: "portrait", "artist-songs": "gallery",
   artists: "reef", discoveries: "gallery", returns: "reef", genres: "reef", pattern: "deep", finale: "shore",
 };
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
   const id = `ocean-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const shot = sceneShots[scene] || "deep";
   const cover = view === "cover";
   const shore = shot === "shore" || view === "poster";
   const still = reducedMotion || quality === 1 || view === "poster";
-  const dawn = shore ? 1 : Math.max(0, Math.min(1, progress));
+  const dawn = listening?.peakHour == null ? shore ? 1 : Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0)) : Math.max(.08, stableSin((listening.peakHour - 6) / 24 * Math.PI * 2));
+  const currents = Math.min(quality + 1,Math.max(0,listening?.returningRecordingCount || 0));
+  const shells = listening?.discoveredRecordingCount == null ? undefined : Math.min(quality + 3,Math.max(0,listening.discoveredRecordingCount));
   const style = { "--ocean-dawn": dawn, "--ocean-stage": stage } as CSSProperties;
-  return <section className={s.world} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"}>
-    <div className={s.environment}><SeaPainting id={id} quality={quality} shore={shore} deep={shot === "deep" || shot === "portrait" || shot === "gallery"} poster={view === "poster"} /></div>
+  return <section className={s.world} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"} data-listening={Boolean(listening)} data-return-currents={listening?.returningRecordingCount == null ? undefined : currents} data-discovery-shells={shells} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)}>
+    <div className={s.environment}><SeaPainting id={id} quality={quality} shore={shore} deep={shot === "deep" || shot === "portrait" || shot === "gallery"} poster={view === "poster"} listening={listening}/><svg className={s.currentPainting} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><ReturningCurrents amount={currents}/></svg></div>
     <div className={s.portraitGarden} aria-hidden="true"><svg viewBox="0 0 390 900" preserveAspectRatio="none" fill="none">
       <g opacity={shore ? .3 : .56}>
         {Array.from({length:Math.min(quality,4)},(_,i)=><Kelp key={`left-${i}`} index={i} quality={quality} side="left" />)}
         <g transform="translate(-850 0)">{Array.from({length:Math.min(quality,4)},(_,i)=><Kelp key={`right-${i}`} index={i} quality={quality} side="right" />)}</g>
       </g>
       {quality >= 4 && <g opacity=".32" stroke="var(--ocean-coral)" strokeLinecap="round"><path d="M12 897Q22 844 15 793M17 850Q44 834 41 810M18 873Q-4 857-5 832M371 900Q351 848 363 790M358 850Q341 831 345 811M361 873Q383 850 383 825" strokeWidth="3" /></g>}
+      <ReturningCurrents amount={currents} portrait/>
+      {shells != null && <g opacity=".65">{Array.from({length:Math.min(4,shells)},(_,n)=><Shell key={n} x={38 + n * 103} y={841 + n % 2 * 19} size={.5} turn={n * 17 - 25} variant={n}/>)}</g>}
     </svg></div>
     {(cover || shot === "surface" || shot === "shore") && <div className={s.portraitMoon} aria-hidden="true"><svg viewBox="0 0 85 85" fill="none"><path d="M17 20Q7 45 25 64Q48 79 67 59Q81 36 62 18Q38 4 17 20Z" fill="var(--ocean-moon)" /><path d="M21 27q10-12 22-7M17 45q6-8 12-9M46 62q11-2 15-13" stroke="var(--ocean-moon-ink)" strokeWidth="1.3" opacity=".4" /></svg></div>}
     <div className={s.dawn} aria-hidden="true" />

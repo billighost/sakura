@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useId, useState, type CSSProperties } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import { useMusic } from "./MusicContext";
 import { useResource } from "./resources";
 import { Artwork, Button, Empty, LoadingRows, LoadError, TrackList } from "./Elements";
@@ -12,6 +12,7 @@ import { musicTrack, type MusicTrack } from "./types";
 import { PersonalizationDataControls } from "./PersonalizationDataControls";
 import { BloomShelf } from "../bloom/BloomPage";
 import s from "./listening-profile.module.css";
+import starting from "./initial-taste-profile.module.css";
 
 interface Genre { name: string; audibleMs: number; share?: number }
 interface Day { date: string; audibleMs: number }
@@ -20,14 +21,16 @@ interface Insights {
   days: Day[]; hours: Hour[]; genres: Genre[]; completionRate: number; skipRate: number; activeDays: number; finishedEvents?: number;
   confidence: { level: "starting" | "growing" | "established"; label: string; evidence: string };
   topSongs: Record<string, unknown>[]; timeZone: string;
-  retention?: { description?: string; historyEvents?: number; rateDescription?: string };
+  retention?: { description?: string; historyEvents?: number; rateDescription?: string; genreDescription?: string };
+  genreDescription?: string;
+  untaggedAudibleMs?: number;
 }
 interface ProfileData {
   profile: { username: string; bio?: string | null; avatarUrl?: string | null; createdAt?: string };
   stats: { audibleMs?: number; playCount?: number; uniqueRecordings?: number; completedCount?: number; skippedCount?: number; liked?: number; playlists?: number };
   topArtists: { id: string; name: string; imageUrl?: string | null; audibleMs: number }[];
   insights?: Insights;
-  onboarding?: { seedGenres?: string[]; seedArtists?: string[] };
+  onboarding?: { seedGenres?: string[]; seedArtists?: string[]; initialTasteGenres?:string[] };
 }
 function listeningTime(value: number) {
   const minutes = Math.floor(Math.max(0, Number(value) || 0) / 60000);
@@ -69,26 +72,32 @@ function ListeningDays({ days }: { days: Day[] }) {
 
 function ListeningHours({ hours, timeZone }: { hours: Hour[]; timeZone: string }) {
   const [selected, setSelected] = useState<number | null>(null);
+  const bars = useRef<HTMLDivElement>(null);
   const complete = Array.from({ length: 24 }, (_, hour) => hours.find(item => item.hour === hour) || { hour, audibleMs: 0, genres: [] });
   const peak = complete.reduce((best, item) => item.audibleMs > best.audibleMs ? item : best, complete[0]);
   const selectedHour = complete[selected ?? peak.hour], maximum = Math.max(1, peak.audibleMs);
   return <section className={`${s.chartCard} ${s.hourCard}`} aria-label="Listening by hour of the day">
     <div className={s.cardHeading}><div><span className={s.eyebrow}>YOUR LISTENING RHYTHM</span><h2>Your listening,<br/><em>through the day.</em></h2></div><Icon name="moon" size={23}/></div>
-    <div className={s.hourBars} role="group" aria-label="Select an hour to see its listening details">{complete.map(item => <button key={item.hour} type="button" aria-pressed={selectedHour.hour === item.hour} aria-label={`${hourLabel(item.hour)}, ${listeningTime(item.audibleMs)} listened`} title={`${hourLabel(item.hour)} · ${listeningTime(item.audibleMs)}`} onClick={() => setSelected(item.hour)}><span style={{ "--bar-height": `${Math.max(3, item.audibleMs / maximum * 100)}%` } as CSSProperties}/></button>)}</div>
+    <div ref={bars} className={s.hourBars} role="group" aria-label="Select an hour to see its listening details" onKeyDown={event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? 23 : (selectedHour.hour + (event.key === "ArrowRight" ? 1 : -1) + 24) % 24;
+      setSelected(next); bars.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+    }}>{complete.map(item => <button key={item.hour} type="button" tabIndex={selectedHour.hour === item.hour ? 0 : -1} aria-pressed={selectedHour.hour === item.hour} aria-label={`${hourLabel(item.hour)}, ${listeningTime(item.audibleMs)} listened`} title={`${hourLabel(item.hour)} · ${listeningTime(item.audibleMs)}`} onClick={() => setSelected(item.hour)}><span style={{ "--bar-height": `${Math.max(3, item.audibleMs / maximum * 100)}%` } as CSSProperties}/></button>)}</div>
     <div className={s.chartDates}><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div>
-    <div className={s.hourDetail} aria-live="polite"><b>{hourLabel(selectedHour.hour)}</b><span>{listeningTime(selectedHour.audibleMs)} of listening</span>{selectedHour.genres.length ? <div className={s.hourGenres}>{selectedHour.genres.slice(0, 3).map(genre => <span key={genre.name}><b dir="auto">{genre.name}</b><small>{listeningTime(genre.audibleMs)}</small></span>)}</div> : <small>No genre pattern recorded for this hour yet.</small>}</div>
-    <p className={s.smallNote}>Your retained listening history, shown in {timeZone}. Tap an hour to explore.</p>
+    <div className={s.hourDetail}><label className={s.hourPicker}><span className={s.srOnly}>Choose a listening hour</span><select value={selectedHour.hour} onChange={event => setSelected(Number(event.target.value))}>{complete.map(item => <option key={item.hour} value={item.hour}>{hourLabel(item.hour)}</option>)}</select></label><span aria-live="polite">{listeningTime(selectedHour.audibleMs)} of listening</span>{selectedHour.genres.length ? <div className={s.hourGenres}>{selectedHour.genres.slice(0, 3).map(genre => <span key={genre.name}><b dir="auto">{genre.name}</b><small>{listeningTime(genre.audibleMs)}</small></span>)}</div> : <small>No genre information for this listening hour.</small>}</div>
+    <p className={s.smallNote}>Saved listening history, shown in {timeZone}. Choose an hour above or use the arrow keys in the chart.</p>
   </section>;
 }
 
-function GenreGarden({ genres, seeds }: { genres: Genre[]; seeds: string[] }) {
+function GenreGarden({ genres, seeds, description, untaggedAudibleMs }: { genres: Genre[]; seeds: string[]; description?: string; untaggedAudibleMs?: number }) {
   const [selected, setSelected] = useState<string | null>(null);
   const maximum = Math.max(1, ...genres.map(genre => genre.audibleMs)), total = genres.reduce((sum, genre) => sum + genre.audibleMs, 0);
   const chosen = genres.find(genre => genre.name === selected) || genres[0];
-  return <section className={`${s.chartCard} ${s.genreCard}`} aria-label="Your preferred genres">
+  return <section className={`${s.chartCard} ${s.genreCard}`} aria-label="Genres you listened to">
     <div className={s.cardHeading}><div><span className={s.eyebrow}>YOUR LISTENING BY GENRE</span><h2>The genres<br/><em>you listen to.</em></h2></div><Blossom/></div>
     {genres.length > 0 ? <><div className={s.genreRows}>{genres.slice(0, 8).map((genre, index) => <button type="button" key={genre.name} aria-pressed={chosen?.name === genre.name} onClick={() => setSelected(genre.name)}><span><b dir="auto">{genre.name}</b><small>{Math.round((genre.share ?? genre.audibleMs / Math.max(1, total)) * 100)}%</small></span><i><i style={{ width: `${genre.audibleMs / maximum * 100}%`, "--genre-index": index } as CSSProperties}><Blossom/></i></i></button>)}</div><p className={s.genreDetail} aria-live="polite">{chosen && <><strong>{chosen.name}</strong> · {listeningTime(chosen.audibleMs)} of listening</>}</p></> : <div className={s.genreEmpty}><Blossom/><p>Genre patterns appear as you listen to songs with genre information.</p>{seeds.length > 0 && <div className={s.seedTags}>{seeds.map(seed => <span key={seed}>{seed}</span>)}</div>}</div>}
-    <p className={s.smallNote}>Genre patterns use the first published tag on each song. Untagged songs stay out of this chart.{!genres.length && seeds.length > 0 ? " The tags above are genres you chose, before listening patterns grow." : ""}</p>
+    <p className={s.smallNote}>{description || "Listening time is shared evenly across each song’s published genres. Songs without genre information are counted separately."}{untaggedAudibleMs ? ` ${listeningTime(untaggedAudibleMs)} of listening had no genre tags.` : ""}{!genres.length && seeds.length > 0 ? " The genres above are choices you made." : ""}</p>
   </section>;
 }
 
@@ -104,20 +113,21 @@ export function ListeningProfile() {
     </div>
     {resource.loading && !data ? <LoadingRows/> : resource.error && !data ? <LoadError message={resource.error} retry={resource.retry}/> : <>
       {resource.error && data && <RecoveryNotice compact error={resource.error} retry={resource.retry}/>}
-      <div className={s.statsGrid}>{[
+      <p className={s.totalsLabel}>Your saved listening totals</p><div className={s.statsGrid}>{[
         { value: ((Number(stats.audibleMs) || 0) / 3600000).toFixed(1), label: "hours of listening", note: "Time you actually heard" },
-        { value: Number(stats.playCount) || 0, label: "song plays", note: "Songs with audible listening" },
-        { value: Number(stats.uniqueRecordings) || 0, label: "songs heard", note: "Distinct recordings" },
-        { value: insights?.activeDays || 0, label: "active days", note: "In your retained history" },
+        { value: Number(stats.playCount) || 0, label: "song plays", note: "Including partial listens" },
+        { value: Number(stats.uniqueRecordings) || 0, label: "songs heard", note: "Each song version counts once" },
+        { value: insights?.activeDays || 0, label: "days with music", note: "In your saved history" },
       ].map(stat => <div key={stat.label}><b>{stat.value}</b><span>{stat.label}</span><small>{stat.note}</small></div>)}</div>
       <div className={s.tasteNote}><span className={s.confidenceBloom}><Blossom/></span><div><span className={s.eyebrow}>YOUR RECOMMENDATION HISTORY</span><h2>{insights?.confidence.label || "Your recommendations start here."}</h2><p>{insights?.confidence.evidence || "Your chosen artists, genres, and listening history help select recommendations."}</p></div><Link href="/settings#your-feed">Adjust preferences <Icon name="arrow" size={16}/></Link></div>
-      {!Number(stats.audibleMs) && <div className={s.startNote}><Blossom/><p>No listening has been recorded yet. Your charts will appear as you play music.</p><Link href="/home">Browse music <Icon name="arrow" size={15}/></Link></div>}
-      <div className={s.insightGrid}><ListeningDays days={insights?.days || []}/><ListeningHours hours={insights?.hours || []} timeZone={insights?.timeZone || music.settings.timeZone || "Africa/Lagos"}/><GenreGarden genres={insights?.genres || []} seeds={data?.onboarding?.seedGenres || []}/><section className={`${s.chartCard} ${s.listeningHabits}`} aria-label="Listening habits"><div className={s.cardHeading}><div><span className={s.eyebrow}>THE WAY YOU LISTEN</span><h2>From the first note<br/><em>to the end.</em></h2></div><Icon name="queue" size={23}/></div><div className={s.habitStats}><div><strong>{Math.round(Math.max(0, Math.min(1, insights?.completionRate || 0)) * 100)}<small>%</small></strong><span>played to the end</span><p>{insights?.finishedEvents === undefined ? Number(stats.completedCount) || 0 : Math.round(insights.finishedEvents * insights.completionRate)} recorded finishes</p></div><div><strong>{Math.round(Math.max(0, Math.min(1, insights?.skipRate || 0)) * 100)}<small>%</small></strong><span>skipped</span><p>{insights?.finishedEvents === undefined ? Number(stats.skippedCount) || 0 : Math.round(insights.finishedEvents * insights.skipRate)} recorded skips</p></div></div><div className={s.libraryCounts}><Link href="/liked"><Icon name="heart" size={17}/><span>{Number(stats.liked) || 0} liked songs</span><Icon name="arrow" size={14}/></Link><Link href="/library"><Icon name="library" size={17}/><span>{Number(stats.playlists) || 0} playlists</span><Icon name="arrow" size={14}/></Link></div><p className={s.smallNote}>{insights?.retention?.rateDescription || "Completion and skip rates use finalized listening events. Paused or unfinished events are excluded."}</p></section></div>
-      {artists.length > 0 && <section className={s.artistSection}><div className={s.sectionHeading}><div><span className={s.eyebrow}>YOUR MOST HEARD ARTISTS</span><h2>The artists<br/><em>you return to.</em></h2></div><Link href="/discover">Explore artists <Icon name="arrow" size={16}/></Link></div><div className={s.artistGrid}>{artists.slice(0, 6).map((artist, index) => <Link className={s.artistCard} href={`/artist/${encodeURIComponent(artist.id)}`} key={artist.id}><div className={s.artistArt}><Artwork url={artist.imageUrl} title={artist.name}/><span>{String(index + 1).padStart(2, "0")}</span></div><h3 dir="auto">{artist.name}</h3><small>{listeningTime(artist.audibleMs)} together</small></Link>)}</div></section>}
+      {!Number(stats.audibleMs) && <div className={s.startNote}><Blossom/><p>No listening has been recorded yet. Your charts show listening saved in Sakura.</p><Link href="/home">Browse music <Icon name="arrow" size={15}/></Link></div>}
+      {insights?.confidence.level!=="established"&&Boolean(data?.onboarding?.seedArtists?.length)&&<details className={starting.startingPoints}><summary>Your chosen starting points</summary><p>Your chosen artists guide recommendations: {data!.onboarding!.seedArtists!.join(", ")}.</p>{Boolean(data?.onboarding?.initialTasteGenres?.length)&&<p>Genres from their music: {data!.onboarding!.initialTasteGenres!.slice(0,6).join(", ")}.</p>}<p>Your charts and Bloom show recorded listening separately.</p><Link href="/onboarding">Change your artists <Icon name="arrow" size={15}/></Link></details>}
+      <div className={s.insightGrid}><ListeningDays days={insights?.days || []}/><ListeningHours hours={insights?.hours || []} timeZone={insights?.timeZone || music.settings.timeZone || "Africa/Lagos"}/><GenreGarden genres={insights?.genres || []} seeds={data?.onboarding?.seedGenres || []} description={insights?.genreDescription || insights?.retention?.genreDescription} untaggedAudibleMs={insights?.untaggedAudibleMs}/><section className={`${s.chartCard} ${s.listeningHabits}`} aria-label="Listening habits"><div className={s.cardHeading}><div><span className={s.eyebrow}>LISTENS THAT ENDED</span><h2>From the first note<br/><em>to the end.</em></h2></div><Icon name="queue" size={23}/></div>{insights?.finishedEvents === 0 || !Number(stats.playCount) ? <p className={s.habitsEmpty}>No recorded finishes or skips yet.</p> : <div className={s.habitStats}><div><strong>{Math.round(Math.max(0, Math.min(1, insights?.completionRate || 0)) * 100)}<small>%</small></strong><span>played to the end</span><p>{insights?.finishedEvents === undefined ? Number(stats.completedCount) || 0 : Math.round(insights.finishedEvents * insights.completionRate)} recorded finishes</p></div><div><strong>{Math.round(Math.max(0, Math.min(1, insights?.skipRate || 0)) * 100)}<small>%</small></strong><span>skipped</span><p>{insights?.finishedEvents === undefined ? Number(stats.skippedCount) || 0 : Math.round(insights.finishedEvents * insights.skipRate)} recorded skips</p></div></div>}<div className={s.libraryCounts}><Link href="/liked"><Icon name="heart" size={17}/><span>{Number(stats.liked) || 0} liked songs</span><Icon name="arrow" size={14}/></Link><Link href="/library"><Icon name="library" size={17}/><span>{Number(stats.playlists) || 0} playlists</span><Icon name="arrow" size={14}/></Link></div><p className={s.smallNote}>{insights?.retention?.rateDescription || "These percentages describe listens that ended or were skipped. Paused and unfinished listens stay out of the count."}</p></section></div>
+      {artists.length > 0 && <section className={s.artistSection}><div className={s.sectionHeading}><div><span className={s.eyebrow}>YOUR MOST HEARD ARTISTS</span><h2>The artists<br/><em>in your listening.</em></h2></div><Link href="/discover">Explore artists <Icon name="arrow" size={16}/></Link></div><div className={s.artistGrid}>{artists.slice(0, 6).map((artist, index) => <Link className={s.artistCard} href={`/artist/${encodeURIComponent(artist.id)}`} key={artist.id}><div className={s.artistArt}><Artwork url={artist.imageUrl} title={artist.name}/><span>{String(index + 1).padStart(2, "0")}</span></div><h3 dir="auto">{artist.name}</h3><small>{listeningTime(artist.audibleMs)} together</small></Link>)}</div></section>}
       <section className={s.topSongSection}><div className={s.sectionHeading}><div><span className={s.eyebrow}>YOUR MOST HEARD SONGS</span><h2>The songs<br/><em>you play most.</em></h2></div>{tracks.length > 0 && <Button secondary icon="play" onClick={() => music.play(tracks[0], tracks)}>Play top songs</Button>}</div>{tracks.length > 0 ? <TrackList tracks={tracks.slice(0, 8)}/> : <Empty title="No top songs yet." description="Songs are ranked by your recorded listening time." href="/home" action="Browse music"/>}</section>
       <BloomShelf/>
       <PersonalizationDataControls/>
-      <p className={s.profileFootnote}>{insights?.retention?.description || "From your retained Sakura listening history."} These charts describe recorded listening patterns.</p>
+      <p className={s.profileFootnote}>{insights?.retention?.description || "From your saved Sakura listening history."} These charts describe recorded listening patterns.</p>
     </>}
   </div>;
 }

@@ -20,6 +20,8 @@
 .innerDoors {opacity:.8;transition:opacity 1.8s ease;}
 .world[data-shot=dawn] .innerDoors {opacity:.08;}
 .recordLounge {opacity:.64;transition:opacity 1.2s ease;}
+.listeningRecords {position:absolute;left:9%;bottom:13%;width:clamp(85px,18%,225px);z-index:-2;pointer-events:none;opacity:.82;}
+.listeningRecords svg {display:block;width:100%;height:auto;}
 .world[data-shot=lounge] .recordLounge {opacity:1;}
 .roseWash {z-index:-5;background:radial-gradient(ellipse at 80% 12%,#df80b341 0%,#9a468c17 34%,transparent 67%),radial-gradient(ellipse at 13% 75%,#707ccb24 0%,transparent 55%);opacity:calc(.4 + var(--disco-growth)*.6);}
 .afterhours {position:absolute;inset:0;z-index:-5;pointer-events:none;background:radial-gradient(ellipse at 50% 53%,#e5aa8857 0%,#b977861e 49%,transparent 80%),linear-gradient(0deg,#d5a48920,transparent 65%);opacity:0;transition:opacity 2s ease;}
@@ -129,3 +131,11 @@
 :global(dialog[data-paused=true]) .world * {animation-play-state:paused!important;}
 :global(dialog[data-motion=still]) .world * {animation:none!important;transition:none!important;}
 @media(prefers-reduced-motion:reduce){.world *{animation:none!important;transition:none!important;}}
+
+/* The stage can lengthen while the cinema remains the single scroll surface. */
+.world[data-view="story"] {
+ height:auto;min-height:inherit;
+ padding-top:calc(145px + env(safe-area-inset-top));
+ padding-bottom:calc(140px + env(safe-area-inset-bottom));
+}
+.world[data-view="story"] .foreground { margin-top:0; }

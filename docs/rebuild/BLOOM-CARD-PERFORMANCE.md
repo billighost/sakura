@@ -12,12 +12,14 @@ The generator captures each original `WorldStage` opening cover at detail level 
 
 | Variant | All ten worlds | Largest image |
 | --- | ---: | ---: |
-| Light, 480 × 360 | 200,520 bytes | 26,046 bytes |
-| Dark, 480 × 360 | 199,002 bytes | 26,104 bytes |
-| Light, 960 × 720 | 516,754 bytes | 68,526 bytes |
-| Dark, 960 × 720 | 510,898 bytes | 66,964 bytes |
+| Light, 480 × 360 | 200,578 bytes | 26,046 bytes |
+| Dark, 480 × 360 | 198,952 bytes | 26,104 bytes |
+| Light, 960 × 720 | 516,898 bytes | 68,498 bytes |
+| Dark, 960 × 720 | 511,428 bytes | 66,994 bytes |
 
-All 40 files together occupy 1,427,174 bytes. Responsive selection loads one size in the active palette for each world; repeated instances share the same cached URL. The generator enforces 180 KB per image and 4 MB for all variants.
+All 40 files together occupy 1,427,856 bytes. Responsive selection loads one size in the active palette for each world; repeated instances share the same cached URL. The generator enforces 180 KB per image and 4 MB for all variants.
+
+The final 8 November refresh follows the story layout refinements. Source hashes include each complete world stylesheet, so all twenty world/palette entries were regenerated even though cover and poster selectors remained unchanged. Revision `06efeae23820` passes both freshness regressions. Thirty-seven WebPs are byte-identical to the previous `e7e3bb4d8ce6` set; three have small raster differences. The before/after atlases were visually inspected and retain the original compositions and lettering. The capture route and its directory were removed after generation.
 
 To regenerate, run Next in development mode and use Python with Pillow:
 

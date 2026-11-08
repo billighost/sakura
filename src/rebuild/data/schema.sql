@@ -13,6 +13,15 @@ CREATE TABLE IF NOT EXISTS sakura_v2."AccountPreferences" (
   revision bigint NOT NULL DEFAULT 1,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Per-field revisions preserve newer choices even if a device changes a value
+-- and then changes it back while another device holds an older offline draft.
+ALTER TABLE sakura_v2."AccountPreferences" ADD COLUMN IF NOT EXISTS field_revisions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(field_revisions)='object');
+UPDATE sakura_v2."AccountPreferences" p SET field_revisions=(
+  SELECT jsonb_object_agg(key,p.revision) FROM (
+    SELECT key FROM jsonb_object_keys(p.preferences) key
+    UNION SELECT unnest(ARRAY['seedArtists','seedGenres','onboarded'])
+  ) fields
+) WHERE field_revisions='{}'::jsonb;
 CREATE TABLE IF NOT EXISTS sakura_v2."Artist" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   provider text NOT NULL, external_id text NOT NULL,
@@ -105,6 +114,20 @@ CREATE TABLE IF NOT EXISTS sakura_v2."HistoryDeletion" (
  period_start timestamptz, cleared_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS v2_history_deletion_owner ON sakura_v2."HistoryDeletion"(account_id,cleared_at DESC);
+-- Consent dates reject late device uploads from private or paused listening.
+-- Existing retained history is untouched; no music or measurements are stored.
+CREATE TABLE IF NOT EXISTS sakura_v2."ListeningPrivacyWindow" (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+ started_at timestamptz NOT NULL, ended_at timestamptz,
+ CHECK(ended_at IS NULL OR ended_at>=started_at)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS v2_listening_privacy_open ON sakura_v2."ListeningPrivacyWindow"(account_id) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS v2_listening_privacy_owner ON sakura_v2."ListeningPrivacyWindow"(account_id,started_at);
+INSERT INTO sakura_v2."ListeningPrivacyWindow"(account_id,started_at)
+  SELECT account_id,updated_at FROM sakura_v2."AccountPreferences"
+  WHERE preferences->>'privateSession'='true' OR preferences->>'learnFromListening'='false'
+  ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS sakura_v2."ClearedListeningEvent" (
  account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
  event_id uuid NOT NULL, cleared_at timestamptz NOT NULL DEFAULT now(),

@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-11-08T20:11:03.397Z",
+  "sources": [
+    {
+      "url": "https://html.spec.whatwg.org/multipage/media.html",
+      "phrases": [
+        "The currentTime attribute",
+        "The paused attribute",
+        "The muted attribute",
+        "timeupdate"
+      ],
+      "purpose": "Playback measurements must use actual media progress with pause, seeking and mute boundaries; timeupdate is periodic rather than a terminal measurement.",
+      "status": 200,
+      "verified": true,
+      "excerpts": [
+        "the user agent is to show a poster frame for a video element instead of showing the video contents. The currentTime attribute must, on getting, return the media element 's default playback start position , unless that is zero, in which case it must return the element's official playback position . The returned value must be expressed in seconds. On setting, if the media element 's readyState is HAVE_NOTHING , then it must set the media element 's default playback start position to the new value; otherwise, it must set the official playback position to the new value and then seek to the new value. The new value must be interpreted as being in seconds. If the media resource is a streaming resource, then the user agent might be unable to obtai",
+        "resource-specific tracks . If readyState is not set to HAVE_NOTHING , then set it to that state. If the paused attribute is false: Set the paused attribute to true. Take pending play promises and reject pending play promises with the result and an \" AbortError \" DOMException . If seeking is true, set it to false. Set the current playback position to 0. Set the official playback position to 0. If this changed the official playback position , then queue a media element task given the media element to fire an event named timeupdate at the media element . Set the timeline offset to Not-a-Number (NaN). Update the duration attribute to Not-a-Number (NaN). The user agent will not fire a durationchange event for this particular change of the durati",
+        "d ? WebView Android 37+ Samsung Internet ? Opera Android 12.1+ Event Either the volume attribute or the muted attribute has changed. Fired after the relevant attribute's setter has returned. The following event fires on source elements: Event name Interface Fired when... error Event An error occurs while fetching the media data or the type of the resource is not a supported media format. The following events fire on AudioTrackList , VideoTrackList , and TextTrackList objects: Event name Interface Fired when... change ✔ MDN AudioTrackList/change_event Support in all current engines. Firefox 🔰 33+ Safari 7+ Chrome 🔰 37+ Opera ? Edge 🔰 79+ Edge (Legacy) No Internet Explorer 10+ Firefox Android ? Safari iOS ? Chrome Android ? WebView Android",
+        " playback position , then queue a media element task given the media element to fire an event named timeupdate at the media element . Set the timeline offset to Not-a-Number (NaN). Update the duration attribute to Not-a-Number (NaN). The user agent will not fire a durationchange event for this particular change of the duration. Set the playbackRate attribute to the value of the defaultPlaybackRate attribute. Set the error attribute to null and the can autoplay flag to true. Invoke the media element 's resource selection algorithm . Playback of any previously playing media resource for this element stops. The resource selection algorithm for a media element is as follows. This algorithm is always invoked as part of a task , but one of the fi"
+      ]
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/explicit-locking.html",
+      "phrases": [
+        "Transaction-level lock requests",
+        "advisory locks",
+        "FOR UPDATE"
+      ],
+      "purpose": "Account transaction locks serialize reads and erasure; settings revision checks protect concurrent choices.",
+      "status": 200,
+      "verified": true,
+      "excerpts": [
+        "ted lock request there must be a corresponding unlock request before the lock is actually released. Transaction-level lock requests, on the other hand, behave more like regular lock requests: they are automatically released at the end of the transaction, and there is no explicit unlock operation. This behavior is often more convenient than the session-level behavior for short-term usage of an advisory lock. Session-level and transaction-level lock requests for the same advisory lock identifier will block each other in the expected way. If a session already holds a given advisory lock, additional requests by it will always succeed, even if other sessions are awaiting the lock; this statement is true regardless of whether the existing lock ho",
+        "3.3.1. Table-Level Locks 13.3.2. Row-Level Locks 13.3.3. Page-Level Locks 13.3.4. Deadlocks 13.3.5. Advisory Locks PostgreSQL provides various lock modes to control concurrent access to data in tables. These modes can be used for application-controlled locking in situations where MVCC does not give the desired behavior. Also, most PostgreSQL commands automatically acquire locks of appropriate modes to ensure that referenced tables are not dropped or modified in incompatible ways while the command executes. (For example, TRUNCATE cannot safely be executed concurrently with other operations on the same table, so it obtains an ACCESS EXCLUSIVE lock on the table to enforce that.) To examine a list of the currently outstanding locks in a databas",
+        "USIVE lock modes. The SELECT command acquires a lock of this mode on all tables on which one of the FOR UPDATE , FOR NO KEY UPDATE , FOR SHARE , or FOR KEY SHARE options is specified (in addition to ACCESS SHARE locks on any other tables that are referenced without any explicit FOR ... locking option). ROW EXCLUSIVE ( RowExclusiveLock ) Conflicts with the SHARE , SHARE ROW EXCLUSIVE , EXCLUSIVE , and ACCESS EXCLUSIVE lock modes. The commands UPDATE , DELETE , INSERT , and MERGE acquire this lock mode on the target table (in addition to ACCESS SHARE locks on any other referenced tables). In general, this lock mode will be acquired by any command that modifies data in a table. SHARE UPDATE EXCLUSIVE ( ShareUpdateExclusiveLock ) Conflicts with"
+      ]
+    },
+    {
+      "url": "https://drafts.csswg.org/web-animations-1/#dom-animation-pause",
+      "checkedAt": "2026-11-08T22:56:05.914Z",
+      "status": 200,
+      "verified": true,
+      "title": "Web Animations Module Level 1",
+      "purpose": "Bloom pauses in-progress scene transitions through Animation.pause in addition to CSS keyframes; only transitions held by the story resume.",
+      "excerpts": [
+        "void pause(): Suspends the playback of this animation by running the procedure to pause an animation for this object."
+      ]
+    }
+  ]
+}

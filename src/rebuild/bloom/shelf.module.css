@@ -1,0 +1,22 @@
+.shelf{margin:32px 0 44px;min-width:0}
+.heading{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:18px}
+.heading>div>span{font-size:10px;letter-spacing:.16em;color:var(--ink-muted)}
+.heading h2{font:clamp(25px,3vw,34px)/1.1 var(--font-fraunces),Georgia,serif;letter-spacing:-.035em;margin:8px 0 0}
+.heading a,.link{display:inline-flex;align-items:center;gap:9px;min-height:44px;color:var(--ink-accent);font-size:12px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.card{min-width:0;border:1px solid var(--ink-line);border-radius:15px;overflow:hidden;background:var(--ink-card)}
+.card>div:first-child{aspect-ratio:16/9}
+.body{padding:23px 25px 24px}
+.status{font-size:10px;letter-spacing:.09em;line-height:1.6;color:var(--ink-muted)}
+.body h3{font:clamp(26px,3vw,33px)/1.1 var(--font-fraunces),Georgia,serif;letter-spacing:-.035em;margin:10px 0 9px;overflow-wrap:anywhere}
+.body p{font-size:13px;line-height:1.65;color:var(--ink-muted);margin:10px 0;max-width:49ch}
+.body .period{font-size:12px;margin-top:0}
+.body .timing{font-size:12px;color:var(--ink-text);margin:16px 0 10px}
+.shelf .primary{display:inline-flex;align-items:center;justify-content:center;gap:14px;min-height:44px;padding:11px 18px;font-size:12px;background:var(--ink-accent);color:var(--ink-on);border-radius:25px;margin-top:5px}
+.shelf a:focus-visible{outline:2px solid var(--ink-accent);outline-offset:4px}
+.loading{font-size:13px;line-height:1.7;color:var(--ink-muted);padding:20px 0;border-block:1px solid var(--ink-line)}
+.loading a{display:inline-flex;align-items:center;min-height:44px;color:var(--ink-accent)}
+.cards[data-count="1"]{grid-template-columns:minmax(0,1fr)}
+.cards[data-count="1"] .card{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.cards[data-count="1"] .card>div:first-child{height:100%;aspect-ratio:auto;min-height:220px}
+@media(max-width:750px){.heading{align-items:start;flex-direction:column;gap:4px}.cards{grid-template-columns:minmax(0,1fr)}.body{padding:21px}.cards[data-count="1"] .card{display:block}.cards[data-count="1"] .card>div:first-child{aspect-ratio:16/9;min-height:0}.shelf{margin:26px 0 34px}}

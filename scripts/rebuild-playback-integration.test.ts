@@ -16,7 +16,10 @@ import {userIssue,UserFacingError,responseIssue,type FailureKind} from "../src/r
 import {FEED_DEFAULTS} from "../src/rebuild/app/feedPreferences";
 import * as listeningEvidence from "../src/rebuild/app/listeningEvidence";
 import * as smartQueueHelpers from "../src/rebuild/app/smartQueue";
+import * as tasteOrdering from "../src/rebuild/app/tasteOrdering";
 import * as personalization from "../src/rebuild/recommendations/personalization";
+import {settingsFields,fullSettings,rebasePreferences,preferenceRevision,preferenceFieldRevisions,unacknowledgedPreferences,type PreferenceDraft,type PreferenceSyncMetadata} from "../src/rebuild/app/preferences";
+import type {UserSettings} from "../src/rebuild/app/types";
 
 const accountId="90000000-0000-4000-8000-000000000001";
 const code=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/MusicContext.tsx",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
@@ -28,8 +31,13 @@ function song(index=1):MusicTrack{
 }
 
 /** Runs the real provider with deterministic media, storage and React host adapters. */
-async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[]}={}){
- let remoteTaste:Record<string,unknown>={feedback:[],tasteEvidence:[],historyClearedAt:null};const historyClears:Array<{accountId:string;period:string;cutoff:number}>=[];
+async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[];recordListening?:boolean;clock?:boolean;remoteSettings?:Record<string,unknown>;preferenceDraft?:PreferenceDraft;deferSettingsPatch?:boolean;deferHistoryClear?:boolean}={}){
+ let holdTaste=false;const tasteRequests:Array<(response:unknown)=>void>=[];
+ let remoteTaste:Record<string,unknown>={feedback:[],tasteEvidence:[],historyClearedAt:null};const historyClears:Array<{accountId:string;period:string;cutoff:number}>=[],historyClearResolvers:Array<()=>void>=[];
+ let remoteSettings:Record<string,unknown>={privateSession:!options.recordListening,revision:0,...options.remoteSettings},preferenceDraft=options.preferenceDraft;
+ const settingsRequests:Array<{body:Record<string,unknown>;resolve:(response:unknown)=>void;reject:(error:unknown)=>void}>=[];
+ const invalidations:Array<{accountId:string;prefix:string;dropData:boolean}>=[];
+ let elapsed=0;const delivered:Array<Record<string,unknown>>=[];
  const smartRequests:Array<{body:{scope:string;recordingIds?:string[]};resolve:(response:unknown)=>void}>=[];
  const states:unknown[]=[],refs:Array<{current:unknown}>=[],requests:string[]=[],requestOwners:Array<string|undefined>=[],saved=new Map<string,unknown>();
  const hooks:Array<{deps:unknown[]|undefined;cleanup?:()=>void}>=[],pendingEffects:Array<{slot:number;effect:()=>void|(()=>void)}>=[];
@@ -48,7 +56,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  const react={createContext:()=>({Provider:noop}),useState(initial:unknown){const slot=stateSlot++;if(slot>=states.length)states[slot]=initial;return [states[slot],(next:unknown)=>{states[slot]=typeof next==="function"?(next as (previous:unknown)=>unknown)(states[slot]):next;scheduleRender();}];},useRef(current:unknown){const slot=refSlot++;return refs[slot]||(refs[slot]={current});},useEffect(effect:()=>void|(()=>void),deps?:unknown[]){const slot=effectSlot++,previous=hooks[slot];if(!previous||!deps||deps.length!==previous.deps?.length||deps.some((dep,index)=>!Object.is(dep,previous.deps?.[index])))pendingEffects.push({slot,effect});hooks[slot]={deps,cleanup:previous?.cleanup};}};
  function captureMedia(audio:FixtureAudio){media=audio;}
  class FixtureAudio {
-  private address="";preload="";volume=.8;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;error:{code:number}|null=null;
+  private address="";preload="";volume=.8;muted=false;seeking=false;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;error:{code:number}|null=null;
   listeners=new Map<string,Set<{listener:()=>void;once:boolean}>>();
   constructor(){captureMedia(this);}
   get src(){return this.address;}set src(address:string){this.address=address?new URL(address,location.href).href:"";}
@@ -75,24 +83,24 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  }
  const resolved=(track:MusicTrack)=>({status:"resolved",recording:{recordingId:track.id,references:track.references,reference:track.reference,metadata:{title:track.title,artists:track.artists,durationMs:track.durationMs}},playback:track.readyPlayback});
  const modules:Record<string,unknown>={
-  "./feedPreferences":{FEED_DEFAULTS},"./listeningEvidence":listeningEvidence,"./smartQueue":smartQueueHelpers,"../recommendations/personalization":personalization,
+  "./feedPreferences":{FEED_DEFAULTS},"./listeningEvidence":listeningEvidence,"./smartQueue":smartQueueHelpers,"./tasteOrdering":tasteOrdering,"../recommendations/personalization":personalization,
   react,"react/jsx-runtime":{jsx:(_type:unknown,props:unknown)=>props},"next-auth/react":{signOut:async()=>{loggedOut=true;}},"./types":{musicTrack},
-  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/taste")return remoteTaste;if(path==="/api/v2/library?kind=liked")return {recordings:[]};if(path==="/api/v2/settings")return {settings:{privateSession:true,...(init.body?JSON.parse(String(init.body)):{})}};if(path==="/api/v2/smart-queue"){const body=JSON.parse(String(init.body));const tracks=(options.smartTracks||[song(4),song(5)]).map(track=>resolved(track).recording);return options.deferSmartQueue?new Promise(resolve=>smartRequests.push({body,resolve})):{tracks,reason:"Chosen from your fixture listening"};}if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise((resolve,reject)=>resolvers.push({track,resolve,reject,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue,userMessage:(error:Error)=>error.message,UserFacingError,responseIssue},
-  "./preferences":{cachedPreferences:()=>({privateSession:true}),settingsFields:(settings:unknown)=>settings,readPreferenceDraft:asyncNoop,writePreferenceDraft:asyncNoop,unacknowledgedPreferences:()=>({})},
+  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/taste"){if(holdTaste){holdTaste=false;return new Promise(resolve=>tasteRequests.push(resolve));}return remoteTaste;}if(path==="/api/v2/library?kind=liked")return {recordings:[]};if(path==="/api/v2/settings"){if(!init.body)return {settings:remoteSettings};const body=JSON.parse(String(init.body));if(options.deferSettingsPatch)return new Promise((resolve,reject)=>settingsRequests.push({body,resolve,reject}));const {expectedRevision,...patch}=body;if(expectedRevision!==undefined&&expectedRevision!==remoteSettings.revision)throw Object.assign(new UserFacingError(responseIssue(409,null)),{status:409});remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};return {settings:remoteSettings};}if(path==="/api/v2/smart-queue"){const body=JSON.parse(String(init.body));const tracks=(options.smartTracks||[song(4),song(5)]).map(track=>resolved(track).recording);return options.deferSmartQueue?new Promise(resolve=>smartRequests.push({body,resolve})):{tracks,reason:"Chosen from your fixture listening"};}if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise((resolve,reject)=>resolvers.push({track,resolve,reject,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue,userMessage:(error:Error)=>error.message,UserFacingError,responseIssue},
+  "./preferences":{cachedPreferences:()=>preferenceDraft?.settings||{privateSession:!options.recordListening},settingsFields,fullSettings,rebasePreferences,preferenceRevision,preferenceFieldRevisions,readPreferenceDraft:async()=>preferenceDraft,writePreferenceDraft:async(_owner:string,settings:UserSettings,pending:boolean,pendingPatch:Partial<UserSettings>,metadata?:PreferenceSyncMetadata)=>{preferenceDraft={settings,pending,pendingPatch,savedAt:Date.now(),...metadata};},unacknowledgedPreferences},
   "./favorites":{readFavoriteDraft:asyncNoop,writeFavoriteDraft:asyncNoop,favoriteOverlay:(ids:string[])=>new Set(ids)},
   "./downloadEngine":{DurableDownloadManager:Manager},"./sharedFlight":{SharedFlight},
   "./partialPlayback":{partialPlaybackUrl:async(accountId:string,source:{track:MusicTrack},ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>{if(options.bridge===false)return;const registration={accountId,track:source.track,ensure};registrations.push(registration);return options.deferRegistration?new Promise<string|undefined>(resolve=>Object.assign(registration,{resolve})):"https://sakura.example/_sakura/audio/fixture";},revokePartialPlayback:()=>{revocations++;}},
   "./listeningSync":{ListeningSync:class{start=asyncNoop;stop=noop;refresh=asyncNoop;flush=asyncNoop;change=noop;},deviceIdentity:()=>"fixture"},"./sessionState":{sessionState:()=>({})},
   "../audio/engine":{MediaAudioEngine:class{initialized=false;requiresVolumeGraph=false;setVolume(){}setMode(){return Promise.resolve();}dispose(){}}},"../audio/presets":{audioTechnology:()=>"none"},
-  "./playbackSource":{readyPlaybackFor},"./seekPosition":{boundedSeekPosition},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:noop},"./listeningQueue":queue,
-  "./offline":{localRead:async(owner:string,key:string)=>accountStorage.get(owner)?.get(key),localWrite:async(owner:string,key:string,entry:unknown)=>{let storage=accountStorage.get(owner);if(!storage){storage=new Map();accountStorage.set(owner,storage);}storage.set(key,entry);},rememberAccount:asyncNoop,lastAccount:async()=>({id:profileId}),forgetActiveAccount:asyncNoop,drainListen:asyncNoop,clearListeningOutbox:async(accountId:string,period:string,cutoff:number)=>{historyClears.push({accountId,period,cutoff});},deliverListen:async()=>true,savedAudio:async(owner:string)=>[...(accountStorage.get(owner)||new Map())].filter(([key,value])=>String(key)==="audio:"+(value as {track?:MusicTrack})?.track?.id&&validOfflineAudio(value)).map(([,value])=>value),validOfflineAudio},
+  "./playbackSource":{readyPlaybackFor},"./seekPosition":{boundedSeekPosition},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:(accountId:string,prefix="/api/v2/",dropData=false)=>invalidations.push({accountId,prefix,dropData})},"./listeningQueue":queue,
+  "./offline":{localRead:async(owner:string,key:string)=>accountStorage.get(owner)?.get(key),localWrite:async(owner:string,key:string,entry:unknown)=>{let storage=accountStorage.get(owner);if(!storage){storage=new Map();accountStorage.set(owner,storage);}storage.set(key,entry);},rememberAccount:asyncNoop,lastAccount:async()=>({id:profileId}),forgetActiveAccount:asyncNoop,drainListen:asyncNoop,clearListeningOutbox:async(accountId:string,period:string,cutoff:number)=>{historyClears.push({accountId,period,cutoff});if(options.deferHistoryClear)await new Promise<void>(resolve=>historyClearResolvers.push(resolve));},deliverListen:async(_owner:string,chunk:Record<string,unknown>)=>{delivered.push(chunk);return true;},savedAudio:async(owner:string)=>[...(accountStorage.get(owner)||new Map())].filter(([key,value])=>String(key)==="audio:"+(value as {track?:MusicTrack})?.track?.id&&validOfflineAudio(value)).map(([,value])=>value),validOfflineAudio},
  };
  class FixtureUrl extends URL {static createObjectURL(blob:Blob){const url=URL.createObjectURL(blob);objectUrls.push(url);return url;}static revokeObjectURL(url:string){revokedUrls.push(url);URL.revokeObjectURL(url);}}
- const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:{...events(windowEvents),dispatchEvent(event:Event){for(const listener of windowEvents.get(event.type)||[])(listener as (event:Event)=>void)(event);return true;}},CustomEvent,URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
+ const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:{...events(windowEvents),dispatchEvent(event:Event){for(const listener of windowEvents.get(event.type)||[])(listener as (event:Event)=>void)(event);return true;}},CustomEvent,URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance:options.clock?{now:()=>elapsed}:performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
 
 test("smart queue appends suggestions without interrupting current music or removing manual picks",async()=>{
@@ -377,4 +385,241 @@ test("a rejected repeat-one restart stops automatic transfer work until the next
 
 test("account changes release old Blob playback and cannot reuse another account's saved bytes",async()=>{
  const p=await player();try{const track=song(),blob=new Blob(["account-bound audio"],{type:"audio/mpeg"});p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});p.value.play(track);await until(()=>p.value.status==="playing");p.value.requestDownload(song(2));await until(()=>p.entries[song(2).id]?.requested);const address=p.media.src,next="90000000-0000-4000-8000-000000000002";await p.profile(next);assert.equal(Object.keys(p.value.downloads).length,0);assert.ok(p.revokedUrls.includes(address));assert.equal(p.value.track,null);assert.equal(p.value.status,"idle");p.value.play(track);await until(()=>p.value.status==="playing");assert.ok(!p.media.src.startsWith("blob:"));assert.equal(p.registrations.at(-1)!.accountId,next);assert.equal(p.saved.has("audio:"+track.id),true);assert.equal(p.entries[song(2).id].requested,true);}finally{p.close();}
+});
+
+
+test("pause and natural ending keep the final audible interval and commit one terminal outcome",async()=>{
+ const p=await player({recordListening:true,clock:true});try{
+  p.value.play(song(),[song(),song(2)]);await until(()=>p.value.status==="playing");p.advance(1000);p.value.pause();await tick();assert.equal(p.delivered[0].msPlayed,1000);assert.equal(p.delivered[0].finished,false);
+  p.value.togglePlay();await until(()=>p.value.status==="playing");p.advance(179000);p.media.paused=true;p.media.emit("ended");await until(()=>p.value.track?.id===song(2).id);await tick();
+  const first=p.delivered.filter(chunk=>chunk.recordingId===song().id);assert.equal(first.reduce((sum,c)=>sum+Number(c.msPlayed),0),180000);assert.equal(first.filter(c=>c.completed).length,1);assert.equal(first.some(c=>c.skipped),false);assert.equal(first.at(-1)?.finished,true);
+ }finally{p.close();}
+});
+
+test("volume boundaries record sounding intervals and exclude muted media movement",async()=>{
+ const p=await player({recordListening:true,clock:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.advance(1000);p.value.setVolume(0);await tick();p.advance(9000);p.value.setVolume(.8);await tick();p.advance(1000);p.value.pause();await tick();assert.equal(p.delivered.reduce((sum,c)=>sum+Number(c.msPlayed),0),2000);
+ }finally{p.close();}
+});
+
+test("native mute changes use the previous sound boundary rather than crediting silent time",async()=>{
+ const p=await player({recordListening:true,clock:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.advance(1000);p.media.muted=true;p.media.emit("volumechange");p.advance(9000);p.media.muted=false;p.media.emit("volumechange");p.advance(1000);p.value.pause();await tick();assert.equal(p.delivered.reduce((sum,c)=>sum+Number(c.msPlayed),0),2000);
+ }finally{p.close();}
+});
+
+test("a settings change fences an older soundtrack response and releases its busy state",async()=>{
+ const p=await player({deferSmartQueue:true});try{
+  const generated=p.value.smartQueue();await until(()=>p.smartRequests.length===1);const change=p.value.updateSettings({discovery:.8});await tick();p.resolveSmart([song(4)]);await generated;await change;await tick();assert.equal(p.value.track,null);assert.equal(p.value.queue.length,0);assert.equal(p.value.smartQueueBusy,false);
+ }finally{p.close();}
+});
+
+test("a new song exclusion fences an older soundtrack response",async()=>{
+ const p=await player({deferSmartQueue:true});try{
+  const generated=p.value.smartQueue();await until(()=>p.smartRequests.length===1);p.dispatch("sakura-taste-updated",{accountId,feedback:{target:"recording",targetId:song(4).id,kind:"exclude"}});p.resolveSmart([song(4)]);await generated;await tick();assert.equal(p.value.track,null);assert.equal(p.value.queue.length,0);assert.equal(p.value.smartQueueBusy,false);
+ }finally{p.close();}
+});
+
+test("collection soundtracks reject songs returned outside the selected source",async()=>{
+ const p=await player({smartTracks:[song(1),song(4),song(2)]});try{
+  await p.value.smartQueue({scope:"collection",tracks:[song(1),song(2)]});await until(()=>p.value.status==="playing");assert.deepEqual(p.value.queue.map(entry=>entry.track.id),[song(1).id,song(2).id]);
+ }finally{p.close();}
+});
+
+test("reconnecting reconciles every selective clear performed while this device was away",async()=>{
+ const p=await player();try{
+  p.setTaste({feedback:[],tasteEvidence:[],historyClearedAt:"2026-11-08T00:00:00Z",historyDeletion:{periodStart:"2026-11-01T00:00:00Z",clearedAt:"2026-11-08T00:00:00Z"},historyDeletions:[{periodStart:"2026-09-01T00:00:00Z",clearedAt:"2026-10-01T00:00:00Z"},{periodStart:"2026-11-01T00:00:00Z",clearedAt:"2026-11-08T00:00:00Z"}]});await p.connection(true);await until(()=>p.historyClears.length===2);assert.deepEqual(p.historyClears.map(clear=>clear.period),["month","week"]);assert.equal(p.saved.get("personalization-clear-marker"),"2026-11-08T00:00:00Z");
+ }finally{p.close();}
+});
+
+
+test("leaving a failed audio source records an ending without claiming a deliberate skip",async()=>{
+ const p=await player({recordListening:true,clock:true,bridge:false});try{
+  p.value.play(song(),[song(),song(2)]);await until(()=>p.value.status==="playing");p.advance(1000);p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.value.status==="error");p.value.next();await until(()=>p.value.track?.id===song(2).id&&p.value.status==="playing");const failed=p.delivered.filter(chunk=>chunk.recordingId===song().id);assert.equal(failed.reduce((sum,c)=>sum+Number(c.msPlayed),0),1000);assert.equal(failed.some(c=>c.skipped),false);assert.equal(failed.at(-1)?.finished,true);
+ }finally{p.close();}
+});
+
+
+test("stale offline feed edits preserve a newer privacy choice and rebase unrelated controls",async()=>{
+ const base={privateSession:true,learnFromListening:true,discovery:.35},local={...base,discovery:.7};const draft={settings:local as UserSettings,pending:true,pendingPatch:{learnFromListening:true,discovery:.7},savedAt:Date.now(),serverRevision:2,serverSettings:base,baseSettings:{learnFromListening:true,discovery:.35}};
+ const p=await player({preferenceDraft:draft,remoteSettings:{learnFromListening:false,discovery:.35,revision:5}});try{await until(()=>p.value.settings.discovery===.7&&p.value.settings.learnFromListening===false);assert.equal(p.preferenceDraft?.pending,false);assert.equal(p.preferenceDraft?.serverRevision,6);assert.equal(p.preferenceDraft?.serverSettings?.learnFromListening,false);}finally{p.close();}
+});
+
+test("a newer slider edit survives an accepted older preference write",async()=>{
+ const p=await player({deferSettingsPatch:true});try{
+  const first=p.value.updateSettings({discovery:.6});await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);assert.equal(p.settingsRequests[0].body.expectedRevision,0);
+  const second=p.value.updateSettings({discovery:.9});await tick();p.resolveSettings(0);await first;await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===2);assert.equal(p.settingsRequests[1].body.discovery,.9);assert.equal(p.settingsRequests[1].body.expectedRevision,1);p.resolveSettings(1);await second;await tick();assert.equal(p.value.settings.discovery,.9);assert.equal(p.preferenceDraft?.pending,false);
+ }finally{p.close();}
+});
+
+test("a revision conflict refreshes settings and keeps another device's newer same-field choice",async()=>{
+ const p=await player({deferSettingsPatch:true});try{
+  const change=p.value.updateSettings({discovery:.6});await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);p.conflictSettings({discovery:.85});await change;await tick();assert.equal(p.value.settings.discovery,.85);assert.equal(p.preferenceDraft?.pending,false);assert.equal(p.settingsRequests.length,1);
+ }finally{p.close();}
+});
+
+
+test("an older offline intent cannot override a newer field choice that returned to its original value",async()=>{
+ const p=await player({deferSettingsPatch:true,remoteSettings:{discovery:.35,fieldRevisions:{discovery:0}}});try{
+  const change=p.value.updateSettings({discovery:.6});await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);p.remoteChoice({discovery:.9});p.conflictSettings({discovery:.35});await change;await tick();assert.equal(p.value.settings.discovery,.35);assert.equal(p.preferenceDraft?.pending,false);assert.equal(p.settingsRequests.length,1);
+ }finally{p.close();}
+});
+
+test("a mounted artist editor cannot stage choices against a newer account baseline",async()=>{
+ const p=await player({deferSettingsPatch:true,remoteSettings:{seedArtists:["A"],seedArtistSelections:[],fieldRevisions:{seedArtists:1,seedArtistSelections:1}}});try{
+  const baseline=p.value.artistChoiceVersion;p.remoteChoice({seedArtists:["B"],seedArtistSelections:[]});await p.pollTaste();await until(()=>p.value.settings.seedArtists[0]==="B");
+  await assert.rejects(p.value.updateSettings({seedArtists:["Stale draft"],seedArtistSelections:[]},{artistChoiceVersion:baseline}),(error:unknown)=>error instanceof UserFacingError&&error.status===409&&error.issue.kind==="validation");
+  assert.deepEqual(p.value.settings.seedArtists,["B"]);assert.equal(p.settingsRequests.length,0);
+ }finally{p.close();}
+});
+
+test("artist edit guards detect a remote change and revert even when visible choices match",async()=>{
+ const p=await player({deferSettingsPatch:true,remoteSettings:{seedArtists:["A"],seedArtistSelections:[],fieldRevisions:{seedArtists:0,seedArtistSelections:0}}});try{
+  const baseline=p.value.artistChoiceVersion;p.remoteChoice({seedArtists:["B"],seedArtistSelections:[]});p.remoteChoice({seedArtists:["A"],seedArtistSelections:[]});await p.pollTaste();await until(()=>p.value.artistChoiceVersion!==baseline);
+  assert.deepEqual(p.value.settings.seedArtists,["A"]);await assert.rejects(p.value.updateSettings({seedArtists:["Stale draft"],seedArtistSelections:[]},{artistChoiceVersion:baseline}));assert.equal(p.settingsRequests.length,0);
+ }finally{p.close();}
+});
+
+test("unrelated remote settings do not discard the artist editor baseline",async()=>{
+ const p=await player({deferSettingsPatch:true,remoteSettings:{seedArtists:["A"],seedArtistSelections:[],fieldRevisions:{seedArtists:0,seedArtistSelections:0}}});try{
+  const baseline=p.value.artistChoiceVersion;p.remoteChoice({volume:.31});await p.pollTaste();await until(()=>p.value.settings.volume===.31);assert.equal(p.value.artistChoiceVersion,baseline);
+  const save=p.value.updateSettings({seedArtists:["New draft"],seedArtistSelections:[]},{artistChoiceVersion:baseline});await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);p.resolveSettings();await save;assert.deepEqual(p.value.settings.seedArtists,["New draft"]);
+ }finally{p.close();}
+});
+
+
+test("an unchanged taste poll preserves cached stories and an active soundtrack request",async()=>{
+ const p=await player({deferSmartQueue:true});try{
+  p.invalidations.length=0;const generated=p.value.smartQueue();await until(()=>p.smartRequests.length===1);await p.pollTaste();assert.deepEqual(p.invalidations,[]);assert.equal(p.value.smartQueueBusy,true);p.resolveSmart([song(4)]);await generated;await until(()=>p.value.track?.id===song(4).id&&p.value.status==="playing");
+ }finally{p.close();}
+});
+
+test("reordered equivalent listening and feedback do not trigger another cache refresh",async()=>{
+ const p=await player();try{
+  const a={recordingId:song(1).id,audibleMs:1000,playCount:1,completedCount:0,skippedCount:0,lastPlayedAt:"2026-11-01T00:00:00Z",hourWeights:[{hour:1,audibleMs:500},{hour:2,audibleMs:500}]},b={...a,recordingId:song(2).id};const feedback=[{target:"recording",targetId:song(1).id,kind:"snooze",expiresAt:"2026-11-09T00:00:00Z"},{target:"recording",targetId:song(2).id,kind:"less",expiresAt:null}];
+  p.setTaste({feedback,tasteEvidence:[a,b],historyClearedAt:null});await p.pollTaste();p.invalidations.length=0;p.setTaste({feedback:[...feedback].reverse(),tasteEvidence:[b,{...a,hourWeights:[...a.hourWeights].reverse()}],historyClearedAt:null});await p.pollTaste();assert.deepEqual(p.invalidations,[]);
+ }finally{p.close();}
+});
+
+test("new listening updates the journal and Bloom shelf without resetting stories or a requested queue",async()=>{
+ const p=await player({deferSmartQueue:true});try{
+  p.invalidations.length=0;const generated=p.value.smartQueue();await until(()=>p.smartRequests.length===1);p.setTaste({feedback:[],tasteEvidence:[{recordingId:song(1).id,audibleMs:1000,playCount:1,completedCount:0,skippedCount:0}],historyClearedAt:null});await p.pollTaste();assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/profile"),true);assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/history"),true);assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/"||item.prefix.includes("bloom")&&item.prefix!=="/api/v2/bloom/shelf"||item.dropData),false);assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/bloom/shelf"),true);assert.equal(p.value.smartQueueBusy,true);p.resolveSmart([song(4)]);await generated;await until(()=>p.value.track?.id===song(4).id&&p.value.status==="playing");
+ }finally{p.close();}
+});
+
+test("feedback changes refresh recommendations while preserving Bloom and listening caches",async()=>{
+ const p=await player({deferSmartQueue:true});try{
+  p.invalidations.length=0;const generated=p.value.smartQueue();await until(()=>p.smartRequests.length===1);p.setTaste({feedback:[{target:"recording",targetId:song(4).id,kind:"snooze",expiresAt:null}],tasteEvidence:[],historyClearedAt:null});await p.pollTaste();assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/taste"),true);assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/"||item.prefix.includes("bloom")||item.prefix==="/api/v2/history"||item.prefix==="/api/v2/profile"||item.dropData),false);p.resolveSmart([song(4)]);await generated;await tick();assert.equal(p.value.track,null);
+ }finally{p.close();}
+});
+
+test("feedback-only clearing leaves valid Bloom and listening data cached",async()=>{
+ const p=await player();try{p.invalidations.length=0;p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"all"});await tick();assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/taste"),true);assert.equal(p.invalidations.some(item=>item.prefix==="/api/v2/"||item.prefix.includes("bloom")||item.prefix==="/api/v2/history"||item.prefix==="/api/v2/profile"||item.dropData),false);}finally{p.close();}
+});
+
+
+test("an immediate offline queue after a partial feedback clear keeps older exclusions",async()=>{
+ const p=await player({offline:true});try{
+  const blob=new Blob(["verified partial-clear audio"],{type:"audio/mpeg"});for(const index of [1,2,3]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}
+  const old={target:"recording",targetId:song(1).id,kind:"block",expiresAt:null},recent={target:"recording",targetId:song(2).id,kind:"block",expiresAt:null};for(const feedback of [old,recent])p.dispatch("sakura-taste-updated",{accountId,feedback});
+  p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"week",feedbackAuthoritative:true,tasteFeedback:[old]});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.equal(p.value.queue.some(entry=>entry.track.id===song(1).id),false);assert.equal(p.value.queue.some(entry=>entry.track.id===song(2).id),true);assert.equal((p.saved.get("personalization-evidence") as {feedback:unknown[]}).feedback.length,1);
+ }finally{p.close();}
+});
+
+test("a legacy partial clear reply preserves known exclusions until authoritative refresh",async()=>{
+ const p=await player({offline:true});try{
+  const blob=new Blob(["verified legacy-clear audio"],{type:"audio/mpeg"});for(const index of [1,2]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}p.dispatch("sakura-taste-updated",{accountId,feedback:{target:"recording",targetId:song(1).id,kind:"block",expiresAt:null}});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"month"});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.deepEqual(p.value.queue.map(entry=>entry.track.id),[song(2).id]);
+ }finally{p.close();}
+});
+
+
+test("a feedback choice newer than the clear cutoff survives its delayed reply within one millisecond",async()=>{
+ const p=await player({offline:true});try{
+  const blob=new Blob(["verified ordered-clear audio"],{type:"audio/mpeg"});for(const index of [1,2,3]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}
+  const old={target:"recording",targetId:song(1).id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000001Z"},newer={...old,targetId:song(2).id,updatedAt:"2026-11-08T00:00:00.000004Z"};p.dispatch("sakura-taste-updated",{accountId,feedback:old});p.dispatch("sakura-taste-updated",{accountId,feedback:newer});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"week",cutoff:"2026-11-08T00:00:00.000003Z",feedbackAuthoritative:true,tasteFeedback:[old]});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.deepEqual(p.value.queue.map(entry=>entry.track.id),[song(3).id]);
+ }finally{p.close();}
+});
+
+test("a newer undo cannot be reversed by an older clear reply",async()=>{
+ const p=await player({offline:true});try{
+  const blob=new Blob(["verified ordered-undo audio"],{type:"audio/mpeg"});for(const index of [1,2]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}
+  const old={target:"recording",targetId:song(1).id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000001Z"};p.dispatch("sakura-taste-updated",{accountId,feedback:old});p.dispatch("sakura-taste-updated",{accountId,removedTargetId:song(1).id,target:"recording",mutationAt:"2026-11-08T00:00:00.000004Z"});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"week",cutoff:"2026-11-08T00:00:00.000003Z",feedbackAuthoritative:true,tasteFeedback:[old]});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.equal(p.value.queue.some(entry=>entry.track.id===song(1).id),true);
+ }finally{p.close();}
+});
+
+test("a delayed pre-clear choice response cannot recreate an erased exclusion",async()=>{
+ const p=await player({offline:true});try{
+  const track=song(1),blob=new Blob(["verified erased-choice audio"],{type:"audio/mpeg"});p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"all",cutoff:"2026-11-08T00:00:00.000003Z",feedbackAuthoritative:true,tasteFeedback:[]});p.dispatch("sakura-taste-updated",{accountId,feedback:{target:"recording",targetId:track.id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000002Z"}});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.equal(p.value.track?.id,track.id);
+ }finally{p.close();}
+});
+
+test("a history-erasure response preserves feedback changed while its taste read was in flight",async()=>{
+ const p=await player();try{
+  p.holdTaste();await p.pollTaste();const feedback={target:"recording",targetId:song(1).id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000004Z"};p.dispatch("sakura-taste-updated",{accountId,feedback});p.resolveTaste({feedback:[],tasteEvidence:[],historyClearedAt:"2026-11-08T00:00:00Z",historyDeletion:{periodStart:null,clearedAt:"2026-11-08T00:00:00Z"}});await until(()=>p.historyClears.length>0);await tick();const retained=(p.saved.get("personalization-evidence") as {feedback:Array<typeof feedback>}).feedback;assert.equal(retained.length,1);assert.equal(retained[0].targetId,feedback.targetId);assert.equal(retained[0].updatedAt,feedback.updatedAt);
+ }finally{p.close();}
+});
+
+
+test("older exclusions beyond the recent five hundred choices still apply to offline playback",async()=>{
+ const p=await player();try{
+  const choices=Array.from({length:500},(_,index)=>({target:"recording",targetId:song(index+2).id,kind:"block",expiresAt:null}));choices.push({target:"recording",targetId:song(1).id,kind:"block",expiresAt:null});p.setTaste({feedback:choices,tasteEvidence:[],historyClearedAt:null});await p.pollTaste();const blob=new Blob(["verified older-exclusion audio"],{type:"audio/mpeg"});for(const index of [1,502]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}await p.connection(false);await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.deepEqual(p.value.queue.map(entry=>entry.track.id),[song(502).id]);
+ }finally{p.close();}
+});
+
+
+test("an older clear reply cannot restore choices erased by a newer clear",async()=>{
+ const p=await player({offline:true});try{const track=song(1),blob=new Blob(["verified newer-clear audio"],{type:"audio/mpeg"});p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"all",cutoff:"2026-11-08T00:00:00.000005Z",feedbackAuthoritative:true,tasteFeedback:[]});p.dispatch("sakura-personalization-cleared",{accountId,scope:"feedback",period:"week",cutoff:"2026-11-08T00:00:00.000003Z",feedbackAuthoritative:true,tasteFeedback:[{target:"recording",targetId:track.id,kind:"block",expiresAt:null,updatedAt:"2026-11-01T00:00:00Z"}]});await p.value.smartQueue({scope:"downloads"});await until(()=>p.value.status==="playing");assert.equal(p.value.track?.id,track.id);}finally{p.close();}
+});
+
+for(const scope of ["history","all"] as const)for(const receipt of ["older","duplicate"] as const)test(`${receipt==="older"?"an":"a"} ${receipt} ${scope} clear receipt preserves newer listening and its current event`,async()=>{
+ const p=await player({recordListening:true,clock:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");const newer="2026-11-08T00:00:00.000005Z";
+  p.dispatch("sakura-personalization-cleared",{accountId,scope,period:"all",cutoff:newer,feedbackAuthoritative:true,tasteFeedback:[]});
+  p.advance(1000);p.value.pause();await tick();p.value.togglePlay();await until(()=>p.value.status==="playing");p.advance(2000);
+  const cutoff=receipt==="older"?"2026-11-08T00:00:00.000003Z":newer;
+  p.dispatch("sakura-personalization-cleared",{accountId,scope,period:"week",cutoff,feedbackAuthoritative:true,tasteFeedback:[]});p.value.pause();await tick();
+  assert.equal(p.delivered.reduce((sum,chunk)=>sum+Number(chunk.msPlayed),0),3000);
+  assert.equal(new Set(p.delivered.map(chunk=>chunk.eventId)).size,1);
+  assert.equal((p.saved.get("personalization-evidence") as {history:Array<{audibleMs:number}>}).history[0].audibleMs,3000);
+  assert.equal(p.saved.get("personalization-clear-marker"),newer);
+  assert.equal(p.historyClears.length,2);assert.equal(p.historyClears[1].period,"week");
+ }finally{p.close();}
+});
+
+test("cross-device history clears retain their microsecond ordering within one millisecond",async()=>{
+ const p=await player();try{
+  const older="2026-11-08T00:00:00.000003Z",newer="2026-11-08T00:00:00.000005Z";
+  p.dispatch("sakura-personalization-cleared",{accountId,scope:"history",period:"week",cutoff:older});await tick();
+  p.setTaste({feedback:[],tasteEvidence:[],historyClearedAt:newer,historyDeletions:[{periodStart:"2026-11-01T00:00:00.000005Z",clearedAt:newer},{periodStart:null,clearedAt:older}]});await p.pollTaste();await tick();
+  assert.equal(p.historyClears.length,2);assert.equal(p.historyClears[1].period,"week");assert.equal(p.saved.get("personalization-clear-marker"),newer);
+ }finally{p.close();}
+});
+
+test("an in-flight history reconciliation cannot restore data erased by a newer clear",async()=>{
+ const p=await player({recordListening:true,clock:true,deferHistoryClear:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");const older="2026-11-08T00:00:00.000003Z",newer="2026-11-08T00:00:00.000005Z";
+  p.setTaste({feedback:[],tasteEvidence:[{recordingId:song().id,audibleMs:9000,playCount:1,completedCount:0,skippedCount:0}],historyClearedAt:older,historyDeletion:{periodStart:null,clearedAt:older}});await p.pollTaste();assert.equal(p.historyClears.length,1);
+  p.dispatch("sakura-personalization-cleared",{accountId,scope:"history",period:"all",cutoff:newer});p.advance(1000);p.value.pause();await tick();
+  p.resolveHistoryClear(0);await tick();await tick();
+  assert.equal((p.saved.get("personalization-evidence") as {history:Array<{audibleMs:number}>}).history[0].audibleMs,1000);assert.equal(p.saved.get("personalization-clear-marker"),newer);
+  p.resolveHistoryClear(1);
+ }finally{p.close();}
+});
+
+test("a remote timezone change refreshes calendar views once and retains cached data",async()=>{
+ const p=await player();try{
+  p.invalidations.length=0;p.remoteChoice({timeZone:"Asia/Tokyo"});await p.pollTaste();await until(()=>p.value.settings.timeZone==="Asia/Tokyo");
+  for(const prefix of ["/api/v2/profile","/api/v2/history","/api/v2/bloom/shelf"])assert.equal(p.invalidations.some(item=>prefix.startsWith(item.prefix)),true,prefix);
+  assert.equal(p.invalidations.some(item=>item.dropData),false);
+  p.invalidations.length=0;await p.pollTaste();assert.deepEqual(p.invalidations,[]);
+ }finally{p.close();}
+});
+
+test("listening and feedback recorded during local history reconciliation survive its older snapshot",async()=>{
+ const p=await player({recordListening:true,clock:true,deferHistoryClear:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");const cutoff="2026-11-08T00:00:00.000003Z";
+  p.setTaste({feedback:[],tasteEvidence:[{recordingId:song().id,audibleMs:9000,playCount:1,completedCount:0,skippedCount:0}],historyClearedAt:cutoff,historyDeletion:{periodStart:"2026-11-01T00:00:00.000003Z",clearedAt:cutoff}});await p.pollTaste();
+  const feedback={target:"recording",targetId:song(2).id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000005Z"};p.dispatch("sakura-taste-updated",{accountId,feedback});p.advance(1000);p.value.pause();await tick();p.resolveHistoryClear();await tick();await tick();
+  const retained=p.saved.get("personalization-evidence") as {history:Array<{audibleMs:number}>;feedback:Array<typeof feedback>};assert.equal(retained.history[0].audibleMs,10000);assert.equal(retained.feedback[0].targetId,feedback.targetId);
+ }finally{p.close();}
 });

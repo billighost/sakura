@@ -75,6 +75,13 @@
 .world[data-quality="2"] .pinePassage,.world[data-quality="2"] .riverBanks,.world[data-quality="2"] .boat,.world[data-quality="2"] .crane {animation:none;}
 .world[data-motion="still"] *,.world[data-motion="still"] *::before,.world[data-motion="still"] *::after {animation:none!important;transition:none!important;}
 .world[data-motion="still"] .inkWashes,.world[data-motion="still"] .paperFlecks {display:none;}
+.listeningLandscape {opacity:.9;}
+
+/* Retain the painted page's space while allowing tall story text to scroll. */
+.world[data-view="story"] {
+  height:auto;
+  padding-block:env(safe-area-inset-top) env(safe-area-inset-bottom);
+}
 .world[data-quality="1"] .mount {filter:none;}
 :global(dialog[data-paused="true"]) .world *,:global(dialog[data-paused="true"]) .world *::before,:global(dialog[data-paused="true"]) .world *::after {animation-play-state:paused!important;}
 @keyframes paintPassage {from{opacity:.3}to{opacity:var(--ink-growth)}}

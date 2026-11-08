@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { useMusic } from "./MusicContext";
 import { invalidateResources } from "./resources";
+import { invalidateRecommendationResources } from "./recommendationResources";
 import type { MusicTrack } from "./types";
 import { Icon } from "./Icon";
 import { ArtistLinks } from "./ArtistLinks";
+import { primaryArtistHref } from "./artistNavigation";
 import { requestJson, userIssue, type UserIssue } from "./errors";
 import s from "./touch.module.css";
 
@@ -54,9 +56,9 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   async function taste(kind:"less"|"snooze"|"block",duration:"day"|"week"|"month"|"forever"="forever") {
    if(busyRef.current||!music.account)return;busyRef.current=true;setBusy(true);setFailure(null);const accountId=music.account.id,version=requestVersion.current,controller=new AbortController();requestController.current=controller;
    try{const canonical=await music.ensureRecording(track);if(version!==requestVersion.current||controller.signal.aborted)return;
-    await requestJson("/api/v2/taste",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({target:"recording",targetId:canonical.id,kind,duration})},{context:"save",accountId});if(version!==requestVersion.current||controller.signal.aborted)return;
-    const days=duration==="day"?1:duration==="week"?7:duration==="month"?30:0;const feedback={target:"recording" as const,targetId:canonical.id,kind,expiresAt:days?new Date(Date.now()+days*86400000).toISOString():null};
-    window.dispatchEvent(new CustomEvent("sakura-taste-updated",{detail:{accountId,recordingId:canonical.id,feedback}}));invalidateResources(accountId);music.notify(kind==="less"?"We’ll recommend this song less often.":days?`This song is resting from your taste for ${days===1?"a day":days===7?"a week":"a month"}.` :"This song is excluded from your taste. Restore it in Settings anytime.");onClose();
+    const result=await requestJson<{expiresAt?:string|null;updatedAt?:string}>("/api/v2/taste",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({target:"recording",targetId:canonical.id,kind,duration})},{context:"save",accountId});if(version!==requestVersion.current||controller.signal.aborted)return;
+    const days=duration==="day"?1:duration==="week"?7:duration==="month"?30:0;const feedback={target:"recording" as const,targetId:canonical.id,kind,expiresAt:result.expiresAt??(days?new Date(Date.now()+days*86400000).toISOString():null),updatedAt:result.updatedAt};
+    window.dispatchEvent(new CustomEvent("sakura-taste-updated",{detail:{accountId,recordingId:canonical.id,feedback}}));invalidateRecommendationResources(accountId);music.notify(kind==="less"?"We’ll recommend this song less often.":days?`This song is excluded from recommendations for ${days} ${days===1?"day":"days"}.` :"This song is excluded from recommendations. Undo this in Settings anytime.");onClose();
    }catch(error){if(version===requestVersion.current&&!controller.signal.aborted)setFailure({issue:userIssue(error,"save"),retry:()=>void taste(kind,duration)});}finally{if(version===requestVersion.current){busyRef.current=false;setBusy(false);}if(requestController.current===controller)requestController.current=null;}
   }
   const id=music.effectiveId(track);
@@ -66,7 +68,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   const content=<div ref={menu} popover="auto" role="menu" aria-label={`Options for ${track.title}`} data-motion={music.settings.reducedMotion?"still":undefined} className={s.songPopover} onKeyDown={keyboard} onToggle={event=>{if(event.newState==="closed")onClose();}}>
     <div className={s.popoverHeading}><span>song options</span><strong>{track.title}</strong><small onClick={onClose}><ArtistLinks track={track}/></small></div>
     {failure&&<><p className={s.popoverNote} role="alert">{failure.issue.message}</p>{failure.issue.kind!=="session"&&<button role="menuitem" disabled={busy} onClick={failure.retry}><Icon name="repeat"/>{failure.issue.action}</button>}{failure.issue.href&&<Link role="menuitem" href={failure.issue.href} onClick={onClose}><Icon name="arrow"/>{failure.issue.linkLabel||"Return to music"}</Link>}</>}
-    {tasteMenu?<><p className={s.popoverNote}>Exclude this song from recommendations and taste learning. It stays in your library and can still be played.</p><button role="menuitem" disabled={busy} onClick={()=>void taste("less")}><Icon name="discover"/>{busy?"Updating your taste…":"Recommend this song less"}</button>{(["day","week","month","forever"] as const).map(duration=><button role="menuitem" disabled={busy} key={duration} onClick={()=>void taste(duration==="forever"?"block":"snooze",duration)}><Icon name={duration==="forever"?"close":"moon"}/>{duration==="forever"?"Exclude from my taste":`Let it rest for a ${duration}`}</button>)}<button role="menuitem" disabled={busy} onClick={()=>setTasteMenu(false)}><Icon name="back"/>Back to song options</button></>:playlists?<>{playlists.map(list=><button role="menuitem" key={list.id} disabled={busy} onClick={()=>void choose(list)}><Icon name="library"/>{list.name}</button>)}{!playlists.length&&<p className={s.popoverNote}>Create a playlist to add this song.</p>}<Link role="menuitem" href="/library" onClick={onClose}><Icon name="plus"/>Create a playlist</Link><button role="menuitem" onClick={()=>setPlaylists(null)}><Icon name="back"/>Back to song options</button></>:<>
+    {tasteMenu?<><p className={s.popoverNote}>Change how this song shapes recommendations. Excluding it also stops its past listens from influencing suggestions. It stays in your library and can still be played.</p><button role="menuitem" disabled={busy} onClick={()=>void taste("less")}><Icon name="discover"/>{busy?"Updating recommendations…":"Recommend this song less"}</button>{(["day","week","month","forever"] as const).map(duration=><button role="menuitem" disabled={busy} key={duration} onClick={()=>void taste(duration==="forever"?"block":"snooze",duration)}><Icon name={duration==="forever"?"close":"moon"}/>{duration==="forever"?"Exclude from recommendations":`Exclude for ${duration==="day"?"1 day":duration==="week"?"7 days":"30 days"}`}</button>)}<button role="menuitem" disabled={busy} onClick={()=>setTasteMenu(false)}><Icon name="back"/>Back to song options</button></>:playlists?<>{playlists.map(list=><button role="menuitem" key={list.id} disabled={busy} onClick={()=>void choose(list)}><Icon name="library"/>{list.name}</button>)}{!playlists.length&&<p className={s.popoverNote}>Create a playlist to add this song.</p>}<Link role="menuitem" href="/library" onClick={onClose}><Icon name="plus"/>Create a playlist</Link><button role="menuitem" onClick={()=>setPlaylists(null)}><Icon name="back"/>Back to song options</button></>:<>
       <button role="menuitem" onClick={()=>{music.play(track);onClose();}}><Icon name="play"/>Play now</button>
       <button role="menuitem" onClick={()=>{music.addQueue(track);onClose();}}><Icon name="queue"/>Add to queue</button>
       <button role="menuitem" onClick={()=>{void music.toggleLike(track);onClose();}}><Icon name="heart"/>{music.liked.has(id)?"Remove from liked songs":"Like this song"}</button>
@@ -74,7 +76,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
       <button role="menuitem" disabled={saved||saving} onClick={()=>{music.requestDownload(track);onClose();}}><Icon name={saved?"check":"download"}/>{saved?"Saved on this device":saving?"Saving on this device…":"Save on this device"}</button>
       <button role="menuitem" onClick={()=>{music.openModal("share",track);onClose();}}><Icon name="share"/>Share this song</button>
       <button role="menuitem" disabled={busy} onClick={()=>setTasteMenu(true)}><Icon name="discover"/>Recommendation controls</button>
-      {track.artists[0]&&<Link role="menuitem" href={track.artistId?"/artist/"+encodeURIComponent(track.artistId):"/search?"+new URLSearchParams({q:track.artists[0],tab:"Artists"})} onClick={onClose}><Icon name="user"/>Visit artist</Link>}
+      {track.artists[0]&&<Link role="menuitem" href={primaryArtistHref(track)} onClick={onClose}><Icon name="user"/>Visit artist</Link>}
       <Link role="menuitem" href={"/track/"+encodeURIComponent(id)} onClick={onClose}><Icon name="lyrics"/>Song details</Link>
     </>}
   </div>;

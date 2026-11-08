@@ -22,7 +22,7 @@ const fallbacks: Record<ErrorContext, UserIssue> = {
  share: {...issues.unknown,title:"Your shared moment couldn’t be prepared.",message:"Try preparing it again, or choose an image or link to share instead.",action:"Prepare again"},
 };
 export class UserFacingError extends Error {
- constructor(readonly issue: UserIssue) { super(issue.message); this.name="UserFacingError"; }
+ constructor(readonly issue: UserIssue,readonly status?:number) { super(issue.message); this.name="UserFacingError"; }
 }
 const rememberedIssues=new Map<string,UserIssue>();
 export function userIssue(error: unknown, context: ErrorContext = "page"): UserIssue {
@@ -64,7 +64,7 @@ export interface JsonOptions {context?:ErrorContext;acceptStatuses?:number[];tim
 export async function readJsonResponse<T=Record<string,unknown>>(response:Response,options:JsonOptions={}):Promise<T> {
  let payload:unknown;
  try {const body=await response.text();payload=JSON.parse(body);}catch {throw new UserFacingError(responseIssue(response.ok?502:response.status,null,options.context));}
- if(!response.ok&&!options.acceptStatuses?.includes(response.status))throw new UserFacingError(responseIssue(response.status,payload,options.context));
+ if(!response.ok&&!options.acceptStatuses?.includes(response.status))throw new UserFacingError(responseIssue(response.status,payload,options.context),response.status);
  if(payload===null||typeof payload!=="object"||Array.isArray(payload))throw new UserFacingError(responseIssue(502,null,options.context));
  return payload as T;
 }

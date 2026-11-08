@@ -12,7 +12,7 @@ export function listeningOutcome(input:{naturalEnd:boolean;explicitSkip:boolean;
 }
 
 export function listeningTimeFallsInPeriod(occurredAt:string|undefined,period:"week"|"month"|"all",cutoffMs=Date.now()) {
- if(period==="all"||!occurredAt)return true;
+ if(!occurredAt)return true;
  const time=Date.parse(occurredAt),days=period==="week"?7:30;
- return !Number.isFinite(time)||time>=cutoffMs-days*86400000&&time<=cutoffMs;
+ return !Number.isFinite(time)||time<=cutoffMs&&(period==="all"||time>=cutoffMs-days*86400000);
 }

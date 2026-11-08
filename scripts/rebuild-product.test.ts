@@ -1,7 +1,7 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir,readFile,writeFile } from "node:fs/promises";
 import { after,before,describe,it } from "node:test";
 import { getRebuildPool,inTransaction } from "../src/rebuild/data/db";
 import { getLibrary,createPlaylist,getPlaylist,mutatePlaylistTracks,setFavorite,updatePlaylist,deletePlaylist } from "../src/rebuild/data/collections";
@@ -21,6 +21,8 @@ const recordingIds=Array.from({length:80},()=>randomUUID());
 const events=Array.from({length:6},()=>randomUUID());
 const actualPool=getRebuildPool();
 const testSchema=`sakura_test_${prefix}`;
+const fixtureJournal=`.local/product-db-fixture-${prefix}.json`;
+const recordFixture=(status:string)=>writeFile(fixtureJournal,JSON.stringify({schema:testSchema,accounts:[first,second],recordings:recordingIds,status},null,2));
 // Each run gets an isolated catalog schema. Synthetic verified recordings must
 // never appear in the real Home feed while browser tests or people use the app.
 const rewrite=(statement:unknown)=>typeof statement==="string"?statement.replaceAll("sakura_v2",testSchema):statement;
@@ -38,6 +40,7 @@ const pool=new Proxy(actualPool,{get(target,property){
 const input=(sequence:number,msPlayed:number,flags={})=>({eventId:events[0],recordingId:recordingIds[0],sequence,msPlayed,positionMs:msPlayed,context:"test",...flags});
 describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
   before(async()=>{
+    await mkdir(".local",{recursive:true});await recordFixture("starting");
     for(const filename of ["src/rebuild/server/schema-proposal.sql","src/rebuild/data/schema.sql"]){
       await actualPool.query((await readFile(filename,"utf8")).replaceAll("sakura_v2",testSchema));
     }
@@ -54,20 +57,17 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
         SELECT 'deezer','fixture-'||$2||'-'||x.position,x.id,now() FROM unnest($1::uuid[]) WITH ORDINALITY x(id,position)`,[recordingIds,prefix]);
       await syncCatalog(client);
     });
+    await recordFixture("active");
   });
   after(async()=>{
-    await inTransaction(async client=>{
-      for(const table of ["UserDownload","AudioResolveJob","Share","ArchivedListeningRecording","ListeningImportSnapshot","LifetimeListeningSummary"])
-        await client.query(`DELETE FROM sakura_v2."${table}" WHERE account_id=ANY($1::uuid[])`,[[first,second]]);
-      await client.query(`DELETE FROM sakura_v2."AudioAsset" WHERE recording_id=ANY($1::uuid[])`,[recordingIds]);
-      await client.query(`DELETE FROM public."User" WHERE id=ANY($1::uuid[])`,[[first,second]]);
-      await client.query(`DELETE FROM sakura_v2."ExternalReference" WHERE recording_id=ANY($1::uuid[])`,[recordingIds]);
-      await client.query(`DELETE FROM sakura_v2."Recording" WHERE id=ANY($1::uuid[])`,[recordingIds]);
-      await client.query(`DELETE FROM sakura_v2."Album" WHERE external_id LIKE $1`,[`fixture-${prefix}-%`]);
-      await client.query(`DELETE FROM sakura_v2."Artist" WHERE external_id LIKE $1`,[`fixture-${prefix}-%`]);
-    });
-    await actualPool.query(`DROP SCHEMA "${testSchema}" CASCADE`);
-    await pool.end();
+    try{
+      // The schema is exclusive to this run. Drop its foreign keys first so
+      // cleanup also works when setup stopped before creating every table.
+      await actualPool.query(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
+      await actualPool.query(`DELETE FROM public."User" WHERE id=ANY($1::uuid[]) AND email=ANY($2::text[])`,[[first,second],[first,second].map(id=>`${id}@example.invalid`)]);
+      await recordFixture("cleaned");
+    }catch(error){await recordFixture("cleanup-failed");throw error;}
+    finally{await actualPool.end();}
   });
   it("validates cursor, settings and incremental audible contracts",()=>{
     assert.throws(()=>pageInput(new URL("http://localhost/api?cursor=invalid")),ProductError);

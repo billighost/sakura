@@ -3,13 +3,15 @@
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 const density = [0, 24, 38, 58, 84, 116];
 const waterDetail = [0, 12, 22, 38, 62, 94];
 const pollenCount = [0, 0, 0, 6, 16, 30];
 const sample = (n: number) => {
-  const value = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  const value = stableSin(n * 127.1 + 311.7) * 43758.5453;
   return value - Math.floor(value);
 };
 const foliage = ["#204840", "#316251", "#4c7d5e", "#699269", "#91aa7b", "#a8b988"];
@@ -88,8 +90,11 @@ function Foreground({ quality, side, id }: { quality: number; side: "left" | "ri
   </svg>;
 }
 
-function Landscape({ id, quality, dawn }: { id: string; quality: number; dawn: number }) {
+function Landscape({ id, quality, dawn, listening }: { id: string; quality: number; dawn: number; listening?: BloomListeningProfile }) {
   const paint = (name: string) => `url(#${id}-${name})`;
+  const currents = listening?.genres?.filter(genre => genre.share > 0).slice(0, quality + 1) ?? [];
+  const newLilies = Math.min(quality + 2, Math.max(0, listening?.discoveredArtistCount ?? 0));
+  const returningPads = Math.min(quality + 2, Math.max(0, listening?.returningArtistCount ?? 0));
   return <svg className={s.landscape} viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
     <defs>
       <linearGradient id={`${id}-sky`} x2="0" y2="1"><stop stopColor="#183e43" /><stop offset=".5" stopColor="#557a71" /><stop offset="1" stopColor="#abb58c" /></linearGradient>
@@ -111,6 +116,9 @@ function Landscape({ id, quality, dawn }: { id: string; quality: number; dawn: n
     <path d="M0 465C224 401 407 442 565 478S818 414 925 458S1302 393 1600 469V700H0Z" fill="#305e52" />
     <path d="M0 534C276 450 443 521 626 504S981 505 1125 483S1408 487 1600 527V1000H0Z" fill={paint("bank")} />
     <path d={riverOutline} fill={paint("river")} />
+    {currents.length > 0 && <g className={s.listeningCurrents} clipPath={paint("river-clip")} data-listening-motif="genre-currents" fill="none" strokeLinecap="round">
+      {currents.map((genre, n) => <path key={genre.name} d={`M${847 + n * 7} 454C${767 + n * 9} 506 ${1032 - n * 13} 512 ${1003 - n * 13} 560C${969 - n * 17} 620 ${569 + n * 15} 585 ${600 + n * 16} 653C${637 + n * 14} 738 ${1253 - n * 20} 683 ${1237 - n * 23} 787C${1227 - n * 26} 887 ${798 + n * 20} 949 ${800 + n * 23} 1005`} stroke={["#edcea1", "#a7d1b5", "#cfaca7", "#b4c3d5", "#dddba2", "#9dc4bb"][n]} strokeWidth={1.5 + genre.share * 12} opacity={.32 + genre.share * .35}/>) }
+    </g>}
     <path d="M850 453C816 491 999 512 1001 551M604 643C616 718 1233 684 1231 782M1248 791C1240 868 864 938 820 971" fill="none" stroke="#c5cfad" strokeOpacity=".43" strokeWidth="3" />
     <path d="M598 576C433 603 366 631 445 688M421 739C444 806 253 855 252 953" fill="none" stroke="#122f2a" strokeOpacity=".4" strokeWidth="11" />
     <g clipPath={paint("river-clip")}><g className={s.waterLines} fill="none" strokeLinecap="round">{Array.from({ length: waterDetail[quality] }, (_, i) => {
@@ -130,6 +138,17 @@ function Landscape({ id, quality, dawn }: { id: string; quality: number; dawn: n
       const x = 595 + sample(i + 502) * 500, y = 770 + sample(i + 511) * 225;
       return <g key={i} transform={`translate(${x} ${y})`}><path d="M-28 1C-25-10 12-12 28-2C41 9 3 15-19 8L-2 0Z" fill={i % 2 ? "#47785d" : "#709777"} /><path d="M-22 3Q-1-3 22 1" stroke="#a5bb8c" strokeWidth="1" fill="none" opacity=".6" />{quality >= 3 && i % 3 === 0 && <Flower x={0} y={0} scale={.4 + sample(i + 512) * .28} colour={i % 2 ? "#e5c38f" : "#cb9684"} />}</g>;
     })}</g>
+    {(newLilies > 0 || returningPads > 0) && <g className={s.listeningLilies} clipPath={paint("river-clip")} data-listening-motif="new-lilies-and-returning-pads">
+      {Array.from({ length: returningPads }, (_, n) => <g key={`return-${n}`} transform={`translate(${720 + n * 63} ${820 + n % 2 * 51})`}>
+        <ellipse rx="26" ry="9" fill="#739878"/>
+        <ellipse rx="39" ry="13" fill="none" stroke="#dfd3a7" strokeWidth="1.2" opacity=".58"/>
+        <ellipse rx="49" ry="17" fill="none" stroke="#dfd3a7" strokeWidth=".7" opacity=".32"/>
+      </g>)}
+      {Array.from({ length: newLilies }, (_, n) => <g key={`new-${n}`} transform={`translate(${667 + n * 68} ${902 + n % 2 * 36})`}>
+        <ellipse rx="27" ry="9" fill="#60816a"/>
+        <Flower x={0} y={-4} scale={.55} colour={n % 2 ? "#d9b681" : "#e2a291"}/>
+      </g>)}
+    </g>}
     {quality >= 5 && <g className={s.riverBird} transform="translate(1240 675)">
       <path d="M-4 29-7 78M7 30 9 77M-8 78-17 81M9 77 18 81" stroke="#adac84" strokeWidth="2" fill="none" />
       <path d="M-7 35Q-26 16-13 1Q-5-6 2-3Q12-16 5-31Q-6-45 6-54Q17-61 20-52Q28-42 15-32Q26-2 17 14Q33 17 22 27Q9 38-7 35Z" fill="#dfddbf" />
@@ -150,14 +169,15 @@ function Title({ cover }: { cover: boolean }) {
   </div>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
   const id = `jungle-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const isCover = view === "cover";
-  const dawn = scene === "finale" || view === "poster" ? 1 : scene === "opening" ? 0 : Math.min(.88, Math.max(stage / 18, progress * .78));
+  const hour = listening?.peakHour;
+  const dawn = hour == null ? scene === "finale" || view === "poster" ? 1 : scene === "opening" ? 0 : Math.min(.88, Math.max(stage / 18, progress * .78)) : .12 + Math.max(0, stableSin((hour - 6) / 12 * Math.PI)) * .78;
   const shot = ["time", "comparison", "days", "breadth"].includes(scene) ? "river" : ["song-winner", "artist", "artist-songs"].includes(scene) ? "clearing" : ["songs", "artists", "discoveries", "returns", "genres"].includes(scene) ? "pool" : scene === "finale" ? "lagoon" : "canopy";
   const vars = { "--dawn": dawn, "--travel": Math.max(0, Math.min(1, progress)), "--shade": theme === "dark" ? .27 - dawn * .13 : .16 - dawn * .12 } as CSSProperties;
   return <div className={s.world} data-world="jungle" data-scene={scene} data-shot={shot} data-view={view} data-quality={quality} data-reduced-motion={reducedMotion || view === "poster"} data-theme={theme} style={vars}>
-    <div className={s.paintedWorld}><Landscape id={id} quality={quality} dawn={dawn} /></div>
+    <div className={s.paintedWorld} data-listening-hour={hour ?? undefined}><Landscape id={id} quality={quality} dawn={dawn} listening={listening}/></div>
     <div className={s.shade} aria-hidden="true" />
     <Foreground quality={quality} side="left" id={id} />
     <Foreground quality={quality} side="right" id={id} />

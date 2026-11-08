@@ -20,7 +20,8 @@ export function tasteExpiry(duration:TasteDuration,now=new Date()):string|null {
   return duration==="forever"?null:new Date(now.getTime()+durationMs[duration]).toISOString();
 }
 export async function getTaste(accountId:string,pool:{query:PoolClient["query"]}=getRebuildPool()) {
-  const rows=(await pool.query(`SELECT f.target,f.target_id AS "targetId",f.kind,f.expires_at AS "expiresAt",f.updated_at AS "updatedAt",
+  const rows=(await pool.query(`SELECT f.target,f.target_id AS "targetId",f.kind,f.expires_at AS "expiresAt",
+    to_char(f.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "updatedAt",
     (f.expires_at IS NULL OR f.expires_at>now()) AS active,a.name
     FROM sakura_v2."TasteFeedback" f LEFT JOIN sakura_v2."Artist" a ON f.target='artist' AND a.id=f.target_id
     WHERE f.account_id=$1::uuid ORDER BY f.updated_at DESC,f.target_id`,[accountId])).rows;
@@ -30,8 +31,8 @@ export async function getTaste(accountId:string,pool:{query:PoolClient["query"]}
     description:"Your deliberate taste choices. Expired pauses no longer affect recommendations."};
 }
 export async function setTaste(accountId:string,value:unknown) {
-  const input=tasteInput(value),expiresAt=tasteExpiry(input.duration);
-  await inTransaction(async client=>{
+  const input=tasteInput(value);
+  return inTransaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     const exists=input.target==="recording"
       ?(await client.query(`SELECT r.id FROM sakura_v2."Recording" r WHERE r.id=$1::uuid AND ${VERIFIED}`,[input.targetId])).rowCount
@@ -39,25 +40,30 @@ export async function setTaste(accountId:string,value:unknown) {
         SELECT 1 FROM sakura_v2."RecordingArtist" ra JOIN sakura_v2."Recording" r ON r.id=ra.recording_id
         WHERE ra.artist_id=a.id AND ${VERIFIED})`,[input.targetId])).rowCount;
     if(!exists)throw new ProductError(404,"That song or artist is unavailable");
-    await client.query(`INSERT INTO sakura_v2."TasteFeedback"(account_id,target,target_id,kind,expires_at)
-      VALUES($1::uuid,$2,$3::uuid,$4,$5::timestamptz) ON CONFLICT(account_id,target,target_id)
-      DO UPDATE SET kind=EXCLUDED.kind,expires_at=EXCLUDED.expires_at,updated_at=now()`,
-      [accountId,input.target,input.targetId,input.kind,expiresAt]);
+    // A transaction can wait behind clearing before obtaining the account
+    // lock. Its start time is not the time this choice actually took effect.
+    const updatedAt=String((await client.query(`SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS stamp`)).rows[0].stamp);
+    const expiresAt=tasteExpiry(input.duration,new Date(updatedAt));
+    await client.query(`INSERT INTO sakura_v2."TasteFeedback"(account_id,target,target_id,kind,expires_at,updated_at)
+      VALUES($1::uuid,$2,$3::uuid,$4,$5::timestamptz,$6::timestamptz) ON CONFLICT(account_id,target,target_id)
+      DO UPDATE SET kind=EXCLUDED.kind,expires_at=EXCLUDED.expires_at,updated_at=EXCLUDED.updated_at`,
+      [accountId,input.target,input.targetId,input.kind,expiresAt,updatedAt]);
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    return {...input,expiresAt,updatedAt,saved:true};
   });
-  return {...input,expiresAt,saved:true};
 }
 export async function removeTaste(accountId:string,value:unknown) {
   const raw=object(value);
   if(Object.keys(raw).some(key=>!["target","targetId"].includes(key)))throw new ProductError(400,"Unsupported taste preference");
   if(raw.target!=="recording"&&raw.target!=="artist")throw new ProductError(400,"Invalid taste target");
   const targetId=uuid(raw.targetId,"taste target ID");
-  await inTransaction(async client=>{
+  return inTransaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+    const mutationAt=String((await client.query(`SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS stamp`)).rows[0].stamp);
     await client.query(`DELETE FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND target=$2 AND target_id=$3::uuid`,[accountId,raw.target,targetId]);
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    return {removed:true,target:raw.target,targetId,mutationAt};
   });
-  return {removed:true,target:raw.target,targetId};
 }

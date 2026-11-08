@@ -2,12 +2,20 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import type {BloomRecap} from "./uiTypes";
 import {chapterHold,resumeBloomIndex} from "./story";
+import {sameBloomStory,mergeBloomRefresh} from "./refresh";
 
 export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initial:BloomRecap;onReveal:(id:string)=>Promise<BloomRecap>;onComplete:()=>Promise<BloomRecap>;storageKey?:string}){
  const [recap,setRecap]=useState(initial),[index,setIndex]=useState(0),[begun,setBegun]=useState(false),[finished,setFinished]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[autoplay,setAutoplay]=useState(false),[paused,setPaused]=useState(false),[reading,setReading]=useState(false),[hidden,setHidden]=useState(false),[elapsed,setElapsed]=useState(0);
- const state=useRef({recap,index,begun,finished}),lock=useRef(false),alive=useRef(true),generation=useRef(0),clock=useRef({index:-1,elapsed:0}),callbacks=useRef({onReveal,onComplete});
+ const state=useRef({recap,index,begun,finished}),lock=useRef(false),alive=useRef(true),generation=useRef(0),clock=useRef({index:-1,elapsed:0}),callbacks=useRef({onReveal,onComplete}),loaded=useRef(initial);
  const failedAction=useRef<{target:number}|{complete:true}|null>(null);
  useEffect(()=>{callbacks.current={onReveal,onComplete};},[onReveal,onComplete]);
+ useEffect(()=>{
+  if(loaded.current===initial)return;
+  if(sameBloomStory(state.current.recap,initial)){loaded.current=initial;const merged=mergeBloomRefresh(state.current.recap,initial);state.current={...state.current,recap:merged};setRecap(merged);return;}
+  loaded.current=initial;generation.current++;lock.current=false;failedAction.current=null;
+  state.current={recap:initial,index:0,begun:false,finished:false};clock.current={index:-1,elapsed:0};
+  setRecap(initial);setIndex(0);setBegun(false);setFinished(false);setBusy(false);setError(null);setElapsed(0);setPaused(true);
+ },[initial]);
  useEffect(()=>{const epoch=generation.current;alive.current=true;return()=>{alive.current=false;generation.current=epoch+1;};},[]);
  useEffect(()=>{const change=()=>setHidden(document.hidden);change();document.addEventListener("visibilitychange",change);return()=>document.removeEventListener("visibilitychange",change);},[]);
  const enter=useCallback(async(target:number)=>{
@@ -15,11 +23,11 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
   lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
   try{const chapter=current.chapters[target];const result=chapter.revealed?current:await callbacks.current.onReveal(chapter.id);
    if(!alive.current||epoch!==generation.current)return;
-   if(result.id!==current.id||!result.chapters[target]?.revealed)throw new Error("This part of your Bloom has not opened yet. Please try again.");
+   if(!sameBloomStory(current,result)||result.chapters[target]?.id!==chapter.id||!result.chapters[target]?.revealed)throw new Error("This part of your Bloom has changed. Open the story again to continue.");
    state.current={recap:result,index:target,begun:true,finished:false};failedAction.current=null;
    clock.current={index:target,elapsed:0};setRecap(result);setIndex(target);setBegun(true);setFinished(false);setElapsed(0);
    if(storageKey)try{localStorage.setItem(storageKey,JSON.stringify({index:target,version:result.version||1}));}catch{}
-  }catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={target};setError(problem);setPaused(true);}}finally{lock.current=false;if(alive.current&&epoch===generation.current)setBusy(false);}
+  }catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={target};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
  },[storageKey]);
  const begin=useCallback(()=>{let saved=0;if(storageKey)try{saved=Number(JSON.parse(localStorage.getItem(storageKey)||"{}").index)||0;}catch{}return enter(resumeBloomIndex(state.current.recap,saved));},[enter,storageKey]);
  const next=useCallback(async()=>{
@@ -27,7 +35,7 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
   if(!current.begun){await begin();return;}
   if(current.index<current.recap.chapters.length-1){await enter(current.index+1);return;}
   lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
-  try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{lock.current=false;if(alive.current&&epoch===generation.current)setBusy(false);}
+  try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){if(!sameBloomStory(current.recap,result)||!result.completed||result.chapters.some(chapter=>!chapter.revealed))throw new Error("This Bloom could not be finished. Open the story again to continue.");state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
  },[begin,enter]);
  const previous=useCallback(()=>{setPaused(true);if(state.current.finished){state.current={...state.current,finished:false};setFinished(false);setElapsed(0);return;}if(state.current.index>0)void enter(state.current.index-1);},[enter]);
  const jump=useCallback((target:number)=>{if(state.current.recap.chapters[target]?.revealed){setPaused(true);void enter(target);}},[enter]);

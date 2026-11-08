@@ -126,3 +126,10 @@
   .world[data-view="poster"] .content {padding:219px 15% 190px;}
 }
 @media(prefers-reduced-motion:reduce){.world *,.world *::before,.world *::after {animation:none!important;transition:none!important;}}
+
+/* The window extends with the story while cinema controls stay fixed. */
+.world[data-view="story"] {
+  height:auto;
+  padding-block:env(safe-area-inset-top) env(safe-area-inset-bottom);
+}
+.solderJoints{pointer-events:none}

@@ -1,7 +1,7 @@
 import {createHash,randomBytes} from "node:crypto";
 import type {PoolClient} from "pg";
 import {getRebuildPool,inTransaction} from "../data/db";
-import {CARD_SELECT,VERIFIED,card,cardsForIds,type RecordingCard} from "../data/catalog";
+import {RANKING_CARD_SELECT,VERIFIED,card,cardsForIds,type RecordingCard} from "../data/catalog";
 import {getSettings} from "../data/settings";
 import {ProductError,ids,integer,object} from "../data/validation";
 import {FEED_DEFAULTS} from "../app/feedPreferences";
@@ -13,9 +13,9 @@ type FeedCard=RecordingCard&{releaseDate:string|null};
 interface FeedEntry {recordingId:string;reason:string;lane:RankedTrack<FeedCard>["lane"]}
 interface FeedSection {id:string;title:string;description:string;tracks:FeedCard[]}
 type Queryable=Pick<PoolClient,"query">;
-const CANDIDATE_SELECT=CARD_SELECT.replace("SELECT r.id,r.metadata,r.provenance,",`SELECT r.id,r.metadata,r.provenance,
-  (SELECT a.release_date FROM sakura_v2."RecordingAlbum" ra JOIN sakura_v2."Album" a ON a.id=ra.album_id
-    WHERE ra.recording_id=r.id ORDER BY ra.position,ra.album_id LIMIT 1) AS "releaseDate",`);
+const CANDIDATE_SELECT=RANKING_CARD_SELECT.replace("SELECT r.id,r.metadata,r.provenance,",()=>`SELECT r.id,r.metadata,r.provenance,
+  (SELECT MIN(a.release_date) FROM sakura_v2."RecordingAlbum" ra JOIN sakura_v2."Album" a ON a.id=ra.album_id
+    WHERE ra.recording_id=r.id AND a.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$') AS "releaseDate",`);
 const feedCard=(row:Parameters<typeof card>[0]):FeedCard=>({...card(row),releaseDate:typeof row.releaseDate==="string"?row.releaseDate:null});
 const settingsKeys=[...Object.keys(FEED_DEFAULTS),"seedArtists","seedGenres","seedArtistSelections","explicitContent","timeZone"];
 export function feedSettingsSignature(settings:TasteSettings):string{
@@ -30,21 +30,23 @@ async function tasteContext(accountId:string,pool:Queryable=getRebuildPool()){
       SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND
         (EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id) OR
          ($2::boolean AND EXISTS(SELECT 1 FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id AND s.audible_ms>0)))
-      ORDER BY EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id) DESC,r.created_at DESC,r.id LIMIT 1000
+      ORDER BY EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id) DESC,
+        CASE WHEN $2::boolean THEN COALESCE((SELECT s.audible_ms FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id),0) ELSE 0 END DESC,
+        r.created_at DESC,r.id LIMIT 1000
     ), unexplored AS (
       SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED}
         AND NOT EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id)
         AND (NOT $2::boolean OR NOT EXISTS(SELECT 1 FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id AND s.audible_ms>0))
       ORDER BY r.created_at DESC,r.id LIMIT 1500
-    ) ${CANDIDATE_SELECT} WHERE ${VERIFIED} AND r.id IN (SELECT id FROM known UNION SELECT id FROM unexplored) ORDER BY r.id`,[accountId,settings.learnFromListening!==false]),
+    ) ${CANDIDATE_SELECT} WHERE ${VERIFIED} AND r.id IN (SELECT id FROM known UNION SELECT id FROM unexplored UNION SELECT unnest($3::uuid[])) ORDER BY r.id`,[accountId,settings.learnFromListening!==false,[...new Set((settings.initialTasteProfile?.artists||[]).flatMap((artist:{recordings:{id:string}[]})=>artist.recordings.map(recording=>recording.id)))]]),
     ()=>settings.learnFromListening===false?Promise.resolve({rows:[]}):pool.query(`SELECT recording_id,audible_ms,play_count,completed_count,skipped_count,last_played_at
       FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid ORDER BY audible_ms DESC,recording_id LIMIT 5000`,[accountId]),
     ()=>pool.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid`,[accountId]),
     ()=>pool.query(`SELECT target,target_id,kind,expires_at FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND (expires_at IS NULL OR expires_at>now())`,[accountId]),
     ()=>settings.timeAware===false||settings.learnFromListening===false?Promise.resolve({rows:[]}):pool.query(`SELECT l.recording_id,
-      EXTRACT(HOUR FROM COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $2)::integer AS local_hour,SUM(c.audible_ms)::text audible_ms
+      EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $2)::integer AS local_hour,SUM(c.audible_ms)::text audible_ms
       FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l ON l.account_id=c.account_id AND l.event_id=c.event_id
-      WHERE c.account_id=$1::uuid AND c.audible_ms>0 AND COALESCE(c.occurred_at,c.created_at)>=now()-interval '90 days'
+      WHERE c.account_id=$1::uuid AND c.audible_ms>0 AND c.occurred_at>=now()-interval '90 days'
       GROUP BY l.recording_id,local_hour`,[accountId,settings.timeZone]),
   ];
   // pg transaction clients execute one query at a time; concurrent query calls are deprecated.
@@ -61,10 +63,10 @@ async function tasteContext(accountId:string,pool:Queryable=getRebuildPool()){
 function sectionsFor(ranked:RankedTrack<FeedCard>[],context:Awaited<ReturnType<typeof tasteContext>>,now:number):FeedSection[]{
   const sections:FeedSection[]=[];
   const add=(id:string,title:string,description:string,tracks:FeedCard[])=>{if(tracks.length)sections.push({id,title,description,tracks:tracks.slice(0,6)});};
-  add("fresh-voices","New from familiar artists","Recent releases from artists you listen to, where release dates are available.",ranked.filter(item=>item.familiarArtist&&recentRelease(item.track.releaseDate,now)).map(item=>item.track));
-  add("another-side","More from familiar artists","Unheard songs from artists you already listen to.",ranked.filter(item=>item.familiarArtist&&!item.heard&&!context.likedIds.includes(item.track.id)).map(item=>item.track));
+  add("fresh-voices","From recent albums","Recent albums by artists you have chosen or heard here, where dates are available.",ranked.filter(item=>item.familiarArtist&&recentRelease(item.track.releaseDate,now)).map(item=>item.track));
+  add("another-side","More from familiar artists","Songs you have not heard here, from artists in your listening or selected preferences.",ranked.filter(item=>item.familiarArtist&&!item.heard&&!context.likedIds.includes(item.track.id)).map(item=>item.track));
   const history=new Map(context.history.map(item=>[item.recordingId,item]));
-  add("return-to","Favorites to revisit","Liked songs you have not played in the last two weeks.",ranked.filter(item=>context.likedIds.includes(item.track.id)&&
+  add("return-to","Favorites to revisit",context.settings.learnFromListening===false?"A mix from your liked songs.":"Liked songs with no saved listening in the last two weeks.",ranked.filter(item=>context.likedIds.includes(item.track.id)&&
     (!history.has(item.track.id)||Date.parse(String(history.get(item.track.id)?.lastPlayedAt))<now-14*86400000)).map(item=>item.track));
   add("familiar-world","Songs you know","Songs you have liked or played here.",ranked.filter(item=>item.heard||context.likedIds.includes(item.track.id)).map(item=>item.track));
   add("new-paths","Artists to discover","Songs from artists you have not listened to here.",ranked.filter(item=>!item.familiarArtist&&!item.heard).map(item=>item.track));
@@ -106,6 +108,8 @@ async function personalizedFeedPage(accountId:string,url:URL,pool:Queryable){
     const ranked=rankPersonalizedTracks(context.cards,{...context,settings:context.settings,surface,mode,nowMs:now,seed:`${accountId}:${now}`});
     const ordered=orderPersonalizedTracks(ranked,context.settings);
     sections=sectionsFor(ordered,context,now);
+    const visibleCards=new Map((await cardsForIds(accountId,[...new Set(sections.flatMap(section=>section.tracks.map(track=>track.id)))],pool)).map(track=>[track.id,track]));
+    sections=sections.map(section=>({...section,tracks:section.tracks.flatMap(track=>{const full=visibleCards.get(track.id);return full?[{...full,releaseDate:track.releaseDate}]:[];})})).filter(section=>section.tracks.length);
     const entries=ordered.map(item=>({recordingId:item.track.id,reason:item.reason,lane:item.lane})),secret=randomBytes(32).toString("hex");
     const eligibleIds=new Set(ranked.map(item=>item.track.id));
     personalized=context.history.some(item=>item.audibleMs>0&&eligibleIds.has(item.recordingId))||context.likedIds.some(id=>eligibleIds.has(id))||
@@ -167,6 +171,6 @@ async function smartQueueFor(accountId:string,value:unknown,pool:Queryable){
   const selected=new Set(candidates.map(track=>track.id));
   const retainedHistory=context.history.filter(item=>!tasteExcluded(context.cards.find(track=>track.id===item.recordingId)||{id:item.recordingId,artists:[]},context.feedback,now));
   const history=[...retainedHistory.filter(item=>selected.has(item.recordingId)),...retainedHistory.filter(item=>!selected.has(item.recordingId))].slice(0,500);
-  return {tracks,scope,generatedAt:new Date(now).toISOString(),reason:scope==="downloads"?"A mix from songs downloaded on this device":scope==="liked"?"A mix from your liked songs":scope==="collection"?"A mix from this collection":"A soundtrack based on your listening preferences",
+  return {tracks:await cardsForIds(accountId,tracks.map(track=>track.id),pool),scope,generatedAt:new Date(now).toISOString(),reason:scope==="downloads"?"A mix from songs downloaded on this device":scope==="liked"?"A mix from your liked songs":scope==="collection"?"A mix from this collection":"A soundtrack based on your listening preferences",
     taste:{history,feedback:context.feedback},constraint:scope==="downloads"?"The device must verify saved audio before playback":undefined};
 }

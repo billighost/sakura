@@ -1,5 +1,9 @@
 # Personalized feed verification
 
+This document records the first implementation pass. The integrated refinement,
+connected onboarding/Search, and ten-world Bloom evidence are recorded in
+[`SECOND-PASS-VERIFICATION.md`](./SECOND-PASS-VERIFICATION.md).
+
 Verified on 8 November 2026 after the final copy revision, fragment navigation fix, and compact data confirmation. The comprehensive browser suite passes **29 checks with no uncaught browser errors**. Production build, TypeScript, scoped ESLint, and the server/data tests also pass.
 
 ## Browser acceptance

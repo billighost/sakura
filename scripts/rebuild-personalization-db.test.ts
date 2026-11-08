@@ -12,6 +12,7 @@ import {clearPersonalizationData} from "../src/rebuild/data/personalization";
 import {getPersonalizedFeed,generateSmartQueue} from "../src/rebuild/recommendations/feed";
 import {ensureMixes,getMix,offlineMixes} from "../src/rebuild/recommendations/service";
 import {ProductError} from "../src/rebuild/data/validation";
+import {getHome} from "../src/rebuild/data/product";
 
 const first=randomUUID(),second=randomUUID(),prefix=randomUUID().replaceAll("-","");
 const recordings:string[]=Array.from({length:40},()=>randomUUID());
@@ -65,6 +66,16 @@ describe("Personalization service with isolated PostgreSQL fixtures",()=>{
     await pool.query(`UPDATE sakura_v2."FeedSession" SET expires_at=now()-interval '1 minute' WHERE account_id=$1::uuid AND id=$2::uuid`,[first,renewed.sessionId]);
     await assert.rejects(getPersonalizedFeed(first,feed(renewed.nextCursor)),status(410));
   });
+  it("liking or unliking changes the feed selection and its explanations",async()=>{
+    const page=await getPersonalizedFeed(first,feed());
+    await setFavorite(first,{recordingId:recordings[0],liked:true});
+    await assert.rejects(getPersonalizedFeed(first,feed(page.nextCursor)),status(410));
+    const liked=await getPersonalizedFeed(first,feed(null,"home","balanced",40));
+    assert.match(liked.items.find(item=>item.track.id===recordings[0])!.reason,/liked/);
+    await setFavorite(first,{recordingId:recordings[0],liked:false});
+    const unliked=await getPersonalizedFeed(first,feed(null,"home","balanced",40));
+    assert.doesNotMatch(unliked.items.find(item=>item.track.id===recordings[0])!.reason,/liked/);
+  });
   it("rechecks suppression after a cursor snapshot has been created",async()=>{
     const page=await getPersonalizedFeed(first,feed()),pending=await getPersonalizedFeed(first,feed(page.nextCursor)),blocked=pending.items[0].track.id;
     await pool.query(`INSERT INTO sakura_v2."TasteFeedback"(account_id,target,target_id,kind) VALUES($1::uuid,'recording',$2::uuid,'block') ON CONFLICT(account_id,target,target_id) DO UPDATE SET kind='block',expires_at=NULL`,[first,blocked]);
@@ -77,6 +88,16 @@ describe("Personalization service with isolated PostgreSQL fixtures",()=>{
     await pool.query(`UPDATE sakura_v2."Album" SET release_date='2099-01-01' WHERE external_id=$1`,[`fixture-${prefix}-album-10`]);
     const page=await getPersonalizedFeed(first,feed()),shelf=page.sections.find(section=>section.id==="fresh-voices");
     assert.ok(shelf);assert.ok(shelf.tracks.some(track=>track.id===recordings[0]));assert.ok(!shelf.tracks.some(track=>track.id===recordings[10]));
+  });
+  it("an old recording on a recent compilation is not labeled a new release",async()=>{
+    const original=randomUUID();
+    await pool.query(`INSERT INTO sakura_v2."Album"(id,provider,external_id,title,release_date) VALUES($1::uuid,'deezer',$2,'Original edition','2001-04-12')`,[original,`fixture-${prefix}-original`]);
+    await pool.query(`INSERT INTO sakura_v2."RecordingAlbum"(recording_id,album_id,position) VALUES($1::uuid,$2::uuid,99)`,[recordings[0],original]);
+    try{
+      const page=await getPersonalizedFeed(first,feed(null,"home","balanced",40));
+      assert.ok(!page.sections.find(section=>section.id==="fresh-voices")?.tracks.some(track=>track.id===recordings[0]));
+      assert.doesNotMatch(page.items.find(item=>item.track.id===recordings[0])!.reason,/recent album/);
+    }finally{await pool.query(`DELETE FROM sakura_v2."Album" WHERE id=$1::uuid`,[original]);}
   });
   it("smart queues stay inside chosen downloads, collections and liked songs",async()=>{
     const selected=recordings.slice(0,5),queue=await generateSmartQueue(first,{scope:"downloads",recordingIds:selected,limit:80});
@@ -145,6 +166,7 @@ describe("Personalization service with isolated PostgreSQL fixtures",()=>{
     await patchSettings(second,{privateSession:false,learnFromListening:true,seedArtists:[],seedGenres:[]});
     await recordHistory(second,{eventId:randomUUID(),recordingId:recordings[3],sequence:0,msPlayed:60000,positionMs:60000,occurredAt:new Date().toISOString()});
     assert.equal((await getPersonalizedFeed(second,feed())).personalized,true);
+    const oldMix=(await ensureMixes(second,true))[0];assert.ok(oldMix);
     const blocker=await actual.connect();let committed=false;
     try{
       await blocker.query("BEGIN");
@@ -162,10 +184,14 @@ describe("Personalization service with isolated PostgreSQL fixtures",()=>{
       }
       assert.ok(clearWaiting,"The erasure request must be waiting on its account lock before the feed starts");
       const arriving=getPersonalizedFeed(second,feed());
+      const opening=getMix(second,oldMix.id).then(()=>false,error=>error instanceof ProductError&&error.status===404);
+      const homeOpening=getHome(second);
       await blocker.query("COMMIT");committed=true;
       await clearing;const page=await arriving;
       assert.equal(page.personalized,false);
       assert.ok(page.items.every(item=>item.reason==="A starting point for your recommendations"));
+      assert.equal(await opening,true,"An erased mix cannot reopen its old projection");
+      assert.deepEqual((await homeOpening).recent,[],"Home cannot return the erased recent history");
       assert.equal((await pool.query(`SELECT COUNT(*)::integer n FROM sakura_v2."ListeningEventLedger" WHERE account_id=$1::uuid`,[second])).rows[0].n,0);
     }finally{if(!committed)await blocker.query("ROLLBACK");blocker.release();}
   });

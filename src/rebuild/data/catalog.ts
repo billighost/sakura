@@ -63,7 +63,7 @@ export function card(row: QueryResultRow): RecordingCard {
     durationMs:typeof metadata.durationMs==="number"?metadata.durationMs:null,metadata,
     coverUrl:safeImage(metadata.coverUrl||catalog.coverUrl),artistImageUrl:safeImage(row.artistImageUrl||metadata.artistImageUrl||catalog.artistImageUrl),
     artistId:row.artistId||null,albumId:row.albumId||null,albumTitle:typeof (metadata.albumTitle||catalog.albumTitle)==="string"?String(metadata.albumTitle||catalog.albumTitle):null,
-    reference,references:refs,genres:Array.isArray(metadata.genres)?metadata.genres.map(String):[],
+    reference,references:refs,genres:Array.isArray(metadata.genres)?metadata.genres.filter((genre):genre is string=>typeof genre==="string"&&Boolean(genre.trim())).map(genre=>genre.trim()):[],
     popularity:Math.max(0,Math.min(1,popularity)),artistCredits,playability:row.ready?"ready":"resolvable",...(playback?{readyPlayback:playback}:{}),...(typeof row.liked==="boolean"?{liked:row.liked}:{}),...(addedAt?{addedAt}:{})};
 }
 export const CARD_SELECT = `SELECT r.id,r.metadata,r.provenance,
@@ -89,6 +89,22 @@ export const CARD_SELECT = `SELECT r.id,r.metadata,r.provenance,
     AND (a.owner_account_id IS NULL OR a.owner_account_id=$1::uuid)) AS ready
   FROM sakura_v2."Recording" r`;
 export const VERIFIED = `r.state='verified' AND EXISTS(SELECT 1 FROM sakura_v2."ExternalReference" e WHERE e.recording_id=r.id AND e.verified_at IS NOT NULL)`;
+
+/** Ranking needs catalog identity, never audio delivery proofs or portraits. */
+export const RANKING_CARD_SELECT = `SELECT r.id,r.metadata,r.provenance,
+  COALESCE((SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object('provider',e.provider,'id',e.external_id,'scope',NULLIF(e.scope,''))) ORDER BY e.provider,e.external_id)
+    FROM sakura_v2."ExternalReference" e WHERE e.recording_id=r.id AND e.verified_at IS NOT NULL),'[]'::jsonb) AS "references",
+  (SELECT ra.artist_id FROM sakura_v2."RecordingArtist" ra WHERE ra.recording_id=r.id ORDER BY ra.position,ra.artist_id LIMIT 1) AS "artistId",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('artistId',a.id,'name',a.name,'role',CASE WHEN ra.position=0 THEN 'primary' ELSE 'featured' END,
+    'reference',jsonb_build_object('provider',a.provider,'id',a.external_id)) ORDER BY ra.position,a.id)
+    FROM sakura_v2."RecordingArtist" ra JOIN sakura_v2."Artist" a ON a.id=ra.artist_id WHERE ra.recording_id=r.id),'[]'::jsonb) AS "artistCredits",
+  false AS ready FROM sakura_v2."Recording" r CROSS JOIN (SELECT $1::uuid AS account_id) ranking_owner`;
+
+export async function cardsForRanking(accountId:string,recordingIds:readonly string[],sql:Queryable=getRebuildPool()):Promise<RecordingCard[]>{
+  if(!recordingIds.length)return [];
+  const rows=await sql.query(`${RANKING_CARD_SELECT} WHERE ${VERIFIED} AND r.id=ANY($2::uuid[])`,[accountId,recordingIds]);
+  const found=new Map(rows.rows.map(row=>[row.id,card(row)]));return recordingIds.flatMap(id=>found.has(id)?[found.get(id)!]:[]);
+}
 
 export async function cardsForIds(accountId:string,recordingIds:readonly string[],sql:Queryable=getRebuildPool()):Promise<RecordingCard[]> {
   if (!recordingIds.length) return [];

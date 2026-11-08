@@ -198,3 +198,54 @@
 :global([data-reduced-motion]) .growingStem{stroke-dashoffset:0}
 :global([data-reduced-motion]) .drawnBloom{opacity:.72}
 @media(forced-colors:active){.record{background:Canvas;border-color:CanvasText}.song,.shelfArtwork,.explanation,.modeChoices>button,.privateNote{border-color:CanvasText}.songPlay,.shelfPlay,.sleevePlay{border:1px solid ButtonText}.playingPetals>i{background:Highlight}.growingStem{stroke:CanvasText}.drawnBloom,.leaves{fill:Canvas;stroke:CanvasText}.songNumber{background:Canvas;color:CanvasText;text-shadow:none}}
+
+/* Quiet song pages: typography leads, secondary controls have room to touch. */
+.songTitle,.pickCaption>div:first-child>a,.shelfTitle{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.songTools>button,.shelfPlay,.songPlay,.sleevePlay{min-width:44px;min-height:44px}
+.songTools>button{flex-shrink:0}
+.songDetails{max-width:calc(100% - 92px)}
+.welcome>a,.feedControls>a,.tasteNote>button,.heroActions>a,.refresh,.modeChoices>button{min-height:44px}
+.shelfTitle{min-height:44px}.shelf{scroll-padding-inline:2px}
+.songNumber{background:color-mix(in srgb,var(--ink-text) 70%,transparent);border-radius:7px 2px 7px 2px;padding:4px 7px;line-height:1}
+.pickReason{overflow-wrap:anywhere}
+@media(max-height:740px) and (min-width:951px){.hero{min-height:325px;padding-block:15px 23px}.heroMusic{min-height:285px}.heroPick{max-width:245px}.heroCopy h1{font-size:50px;margin-block:14px!important}.heroActions{margin-top:18px}.tasteNote{margin-top:12px}.littlePaths{margin-block:15px 22px}}
+@media(max-width:650px){.songDetails{max-width:100%}.songTools>button{width:44px;height:44px}.shelfBottom .songTools>button,.pickCaption .songTools>button{width:44px;height:44px}.welcome>a,.heroActions>a,.feedControls>a{font-size:10px}.tasteNote>button{font-size:10px}.sectionHeading>button{min-height:44px}.shelfBottom>span{font-size:10px}.shelfArtist{font-size:10px}.songArtist{font-size:10px}.modeChoices>button{min-height:44px}}
+@media(max-width:520px){
+  .songGrid{grid-template-columns:minmax(0,1fr);gap:13px}
+  .song{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:start;border-radius:16px 4px 16px 4px;background:var(--ink-card);padding:10px;gap:13px}
+  .songArtwork{aspect-ratio:1;margin:0;border-radius:10px 2px 10px 2px}
+  .songBody{padding:0;min-width:0}
+  .songTitle{font-size:23px;line-height:1.2}
+  .songArtist{font-size:11px;margin-top:5px}
+  .songReason{font-size:12px;min-height:0;margin-top:9px!important;margin-bottom:7px!important;overflow-wrap:anywhere}
+  .songBottom{position:static;padding:0;min-height:44px;flex-direction:row;align-items:center;gap:4px}
+  .songBottom>.songTools{position:static;align-self:auto;flex-shrink:0}
+  .songDetails{font-size:9px;padding:0;max-width:calc(100% - 92px)}
+  .songDetails>span+span::before{margin-right:4px}
+  .songPlay{width:44px;height:44px;right:7px;bottom:7px}
+  .songNumber{font-size:10px;top:6px;left:6px}
+  .lane{font-size:9px;min-height:0;margin-bottom:7px}
+  .featuredSong{grid-template-columns:minmax(0,1fr);padding:8px;gap:0;border-radius:4px 24px 4px 24px;grid-column:auto;background:linear-gradient(135deg,color-mix(in srgb,var(--ink-petal) 10%,var(--ink-card)),var(--ink-card) 70%)}
+  .featuredSong .songArtwork{aspect-ratio:1.65;min-height:0;margin:0;border-radius:2px 17px 2px 17px}
+  .featuredSong .songBody{padding:19px 12px 6px}
+  .featuredSong .songTitle{font-size:29px}
+  .featuredSong .lane{font-size:10px;margin-bottom:9px}
+  .featuredSong .songArtist{font-size:11px}
+  .featuredSong .songReason{font-size:14px;line-height:1.6;margin-top:12px!important}
+  .featuredSong .songBottom{padding:0}
+  .featuredSong .songDetails{font-size:10px}
+  .feedHeading p,.sectionHeading p{font-size:11px}
+  .refresh{width:44px;min-width:44px;justify-content:center}
+  .refresh>svg{margin-left:0}
+  .pickCaption{gap:6px;flex-wrap:wrap}
+  .pickCaption>div:first-child{flex-basis:100%}
+  .pickCaption .songTools{margin-left:auto}
+  .pickReason{font-size:12px;margin-top:6px}
+  .heroMusic{min-height:325px}
+  .shelfSong{min-width:160px}
+  .shelfBottom{align-items:center}
+  .littlePaths small{font-size:10px}
+  .modeChoices>button{font-size:10px!important;padding-inline:7px}
+  .chapter{contain-intrinsic-size:auto 3600px}
+}
+@media(max-width:380px){.song{grid-template-columns:76px minmax(0,1fr);gap:10px;padding:9px}.songTitle{font-size:21px}.songBottom{flex-wrap:wrap;justify-content:flex-end}.songDetails{max-width:100%;flex:1 1 100%}.songArtist{font-size:10px}.featuredSong{grid-template-columns:minmax(0,1fr);gap:0;padding:8px}.featuredSong .songTitle{font-size:27px}.featuredSong .songBottom{flex-wrap:nowrap}.featuredSong .songDetails{flex:initial;max-width:calc(100% - 92px)}.heroMusic{padding-right:30px}.modeChoices>button{font-size:9px!important}}

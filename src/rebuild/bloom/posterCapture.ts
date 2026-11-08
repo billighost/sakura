@@ -24,6 +24,15 @@ export async function exportCinematicBloom(recap:BloomRecap,design:BloomDesign,t
   await Promise.all([...host.querySelectorAll("img")].map(image=>Promise.race([image.decode().catch(()=>{}),new Promise(resolve=>setTimeout(resolve,8000))])));
   await frame();
   const original=host.firstElementChild!;
+  // A poster has a fixed page, unlike the scrolling story. Preserve full titles
+  // and the closing line when a world's composition or long credits need room.
+  const content=original.querySelector<HTMLElement>(".bloom-content");
+  if(content){
+   const page=original.getBoundingClientRect(),box=content.getBoundingClientRect();
+   const availableHeight=Math.max(1,height-24-(box.top-page.top));
+   const scale=Math.min(1,availableHeight/Math.max(1,box.height));
+   if(scale<1){content.style.transformOrigin="top center";content.style.transform=`scale(${scale})`;await frame();}
+  }
   const cloned=original.cloneNode(true) as HTMLElement;
   const originals=[original,...original.querySelectorAll("*")],copies=[cloned,...cloned.querySelectorAll("*")];
   const pseudoStyles:string[]=[];

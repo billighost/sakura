@@ -133,6 +133,10 @@
 .world[data-view="cover"] .secondChart {display:none;}
 .guideStar {position:absolute;right:17%;bottom:11.5%;width:52px;pointer-events:none;z-index:3;}
 .guideStar svg {width:100%;height:auto;overflow:visible;}
+.guideStar.listeningOrbit{width:92px;right:8%;bottom:11%}
+.world[data-view="cover"] .guideStar.listeningOrbit{width:58px;right:5%;top:7%;bottom:auto}
+.world[data-view="poster"] .guideStar.listeningOrbit{width:74px;right:7%;bottom:23px}
+@media(max-width:540px){.guideStar.listeningOrbit,.world[data-shot="instrument"] .guideStar.listeningOrbit,.world[data-shot="aperture"] .guideStar.listeningOrbit,.world[data-shot="panorama"] .guideStar.listeningOrbit{right:8%;bottom:34px;width:62px}.world[data-opening="true"] .guideStar.listeningOrbit{top:8%;bottom:auto;right:8%}.world[data-view="cover"] .guideStar.listeningOrbit{width:48px;top:6%;right:5%}}
 .world[data-shot="instrument"] .guideStar {right:41%;bottom:20%;}
 .world[data-shot="aperture"] .guideStar {right:28%;bottom:12%;}
 .world[data-shot="panorama"] .guideStar {right:20%;bottom:14%;width:66px;}
@@ -263,3 +267,9 @@
 .world[data-view="poster"] .telescopeObject {left:-14px;bottom:16px;width:100px;}
 .world[data-view="poster"] .orreryObject {right:-8px;bottom:13px;width:118px;}
 .world[data-view="poster"] .guideStar {right:18%;bottom:56px;width:36px;}
+
+/* Long constellations retain the paper staging and device-safe margins. */
+.world[data-view="story"] {
+  height:auto;
+  padding-block:env(safe-area-inset-top) env(safe-area-inset-bottom);
+}

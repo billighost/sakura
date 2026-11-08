@@ -17,7 +17,8 @@ export function historyChunk(value:unknown) {
   let occurredAt:string|undefined;
   if(raw.occurredAt!==undefined){
     const stamp=text(raw.occurredAt,"listening timestamp",40),time=Date.parse(stamp);
-    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(stamp)||!Number.isFinite(time)||time>Date.now()+300000||time<Date.UTC(2000,0,1))throw new ProductError(400,"Invalid listening timestamp");
+    const calendar=Date.parse(stamp.slice(0,10)+"T00:00:00Z");
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(stamp)||!Number.isFinite(time)||!Number.isFinite(calendar)||new Date(calendar).toISOString().slice(0,10)!==stamp.slice(0,10)||time>Date.now()+300000||time<Date.UTC(2000,0,1))throw new ProductError(400,"Invalid listening timestamp");
     occurredAt=new Date(time).toISOString();
   }
   // Omitting the new optional field keeps legacy retry hashes byte-identical.
@@ -35,6 +36,9 @@ export async function recordHistory(accountId:string,value:unknown) {
     const prefs=(await client.query(`SELECT preferences FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid`,[accountId])).rows[0];
     if(prefs?.preferences?.privateSession)return {accepted:false,privateSession:true};
     if(prefs?.preferences?.learnFromListening===false)return {accepted:false,learningPaused:true};
+    const privateInterval=(await client.query(`SELECT EXISTS(SELECT 1 FROM sakura_v2."ListeningPrivacyWindow" WHERE account_id=$1::uuid AND
+      ($2::timestamptz IS NULL OR ($2::timestamptz>=started_at AND (ended_at IS NULL OR $2::timestamptz<ended_at)))) AS paused`,[accountId,chunk.occurredAt||null])).rows[0];
+    if(privateInterval?.paused)return {accepted:false,learningPaused:true};
     const erased=(await client.query(`SELECT
       EXISTS(SELECT 1 FROM sakura_v2."ClearedListeningEvent" WHERE account_id=$1::uuid AND event_id=$2::uuid) OR
       EXISTS(SELECT 1 FROM sakura_v2."HistoryDeletion" WHERE account_id=$1::uuid AND

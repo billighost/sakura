@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { BloomListeningProfile } from "../uiTypes";
 
 export type BloomQuality = 1 | 2 | 3 | 4 | 5;
 export type BloomWorldId = "sakura" | "jungle" | "disco" | "japan" | "china" | "korea" | "india" | "ocean" | "cosmos" | "glass";
@@ -13,6 +14,7 @@ export interface BloomWorldProps {
   reducedMotion: boolean;
   view: "cover" | "story" | "poster";
   theme: "light" | "dark";
+  listening?: BloomListeningProfile;
   children?: ReactNode;
 }
 

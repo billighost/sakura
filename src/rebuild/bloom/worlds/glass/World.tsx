@@ -2,6 +2,8 @@
 
 import { useId, type CSSProperties } from "react";
 import type { BloomQuality, BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin, stableCos } from "../stableTrig";
 import s from "./world.module.css";
 
 const LEAD = "#283d3b";
@@ -13,7 +15,18 @@ const detail = [
   { leaves: 16, flowers: 6, veins: true, facets: true, bubbles: 22, ribs: 9, lights: 4 },
   { leaves: 22, flowers: 9, veins: true, facets: true, bubbles: 45, ribs: 13, lights: 7 },
 ] as const;
-const random = (n: number) => { const f = Math.sin(n * 73.13 + 31.9) * 43758.5453; return f - Math.floor(f); };
+const random = (n: number) => { const f = stableSin(n * 73.13 + 31.9) * 43758.5453; return f - Math.floor(f); };
+
+function paneColour(index: number, amount: number, variant: number, listening?: BloomListeningProfile) {
+  if (!listening?.genres) return GLASS[(index + variant) % 4];
+  const position = (index + .5) / Math.max(1,amount);
+  let share = 0;
+  for (const genre of listening.genres) {
+    share += Math.max(0,Math.min(1,genre.share));
+    if (position < share) return GLASS[Array.from(genre.name).reduce((sum,letter)=>sum + letter.charCodeAt(0),0) % GLASS.length];
+  }
+  return "#c1bfab";
+}
 
 function Leaf({ x, y, angle, scale = 1, colour, quality }: { x: number; y: number; angle: number; scale?: number; colour: string; quality: BloomQuality }) {
   return <g transform={`translate(${x} ${y}) rotate(${angle}) scale(${scale})`}>
@@ -34,18 +47,20 @@ function Flower({ x, y, radius = 54, quality, seed = 1, blush = false }: { x: nu
     </g>)}
     <circle r="13" fill="#c59b59" stroke={LEAD} strokeWidth="2.6"/>
     <circle r="7" fill="#8b7445" opacity=".62"/>
-    {quality >= 3 && Array.from({ length: 9 }, (_, n) => <circle key={n} cx={Math.cos(n * .698) * 7} cy={Math.sin(n * .698) * 7} r="1.2" fill="#efdb9b"/>)}
+    {quality >= 3 && Array.from({ length: 9 }, (_, n) => <circle key={n} cx={stableCos(n * .698) * 7} cy={stableSin(n * .698) * 7} r="1.2" fill="#efdb9b"/>)}
   </g>;
 }
 
 /** A complete botanical panel, with all material detail grouped into one pane. */
-function BotanicalPane({ id, quality, variant = 0, daylight }: { id: string; quality: BloomQuality; variant?: number; daylight: number }) {
+function BotanicalPane({ id, quality, variant = 0, daylight, listening }: { id: string; quality: BloomQuality; variant?: number; daylight: number; listening?: BloomListeningProfile }) {
   const tier = detail[quality - 1];
+  const flowers = listening?.discoveredRecordingCount == null ? tier.flowers : Math.min(tier.flowers,Math.max(0,listening.discoveredRecordingCount));
+  const joints = Math.min(quality + 2,Math.max(0,listening?.returningArtistCount || 0));
   return <g>
     <defs><clipPath id={`${id}-pane`}><path d="M12 716V208C12 72 89 5 208 5C327 5 402 80 402 208V716Z"/></clipPath></defs>
     <path d="M-1 729V207C-1 63 89-10 208-10C335-10 417 66 417 207V729Z" fill="#233d39" stroke="#152e2b" strokeWidth="3"/>
     <path d="M12 716V208C12 72 89 5 208 5C327 5 402 80 402 208V716Z" fill="#c4c8aa" stroke="#a79968" strokeWidth="3"/>
-    <g clipPath={`url(#${id}-pane)`}>
+    <g clipPath={`url(#${id}-pane)`} data-listening-motif={listening?.genres ? "genre-glass" : undefined}>
       <path d="M0 0H420V745H0Z" fill={variant % 2 ? "#d2cab0" : "#b6c8b9"}/>
       {Array.from({ length: tier.ribs }, (_, n) => <path key={n} d={`M${n * 420 / tier.ribs} 0Q${n * 420 / tier.ribs + 15} 340 ${n * 420 / tier.ribs - 5} 745`} stroke="#47756c" opacity=".13" strokeWidth={quality >= 4 ? 20 : 34} fill="none"/>)}
       <path d="M-6 243Q85 205 214 242Q348 278 430 224V330Q325 368 215 326Q96 283-6 340Z" fill="#769791" stroke={LEAD} strokeWidth="2.8"/>
@@ -54,17 +69,18 @@ function BotanicalPane({ id, quality, variant = 0, daylight }: { id: string; qua
       <path d="M206 738Q166 588 193 494Q212 397 169 309Q126 215 205 64" fill="none" stroke={LEAD} strokeWidth="10"/>
       <path d="M206 738Q166 588 193 494Q212 397 169 309Q126 215 205 64" fill="none" stroke="#a7a770" strokeWidth="4.8"/>
       <path d="M187 512Q67 451 42 344M183 611Q312 533 344 424M167 324Q277 286 308 172" fill="none" stroke={LEAD} strokeWidth="5"/>
+      <g className={s.solderJoints} data-listening-motif={joints > 0 ? "returning-stems" : undefined}>{Array.from({length:joints},(_,n)=><g key={n} transform={`translate(${181 + stableSin((650 - n * 79) / 91) * 20} ${650 - n * 79})`}><circle r="10" fill="#c2ad76" stroke={LEAD} strokeWidth="2"/><path d="M-4-3 4 3M-4 3 4-3" stroke="#f7e9bd" strokeWidth="1.2"/></g>)}</g>
       {Array.from({ length: 3 }, (_, group) => <g key={`leaves-${group}`} className={s.paneSegment} style={{ "--delay": `${group * .085}s`, "--pane-x": `${group % 2 ? -5 : 5}px`, "--pane-turn": `${group % 2 ? -1 : 1}deg` } as CSSProperties}>
         {Array.from({ length: tier.leaves }, (_, n) => {
           if (n % 3 !== group) return null;
           const y = 657 - n * 540 / tier.leaves;
-          const x = 181 + Math.sin(y / 91) * 20;
+          const x = 181 + stableSin(y / 91) * 20;
           const side = n % 2 ? 1 : -1;
-          return <Leaf key={n} x={x} y={y} angle={side * (44 + random(n + variant) * 19)} scale={.75 + random(n + 15) * .5} colour={GLASS[(n + variant) % 4]} quality={quality}/>;
+          return <Leaf key={n} x={x} y={y} angle={side * (44 + random(n + variant) * 19)} scale={.75 + random(n + 15) * .5} colour={paneColour(n,tier.leaves,variant,listening)} quality={quality}/>;
         })}
       </g>)}
       {Array.from({ length: 3 }, (_, group) => <g key={`flowers-${group}`} className={s.paneSegment} style={{ "--delay": `${.22 + group * .085}s`, "--pane-x": `${group % 2 ? 6 : -6}px`, "--pane-turn": `${group % 2 ? 1 : -1}deg` } as CSSProperties}>
-        {Array.from({ length: tier.flowers }, (_, n) => n % 3 === group ? <Flower key={n} x={n % 2 ? 288 + random(n + 7) * 55 : 68 + random(n + 5) * 49} y={147 + n * 451 / tier.flowers} radius={35 + random(n + 1) * 18} quality={quality} seed={n + variant} blush={n % 3 === 0}/> : null)}
+        {Array.from({ length: flowers }, (_, n) => n % 3 === group ? <Flower key={n} x={n % 2 ? 288 + random(n + 7) * 55 : 68 + random(n + 5) * 49} y={147 + n * 451 / Math.max(1,flowers)} radius={35 + random(n + 1) * 18} quality={quality} seed={n + variant} blush={n % 3 === 0}/> : null)}
       </g>)}
       <path d="M17 167Q127 80 201 94Q297 106 396 169M18 431Q120 481 200 450Q288 400 397 434" fill="none" stroke={LEAD} strokeWidth="2.4"/>
       <path d="M17 169Q119 86 201 99Q298 110 396 174M21 430Q117 475 201 446" fill="none" stroke="#ebd8a2" strokeWidth=".8" opacity=".6"/>
@@ -114,7 +130,7 @@ function Palm({ x, y, flip = false, quality }: { x: number; y: number; flip?: bo
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
   const token = useId().replace(/:/g, "");
   const id = `glass-${token}`;
   const cover = view === "cover";
@@ -123,13 +139,13 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const music = ["songs", "artist-songs", "discoveries", "returns"].includes(scene);
   const still = reducedMotion || quality === 1 || view === "poster";
   const p = Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : 0));
-  const daylight = finale ? 1 : p;
+  const daylight = listening?.peakHour == null ? finale ? 1 : p : Math.max(.1, stableSin((listening.peakHour - 6) / 24 * Math.PI * 2));
   const tier = detail[quality - 1];
   const style = { "--daylight": daylight, "--floor": theme === "light" ? "#d4d6bc" : "#516c60" } as CSSProperties;
   const windowPositions = opening ? [{ x: 805, y: 55, scale: 1.02 }, { x: 1314, y: 198, scale: .58 }] : finale ? [{ x: -100, y: 72, scale: .65 }, { x: 1230, y: 74, scale: .65 }] : scene === "comparison" ? [{ x: 965, y: 50, scale: .97 }, { x: -233, y: 58, scale: .72 }] : scene === "song-winner" ? [{ x: 890, y: 38, scale: 1.05 }, { x: -153, y: 55, scale: .72 }] : scene === "time" || scene === "breadth" ? [{ x: -124, y: 45, scale: 1.06 }, { x: 1268, y: 100, scale: .74 }] : scene === "days" || scene === "pattern" || scene === "genres" ? [{ x: 1030, y: 152, scale: .86 }, { x: -189, y: 145, scale: .86 }] : [{ x: -132, y: 95, scale: .82 }, { x: 1190, y: 58, scale: .82 }];
   const portrait = opening ? { left: -174, right: 341, y: 118, scale: .63 } : scene === "song-winner" ? { left: -231, right: 344, y: 89, scale: .69 } : scene === "artist" || scene === "artists" ? { left: -178, right: 348, y: 221, scale: .54 } : scene === "days" || scene === "pattern" || scene === "genres" ? { left: -163, right: 345, y: 177, scale: .51 } : scene === "comparison" ? { left: -216, right: 345, y: 116, scale: .64 } : { left: -193, right: 345, y: 121, scale: .57 };
 
-  return <div className={s.world} data-scene={scene} data-theme={theme} data-view={view} data-opening={opening} data-music={music} data-still={still} data-quality={quality} data-stage={stage} style={style}>
+  return <div className={s.world} data-scene={scene} data-theme={theme} data-view={view} data-opening={opening} data-music={music} data-still={still} data-quality={quality} data-stage={stage} data-listening={Boolean(listening)} data-genre-pigments={listening?.genreCount} data-discovery-buds={listening?.discoveredRecordingCount == null ? undefined : Math.min(tier.flowers,listening.discoveredRecordingCount)} data-return-joints={listening?.returningArtistCount == null ? undefined : Math.min(quality + 2,listening.returningArtistCount)} data-hour-light={listening?.peakHour == null ? undefined : daylight.toFixed(3)} style={style}>
     <svg className={s.architecture} viewBox="0 0 1400 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs><pattern id={`${id}-texture`} width="53" height="41" patternUnits="userSpaceOnUse"><path d="M3 8 13 7M39 24 48 25M19 36 22 34" stroke="#fff6da" strokeWidth=".6" opacity=".28"/><circle cx="31" cy="11" r=".8" fill="#214e46" opacity=".1"/></pattern></defs>
       <path d="M0 0H1400V1000H0Z" fill="var(--glass-room)"/>
@@ -142,7 +158,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
       {quality >= 3 && Array.from({ length: quality === 5 ? 28 : 17 }, (_, n) => <path key={n} d={`M${n * 90 - 100} -20Q${n * 77 - 30} 20 ${n * 70 + 60} 95`} fill="none" stroke="#bad1ac" strokeWidth="2.2" opacity=".22"/>)}
       <g className={s.dayGlass} opacity={.16 + daylight * .26}><path d="M0 85 370 20 219 721-40 900Z" fill="#efd096"/><path d="M1400 55 1110 15 1198 658 1440 836Z" fill="#a1c7b0"/></g>
       <g className={s.windows} key={`windows-${scene}`}>
-        {windowPositions.map((position, n) => <g className={s.assemblingPane} key={n} style={{ "--delay": `${n * .14}s` } as CSSProperties} transform={`translate(${position.x} ${position.y}) scale(${position.scale})`}><BotanicalPane id={`${id}-window-${n}`} quality={quality} variant={n + (finale ? 1 : 0)} daylight={daylight}/></g>)}
+        {windowPositions.map((position, n) => <g className={s.assemblingPane} key={n} style={{ "--delay": `${n * .14}s` } as CSSProperties} transform={`translate(${position.x} ${position.y}) scale(${position.scale})`}><BotanicalPane id={`${id}-window-${n}`} quality={quality} variant={n + (finale ? 1 : 0)} daylight={daylight} listening={listening}/></g>)}
       </g>
       {finale && <g className={s.lunette}>
         <path d="M285 180Q370-40 700-35Q1050-20 1120 180Z" fill="#95b4a0" stroke={LEAD} strokeWidth="9"/>
@@ -164,8 +180,8 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
       <path d="M0 0H390V105Q198 143 0 96Z" fill="#2c5148"/>
       {quality > 1 && <g fill="none" stroke="#a1bc99" opacity=".31" strokeWidth="1.2">{Array.from({ length: quality === 5 ? 11 : 6 }, (_, n) => <path key={n} d={`M${n * (quality === 5 ? 38 : 72) - 15} -20Q${n * (quality === 5 ? 37 : 69) + 40} 51 ${n * (quality === 5 ? 35 : 65) + 2} 116`}/>)}</g>}
       <path d="M0 92Q180 147 390 103" fill="none" stroke="#b1b388" strokeWidth="3"/>
-      <g key={`portrait-left-${scene}`} transform={`translate(${portrait.left} ${portrait.y}) scale(${portrait.scale})`}><BotanicalPane id={`${id}-portrait-left`} quality={quality} daylight={daylight}/></g>
-      <g key={`portrait-right-${scene}`} transform={`translate(${portrait.right} ${portrait.y + 9}) scale(${portrait.scale})`}><BotanicalPane id={`${id}-portrait-right`} quality={quality} variant={1} daylight={daylight}/></g>
+      <g key={`portrait-left-${scene}`} transform={`translate(${portrait.left} ${portrait.y}) scale(${portrait.scale})`}><BotanicalPane id={`${id}-portrait-left`} quality={quality} daylight={daylight} listening={listening}/></g>
+      <g key={`portrait-right-${scene}`} transform={`translate(${portrait.right} ${portrait.y + 9}) scale(${portrait.scale})`}><BotanicalPane id={`${id}-portrait-right`} quality={quality} variant={1} daylight={daylight} listening={listening}/></g>
       <path d="M0 779Q191 743 390 786V920H0Z" fill="var(--floor)"/>
       <path d="M0 820H390M0 875H390M0 920 195 766 390 920M91 920 195 766 302 920" fill="none" stroke="#759478" strokeWidth="1" opacity=".42"/>
       <path d="m13 820 106-26 95 126H99Z" fill="#c99089" opacity=".17"/><path d="m251 804 41-12 90 96-50 25Z" fill="#e8c78d" opacity=".2"/>

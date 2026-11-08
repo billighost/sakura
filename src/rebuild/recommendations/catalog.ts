@@ -1,6 +1,6 @@
 import { getRebuildServices } from "../server/runtime";
 import { getRebuildPool } from "../data/db";
-import { getSettings } from "../data/settings";
+import { getSettings,refreshInitialTaste } from "../data/settings";
 import type { ProviderReference } from "../core/types";
 import type { ArtistSelection } from "../data/artistSelection";
 
@@ -37,7 +37,8 @@ export async function enrichCatalogGenres(signal?:AbortSignal):Promise<{albums:n
 /** Provider search acquires candidates; exact provider lookup owns identity.
  * A search snapshot is never promoted to a verified recording on its own. */
 export async function seedCandidateCatalog(options:{artists?:string[];artistSelections?:readonly ArtistSelection[];perArtist?:number;includeCharts?:boolean;signal?:AbortSignal}={}):Promise<CatalogWarmup> {
-  const services=getRebuildServices(),exact=(options.artistSelections||[]).slice(0,20),artists=(exact.length?[]:options.artists?.length?options.artists:FIRST_RUN_ARTISTS).slice(0,20);
+  const services=getRebuildServices(),exact=(options.artistSelections||[]).slice(0,20),normalizeName=(name:string)=>name.normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase("en"),exactNames=new Set(exact.map(artist=>normalizeName(artist.name)));
+  const artists=(options.artists?.length?options.artists.filter(name=>!exactNames.has(normalizeName(name))):exact.length?[]:FIRST_RUN_ARTISTS).slice(0,20-exact.length);
   const references=new Map<string,ProviderReference>();
   const sources=await Promise.allSettled([...artists.map(name=>services.catalog.search(`artist:"${name.replaceAll('"','')}"`,options.signal)),
     ...exact.map(s=>services.catalog.detail("artist",s.reference.provider==="spotify"?`spotify:${s.reference.id}`:s.reference.id,options.signal))]);
@@ -67,7 +68,8 @@ export async function warmCandidateCatalog(accountId:string):Promise<CatalogWarm
     const artists=(settings.seedArtists as string[]).filter(a=>!/^\w{8}-[\w-]{27}$/.test(a));
     const artistSelections=settings.seedArtistSelections as ArtistSelection[];
     if(count>=80&&!artists.length)return {requested:0,indexed:0,failed:0,source:"online-catalog" as const};
-    return seedCandidateCatalog({artists:artists.length?artists:undefined,artistSelections,perArtist:8,includeCharts:count<80,signal:AbortSignal.timeout(90000)});
+    const result=await seedCandidateCatalog({artists:artists.length?artists:undefined,artistSelections,perArtist:8,includeCharts:count<80,signal:AbortSignal.timeout(90000)});
+    await refreshInitialTaste(accountId);return result;
   })().finally(()=>map.delete(accountId));
   map.set(accountId,operation);return operation;
 }
@@ -102,5 +104,6 @@ export async function refreshFeedCatalog(accountId:string):Promise<void>{
     if(!signal.aborted){const rotation=Math.floor(now/(6*60*60*1000))%FIRST_RUN_ARTISTS.length;
       const artists=Array.from({length:4},(_,index)=>FIRST_RUN_ARTISTS[(rotation+index*5)%FIRST_RUN_ARTISTS.length]);
       await seedCandidateCatalog({artists,perArtist:5,includeCharts:false,signal});}
+    await refreshInitialTaste(accountId);
   }catch(error){checks.delete(accountId);throw error;}
 }

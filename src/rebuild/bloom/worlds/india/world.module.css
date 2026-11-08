@@ -139,3 +139,10 @@
   .world[data-view="cover"] .titleObject>i {font-size:6px;}
 }
 @media(prefers-reduced-motion:reduce) {.world *,.world *::before,.world *::after {animation:none!important;transition:none!important;}}
+.pigmentPools{pointer-events:none}
+
+/* Keep the authored pavilion staging and add device-safe story margins. */
+.world[data-view="story"] {
+  height:auto;
+  padding-block:env(safe-area-inset-top) env(safe-area-inset-bottom);
+}

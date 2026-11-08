@@ -3,6 +3,8 @@
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin as sine, stableCos as cosine } from "../stableTrig";
 import s from "./world.module.css";
 
 const ornament = "M0 0C-18-25-34-20-25-6C-19 3-9 4 0 0C18-25 34-20 25-6C19 3 9 4 0 0M0 0C-12 20-5 35 0 25C5 35 12 20 0 0";
@@ -12,7 +14,7 @@ function Fan({ x, y, size = 1, detail = 8 }: { x: number; y: number; size?: numb
     <path d="M-83 0A83 83 0 0 1 83 0M-64 0A64 64 0 0 1 64 0M-42 0A42 42 0 0 1 42 0M-83 0H83M-90 8H90" strokeWidth="1.2" />
     {Array.from({ length: detail + 1 }, (_, i) => {
       const angle = Math.PI + Math.PI * i / detail;
-      return <path key={i} d={`M${Math.cos(angle) * 12} ${Math.sin(angle) * 12}L${Math.cos(angle) * 82} ${Math.sin(angle) * 82}`} strokeWidth=".65" />;
+      return <path key={i} d={`M${cosine(angle) * 12} ${sine(angle) * 12}L${cosine(angle) * 82} ${sine(angle) * 82}`} strokeWidth=".65" />;
     })}
     <path d="M-9 0 0-15 9 0 0 8Z" fill="currentColor" fillOpacity=".5" />
   </g>;
@@ -40,7 +42,7 @@ function Architecture({ id, quality, growth }: { id: string; quality: BloomWorld
     <g fill="none" stroke="#c19887" opacity=".7">
       {Array.from({ length: 8 + quality * 3 }, (_, i) => {
         const a = Math.PI + Math.PI * i / (7 + quality * 3);
-        return <path key={i} d={`M${720 + Math.cos(a) * 354} ${390 + Math.sin(a) * 181}L${720 + Math.cos(a) * 422} ${390 + Math.sin(a) * 249}`} strokeWidth={i % 3 === 0 ? "2" : ".8"} />;
+        return <path key={i} d={`M${720 + cosine(a) * 354} ${390 + sine(a) * 181}L${720 + cosine(a) * 422} ${390 + sine(a) * 249}`} strokeWidth={i % 3 === 0 ? "2" : ".8"} />;
       })}
     </g>
     {[76, 236, 1144, 1304].map((x, i) => <g key={x}>
@@ -71,7 +73,7 @@ function Architecture({ id, quality, growth }: { id: string; quality: BloomWorld
     <g opacity={.2 + growth * .6}>
       {Array.from({ length: 14 + quality * 5 }, (_, i) => {
         const angle = Math.PI * i / (13 + quality * 5);
-        return <circle key={i} cx={720 + Math.cos(angle) * 350} cy={790 + Math.sin(angle) * 60} r="2.5" fill="#edcda3" />;
+        return <circle key={i} cx={720 + cosine(angle) * 350} cy={790 + sine(angle) * 60} r="2.5" fill="#edcda3" />;
       })}
     </g>
     <g className={s.recordLounge} transform="translate(1150 740)">
@@ -102,33 +104,61 @@ function Curtain({ id, quality, right = false }: { id: string; quality: BloomWor
   </div>;
 }
 
-function MirrorBall({ id, quality }: { id: string; quality: BloomWorldProps["quality"] }) {
+function MirrorBall({ id, quality, listening }: { id: string; quality: BloomWorldProps["quality"]; listening?: BloomListeningProfile }) {
   const rows = 6 + quality * 2;
   const columns = 6 + quality * 3;
+  const genres = listening?.genres?.filter(genre => genre.share > 0) ?? [];
+  const palette = ["#edc697", "#dfa4b2", "#a7bad0", "#9ebfaf", "#c7b0d7", "#d7be87"];
   return <div className={s.mirrorBall}><svg viewBox="0 0 220 290" aria-hidden="true">
     <defs><clipPath id={`${id}-sphere`}><circle cx="110" cy="157" r="82" /></clipPath><radialGradient id={`${id}-sphere-light`} cx=".3" cy=".28"><stop stopColor="#fff1c4" /><stop offset=".46" stopColor="#ceafb1" /><stop offset=".85" stopColor="#776983" /><stop offset="1" stopColor="#28273e" /></radialGradient></defs>
     <path d="M110 0V74" stroke="#c9a19e" strokeWidth="1" /><path d="M101 71H119V79H101Z" fill="#e1b499" />
     <circle cx="110" cy="157" r="83" fill={`url(#${id}-sphere-light)`} stroke="#d6c1bb" strokeWidth=".8" />
-    <g clipPath={`url(#${id}-sphere)`}>{Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => {
+    <g clipPath={`url(#${id}-sphere)`} data-listening-motif={genres.length ? "genre-mirror" : undefined}>{Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => {
       const y = 76 + row * 162 / rows;
       const x = 27 + column * 166 / columns + row % 2 * 4;
       const bright = (row * 13 + column * 7) % 11;
-      return <rect key={`${row}-${column}`} x={x} y={y} width={166 / columns - 1.2} height={162 / rows - 1.2} rx=".4" fill={bright < 3 ? "#fff2cb" : bright < 6 ? "#e1bfc2" : "#4e4a6b"} opacity={.15 + bright / 18} />;
+      const fraction = (row * columns + column) / (rows * columns);
+      let share = 0;
+      const genreIndex = genres.findIndex(genre => { share += genre.share; return fraction < share; });
+      return <rect key={`${row}-${column}`} x={x} y={y} width={166 / columns - 1.2} height={162 / rows - 1.2} rx=".4" fill={genres.length ? genreIndex < 0 ? "#4e4a6b" : palette[genreIndex % palette.length] : bright < 3 ? "#fff2cb" : bright < 6 ? "#e1bfc2" : "#4e4a6b"} opacity={.15 + bright / 18} />;
     }))}</g>
     <path d="M61 130 72 116 65 98 83 110 96 102 91 121 108 130 88 132 81 150 77 134Z" fill="#fff5d5" opacity=".8" />
     {quality >= 3 && <g fill="none" stroke="#f5e2c1" strokeWidth=".6" opacity=".6"><path d="M24 100H44M34 90V110M161 192H182M172 181V202M117 241H128M122 236V249" /></g>}
   </svg></div>;
 }
 
-function Atmosphere({ id, quality }: { id: string; quality: BloomWorldProps["quality"] }) {
+function Atmosphere({ id, quality, listening }: { id: string; quality: BloomWorldProps["quality"]; listening?: BloomListeningProfile }) {
   const beams = quality === 1 ? 2 : quality + 3;
+  const hourBands = listening?.hourBands;
   return <div className={s.atmosphere} aria-hidden="true"><svg viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice">
     <defs><linearGradient id={`${id}-beam`} x2="0" y2="1"><stop stopColor="#edc6a3" stopOpacity=".16" /><stop offset="1" stopColor="#ea98ba" stopOpacity="0" /></linearGradient><linearGradient id={`${id}-rose-beam`} x2="0" y2="1"><stop stopColor="#da86b8" stopOpacity=".19" /><stop offset="1" stopColor="#8d81d2" stopOpacity="0" /></linearGradient></defs>
-    {Array.from({ length: beams }, (_, i) => <g key={i} className={s.beam} style={{ "--beam-angle": `${(i - beams / 2) * 13}deg`, "--beam-delay": `${i * -2.7}s` } as CSSProperties}><path d={`M${1070 - i * 62} 211 ${160 + i * 143} 999 ${452 + i * 133} 999Z`} fill={`url(#${id}-${i % 2 ? "rose-beam" : "beam"})`} /></g>)}
+    {Array.from({ length: beams }, (_, i) => <g key={i} className={s.beam} data-listening-motif={hourBands?.length ? "listening-hour-lights" : undefined} opacity={hourBands?.length ? .25 + hourBands[i % hourBands.length].share * 1.5 : 1} style={{ "--beam-angle": `${(i - beams / 2) * 13}deg`, "--beam-delay": `${i * -2.7}s` } as CSSProperties}><path d={`M${1070 - i * 62} 211 ${160 + i * 143} 999 ${452 + i * 133} 999Z`} fill={`url(#${id}-${hourBands?.length ? ["beam", "beam", "rose-beam", "rose-beam"][i % hourBands.length] : i % 2 ? "rose-beam" : "beam"})`} /></g>)}
     <g className={s.sunriseRays}><path d="M604 298 127 1000H1112L835 298Z" fill="#f3c9a9" fillOpacity=".12" /><path d="M692 298 495 1000H771L754 298Z" fill="#ffe4b8" fillOpacity=".12" />{quality >= 4 && <path d="M803 298 1268 1000H1384L851 298Z" fill="#e8adba" fillOpacity=".08" />}</g>
     {quality >= 3 && <g className={s.floorGlints}>{Array.from({ length: quality * 12 }, (_, i) => <path key={i} d={`M${(i * 193) % 1440} ${835 + i % 8 * 21}l${7 + i % 5 * 3} -3 7 3-${7 + i % 5 * 3} 3Z`} fill={i % 3 ? "#dca9b5" : "#d0c2ee"} opacity={.06 + i % 5 * .025} />)}</g>}
     {quality >= 4 && <g className={s.dust}>{Array.from({ length: quality * 11 }, (_, i) => <circle key={i} cx={47 + i * 137 % 1367} cy={143 + i * 83 % 712} r={i % 3 === 0 ? "1.8" : ".85"} fill="#efcbb5" opacity={.13 + i % 4 * .07} />)}</g>}
   </svg></div>;
+}
+
+function ListeningRecords({ quality, listening }: { quality: BloomWorldProps["quality"]; listening?: BloomListeningProfile }) {
+  const returning = Math.min(quality + 1, Math.max(0, listening?.returningArtistCount ?? 0));
+  const discovered = Math.min(quality + 1, Math.max(0, listening?.discoveredArtistCount ?? 0));
+  if (!returning && !discovered) return null;
+  return <div className={s.listeningRecords} aria-hidden="true" data-listening-motif="encore-and-debut-sleeves" data-motif-count={returning + discovered}>
+    <svg viewBox="0 0 240 170">
+      <path d="M8 151H232L223 164H17Z" fill="#613b52" stroke="#d4ad8a" strokeWidth="1"/>
+      {Array.from({ length: returning + discovered }, (_, n) => {
+        const encore = n < returning, x = 17 + n * 172 / Math.max(1, returning + discovered - 1);
+        return <g key={n} transform={`translate(${x} ${encore ? 13 : 31}) rotate(${encore ? -5 : 5})`}>
+          <path d="M0 0H40V122H0Z" fill={encore ? "#3c2945" : "#a06772"} stroke="#dcbb94" strokeWidth=".8"/>
+          <path d="M5 5H35V117H5Z" fill="none" stroke="#ddb990" strokeWidth=".5" opacity=".5"/>
+          <circle cx="20" cy="41" r="13" fill="#211628" stroke="#c39d9b" strokeWidth=".7"/>
+          <circle cx="20" cy="41" r="3" fill="#e8c195"/>
+          {encore && <circle cx="20" cy="41" r="9" fill="none" stroke="#d5b4a4" strokeWidth=".6"/>}
+          <path d="M11 78H29M14 84H26M11 102H29" stroke="#e9c9a6" strokeWidth="1" opacity=".6"/>
+        </g>;
+      })}
+    </svg>
+  </div>;
 }
 
 function Chandelier({ id, quality, growth }: { id: string; quality: BloomWorldProps["quality"]; growth: number }) {
@@ -139,10 +169,10 @@ function Chandelier({ id, quality, growth }: { id: string; quality: BloomWorldPr
     <path d="M210 57 231 80 210 101 189 80Z" fill="#ce9c91" stroke="#e9c5a2" strokeWidth="1" />
     {Array.from({ length: count }, (_, i) => {
       const x = 69 + i * 282 / (count - 1);
-      const y = 151 - Math.sin(i * Math.PI / (count - 1)) * 34;
+      const y = 151 - sine(i * Math.PI / (count - 1)) * 34;
       return <g key={i} opacity={.45 + (i / count < growth ? .48 : .08)}><path d={`M${x} ${y}V${y + 18 + i % 3 * 9}`} stroke="#ccaca0" strokeWidth=".8" /><path d={`M${x} ${y + 14 + i % 3 * 9}q-18 17 0 48q18-31 0-48Z`} fill={`url(#${id}-crystal)`} stroke="#edcfae" strokeWidth=".65" /><path d={`M${x} ${y + 16 + i % 3 * 9}V${y + 60 + i % 3 * 9}`} stroke="#fff0c3" strokeOpacity=".7" strokeWidth=".7" /></g>;
     })}
-    {quality >= 4 && Array.from({ length: 9 }, (_, i) => <g key={i} transform={`translate(${128 + i * 20.5} ${77 - Math.sin(i * Math.PI / 8) * 10})`} fill="#dec2ad"><path d="M0 0V29M0 29Q-10 40 0 49Q10 40 0 29" stroke="#bb9c9f" strokeWidth=".6" /></g>)}
+    {quality >= 4 && Array.from({ length: 9 }, (_, i) => <g key={i} transform={`translate(${128 + i * 20.5} ${77 - sine(i * Math.PI / 8) * 10})`} fill="#dec2ad"><path d="M0 0V29M0 29Q-10 40 0 49Q10 40 0 29" stroke="#bb9c9f" strokeWidth=".6" /></g>)}
     <path d="M198 162 210 182 222 162M210 182V224" fill="none" stroke="#ddbb99" /><path d="M210 208Q186 230 210 250Q234 230 210 208Z" fill={`url(#${id}-crystal)`} />
   </svg></div>;
 }
@@ -171,12 +201,12 @@ function Valance({ quality }: { quality: BloomWorldProps["quality"] }) {
     <path d="M0 0H1440V39Q1260 231 1040 78Q720 236 400 78Q180 231 0 39Z" fill="#321831" />
     <path d="M0 32Q180 217 400 65Q720 220 1040 65Q1260 217 1440 32" fill="none" stroke="#d0a183" strokeWidth="2" />
     <path d="M0 41Q180 231 400 76Q720 234 1040 76Q1260 231 1440 41" fill="none" stroke="#80535f" strokeWidth="6" />
-    {quality >= 2 && Array.from({ length: 18 + quality * 6 }, (_, i) => <path key={i} d={`M${i * 1440 / (18 + quality * 6)} 0Q${i * 1440 / (18 + quality * 6) + 35} 50 ${i * 1440 / (18 + quality * 6) + 10} ${60 + Math.sin(i / 5) * 20}`} fill="none" stroke="#7b3e52" strokeWidth="2" opacity=".5" />)}
+    {quality >= 2 && Array.from({ length: 18 + quality * 6 }, (_, i) => <path key={i} d={`M${i * 1440 / (18 + quality * 6)} 0Q${i * 1440 / (18 + quality * 6) + 35} 50 ${i * 1440 / (18 + quality * 6) + 10} ${60 + sine(i / 5) * 20}`} fill="none" stroke="#7b3e52" strokeWidth="2" opacity=".5" />)}
     {[400, 1040].map(x => <g key={x} transform={`translate(${x} 77)`} fill="#d9b08a"><circle r="7" /><path d="M-4 4H4L8 45 0 59-8 45Z" /><path d="M-7 43H7V53H-7Z" fill="#826069" /></g>)}
   </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
   const id = `disco-${useId().replace(/:/g, "")}`;
   const shot = scene === "opening" ? "entrance" : scene === "finale" ? "dawn" : ["songs", "discoveries", "returns", "breadth"].includes(scene) ? "lounge" : ["artist", "artist-songs", "artists", "song-winner"].includes(scene) ? "stage" : "chandelier";
   const growth = Math.min(1, Math.max(0, stage / 14));
@@ -184,20 +214,21 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     <div className={s.backdrop}><Architecture id={id} quality={quality} growth={growth} /></div>
     <div className={s.roseWash} aria-hidden="true" />
     <div className={s.afterhours} aria-hidden="true" />
-    <Atmosphere id={id} quality={quality} />
+    <Atmosphere id={id} quality={quality} listening={listening}/>
     {quality >= 2 && <Chandelier id={id} quality={quality} growth={growth} />}
-    <MirrorBall id={id} quality={quality} />
+    <MirrorBall id={id} quality={quality} listening={listening}/>
     <Curtain id={id} quality={quality} /><Curtain id={id} quality={quality} right />
     <Valance quality={quality} />
     {quality >= 3 && <ForegroundFurniture quality={quality} id={id} />}
+    <ListeningRecords quality={quality} listening={listening}/>
     {quality >= 4 && <div className={s.floorAura} aria-hidden="true" />}
     <div className={s.foreground}>
       {(view !== "story" || scene === "opening" || scene === "finale") && <div className={s.title}>
         <svg className={s.titleFrame} viewBox="0 0 680 250" preserveAspectRatio="none" aria-hidden="true"><path d="M37 7H643V22H663V43H677V207H663V228H643V243H37V228H17V207H3V43H17V22H37Z" fill="#1d1020" fillOpacity=".74" stroke="#c4a181" strokeWidth="1" /><path d="M43 16H637V31H654V50H668V200H654V219H637V234H43V219H26V200H12V50H26V31H43Z" fill="none" stroke="#d8b58d" strokeOpacity=".34" /><path d="M230 20H450M230 230H450" stroke="#d5a888" />{quality >= 3 && [false,true].map(right => <g key={String(right)} transform={right ? "translate(680 0) scale(-1 1)" : undefined} fill="none" stroke="#d3af8e" strokeWidth=".6"><path d="M31 70H59V42H101M31 180H59V208H101M31 85H73V43M31 165H73V207" /><path d={ornament} transform="translate(58 122) scale(.5)" /></g>)}</svg>
-        <span className={s.titleNote}>a listening night to remember</span>
+        <span className={s.titleNote}>your music takes the stage</span>
         <BloomLettering text="VELVET" style="deco" className={s.titleFirst} />
         <BloomLettering text="DISCO" style="deco" className={s.titleSecond} />
-        <span className={s.titleEdition}>SAKURA BLOOM · AFTER HOURS</span>
+        <span className={s.titleEdition}>SAKURA BLOOM · VELVET EDITION</span>
       </div>}
       <div className={s.content}>{children}</div>
     </div>

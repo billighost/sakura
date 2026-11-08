@@ -3,6 +3,8 @@
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 // Prepared ink marks, rather than a live ink simulation. Detail changes the
@@ -22,7 +24,7 @@ const shots: Record<BloomSceneKind, Shot> = {
   songs: "gallery", "song-winner": "solitude", artist: "grove", "artist-songs": "gallery",
   artists: "grove", discoveries: "gallery", returns: "bank", genres: "water", pattern: "grove", finale: "panorama",
 };
-const grain = (n: number) => ((Math.sin(n * 12.731 + 71.23) * 43758.547) % 1 + 1) % 1;
+const grain = (n: number) => ((stableSin(n * 12.731 + 71.23) * 43758.547) % 1 + 1) % 1;
 const pineCrowns = [[95, 25, 45, 18], [63, 59, 53, 19], [122, 82, 56, 20], [48, 109, 48, 18], [105, 142, 70, 23], [153, 178, 41, 15]] as const;
 const mountainShape="M0 478Q29 404 68 361L79 289Q85 270 110 248L135 182 161 160Q179 119 196 59L216 44 240 0 262 23 283 31Q290 51 306 89L329 126 331 157Q342 175 371 205L381 261Q384 285 411 319Q460 380 482 478Z";
 
@@ -108,7 +110,31 @@ function Mountain({ id, tier, x, y, scale=1, seed=0, light=false }: { id:string;
   </g>;
 }
 
-function Landscape({ id, tier, shot, portrait=false }: { id:string; tier:Detail; shot:Shot; portrait?:boolean }) {
+function ListeningLandscapeMarks({ id, quality, listening, portrait = false }: { id: string; quality: BloomQuality; listening?: BloomListeningProfile; portrait?: boolean }) {
+  const landmarks = Math.min(quality + 1, Math.max(0, listening?.comparison?.sharedArtistCount ?? 0));
+  const arrivals = Math.min(quality + 1, Math.max(0, listening?.discoveredArtistCount ?? 0));
+  const returns = listening?.returningRecordingCount ?? 0;
+  const returnShare = returns / Math.max(1, listening?.recordingCount ?? returns);
+  const genres = listening?.genres?.filter(genre => genre.share > 0).slice(0, quality + 1) ?? [];
+  const current = portrait ? "M37 911Q140 875 238 900Q360 925 443 881" : "M313 815Q460 781 591 818Q780 869 972 790";
+  return <g className={s.listeningLandscape}>
+    {genres.length > 0 && <g data-listening-motif="mineral-genre-washes" fill="none" strokeLinecap="round">
+      {genres.map((genre, n) => <path key={genre.name} d={portrait ? `M${368 + n * 9} ${588 + n * 18}q-29 41-14 74` : `M${1167 + n * 19} ${441 + n * 26}q-40 69-18 113`} stroke={["#7d9a89", "#8c849c", "#ab9973", "#7d9da7", "#b0837c", "#a4a888"][n]} strokeWidth={portrait ? 5 + genre.share * 13 : 8 + genre.share * 23} opacity=".2"/>)}
+    </g>}
+    {landmarks > 0 && <g data-listening-motif="recurring-pavilions" data-motif-count={landmarks}>
+      {Array.from({ length: landmarks }, (_, n) => <use key={n} href={`#${id}-pavilion`} x={portrait ? 259 + n * 31 : 1009 + n * 49} y={portrait ? 851 - n % 2 * 27 : 717 - n % 2 * 42} width={portrait ? 49 : 69} height={portrait ? 37 : 51} opacity={.58 + n % 2 * .13}/>)}
+    </g>}
+    {returns > 0 && <g data-listening-motif="retraced-current" fill="none" stroke="var(--ink-water)" strokeLinecap="round">
+      <path d={current} strokeWidth={1 + Math.min(1, returnShare) * 3} opacity=".5"/>
+      <path d={current} transform="translate(0 8)" strokeWidth=".8" opacity=".32"/>
+    </g>}
+    {arrivals > 0 && <g data-listening-motif="new-route-boats" data-motif-count={arrivals}>
+      {Array.from({ length: arrivals }, (_, n) => <use key={n} href={`#${id}-boat`} x={portrait ? 98 + n * 39 : 384 + n * 87} y={portrait ? 932 - n % 2 * 25 : 847 - n % 2 * 33} width={portrait ? 37 : 49} height={portrait ? 16 : 21} opacity={.49 + n % 2 * .12}/>)}
+    </g>}
+  </g>;
+}
+
+function Landscape({ id, tier, shot, portrait=false, listening, quality }: { id:string; tier:Detail; shot:Shot; portrait?:boolean; listening?:BloomListeningProfile; quality:BloomQuality }) {
   const water=shot==="water",grove=shot==="grove",gallery=shot==="gallery"||shot==="solitude",panorama=shot==="panorama";
   if(portrait)return <g>
     <Mountain id={id} tier={tier} x={gallery?345:260} y={gallery?112:139} scale={gallery?.72:.85} seed={19} light={gallery}/>
@@ -121,6 +147,7 @@ function Landscape({ id, tier, shot, portrait=false }: { id:string; tier:Detail;
     <use href={`#${id}-boat`} x={water?292:183} y="838" width="65" height="28" opacity=".73"/>
     {[[17,892,87,43],[395,913,81,41],[95,936,62,31]].map(([x,y,w,h],n)=><use key={n} href={`#${id}-rock`} x={x} y={y} width={w} height={h} opacity=".54"/>)}
     {Array.from({length:Math.ceil(tier.water/2)},(_,n)=><path key={n} d={`M${60+grain(n*19)*320} ${864+grain(n*5)*64}q${16+grain(n)*28} -4 ${34+grain(n*13)*31} -1`} stroke="var(--ink-water)" strokeWidth=".7" opacity=".2" fill="none"/>)}
+    <ListeningLandscapeMarks id={id} quality={quality} listening={listening} portrait/>
   </g>;
   return <g>
     <g className={s.distantLand}>
@@ -158,6 +185,7 @@ function Landscape({ id, tier, shot, portrait=false }: { id:string; tier:Detail;
     {(grove||panorama)&&<use href={`#${id}-pavilion`} x={grove?1047:934} y={grove?654:657} width="168" height="124" className={s.pavilion}/>}
     <use href={`#${id}-boat`} x={water?861:625} y={water?700:776} width={water?98:76} height={water?42:33} className={s.boat}/>
     {tier.birds>0&&<g className={s.cranes} fill="none" stroke="var(--ink-ink)" strokeWidth="1.4" strokeLinecap="round" opacity=".59">{Array.from({length:tier.birds},(_,n)=><path key={n} d={`M${932+n*24} ${water?393+n*9:217+n*10}q8 -${7+n%3*3} 15 1q7 -11 17 -7`} className={s.crane} style={{"--arrival":`${n*.13}s`} as CSSProperties}/>)}</g>}
+    <ListeningLandscapeMarks id={id} quality={quality} listening={listening}/>
   </g>;
 }
 
@@ -175,19 +203,19 @@ function ScrollMount({ id }: { id:string }) {
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
   const id=`ink-${useId().replace(/[^a-zA-Z0-9]/g,"")}`;
   const shot=shots[scene],tier=detail[quality],opening=scene==="opening"||view==="cover",still=reducedMotion||quality===1||view!=="story";
-  const growth=Math.min(1,Math.max(0,progress)),style={"--ink-dawn":`${growth*.22}`,"--ink-growth":`${.85+growth*.15}`} as CSSProperties;
+  const growth=Math.min(1,Math.max(0,progress)),hour=listening?.peakHour,style={"--ink-dawn":`${hour == null ? growth*.22 : .03 + Math.max(0, stableSin((hour - 6) / 12 * Math.PI)) * .19}`,"--ink-growth":`${.85+growth*.15}`} as CSSProperties;
   return <div className={s.world} data-scene={scene} data-shot={shot} data-quality={quality} data-motion={still?"still":"full"} data-opening={opening} data-view={view} data-theme={theme} style={style}>
     {view!=="poster"&&<svg className={s.definitions} aria-hidden="true"><Definitions id={id} tier={tier}/></svg>}
     <svg className={s.scrollArt} viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
       <ScrollMount id={id}/>
-      <g clipPath={`url(#${id}-paper)`}><g className={s.paintedWorld} key={`${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot}/></g></g>
+      <g clipPath={`url(#${id}-paper)`}><g className={s.paintedWorld} key={`${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot} quality={quality} listening={listening}/></g></g>
       <path d="M1261 117h34v46h-34Z" fill="var(--ink-cinnabar)" opacity=".55"/><path d="M1266 122h24v35h-24Z" fill="none" stroke="var(--ink-paper)" strokeWidth="1" opacity=".6"/>
       <path d="M1271 129h14m-14 8h14m-14 9h14" stroke="var(--ink-paper)" strokeWidth="1.5" opacity=".58"/>
     </svg>
-    <svg className={s.portraitArt} viewBox="0 0 480 960" preserveAspectRatio="none" aria-hidden="true">{view==="poster"&&<Definitions id={id} tier={tier}/>}<path d="M0 0H480V960H0Z" fill="var(--ink-paper)"/><path d="M0 0H480V960H0Z" fill={`url(#${id}-fibres)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={view==="poster"?"var(--ink-silk)":`url(#${id}-silk)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={`url(#${id}-brocade)`}/><path d="M17 0V960M463 0V960" stroke="var(--ink-trunk)" strokeWidth=".7" opacity=".44"/><g className={s.paintedWorld} key={`portrait-${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot} portrait/></g></svg>
+    <svg className={s.portraitArt} viewBox="0 0 480 960" preserveAspectRatio="none" aria-hidden="true">{view==="poster"&&<Definitions id={id} tier={tier}/>}<path d="M0 0H480V960H0Z" fill="var(--ink-paper)"/><path d="M0 0H480V960H0Z" fill={`url(#${id}-fibres)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={view==="poster"?"var(--ink-silk)":`url(#${id}-silk)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={`url(#${id}-brocade)`}/><path d="M17 0V960M463 0V960" stroke="var(--ink-trunk)" strokeWidth=".7" opacity=".44"/><g className={s.paintedWorld} key={`portrait-${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot} portrait quality={quality} listening={listening}/></g></svg>
     <div className={s.dawnLight} aria-hidden="true"/>
     {(opening||view==="poster")&&<div className={s.titleArtwork} aria-hidden="true"><InkTitle/><BloomLettering className={s.subtitle} text="RIVER OF INK" style="brush"/><div className={s.titleRule}/></div>}
     <div className={s.content}>{children}</div>

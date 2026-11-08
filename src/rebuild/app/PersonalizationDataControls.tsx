@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useMusic } from "./MusicContext";
 import { useResource, invalidateResources } from "./resources";
+import { invalidateRecommendationResources } from "./recommendationResources";
 import { useScreenActions } from "./screenActions";
 import { requestJson, userMessage } from "./errors";
 import { musicTrack } from "./types";
@@ -10,6 +11,7 @@ import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
 import { PlayerButton, PlayerDialog } from "../player/Primitives";
 import { requestDialogClose } from "./dialogLifecycle";
+import type { TasteFeedback } from "../recommendations/personalization";
 import s from "./listening-profile.module.css";
 
 type Scope = "history" | "feedback" | "all";
@@ -22,11 +24,11 @@ function feedbackTitle(item: Feedback) {
   try { if (item.track) return musicTrack(item.track).title; } catch {}
   return item.target === "artist" ? "An artist" : "A song";
 }
-function feedbackDescription(item: Feedback) {
+function feedbackDescription(item: Feedback, timeZone?: string) {
   if (item.active === false) return "This exclusion has expired";
   if (item.kind === "love") return "Recommended more often";
   if (item.kind === "less") return "Recommended less often";
-  if (item.expiresAt) return `Excluded until ${new Date(item.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  if (item.expiresAt) return `Excluded until ${new Date(item.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone })}`;
   return "Excluded from recommendations";
 }
 
@@ -47,10 +49,10 @@ function DataControls() {
     const controller = actions.begin("restore"); if (!controller) return;
     setRestoring(item.target + item.targetId); setError(null);
     try {
-      await requestJson("/api/v2/taste", { method: "DELETE", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: item.target, targetId: item.targetId }) }, { context: "save", accountId });
+      const result=await requestJson<{mutationAt?:string}>("/api/v2/taste", { method: "DELETE", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: item.target, targetId: item.targetId }) }, { context: "save", accountId });
       if (!actions.current("restore", controller)) return;
-      invalidateResources(accountId); window.dispatchEvent(new CustomEvent("sakura-taste-updated", { detail: { accountId, removedTargetId: item.targetId, target: item.target } }));
-      music.notify("This taste adjustment has been removed.");
+      invalidateRecommendationResources(accountId); window.dispatchEvent(new CustomEvent("sakura-taste-updated", { detail: { accountId, removedTargetId: item.targetId, target: item.target,mutationAt:result.mutationAt } }));
+      music.notify("This recommendation choice has been removed.");
     } catch (failure) { if (actions.current("restore", controller)) setError(userMessage(failure, "save")); }
     finally { if (actions.finish("restore", controller)) setRestoring(null); }
   }
@@ -59,13 +61,14 @@ function DataControls() {
     const controller = actions.begin("clear"); if (!controller) return;
     setBusy(true); setError(null);
     try {
-      const result = await requestJson<{ cutoff?: string }>("/api/v2/personalization/data", { method: "DELETE", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, period }) }, { context: "save", accountId });
+      const result = await requestJson<{ cutoff?: string; tasteFeedback?: TasteFeedback[]; feedbackAuthoritative?: boolean }>("/api/v2/personalization/data", { method: "DELETE", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, period }) }, { context: "save", accountId });
       if (!actions.current("clear", controller)) return;
-      const detail = { accountId, scope, period, cutoff: result.cutoff };
+      const detail = { accountId, scope, period, cutoff: result.cutoff, tasteFeedback: result.tasteFeedback, feedbackAuthoritative: result.feedbackAuthoritative };
       if (scope === "history" || scope === "all") window.dispatchEvent(new CustomEvent("sakura-history-cleared", { detail }));
       window.dispatchEvent(new CustomEvent("sakura-personalization-cleared", { detail }));
-      invalidateResources(accountId);
-      music.notify(`${scopes[scope]} cleared. Your other library data is unchanged.`);
+      if(scope === "history" || scope === "all")invalidateResources(accountId, "/api/v2/", true);
+      else for(const prefix of ["/api/v2/taste","/api/v2/feed","/api/v2/home","/api/v2/mixes","/api/v2/search/suggestions"])invalidateResources(accountId,prefix);
+      music.notify(`${scopes[scope]} cleared. Your liked songs, playlists, and downloads are kept.`);
       requestDialogClose(() => setConfirmation(false));
     } catch (failure) { if (actions.current("clear", controller)) setError(userMessage(failure, "save")); }
     finally { if (actions.finish("clear", controller)) setBusy(false); }
@@ -92,21 +95,20 @@ function DataControls() {
       <summary><span>Taste choices & song exclusions</span><small>{feedback.filter(item => item.active !== false).length} active</small><Icon name="chevron" size={15}/></summary>
       {resource.loading && !resource.data ? <p className={s.smallNote} role="status">Loading taste choices…</p> : resource.error && !resource.data ? <LoadError message={resource.error} retry={resource.retry}/> : <>
         {!feedback.length && <p className={s.smallNote}>No exclusions or taste choices yet. Manage a song&apos;s influence through its options.</p>}
-        <ul className={s.feedbackList}>{displayed.map(item => <li key={item.target + item.targetId}><span><b dir="auto">{feedbackTitle(item)}</b><small>{feedbackDescription(item)}</small></span><button type="button" disabled={restoring !== null || busy} aria-label={`Remove taste adjustment for ${feedbackTitle(item)}`} onClick={() => void restore(item)}>{restoring === item.target + item.targetId ? "Restoring…" : "Undo"}<Icon name="back" size={14}/></button></li>)}</ul>
+        <ul className={s.feedbackList}>{displayed.map(item => <li key={item.target + item.targetId}><span><b dir="auto">{feedbackTitle(item)}</b><small>{feedbackDescription(item, music.settings.timeZone)}</small></span><button type="button" disabled={restoring !== null || busy} aria-label={`Remove taste adjustment for ${feedbackTitle(item)}`} onClick={() => void restore(item)}>{restoring === item.target + item.targetId ? "Restoring…" : "Undo"}<Icon name="back" size={14}/></button></li>)}</ul>
         {feedback.length > 5 && <button type="button" className={s.textButton} aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer adjustments" : `See all ${feedback.length} adjustments`}</button>}
       </>}
     </details>
-    <div className={s.dataSelects}><label>What to clear<select value={scope} onChange={event => setScope(event.target.value as Scope)}>{Object.entries(scopes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>How much to clear<select value={period} onChange={event => setPeriod(event.target.value as Period)}>{Object.entries(periods).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+    <div className={s.dataSelects}><label>What to clear<select value={scope} onChange={event => setScope(event.target.value as Scope)}>{Object.entries(scopes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Time period<select value={period} onChange={event => setPeriod(event.target.value as Period)}>{Object.entries(periods).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
     <div className={s.dataActions}><Button secondary icon="download" disabled={exporting || busy || !accountId} onClick={() => void exportData()}>{exporting ? "Preparing your data…" : "Export my data"}</Button><button className={s.clearButton} type="button" disabled={busy || !accountId} onClick={() => { setError(null); setConfirmation(true); }}><Icon name="trash" size={17}/>Clear selected data</button></div>
     {error && !confirmation && <p className={s.error} role="alert">{error}</p>}
     <p className={s.smallNote}>Your listening record includes audible time, song positions, finishes, skips, and listening hours. Published genre tags help describe the music. You can pause learning in your feed settings.</p>
-    {confirmation && <PlayerDialog subtitle="YOUR DATA, YOUR CHOICE" title="Clear selected data?" appearance="note" closeDisabled={busy} className={s.clearDialog} onClose={() => setConfirmation(false)}>
+    {confirmation && <PlayerDialog subtitle="YOUR DATA, YOUR CHOICE" title="Clear selected data?" appearance="note" closeDisabled={busy} className={s.clearDialog} onClose={() => setConfirmation(false)} footer={<div className={s.dialogActions}><PlayerButton secondary autoFocus disabled={busy} onClick={() => requestDialogClose(() => setConfirmation(false))}>Keep my data</PlayerButton><PlayerButton className={s.confirmClear} disabled={busy} onClick={() => void clear()}>{busy ? "Clearing your data…" : "Clear this data"}</PlayerButton></div>}>
       <div className={s.clearSummary}><Blossom/><div><b>{scopes[scope]}</b><span>{periods[period]}</span></div></div>
-      <p className={s.clearDescription}>{scope === "feedback" ? "This removes the selected taste choices and song exclusions. Excluded songs can appear in recommendations again." : `This removes ${period === "all" ? "all recorded listening sessions" : "complete listening sessions that touch the selected period"}${scope === "all" ? " and the selected taste choices and song exclusions" : ""}. Listening statistics and recommendations will be rebuilt from the history you keep. Saved listening stories based on the removed history are cleared too.`}</p>
-      <p className={s.keepNote}>Your likes, playlists, preferences, and downloaded songs stay with you. Clearing this data cannot be undone.</p>
+      <p className={s.clearDescription}>{scope === "feedback" ? "This removes the selected taste choices and song exclusions. Excluded songs can appear in recommendations again." : `This removes ${period === "all" ? "all recorded listening sessions" : "whole listens that overlap the selected period"}${scope === "all" ? " and the selected taste choices and song exclusions" : ""}. Listening totals and recommendations will use the history you keep. Your saved listening stories are cleared too.`}</p>
+      <p className={s.keepNote}>Clearing this data cannot be undone. Your likes, playlists, preferences, and downloaded songs stay with you.</p>
       {scope !== "feedback" && period !== "all" && <p className={s.smallNote}>Older imported listening totals can lack session dates. Choose “All time” to clear those totals completely.</p>}
       {error && <p className={s.error} role="alert">{error}</p>}
-      <div className={s.dialogActions}><PlayerButton secondary autoFocus disabled={busy} onClick={() => requestDialogClose(() => setConfirmation(false))}>Keep my data</PlayerButton><PlayerButton className={s.confirmClear} disabled={busy} onClick={() => void clear()}>{busy ? "Clearing your data…" : "Clear this data"}</PlayerButton></div>
     </PlayerDialog>}
   </section>;
 }

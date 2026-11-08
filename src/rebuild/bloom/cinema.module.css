@@ -26,6 +26,7 @@
 @media(prefers-reduced-motion:reduce){.story[open][data-dialog-phase],.story[data-dialog-phase]> .header,.story[data-dialog-phase]> .progress{animation:none}}
 .story[open][data-motion="still"],.story[data-motion="still"]>.header,.story[data-motion="still"]>.progress{animation:none}
 .performanceSettings,.autoChoice,.autoChoice>span{min-width:0}.autoChoice select{min-width:0;max-width:100%;min-height:44px}.performanceSettings p,.autoChoice b,.autoChoice small,.qualityChoices b,.qualityChoices small{overflow-wrap:anywhere}.qualityChoices{grid-template-columns:repeat(5,minmax(0,1fr))}.qualityChoices>button{min-width:0}
+.story .progress{overflow-x:auto;scrollbar-width:none;touch-action:pan-x;gap:5px}.story .progress::-webkit-scrollbar{display:none}.story .progress button{min-width:44px;flex:1 0 44px}
 @media(max-width:750px){.qualityChoices{grid-template-columns:repeat(3,minmax(0,1fr))}.autoChoice{width:100%}.autoChoice select{width:100%}}
 @media(max-width:480px){.qualityChoices{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.qualityChoices>button{padding:14px 12px}.autoChoice{gap:14px}}
 @media(max-width:320px){.qualityChoices{grid-template-columns:minmax(0,1fr)}.qualityChoices>button{display:grid;grid-template-columns:35px minmax(0,1fr);gap:4px 10px;align-items:start}.qualityChoices>button>span{grid-row:1/3}.qualityChoices>button>b{margin:2px 0 0}.qualityChoices>button>small{grid-column:2}}

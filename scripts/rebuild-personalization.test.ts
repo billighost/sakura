@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {describe,it} from "node:test";
 import {rankPersonalizedTracks,orderPersonalizedTracks,planLocalQueue,tasteExcluded,activeTasteFeedback,recentRelease,type TasteTrack,type ListeningEvidence} from "../src/rebuild/recommendations/personalization";
 import {encodeFeedCursor,parseFeedCursor,verifyFeedCursor} from "../src/rebuild/recommendations/feedCursor";
+import {artistCreditHref,primaryArtistHref} from "../src/rebuild/app/artistNavigation";
 
 const now=Date.parse("2026-11-08T12:00:00Z");
 const track=(id:string,artist=id,genres=["Jazz"]):TasteTrack=>({id,title:`Song ${id}`,artists:[artist],artistId:`artist-${artist}`,genres,durationMs:180000,popularity:.5});
@@ -15,6 +16,39 @@ describe("Personalized feed and queue ranking",()=>{
     assert.equal(known.lane,"familiar");assert.match(known.reason,/all the way/);
     assert.equal(related.familiarArtist,true);assert.match(related.reason,/Another side/);
     assert.match(genre.reason,/Jazz/);assert.ok(ranked.every(item=>!/energetic|mood|tempo|BPM/i.test(item.reason)));
+  });
+  it("recognizes short heard recordings without claiming a listening habit from one play",()=>{
+    const song={...track("short","A"),durationMs:20000};
+    const entry=rankPersonalizedTracks([song],{history:[listened("short",{audibleMs:20000,playCount:1,completedCount:1,skippedCount:0})],nowMs:now})[0];
+    assert.equal(entry.heard,true);assert.equal(entry.lane,"familiar");assert.doesNotMatch(entry.reason,/often|Another side/);
+  });
+  it("uses primary credits and keeps unidentified artists unknown",()=>{
+    const source={...track("source","A"),artistId:null,artistCredits:[{name:"Guest",role:"featured" as const,artistId:"guest"},{name:"A",role:"primary" as const,artistId:"primary"}]};
+    const related={...track("related","A"),artistId:"primary"};
+    const unknown={...track("unknown"),artistId:null,artists:[]},other={...unknown,id:"other"};
+    const ranked=rankPersonalizedTracks([source,related,unknown,other],{history:[listened("source"),listened("unknown")],nowMs:now});
+    assert.equal(ranked.find(item=>item.track.id==="related")!.familiarArtist,true);
+    assert.equal(ranked.find(item=>item.track.id==="other")!.familiarArtist,false);
+  });
+  it("visits the lead artist rather than a linked guest when the lead has no catalog ID",()=>{
+    const primary={name:"Unlinked lead",role:"primary" as const,artistId:null},guest={name:"Linked guest",role:"featured" as const,artistId:"guest-id"};
+    const song={artists:[primary.name,guest.name],artistId:guest.artistId,artistCredits:[guest,primary]};
+    assert.equal(primaryArtistHref(song),"/search?q=Unlinked%20lead&tab=Artists");
+    for(const reference of [{provider:"deezer" as const,id:"1204"},{provider:"spotify" as const,id:"exact-primary"}]){
+      const credit={...primary,reference};
+      assert.equal(primaryArtistHref({...song,artistCredits:[guest,credit]}),reference.provider==="deezer"?"/artist/1204":"/artist/spotify%3Aexact-primary");
+      assert.equal(primaryArtistHref({...song,artistCredits:[guest,credit]}),artistCreditHref(credit));
+    }
+    assert.equal(primaryArtistHref({...song,artistCredits:[guest,{...primary,artistId:"lead-id"}]}),"/artist/lead-id");
+    assert.equal(primaryArtistHref({...song,artistCredits:[guest]}),"/search?q=Unlinked%20lead&tab=Artists");
+    assert.equal(primaryArtistHref({artists:["Legacy lead"],artistId:"legacy-id"}),"/artist/legacy-id");
+  });
+  it("does not multiply genre preference or hour weights for duplicate catalog tags",()=>{
+    const source=track("source","A",["Jazz","Pop"]),target=track("target","B",["Jazz"]);
+    const options={history:[listened("source",{hourWeights:[{hour:13,audibleMs:1800000}]})],nowMs:now,seed:"duplicate-genres"};
+    const original=rankPersonalizedTracks([source,target],options).find(item=>item.track.id==="target")!;
+    const repeated=rankPersonalizedTracks([{...source,genres:["Jazz","jazz","Pop"," "]},target],options).find(item=>item.track.id==="target")!;
+    assert.equal(repeated.score,original.score);assert.equal(repeated.reason,original.reason);
   });
   it("changes familiar and exploration ordering using the discovery control",()=>{
     const songs=[track("known","A"),track("new","B")],history=[listened("known")];
@@ -55,7 +89,7 @@ describe("Personalized feed and queue ranking",()=>{
     assert.equal(recentRelease("2026-10-24",now),true);
     for(const value of [undefined,"2026","2026-02-30","2026-12-01","2025-11-01","yesterday"])assert.equal(recentRelease(value,now),false);
     const ranked=rankPersonalizedTracks([{...track("new","A"),releaseDate:"2026-10-24"},track("old","A")],{settings:{seedArtists:["A"]},nowMs:now});
-    assert.equal(ranked.find(item=>item.track.id==="new")!.lane,"fresh");assert.match(ranked.find(item=>item.track.id==="new")!.reason,/recent release/);
+    assert.equal(ranked.find(item=>item.track.id==="new")!.lane,"fresh");assert.match(ranked.find(item=>item.track.id==="new")!.reason,/recent album/);
   });
   it("local queues are unique subsets and enforce explicit/exclusion rules",()=>{
     const songs=[track("one"),track("two"),{...track("explicit"),explicit:true},track("blocked"),track("one")];
@@ -78,6 +112,12 @@ describe("Personalized feed and queue ranking",()=>{
     const unaware=rankPersonalizedTracks(songs,{history,settings:{timeAware:false,timeZone:"Africa/Lagos"},nowMs:now});
     assert.match(aware.find(item=>item.track.id==="related")!.reason,/around this time/);
     assert.ok(!unaware.find(item=>item.track.id==="related")!.reason.includes("around this time"));
+  });
+  it("names the genre supported at this hour instead of a different lifetime interest",()=>{
+    const songs=[track("jazz","A",["Jazz"]),track("metal","B",["Metal"]),track("both","C",["Jazz","Metal"])];
+    const history=[listened("jazz",{audibleMs:36000000,hourWeights:[{hour:20,audibleMs:36000000}]}),listened("metal",{hourWeights:[{hour:13,audibleMs:1800000}]})];
+    const result=rankPersonalizedTracks(songs,{history,settings:{timeZone:"Africa/Lagos"},nowMs:now}).find(item=>item.track.id==="both")!;
+    assert.match(result.reason,/More Metal/);assert.doesNotMatch(result.reason,/More Jazz/);
   });
   it("recent-repeat tolerance affects ranking independently of listening totals",()=>{
     const songs=[track("recent","A"),track("older","A")],history=[listened("recent",{lastPlayedAt:now-60000}),listened("older")];

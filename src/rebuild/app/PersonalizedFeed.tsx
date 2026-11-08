@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMusic } from "./MusicContext";
 import { musicTrack, type MusicTrack } from "./types";
@@ -13,6 +13,7 @@ import { SmartQueueButton } from "./SmartQueueButton";
 import { RecoveryNotice } from "./RecoveryNotice";
 import { requestJson } from "./errors";
 import type { SongMenuAnchor } from "./TrackActions";
+import { appendUniqueFeedItems } from "./feedItems";
 import s from "./personalized-feed.module.css";
 
 type Surface = "home" | "discover";
@@ -38,7 +39,7 @@ const lanes: Record<Lane, { label: string; icon: IconName }> = {
   familiar: { label: "A familiar song", icon: "heart" },
   similar: { label: "Related to your listening", icon: "discover" },
   explore: { label: "Something new", icon: "discover" },
-  fresh: { label: "A recent release", icon: "sun" },
+  fresh: { label: "From a recent album", icon: "sun" },
 };
 
 function emptyFeed(): FeedState {
@@ -113,15 +114,18 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
   const feedRef = useRef(feed);
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const seenCursors = useRef(new Set<string>());
   const sentinel = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ track: MusicTrack; anchor: SongMenuAnchor } | null>(null);
   const [showWhy, setShowWhy] = useState(false);
+  const explanationId = useId();
 
   const load = useCallback(async (reset = false) => {
     if (!accountId || request.current && !reset) return;
     if (!reset && feedRef.current.ready && !feedRef.current.nextCursor) return;
     request.current?.abort();
+    if (reset) seenCursors.current.clear();
     const controller = new AbortController(), epoch = ++generation.current;
     request.current = controller;
     const previous = feedRef.current;
@@ -138,13 +142,13 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
         feedRef.current = changed; setFeed(changed); return;
       }
       const page = parseFeed(raw);
-      const all = reset ? page.items : [...previous.items, ...page.items];
-      const unique = [...new Map(all.map(item => [item.track.id, item])).values()];
+      const unique = appendUniqueFeedItems(reset ? [] : previous.items, page.items);
       const next: FeedState = { ...page, items: unique,
         sections: reset || !previous.ready ? page.sections : previous.sections,
         ready: true, busy: false, error: null, refreshRequired: false };
       // A repeated cursor cannot keep an observer making the same request.
-      if (!reset && previous.nextCursor && page.nextCursor === previous.nextCursor) next.nextCursor = null;
+      if (!reset && previous.nextCursor) seenCursors.current.add(previous.nextCursor);
+      if (page.nextCursor && seenCursors.current.has(page.nextCursor)) next.nextCursor = null;
       feedRef.current = next; setFeed(next); saveFeed(cacheKey, next);
     } catch (error) {
       if (controller.signal.aborted || epoch !== generation.current) return;
@@ -172,13 +176,21 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ accountId?: string }>).detail;
       if (detail?.accountId && detail.accountId !== accountId) return;
-      clearAccountFeeds(accountId); void load(true);
+      clearAccountFeeds(accountId);
+      // Erasure takes effect even if the replacement request fails offline.
+      // No card carrying a removed listening explanation remains cached or visible.
+      if (event.type === "sakura-personalization-cleared" || event.type === "sakura-listening-erased") {
+        const cleared = emptyFeed(); feedRef.current = cleared; setFeed(cleared);
+      }
+      void load(true);
     };
     window.addEventListener("sakura-taste-updated", changed);
     window.addEventListener("sakura-personalization-cleared", changed);
+    window.addEventListener("sakura-listening-erased", changed);
     return () => {
       window.removeEventListener("sakura-taste-updated", changed);
       window.removeEventListener("sakura-personalization-cleared", changed);
+      window.removeEventListener("sakura-listening-erased", changed);
     };
   }, [accountId, load]);
 
@@ -206,7 +218,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
           label={home ? "Find my soundtrack" : "Find my soundtrack"}/>
           <Link href={home ? "/discover" : "/liked"}>{home ? "Explore new music" : "Your liked songs"}<Icon name="arrow" size={15}/></Link></div>
         <div className={s.tasteNote}><span className={s.tasteDot}/>{discoveryLabel}
-          <button type="button" onClick={() => setShowWhy(value => !value)} aria-expanded={showWhy} aria-controls="feed-explanation">About recommendations</button></div>
+          <button type="button" onClick={() => setShowWhy(value => !value)} aria-expanded={showWhy} aria-controls={explanationId}>About recommendations</button></div>
       </div>
       <div className={s.heroMusic}><GardenDrawing/>
         {pick ? <HeroPick item={pick} tracks={allTracks} source={source} onOptions={openMenu}/> : <div className={s.waitingSleeve} aria-hidden="true"><Blossom/><span>your next<br/><em>good song</em></span><i/></div>}
@@ -214,8 +226,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
       </div>
     </section>
 
-    {showWhy && <div id="feed-explanation" className={s.explanation}><Blossom/><div><h2>How these songs are selected.</h2>
-      <p>{feed.personalized ? "These recommendations use your likes, chosen artists and genres, and listening history. Time played, completed songs, and skips help adjust the selection. One skip alone is not treated as a dislike."
+    {showWhy && <div id={explanationId} data-feed-explanation className={s.explanation}><Blossom/><div><h2>How these songs are selected.</h2>
+      <p>{feed.personalized ? "Your likes and chosen artists and genres guide these songs. When learning is on, saved listening also helps refine the selection. A skip alone is not a dislike."
         : "Your chosen artists and genres provide a starting point. When learning is enabled, listening history helps refine the selection. You can change your preferences in Settings."}</p>
       <p>Each song includes a recommendation reason. Song options let you reduce its influence or exclude it for a chosen period.</p>
       <Link href="/profile">See your listening journal<Icon name="arrow" size={14}/></Link></div>
@@ -230,6 +242,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     {privateListening && <div className={s.privateNote}><Icon name="moon" size={16}/><p>{music.settings.privateSession
       ? "Private listening is on. New listening activity is not saved."
       : "Learning is paused. New listening activity is not saved."}</p><Link href="/settings#your-feed">Your controls<Icon name="arrow" size={14}/></Link></div>}
+
+    {children}
 
     {feed.sections.slice(0, 3).map((section, index) => <section key={section.id} className={s.spotlight} aria-label={section.title}>
       <div className={s.sectionHeading}><div><span className={s.eyebrow}>{index === 0 ? "FROM YOUR LISTENING" : "MORE TO EXPLORE"}</span><h2>{section.title}</h2><p>{section.description}</p></div>
@@ -270,7 +284,6 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
 
     <div className={s.bloomPath}><Link href={home ? "/discover" : "/search"}><Icon name="map"/><span><b>{home ? "More music to discover." : "Explore artists and albums."}</b><small>{home ? "Browse new songs and familiar artists in Discover." : "Explore an artist, an album, or the song on your mind."}</small></span><Icon name="arrow" size={16}/></Link>
       <Link href="/bloom"><Blossom/><span><b>Your listening, in Bloom.</b><small>Open your listening stories in Sakura Bloom.</small></span><Icon name="arrow" size={16}/></Link></div>
-    {children}
     {menu && <TrackMenu track={menu.track} anchor={menu.anchor} onClose={() => setMenu(null)}/>}
   </div>;
 }
@@ -320,7 +333,7 @@ function FeedSong({ item, tracks, number, featured, source, onOptions }: {
     onOptions={anchor => onOptions(track, anchor)}>
     <div className={s.songArtwork}><Artwork url={track.coverUrl} title={track.albumTitle || track.title}/><span className={s.songNumber} aria-hidden="true">{String(number).padStart(2, "0")}</span>
       <SongPlay track={track} tracks={tracks} source={source} className={s.songPlay}/>{state.playing && <span className={s.playingPetals} aria-label="Now playing"><i/><i/><i/></span>}</div>
-    <div className={s.songBody}><span className={s.lane} data-lane={item.lane}><Icon name={lane.icon} size={12}/>{lane.label}</span>
+    <div className={s.songBody}><span className={`${s.lane} ${!featured && item.lane !== "fresh" ? s.srOnly : ""}`} data-lane={item.lane}><Icon name={lane.icon} size={12}/>{lane.label}</span>
       <Link className={s.songTitle} href={"/track/" + encodeURIComponent(state.id)} dir="auto">{track.title}</Link><ArtistLinks track={track} className={s.songArtist}/>
       <p className={s.songReason}>{item.reason}</p><div className={s.songBottom}><span className={s.songDetails}>{track.genres?.[0] && <span>{track.genres[0]}</span>}<span>{time(track.durationMs)}</span>
         {track.versionLabel !== "Original recording" && <span title={track.versionLabel}>{track.versionLabel}</span>}</span><SongTools track={track} onOptions={onOptions}/></div></div>

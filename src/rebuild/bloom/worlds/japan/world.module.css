@@ -92,6 +92,7 @@
 .objectSpirit:nth-child(3n) {bottom:11.5%;}
 .objectSpirit>svg {width:100%;height:auto;overflow:visible;}
 .paperLights {position:absolute;inset:0;z-index:2;pointer-events:none;}
+.listeningMarks {opacity:.9;}
 .paperLights i {position:absolute;width:var(--light-size);height:var(--light-size);border-radius:50%;background:#e4b964;opacity:.2;}
 .dawnWash {position:absolute;inset:13% 8% 11%;pointer-events:none;z-index:1;background:linear-gradient(140deg,transparent 30%,#f1ca7552 80%,#e9c8a23b);opacity:var(--japan-dawn);}
 .pageTurn {position:absolute;inset:12% 8% 11%;z-index:6;overflow:hidden;pointer-events:none;}
@@ -187,4 +188,17 @@
 .world[data-view="poster"] .landscape {opacity:.32;}
 @media (prefers-reduced-motion:reduce) {
   .world *,.world *::before,.world *::after {animation:none!important;transition:none!important;}
+}
+
+/* Keep the ink on paper when a narrow chapter becomes taller than the screen. */
+.world[data-view="story"] {height:auto;}
+.world[data-view="story"]:not([data-opening="true"]) .content {
+  padding-top:calc(153px + env(safe-area-inset-top));
+  padding-bottom:calc(170px + env(safe-area-inset-bottom));
+}
+.world[data-view="story"][data-scene="finale"] .content>div>h2 {color:var(--japan-ink);}
+@media(max-width:600px) {
+  .world[data-view="story"]:not([data-opening="true"]) .bookPaper {
+    transform-box:fill-box;transform-origin:center;transform:scaleY(1.3);
+  }
 }

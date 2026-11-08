@@ -2,6 +2,8 @@
 
 import { useId, type CSSProperties } from "react";
 import type { BloomWorldProps, BloomQuality } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin, stableCos } from "../stableTrig";
 import s from "./world.module.css";
 
 const TIERS = {
@@ -13,7 +15,7 @@ const TIERS = {
 } satisfies Record<BloomQuality, { stars: number; pins: number; ribs: number; fibres: number; ticks: number; constellations: number; layers: number }>;
 
 function scatter(n: number) {
-  const value = Math.sin(n * 94.719 + 31.2) * 29183.71;
+  const value = stableSin(n * 94.719 + 31.2) * 29183.71;
   return value - Math.floor(value);
 }
 
@@ -71,8 +73,9 @@ function Definitions({ id }: { id: string }) {
   </defs>;
 }
 
-function Sky({ id, quality, progress }: { id: string; quality: BloomQuality; progress: number }) {
+function Sky({ id, quality, progress, listening }: { id: string; quality: BloomQuality; progress: number; listening?: BloomListeningProfile }) {
   const tier = TIERS[quality];
+  const constellationCount = listening?.artistCount == null ? tier.constellations : Math.min(tier.constellations,Math.max(0,listening.artistCount));
   return <g className={s.sky}>
     <path d="M0 0H1440V900H0Z" fill={`url(#${id}-sky)`}/>
     <path d="M64 101Q431-122 1132 66L1399 262 1286 407Q1007 271 648 167Q327 121 64 245Z" fill="#365775" opacity=".6"/>
@@ -84,13 +87,31 @@ function Sky({ id, quality, progress }: { id: string; quality: BloomQuality; pro
         return n % 7 === 0 ? <Star key={n} x={x} y={y} size={3 + scatter(n * 11) * 6} colour={n % 3 ? "#d7c397" : "#be9289"} folded={quality >= 3}/> : <g key={n} opacity={.25 + scatter(n) * .55}><path d={`M${x - 2} ${y}h4m-2-2v4`} stroke="#f6e7bb" strokeWidth=".7"/>{quality >= 4 && <circle cx={x} cy={y} r="4" fill="none" stroke="#e0c698" strokeWidth=".45" opacity=".5"/>}</g>;
       })}
     </g>
-    {Array.from({ length: tier.constellations }, (_, n) => {
+    {Array.from({ length: constellationCount }, (_, n) => {
       const x = 70 + scatter(n * 23) * 1120, y = 70 + scatter(n * 13) * 470;
       const points = Array.from({ length: 4 + n % 3 }, (_, i) => `${x + i * 26 + scatter(i + n) * 13},${y + scatter(i * 4 + n) * 53}`).join(" ");
       return <g key={`c${n}`} className={s.constellation} style={{ "--constellation-delay": `${.2 + n * .13}s` } as CSSProperties} opacity={.14 + progress * .36}><polyline points={points} stroke="#ead0a0" strokeWidth=".8" fill="none"/>{points.split(" ").map((point, i) => { const [px, py] = point.split(",").map(Number); return <circle key={i} cx={px} cy={py} r="2.3" fill="#dfc69a"/>; })}</g>;
     })}
-    {quality >= 3 && <g opacity=".19" stroke="#c0c8b4" fill="none" strokeWidth=".8"><path d="M52 442Q280 93 677 63Q1090 40 1390 315M80 474Q315 150 696 116Q1042 101 1353 337"/><path d="M701 24 703 109M601 29 613 121M802 25 791 120"/>{Array.from({ length: 19 }, (_, n) => <path key={n} d={`M${112 + n * 64} ${440 - Math.sin(n / 19 * Math.PI) * 300}l7-12`} />)}</g>}
+    {quality >= 3 && <g opacity=".19" stroke="#c0c8b4" fill="none" strokeWidth=".8"><path d="M52 442Q280 93 677 63Q1090 40 1390 315M80 474Q315 150 696 116Q1042 101 1353 337"/><path d="M701 24 703 109M601 29 613 121M802 25 791 120"/>{Array.from({ length: 19 }, (_, n) => <path key={n} d={`M${112 + n * 64} ${440 - stableSin(n / 19 * Math.PI) * 300}l7-12`} />)}</g>}
   </g>;
+}
+
+function ListeningOrbit({ listening, quality }: { listening: BloomListeningProfile; quality: BloomQuality }) {
+  const count = Math.min(quality + 3,Math.max(0,listening.artistCount || 0));
+  const shared = Math.min(count,Math.max(0,listening.comparison?.sharedArtistCount || 0));
+  const returning = Math.min(count,Math.max(0,listening.returningArtistCount || 0));
+  const discovered = Math.min(count,Math.max(0,listening.discoveredArtistCount || 0));
+  return <svg viewBox="-74 -74 148 148" aria-hidden="true" data-listening-motif="artist-orbit" data-orbit-artists={count} data-shared-links={shared}>
+    <circle r="60" fill="none" stroke="#d7c298" strokeWidth=".7" opacity=".65"/>
+    {listening.peakHour != null && <g transform={`rotate(${listening.peakHour / 24 * 360})`}><path d="M0-63V-52" stroke="#efe2bc" strokeWidth="2"/><path d="m-4-68 4 5 4-5" fill="none" stroke="#e0bc75"/></g>}
+    {Array.from({length:count},(_,n)=>{const angle=n / Math.max(1,count) * Math.PI * 2 - Math.PI / 2,x=stableCos(angle) * 47,y=stableSin(angle) * 47;return <g key={n}>
+      {n < shared && <path d={`M0 0 ${x} ${y}`} fill="none" stroke="#d7c298" strokeWidth="1.1"/>}
+      {n < returning && <circle cx={x} cy={y} r="13" fill="none" stroke="#adc1b4" strokeWidth=".8"/>}
+      <Star x={x} y={y} size={n < discovered ? 11 : 8} colour={n < discovered ? "#c7978e" : "#d9c395"} folded/>
+    </g>;})}
+    <Star x={0} y={0} size={16} colour="#e0bc75" folded/>
+    {shared > 1 && <circle r="25" fill="none" stroke="#b2c0ac" strokeWidth=".7" strokeDasharray="2 5"/>}
+  </svg>;
 }
 
 function Dome({ id, quality, open }: { id: string; quality: BloomQuality; open: boolean }) {
@@ -158,7 +179,7 @@ function Orrery({ id, quality }: { id: string; quality: BloomQuality }) {
       {quality >= 3 && <ellipse cx="172" cy="136" rx="79" ry="35" fill="none" stroke="#d7b57a" strokeWidth="1.1"/>}
       <path d="M27 115 173 143 270 78M66 183 173 143 314 171" fill="none" stroke="#cdb68a" strokeWidth="3.3"/>
       <path d="M36 121 173 148 273 85" fill="none" stroke="#506c70" strokeWidth="1"/>
-      {Array.from({length:tier.ticks},(_,n)=>{const angle=n/tier.ticks*Math.PI*2;return <path key={n} d={`M${172+Math.cos(angle)*153} ${136+Math.sin(angle)*68}l${-Math.cos(angle)*(n%3===0?8:4)} ${-Math.sin(angle)*(n%3===0?5:3)}`} stroke="#ebd2a3" strokeWidth=".7"/>;})}
+      {Array.from({length:tier.ticks},(_,n)=>{const angle=n/tier.ticks*Math.PI*2;return <path key={n} d={`M${172+stableCos(angle)*153} ${136+stableSin(angle)*68}l${-stableCos(angle)*(n%3===0?8:4)} ${-stableSin(angle)*(n%3===0?5:3)}`} stroke="#ebd2a3" strokeWidth=".7"/>;})}
       <g transform="translate(269 77)"><circle r="27" fill="#ba8e82" stroke="#20384a" strokeWidth="1.5"/><path d="M0-27Q27-3 0 27" fill="#e3b5a0"/><path d="M-24-9Q-3 6 26-9M-24 10Q0 25 24 10" fill="none" stroke="#795b63" opacity=".6"/><path d="M-4-23V23" stroke="#e5bead" opacity=".55" strokeWidth=".8"/></g>
       <g transform="translate(34 115)"><circle r="18" fill="#88a19d" stroke="#20384a" strokeWidth="1.5"/><path d="M0-18Q17-3 0 18" fill="#b7c1a4"/><path d="M-16-5 14 7" stroke="#627d77"/></g>
       <g transform="translate(308 171)"><ellipse rx="32" ry="8" fill="#c8b38f" stroke="#253c4b" transform="rotate(-18)"/><circle r="14" fill="#cfae68" stroke="#253c4b"/><path d="M0-14Q13 1 0 14" fill="#efd09b"/><path d="M278 179 338 163" stroke="#dfc599" strokeWidth="2"/></g>
@@ -181,7 +202,7 @@ function Chart({ id, quality, variant = 0 }: { id: string; quality: BloomQuality
     <g transform="translate(118 145) rotate(-4)" stroke="#667b77" strokeWidth=".7" fill="none">
       <circle r="79"/><circle r="61"/><circle r="27"/><ellipse rx="77" ry="39" transform={`rotate(${variant ? -28 : 32})`}/>
       <path d="M-86 0H86M0-89V89M-55-66 55 66M-55 66 55-66"/>
-      {Array.from({length:TIERS[quality].ticks/3},(_,n)=>{const a=n/(TIERS[quality].ticks/3)*Math.PI*2;return <path key={n} d={`M${Math.cos(a)*79} ${Math.sin(a)*79} ${Math.cos(a)*(n%3===0?69:74)} ${Math.sin(a)*(n%3===0?69:74)}`}/>;})}
+      {Array.from({length:TIERS[quality].ticks/3},(_,n)=>{const a=n/(TIERS[quality].ticks/3)*Math.PI*2;return <path key={n} d={`M${stableCos(a)*79} ${stableSin(a)*79} ${stableCos(a)*(n%3===0?69:74)} ${stableSin(a)*(n%3===0?69:74)}`}/>;})}
       <path d="M-40 34-12 5 3 25 28-18 43-33M-25-49-7-36 18-53 47-25" stroke="#b58e51" strokeWidth="1.1"/>
       {[-40,-12,3,28,43].map((x,n)=><circle key={n} cx={x} cy={[34,5,25,-18,-33][n]} r="2.1" fill="#b4864c" stroke="none"/>)}
     </g>
@@ -232,7 +253,7 @@ function PaperAperture({ quality }: { quality: BloomQuality }) {
   </svg>;
 }
 
-export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
   const id = `cosmos-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const opening = scene === "opening" || view === "cover";
   const music = ["songs", "song-winner", "artist-songs", "discoveries", "returns", "finale"].includes(scene);
@@ -241,15 +262,16 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
   const completion = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
   const shot = opening ? "entrance" : scene === "song-winner" ? "aperture" : portrait ? "portrait" : scene === "finale" ? "panorama" : scene === "days" ? "calendar" : music || scene === "breadth" ? "gallery" : scene === "comparison" ? "chart" : "instrument";
   const style = { "--cosmos-completion": completion, "--cosmos-stage": stage, "--world-accent": "#a27849", "--world-ink": shot === "aperture" ? "#efe2bd" : "#243a47" } as CSSProperties;
-  return <div className={s.world} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} style={style}>
+  const hasOrbit = listening && (listening.artistCount != null || listening.peakHour != null);
+  return <div className={s.world} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} data-listening={Boolean(listening)} data-calendar-pages={listening?.activeDays == null ? undefined : Math.min(quality + 3,listening.activeDays)} style={style}>
     <svg className={s.environment} viewBox="0 0 1440 900" preserveAspectRatio={view === "poster" ? "none" : "xMidYMid slice"} aria-hidden="true">
-      <Definitions id={id}/><Sky id={id} quality={quality} progress={completion}/>
+      <Definitions id={id}/><Sky id={id} quality={quality} progress={completion} listening={listening}/>
       <Architecture id={id} quality={quality} progress={completion}/>
       {!opening && <g className={s.stageDome}><Dome id={id} quality={quality} open/></g>}
     </svg>
     <div className={s.paperField} aria-hidden="true"><i/><i/><i/><i/></div>
     {scene === "song-winner" && <PaperAperture quality={quality}/>}
-    {scene === "days" && <div className={s.calendarLeaves} aria-hidden="true">{Array.from({length:quality+3},(_,n)=><i key={n} style={{"--leaf":n,"--leaf-col":n%3,"--leaf-row":Math.floor(n/3)} as CSSProperties}><svg viewBox="0 0 56 70"><path d="M5 5H51V62L36 68H5Z" fill={n%2?"#b7c2ab":"#e5d4ae"} stroke="#425e66"/><path d="M9 19H46M14 9v11M42 9v11M14 31h8m10 0h8m-26 9h8m10 0h8m-26 9h8m10 0h8" fill="none" stroke="#516d70" strokeWidth=".8"/><path d="M36 68V57L51 62" fill="#b6a680"/></svg></i>)}</div>}
+    {scene === "days" && <div className={s.calendarLeaves} aria-hidden="true">{Array.from({length:listening?.activeDays == null ? quality+3 : Math.min(quality + 3,Math.max(0,listening.activeDays))},(_,n)=><i key={n} style={{"--leaf":n,"--leaf-col":n%3,"--leaf-row":Math.floor(n/3)} as CSSProperties}><svg viewBox="0 0 56 70"><path d="M5 5H51V62L36 68H5Z" fill={n%2?"#b7c2ab":"#e5d4ae"} stroke="#425e66"/><path d="M9 19H46M14 9v11M42 9v11M14 31h8m10 0h8m-26 9h8m10 0h8m-26 9h8m10 0h8" fill="none" stroke="#516d70" strokeWidth=".8"/><path d="M36 68V57L51 62" fill="#b6a680"/></svg></i>)}</div>}
     {scene === "finale" && <div className={s.finaleTitle} aria-hidden="true"><PaperTitle small/></div>}
     <div className={s.topMark} aria-hidden="true"><svg viewBox="0 0 100 40"><path d="M1 20H32M67 20H99" stroke="currentColor"/><Star x={50} y={20} size={12} colour="currentColor" folded/></svg></div>
     <div className={s.instrumentIllustrations} aria-hidden="true">
@@ -265,6 +287,6 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
     </div>}
     {!opening && <div className={s.paperShutters} key={`${scene}-${stage}`} aria-hidden="true"><i/><i/></div>}
     <div className={s.content}>{children}</div>
-    <div className={s.guideStar} key={`star-${scene}-${stage}`} aria-hidden="true"><svg viewBox="-36 -36 72 72"><path d="M-27 10Q-38-5-13-27" fill="none" stroke="#d4b778" strokeWidth=".8" strokeDasharray="2 4"/><Star x={0} y={0} size={24} colour="#e0bc75" folded/><circle r="33" stroke="#d7c298" fill="none" strokeWidth=".6" opacity=".6"/></svg></div>
+    <div className={`${s.guideStar} ${hasOrbit ? s.listeningOrbit : ""}`} key={`star-${scene}-${stage}`} aria-hidden="true">{hasOrbit ? <ListeningOrbit listening={listening} quality={quality}/> : <svg viewBox="-36 -36 72 72"><path d="M-27 10Q-38-5-13-27" fill="none" stroke="#d4b778" strokeWidth=".8" strokeDasharray="2 4"/><Star x={0} y={0} size={24} colour="#e0bc75" folded/><circle r="33" stroke="#d7c298" fill="none" strokeWidth=".6" opacity=".6"/></svg>}</div>
   </div>;
 }

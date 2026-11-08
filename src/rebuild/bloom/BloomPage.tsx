@@ -1,2 +1,3 @@
 "use client";
-export {BloomPage,BloomShelf} from "./CinematicBloomPage";
+export {BloomPage} from "./CinematicBloomPage";
+export {BloomShelf} from "./BloomShelf";

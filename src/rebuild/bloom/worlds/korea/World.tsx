@@ -3,6 +3,8 @@
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin, stableCos } from "../stableTrig";
 import s from "./world.module.css";
 
 const tiers = {
@@ -12,7 +14,7 @@ const tiers = {
   4: { books: 8, needles: 11, branches: 23, flowers: 25, marks: 95, dust: 16, silk: 15 },
   5: { books: 11, needles: 15, branches: 34, flowers: 39, marks: 160, dust: 30, silk: 23 },
 } as const;
-const seed = (n: number) => { const v = Math.sin(n * 83.17 + 19.71) * 19471.31; return v - Math.floor(v); };
+const seed = (n: number) => { const v = stableSin(n * 83.17 + 19.71) * 19471.31; return v - Math.floor(v); };
 const inks = ["#d9b360", "#bd764f", "#b39d60", "#81936a", "#7b6983", "#ccaf78"];
 type Detail = { [Key in keyof (typeof tiers)[1]]: number };
 
@@ -30,7 +32,7 @@ function Blossom({ x = 0, y = 0, size = 1, warm = false }: { x?: number; y?: num
   </g>;
 }
 
-function Books({ x, y, width, amount, variant }: { x: number; y: number; width: number; amount: number; variant: number }) {
+function Books({ x, y, width, amount, variant, returned = 0, discovered = 0 }: { x: number; y: number; width: number; amount: number; variant: number; returned?: number; discovered?: number }) {
   return <g transform={`translate(${x} ${y})`}>
     {Array.from({ length: amount }, (_, i) => {
       const height = 9 + seed(i + variant) * 8, w = width - seed(i + variant + 9) * width * .2;
@@ -40,6 +42,8 @@ function Books({ x, y, width, amount, variant }: { x: number; y: number; width: 
         <path d={`M3 ${height / 2}H${w - 3}M4 ${height - 3}H${w - 4}`} stroke="#f5dfae" strokeOpacity=".52" strokeWidth=".6"/>
         <path d={`M0 0 ${w * .09} -4H${w + 2}L${w} 0`} fill="#e4cb92" stroke="#846647" strokeWidth=".7"/>
         <path d={`M${w * .18} 1q-6 4 0 8M${w * .8} 1q6 4 0 8`} fill="none" stroke="#3f3a35" strokeWidth="1"/>
+        {i < returned && <><path d={`M${w * .34} 1v${height - 2}m4-${height - 2}v${height - 2}`} stroke="#f2d68d" strokeWidth="1.3"/><circle cx={w * .56} cy={height / 2} r="2.2" fill="#e9ca79"/></>}
+        {i < discovered && <path d={`M${w * .64} 0v${height + 8}l4-3 4 3V0Z`} fill="#c88183" stroke="#7e5652" strokeWidth=".5"/>}
       </g>;
     })}
   </g>;
@@ -71,7 +75,7 @@ function FlowerSpray({ count, rich }: { count: number; rich: boolean }) {
   </g>;
 }
 
-function Cabinet({ side, detail, quality }: { side: "left" | "right"; detail: Detail; quality: BloomQuality }) {
+function Cabinet({ side, detail, quality, listening }: { side: "left" | "right"; detail: Detail; quality: BloomQuality; listening?: BloomListeningProfile }) {
   const mirror = side === "right";
   return <g transform={mirror ? "translate(1600 0) scale(-1 1)" : undefined}>
     <g fill="#33364b" stroke="#b2935e" strokeWidth="1.2">
@@ -82,7 +86,7 @@ function Cabinet({ side, detail, quality }: { side: "left" | "right"; detail: De
     </g>
     {[360, 545, 760].map(y => <g key={y}><path d={`M123 ${y}H401V${y + 13}H123Z`} fill="#bd9b64" stroke="#3f3d36" strokeWidth="1"/><path d={`M143 ${y - 8}H381L401 ${y}H123Z`} fill="#81816c"/></g>)}
     <path d="M255 187V774" stroke="#b49564" strokeWidth="9"/><path d="M259 191V774" stroke="#323345" strokeWidth="4"/>
-    <Books x={153} y={326} width={83} amount={detail.books} variant={mirror ? 2 : 0}/>
+    <Books x={153} y={326} width={83} amount={detail.books} variant={mirror ? 2 : 0} returned={mirror ? 0 : listening?.returningRecordingCount} discovered={mirror ? listening?.discoveredRecordingCount : 0}/>
     <Books x={281} y={739} width={91} amount={Math.max(3, detail.books - 1)} variant={mirror ? 4 : 2}/>
     <Books x={159} y={735} width={69} amount={Math.max(2, detail.books - 3)} variant={3}/>
     <Vessel x={195} y={523} size={1.14} rich={quality >= 3} type={mirror ? 1 : 0}/>
@@ -111,7 +115,7 @@ function Pine({ detail, side, quality }: { detail: Detail; side: "left" | "right
             <path d={`M0 9Q-4-4 0 ${-radius}`} fill="none" stroke="#4b5c47" strokeWidth="1.2"/>
             {Array.from({ length: detail.needles }, (_, n) => {
               const angle = (-165 + n * 155 / Math.max(1, detail.needles - 1)) * Math.PI / 180;
-              const dx = Math.cos(angle) * radius, dy = Math.sin(angle) * radius;
+              const dx = stableCos(angle) * radius, dy = stableSin(angle) * radius;
               return <path key={n} d={`M0 10Q${(dx * .5).toFixed(1)} ${(dy * .55).toFixed(1)} ${dx.toFixed(1)} ${dy.toFixed(1)}`} fill="none" stroke={n % 3 === 0 ? "#919b75" : "#4c614c"} strokeWidth={quality >= 4 ? 1.3 : 1.7} strokeLinecap="round"/>;
             })}
             {quality >= 4 && <g fill="#b9ae7b" opacity=".55"><ellipse cx="-3" cy="5" rx="2" ry="4"/><ellipse cx="3" cy="8" rx="2" ry="4"/></g>}
@@ -184,7 +188,7 @@ function CourtyardTitle() {
   </svg>;
 }
 
-function PaintedScreen({ id, detail, quality, evening }: { id: string; detail: Detail; quality: BloomQuality; evening: number }) {
+function PaintedScreen({ id, detail, quality, evening, listening }: { id: string; detail: Detail; quality: BloomQuality; evening: number; listening?: BloomListeningProfile }) {
   const colour = (name: string) => `url(#${id}-${name})`;
   return <svg className={s.screen} viewBox="0 0 1600 1000" preserveAspectRatio="none" aria-hidden="true">
     <defs>
@@ -220,8 +224,11 @@ function PaintedScreen({ id, detail, quality, evening }: { id: string; detail: D
       <path d="M492 200H1108V666H492Z" fill="none" stroke="#b39564" strokeWidth="2"/>
       <path d="M799 210V656M503 393H1097" fill="none" stroke="#6a654b" strokeWidth="6"/>
     </g>
-    <g className={`${s.screenWing} ${s.screenWingLeft}`}><Cabinet side="left" detail={detail} quality={quality}/></g>
-    <g className={`${s.screenWing} ${s.screenWingRight}`}><Cabinet side="right" detail={detail} quality={quality}/></g>
+    <g className={`${s.screenWing} ${s.screenWingLeft}`} data-listening-motif={listening?.returningRecordingCount != null ? "gold-bindings" : undefined}><Cabinet side="left" detail={detail} quality={quality} listening={listening}/></g>
+    <g className={`${s.screenWing} ${s.screenWingRight}`} data-listening-motif={listening?.discoveredRecordingCount != null ? "fresh-bookmarks" : undefined}><Cabinet side="right" detail={detail} quality={quality} listening={listening}/></g>
+    {listening?.comparison && <g className={s.keepsakeSeals} fill="#aa6758" stroke="#804c43" strokeWidth="1.2">
+      {Array.from({length:Math.min(quality + 2, Math.max(0,listening.comparison.sharedArtistCount))},(_,n)=><g key={n} transform={`translate(${489 + n * 43} 745)`}><rect width="26" height="26" rx="2"/><path d="M6 6h14v14H6Zm0 7h14m-7-7v14" fill="none" stroke="#edcfaa" strokeWidth="1"/></g>)}
+    </g>}
     <path d="M447 777H1153V791H447Z" fill="#b79766" stroke="#6d634a" strokeWidth="1"/>
     <path d="M461 783H1139" stroke="#f0d3a0" strokeWidth="1"/>
     <g fill="none" stroke="#c2a36c" strokeWidth="1" opacity=".7"><path d="M92 146H1508V794H92Z"/><path d="M92 143q15-15 30 0m1368 0q15-15 30 0M92 797q15 15 30 0m1368 0q15 15 30 0"/></g>
@@ -239,15 +246,16 @@ function shotFor(scene: BloomSceneKind) {
   return "alcove";
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
   const id = `korea-${useId().replace(/:/g, "")}`;
-  const evening = Math.max(0, Math.min(1, progress));
-  const detail = { ...tiers[quality], books: Math.min(tiers[quality].books, 3 + Math.round(evening * (tiers[quality].books - 3))) };
+  const journey = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const evening = listening?.peakHour != null ? listening.peakHour / 23 : journey;
+  const detail = { ...tiers[quality], books: listening?.recordingCount == null ? Math.min(tiers[quality].books, 3 + Math.round(journey * (tiers[quality].books - 3))) : Math.max(1, Math.min(tiers[quality].books,listening.recordingCount)) };
   const opening = scene === "opening" || view === "cover";
   const shot = view === "poster" ? "screen" : shotFor(scene);
   const style = { "--evening": evening, "--world-travel": `${(evening - .5) * 5}%`, "--world-accent": "#a76155" } as CSSProperties;
-  return <div className={s.world} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || view === "poster" ? "still" : "full"} data-opening={opening} style={style}>
-    <div className={s.paintedRoom} aria-hidden="true"><PaintedScreen id={id} detail={detail} quality={quality} evening={evening}/></div>
+  return <div className={s.world} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || view === "poster" ? "still" : "full"} data-opening={opening} data-listening={Boolean(listening)} data-gold-bindings={listening?.returningRecordingCount == null ? undefined : Math.min(detail.books,listening.returningRecordingCount)} data-fresh-bookmarks={listening?.discoveredRecordingCount == null ? undefined : Math.min(detail.books,listening.discoveredRecordingCount)} style={style}>
+    <div className={s.paintedRoom} aria-hidden="true"><PaintedScreen id={id} detail={detail} quality={quality} evening={evening} listening={listening}/></div>
     <div className={s.eveningLight} aria-hidden="true"/>
     <Pine side="left" quality={quality} detail={detail}/><Pine side="right" quality={quality} detail={detail}/>
     <div className={s.flowerEdge} aria-hidden="true"><svg viewBox="0 0 350 500"><g transform="translate(109 474) scale(1.7)"><FlowerSpray count={detail.flowers} rich={quality >= 3}/></g><Vessel x={130} y={488} size={1.6} type={1} rich={quality >= 3}/></svg></div>

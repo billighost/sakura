@@ -27,6 +27,7 @@
 .orchard { z-index:-2; transform:translateX(var(--sakura-camera-x)); transition:transform 1.3s cubic-bezier(.2,.7,.2,1); }
 .breeze { z-index:2; }
 .sunlight { opacity:calc(.16 + var(--sakura-afterglow) * .84); transform-origin:949px 378px; transition:opacity 2s; }
+.listeningBranches { opacity:.94; }
 .hills { opacity:.92; }
 .distantOrchard { opacity:calc(.32 + var(--sakura-growth) * .6); transition:opacity 1.4s; }
 .gardenPath { opacity:.82; }
@@ -152,3 +153,11 @@
 .world[data-view="poster"] .clearing::before { inset:8% -5% 3%; opacity:.74; }
 .world[data-view="poster"] .titleArt { width:110%; margin:0 -5% 0; }
 .world[data-view="poster"] .titleCaption { font-size:7px; letter-spacing:.25em; margin-top:-12px; }
+
+/* Story text grows inside the scrolling cinema, clear of its fixed controls. */
+.world[data-view="story"] { height:auto; }
+.world[data-view="story"] .clearing {
+ padding-top:calc(145px + env(safe-area-inset-top));
+ padding-bottom:calc(140px + env(safe-area-inset-bottom));
+}
+.world[data-view="story"][data-scene="finale"] .titleArt { margin-top:0; }

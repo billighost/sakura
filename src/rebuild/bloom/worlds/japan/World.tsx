@@ -3,6 +3,8 @@
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 // The paper, scenery and characters are original illustrations. Detail tiers
@@ -25,7 +27,7 @@ const pineSites = [
 ] as const;
 
 function grain(n: number) {
-  const value = Math.sin(n * 71.37 + 18.49) * 19381.193;
+  const value = stableSin(n * 71.37 + 18.49) * 19381.193;
   return value - Math.floor(value);
 }
 
@@ -158,10 +160,30 @@ function InkTitle() {
   </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+function ListeningMarks({ listening, quality, cover = false }: { listening?: BloomListeningProfile; quality: BloomWorldProps["quality"]; cover?: boolean }) {
+  const arrivals = Math.min(quality + 2, Math.max(0, listening?.discoveredArtistCount ?? 0));
+  const shared = Math.min(quality + 1, Math.max(0, listening?.comparison?.sharedArtistCount ?? 0));
+  return <g className={s.listeningMarks}>
+    {arrivals > 0 && <g data-listening-motif="new-path-lanterns" data-motif-count={arrivals}>
+      {Array.from({ length: arrivals }, (_, n) => <g key={n} transform={`translate(${cover ? 153 + n * 54 : 792 + n * 74} ${cover ? 503 + n % 2 * 15 : 750 + n % 2 * 16}) scale(${cover ? .65 : .75})`}>
+        <path d="M0 24V-11M-12-10H12" stroke={cover ? "#cfb47f" : "var(--japan-ink)"} strokeWidth="1.5" fill="none"/>
+        <path d="M-10-8Q0-13 10-8V10Q0 17-10 10Z" fill="#e2a25d" stroke="#735637" strokeWidth="1"/>
+        <path d="M-5-8V12M0-9V14M5-8V12" stroke="#f3d194" strokeWidth=".7" opacity=".8"/>
+        <path d="M-9 11H9M0 14V19" stroke="#6a4f34" strokeWidth="1.5"/>
+      </g>)}
+    </g>}
+    {shared > 0 && <g data-listening-motif="continuity-bookmarks" data-motif-count={shared}>
+      {Array.from({ length: shared }, (_, n) => <path key={n} d={cover ? `M${112 + n * 25} 638v42l7-6 7 6v-43Z` : `M${139 + n * 24} 769v39l7-6 7 6v-37Z`} fill={n % 2 ? "#8aa59a" : "#b46d54"} stroke="#cfb785" strokeWidth=".6" opacity=".84"/>)}
+    </g>}
+  </g>;
+}
+
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
   const id = `japan-${useId().replace(/:/g, "")}`;
   const tier = details[quality];
-  const morning = Math.max(0, Math.min(1, (progress - .67) / .33));
+  const hour = listening?.peakHour;
+  const morning = hour == null ? Math.max(0, Math.min(1, (progress - .67) / .33)) : Math.max(0, stableSin((hour - 6) / 12 * Math.PI));
+  const companions = listening?.returningArtistCount === undefined ? tier.spirits - 1 : Math.min(tier.spirits, Math.max(0, listening.returningArtistCount));
   const music = ["songs", "song-winner", "artist-songs", "discoveries", "returns", "genres", "finale"].includes(scene);
   const courtyard = ["artist", "artist-songs", "artists", "returns"].includes(scene);
   const opening = scene === "opening" || view === "cover";
@@ -172,6 +194,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
       <Definitions id={id} rich={quality >= 3}/>
       <BookPaper id={id} fibres={tier.fibres}/>
       <Landscape id={id} tier={tier} morning={morning} courtyard={courtyard}/>
+      <ListeningMarks listening={listening} quality={quality}/>
       <g className={s.marginOrnaments} fill="none" stroke="var(--japan-ochre)" opacity=".55" strokeWidth=".9"><path d="M163 171h31m-16-15v31M1250 736h-31m16-15v31"/><path d="M174 170q20-27 39-7-9 17-26 8m1034 565q-17 21-30 1 12-15 25-3"/></g>
       <g className={s.pageNumber} fill="var(--japan-vermilion)" opacity=".52"><path d="M1186 155h34v41h-34Z"/><path d="M1191 160h24v31h-24Z" fill="none" stroke="var(--japan-paper)" strokeWidth=".8"/><path d="M1196 166v20m7-21v21m7-19v17" stroke="var(--japan-paper)" strokeWidth="1.5"/></g>
     </svg>
@@ -199,6 +222,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
         <path d="M186 490Q282 437 395 467Q443 489 500 482L502 526Q390 508 312 536Q236 557 180 533Z" fill="#9ba988" opacity=".16"/>
         <use href={`#${id}-pine`} x="93" y="355" width="199" height="228" opacity=".6"/>
         <use href={`#${id}-boat`} x="330" y="491" width="122" height="51" opacity=".6"/>
+        <ListeningMarks listening={listening} quality={quality} cover/>
         <path d="M96 668 566 640" stroke="#e0c289" strokeWidth=".6" opacity=".38"/>
       </svg>
       <div className={s.coverInk}><InkTitle/><BloomLettering text="THE LANTERN BOOK" style="paper" className={s.coverSubtitle}/></div>
@@ -206,7 +230,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     {view === "poster" && <div className={s.posterInk} aria-hidden="true"><InkTitle/><BloomLettering text="THE LANTERN BOOK" style="paper" className={s.coverSubtitle}/></div>}
     <div className={s.content}>{children}</div>
     <div className={s.lanternGuide} key={`guide-${scene}`} aria-hidden="true"><Lantern id={id} amused={scene === "song-winner" || scene === "finale"}/></div>
-    {!opening && tier.spirits > 1 && <div className={s.procession} key={`procession-${scene}`} aria-hidden="true">{Array.from({length: tier.spirits - 1}, (_, n) => <div className={s.objectSpirit} key={n} style={{"--spirit-x": `${n < 3 ? 4 + n * 9 : 70 + (n - 3) * 8}%`, "--spirit-size": `${n % 3 === 2 ? 64 : 74}px`, "--spirit-delay": `${.15 + n * .13}s`, "--spirit-turn": `${n % 2 ? 3 : -3}deg`} as CSSProperties}><ObjectSpirit type={n} rich={quality >= 4}/></div>)}</div>}
+    {!opening && companions > 0 && <div className={s.procession} key={`procession-${scene}`} aria-hidden="true" data-listening-motif={listening?.returningArtistCount === undefined ? undefined : "returning-procession"} data-motif-count={companions}>{Array.from({length: companions}, (_, n) => <div className={s.objectSpirit} key={n} style={{"--spirit-x": `${n < 3 ? 4 + n * 9 : 70 + (n - 3) * 8}%`, "--spirit-size": `${n % 3 === 2 ? 64 : 74}px`, "--spirit-delay": `${.15 + n * .13}s`, "--spirit-turn": `${n % 2 ? 3 : -3}deg`} as CSSProperties}><ObjectSpirit type={n} rich={quality >= 4}/></div>)}</div>}
     {quality >= 2 && <div className={s.paperLights} aria-hidden="true">{Array.from({length: tier.lights}, (_, n) => <i key={n} style={{left: `${68 + grain(n * 3) * 23}%`, top: `${22 + grain(n * 7) * 51}%`, "--light-delay": `${n * .12}s`, "--light-size": `${1.5 + grain(n * 5) * 2}px`} as CSSProperties}/>)}</div>}
     {!opening && !reducedMotion && <div className={s.pageTurn} key={`page-${scene}-${stage}`} aria-hidden="true"><i/><i/><i/></div>}
     <div className={s.dawnWash} aria-hidden="true"/>

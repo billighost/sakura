@@ -53,3 +53,39 @@ test("server preference metadata is excluded while a dirty patch keeps only chan
  assert.doesNotThrow(()=>preferencesPatch(settings));assert.equal("revision" in settings,false);assert.equal("serverOnly" in settings,false);
  const dirty=settingsFields({theme:"dark",revision:99});assert.deepEqual(dirty,{theme:"dark"});assert.deepEqual(preferencesPatch(dirty),{theme:"dark"});
 });
+
+test("history erasure hides a cached Bloom immediately while retaining saved music",async t=>{
+ const account="resource-history-erasure",story="/api/v2/bloom/yearly-2025",library="/api/v2/library";
+ t.mock.method(globalThis,"fetch",async (input:RequestInfo|URL)=>Response.json(String(input).includes("bloom")?{chapters:["erased story"]}:{recordings:["saved song"]}));
+ await Promise.all([loadResource(account,story),loadResource(account,library)]);
+ invalidateResources(account,"/api/v2/",true);
+ assert.equal(resourceSnapshot(account,story).data,undefined,"An erased story cannot remain on screen while refreshing");
+ assert.deepEqual(resourceSnapshot(account,library).data,{recordings:["saved song"]});
+ clearResources(account);
+});
+
+test("erasure ignores a pending old story response before accepting current history",async t=>{
+ const account="resource-late-erased-story",path="/api/v2/bloom/monthly-2026-10";
+ let release!:(response:Response)=>void,started!:()=>void,calls=0;
+ const pending=new Promise<void>(resolve=>started=resolve);
+ t.mock.method(globalThis,"fetch",async()=>{if(++calls===1){started();return new Promise<Response>(resolve=>release=resolve);}return Response.json({chapters:[],status:"empty"});});
+ const flight=loadResource(account,path);await pending;invalidateResources(account,"/api/v2/",true);
+ release(Response.json({chapters:["erased measurements"]}));await flight;
+ assert.deepEqual(resourceSnapshot(account,path).data,{chapters:[],status:"empty"});
+ clearResources(account);
+});
+
+test("another tab's erasure cannot be overwritten by an older response",async t=>{
+ const account="resource-other-tab-erasure",path="/api/v2/bloom/yearly-2025",values=new Map<string,string>();
+ const original=Object.getOwnPropertyDescriptor(globalThis,"localStorage");
+ Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{getItem:(key:string)=>values.get(key)||null,setItem:(key:string,value:string)=>values.set(key,value)}});
+ t.after(()=>{if(original)Object.defineProperty(globalThis,"localStorage",original);else Reflect.deleteProperty(globalThis,"localStorage");});
+ let release!:(response:Response)=>void,started!:()=>void,calls=0;
+ const pending=new Promise<void>(resolve=>started=resolve);
+ t.mock.method(globalThis,"fetch",async()=>{if(++calls===1){started();return new Promise<Response>(resolve=>release=resolve);}return Response.json({chapters:[],status:"empty"});});
+ const flight=loadResource(account,path);await pending;
+ values.set("sakura-v2-listening-resource-erased:"+account,String(Date.now()));
+ release(Response.json({chapters:["old private story"]}));await flight;
+ assert.equal(calls,2);assert.deepEqual(resourceSnapshot(account,path).data,{chapters:[],status:"empty"});
+ clearResources(account);
+});

@@ -133,3 +133,11 @@
  .world[data-theme=light][data-shot=gallery] .readingSpace::before{background:radial-gradient(ellipse farthest-corner,#eadfbdff 0%,#eadfbdff 74%,#eadfbdf0 89%,#eadfbd00 100%)}
  .world[data-theme=dark][data-shot=gallery] .readingSpace::before{background:radial-gradient(ellipse farthest-corner,#303a42ff 0%,#303a42ff 74%,#303a42f0 89%,#303a4200 100%)}
 }
+.keepsakeSeals{pointer-events:none}
+
+/* The collected pieces grow within the cinema's fixed control margins. */
+.world[data-view="story"] {
+ height:auto;
+ padding-top:calc(145px + env(safe-area-inset-top));
+ padding-bottom:calc(140px + env(safe-area-inset-bottom));
+}

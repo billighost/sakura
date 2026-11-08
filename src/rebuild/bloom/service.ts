@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { getRebuildPool,inTransaction } from "../data/db";
+import { inTransaction } from "../data/db";
 import { cardsForIds } from "../data/catalog";
 import { getSettings } from "../data/settings";
 import { ProductError,text } from "../data/validation";
@@ -7,60 +7,114 @@ import { bloomWindow,bloomWindows,validTimeZone,DEFAULT_BLOOM_TIME_ZONE,type Blo
 
 import {buildBloomSnapshot,discloseBloomChapter,type BloomSnapshot,type SavedBloomChapter} from "./snapshot";
 import {bloomDesignForMonth,legacyBloomDesignForMonth} from "./design";
+import {bloomArtistKey,discloseBloomListening} from "./listening";
+import type {BloomShelfItem} from "./uiTypes";
 export type BloomChapter = SavedBloomChapter;
-async function zone(accountId:string){const settings=await getSettings(accountId);return validTimeZone(settings.timeZone)?settings.timeZone:DEFAULT_BLOOM_TIME_ZONE;}
+async function zone(accountId:string,client:PoolClient){const settings=await getSettings(accountId,client);return validTimeZone(settings.timeZone)?settings.timeZone:DEFAULT_BLOOM_TIME_ZONE;}
 function window(id:string,now:Date,timeZone:string){try{return bloomWindow(id,now,timeZone);}catch{throw new ProductError(400,"Invalid Bloom period");}}
 function requireAvailable(item:BloomWindow){
   if(item.status==="locked")throw new ProductError(423,"This Bloom opens after the listening period ends");
   if(item.status==="expired")throw new ProductError(410,"This Bloom window has closed");
 }
 async function snapshot(accountId:string,item:BloomWindow,client:PoolClient):Promise<BloomSnapshot>{
-  const args=[accountId,item.periodStart,item.periodEnd,item.timeZone];
-  const recordings=(await client.query(`SELECT l.recording_id AS id,SUM(c.audible_ms)::bigint AS audible_ms,
-    COUNT(DISTINCT c.event_id)::integer AS plays,COUNT(DISTINCT (COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $4)::date)::integer AS active_days,
-    MIN(COALESCE(c.occurred_at,c.created_at)) AS first_in_period,
-    (SELECT MIN(COALESCE(all_c.occurred_at,all_c.created_at)) FROM sakura_v2."ListeningChunk" all_c
-      JOIN sakura_v2."ListeningEventLedger" all_l ON all_l.account_id=all_c.account_id AND all_l.event_id=all_c.event_id
-      WHERE all_c.account_id=$1::uuid AND all_l.recording_id=l.recording_id AND all_c.audible_ms>0) AS first_ever
+  const previous=bloomWindows(item.period,new Date(item.periodStart),item.timeZone)[0];
+  const args=[accountId,item.periodStart,item.periodEnd,previous.periodStart];
+  // One retained-history scan replaces a correlated scan for every recording.
+  // Receipt creation dates are not invented listening dates for old imports.
+  const allRows=(await client.query(`WITH measured AS (
+    SELECT l.recording_id AS id,SUM(c.audible_ms)::bigint AS all_ms,
+      COALESCE(SUM(c.audible_ms) FILTER(WHERE c.occurred_at>=$2::timestamptz AND c.occurred_at<$3::timestamptz),0)::bigint AS audible_ms,
+      COUNT(DISTINCT c.event_id) FILTER(WHERE c.occurred_at>=$2::timestamptz AND c.occurred_at<$3::timestamptz)::integer AS plays,
+      COALESCE(SUM(c.audible_ms) FILTER(WHERE c.occurred_at>=$4::timestamptz AND c.occurred_at<$2::timestamptz),0)::bigint AS previous_ms,
+      COUNT(DISTINCT c.event_id) FILTER(WHERE c.occurred_at>=$4::timestamptz AND c.occurred_at<$2::timestamptz)::integer AS previous_plays,
+      MIN(c.occurred_at) AS first_ever,BOOL_OR(c.occurred_at<$2::timestamptz) AS known_before,
+      BOOL_OR(c.occurred_at IS NULL) AS unknown_date
     FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l ON l.account_id=c.account_id AND l.event_id=c.event_id
-    WHERE c.account_id=$1::uuid AND c.audible_ms>0 AND COALESCE(c.occurred_at,c.created_at)>=$2::timestamptz
-      AND COALESCE(c.occurred_at,c.created_at)<$3::timestamptz
-    GROUP BY l.recording_id ORDER BY SUM(c.audible_ms) DESC,l.recording_id`,args)).rows;
-  const days=(await client.query(`SELECT COUNT(DISTINCT (COALESCE(occurred_at,created_at) AT TIME ZONE $4)::date)::integer n
+    WHERE c.account_id=$1::uuid AND c.audible_ms>0 GROUP BY l.recording_id
+  ) SELECT COALESCE(m.id,s.recording_id) AS id,COALESCE(m.audible_ms,0) AS audible_ms,COALESCE(m.plays,0) AS plays,
+      COALESCE(m.previous_ms,0) AS previous_ms,COALESCE(m.previous_plays,0) AS previous_plays,m.first_ever,
+      COALESCE(m.known_before,false) AS known_before,
+      (COALESCE(m.unknown_date,false) OR COALESCE(s.audible_ms,0)>COALESCE(m.all_ms,0)) AS unknown_history,
+      EXISTS(SELECT 1 FROM sakura_v2."ArchivedListeningRecording" WHERE account_id=$1::uuid AND audible_ms>0) AS incomplete_history
+    FROM measured m FULL JOIN (SELECT * FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0) s ON s.recording_id=m.id
+    WHERE COALESCE(m.audible_ms,0)>0 OR COALESCE(m.known_before,false) OR COALESCE(s.audible_ms,0)>COALESCE(m.all_ms,0)`,args)).rows;
+  const recordings=allRows.filter(row=>Number(row.audible_ms)>0);
+  if(!recordings.length)return buildBloomSnapshot([],[],0,item);
+  const hourRows=(await client.query(`SELECT EXTRACT(HOUR FROM occurred_at AT TIME ZONE $4)::integer AS hour,SUM(audible_ms)::text AS audible_ms,
+      ARRAY_AGG(DISTINCT (occurred_at AT TIME ZONE $4)::date::text) AS days
     FROM sakura_v2."ListeningChunk" WHERE account_id=$1::uuid AND audible_ms>0
-      AND COALESCE(occurred_at,created_at)>=$2::timestamptz AND COALESCE(occurred_at,created_at)<$3::timestamptz`,args)).rows[0].n;
-  const cards=await cardsForIds(accountId,recordings.map(r=>r.id),client);
-  return buildBloomSnapshot(recordings,cards,Number(days),item);
+      AND occurred_at>=$2::timestamptz AND occurred_at<$3::timestamptz GROUP BY 1`,[accountId,item.periodStart,item.periodEnd,item.timeZone])).rows;
+  const days=new Set(hourRows.flatMap(row=>row.days as string[])).size;
+  const cards=await cardsForIds(accountId,allRows.map(r=>r.id),client),byId=new Map(cards.map(card=>[card.id,card]));
+  const keys=(rows:typeof allRows)=>rows.flatMap(row=>{const card=byId.get(row.id),key=card?bloomArtistKey(card):null;return key?[key]:[];});
+  const priorRows=allRows.filter(row=>Number(row.previous_ms)>0).map(row=>({...row,audible_ms:row.previous_ms,plays:row.previous_plays}));
+  return buildBloomSnapshot(recordings,cards,days,item,{hours:hourRows.map(row=>({hour:Number(row.hour),audibleMs:Number(row.audible_ms)})),
+    knownBeforeRecordingIds:allRows.filter(row=>row.known_before).map(row=>row.id),knownBeforeArtistKeys:keys(allRows.filter(row=>row.known_before)),
+    discoveryUnknownIds:allRows.filter(row=>row.unknown_history).map(row=>row.id),discoveryUnknownArtistKeys:keys(allRows.filter(row=>row.unknown_history)),discoveryHistoryIncomplete:Boolean(allRows[0]?.incomplete_history),
+    previous:{periodLabel:`Previous ${item.period==="weekly"?"week":item.period==="monthly"?"month":"year"}`,rows:priorRows,cards}});
 }
 
-function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null}) {
+function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at?:Date|string}) {
   const revealed=new Set(row.revealed_chapters);
-  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||(row.snapshot.version===2?bloomDesignForMonth:legacyBloomDesignForMonth)(item.periodStart,item.timeZone),status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
+  const kinds=new Set(row.snapshot.chapters.filter(chapter=>revealed.has(chapter.id)).flatMap(chapter=>[chapter.kind||"",chapter.id]));
+  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||((row.snapshot.version||1)>=2?bloomDesignForMonth:legacyBloomDesignForMonth)(item.periodStart,item.timeZone),status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
+    snapshotCreatedAt:row.created_at?new Date(row.created_at).toISOString():undefined,
+    listening:discloseBloomListening(row.snapshot.listening,kinds,Boolean(row.completed_at)),
     chapters:row.snapshot.chapters.map(c=>discloseBloomChapter(c,revealed.has(c.id))),
     completedAt:row.completed_at,completed:Boolean(row.completed_at)};
 }
 export async function listBloom(accountId:string,rawPeriod:string|null,now=new Date()){
   const period=(rawPeriod||"weekly") as BloomPeriod;if(!["weekly","monthly","yearly"].includes(period))throw new ProductError(400,"Invalid Bloom period");
-  const timeZone=await zone(accountId),items=[];
+  return inTransaction(async client=>{
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+  const timeZone=await zone(accountId,client),items=[];
   for(const item of bloomWindows(period,now,timeZone)){
-    const saved=(await getRebuildPool().query(`SELECT snapshot,revealed_chapters,completed_at,time_zone FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,item.id])).rows[0];
+    const saved=(await client.query(`SELECT snapshot,revealed_chapters,completed_at,time_zone FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,item.id])).rows[0];
     const effective=saved?window(item.id,now,saved.time_zone):item;
     let count=saved?.snapshot?.chapters?.length||0,status=effective.status as string;
     if(status==="available"&&!saved){
-      const amount=(await getRebuildPool().query(`SELECT COALESCE(SUM(audible_ms),0)::bigint n FROM sakura_v2."ListeningChunk"
-        WHERE account_id=$1::uuid AND COALESCE(occurred_at,created_at)>=$2::timestamptz AND COALESCE(occurred_at,created_at)<$3::timestamptz`,[accountId,item.periodStart,item.periodEnd])).rows[0].n;
-      if(Number(amount)===0)status="empty";
-      else count=(await inTransaction(client=>snapshot(accountId,item,client))).chapters.length;
+      count=(await snapshot(accountId,item,client)).chapters.length;
+      if(!count)status="empty";
     }else if(status==="available"&&!count)status="empty";
-    items.push({...effective,version:saved?saved.snapshot.version||1:2,worldId:saved?.snapshot?.worldId||(saved&&(saved.snapshot.version||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),status,chapterCount:count,completed:Boolean(saved?.completed_at),teaser:status==="locked"?"Your next listening story is still growing.":status==="empty"?"No listening was recorded during this period.":"A story made from the music you actually heard."});
+    items.push({...effective,version:saved?saved.snapshot.version||1:3,worldId:saved?.snapshot?.worldId||(saved&&(saved.snapshot.version||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),status,chapterCount:count,completed:Boolean(saved?.completed_at),listening:saved?.completed_at?saved.snapshot.listening:undefined,teaser:status==="locked"?"This story opens after the listening period ends.":status==="empty"?"No dated listening was recorded during this period.":"A story made from the music recorded in this period."});
   }
   return {items,schedule:{timeZone,weekStartsOn:"monday",weeklyAvailableThrough:"saturday",monthlyClosesDaysBeforeNextMonth:7}};
+  });
+}
+/** Home needs calendar readiness and completed cover details, not fresh stories.
+ * Checking for dated audible chunks avoids rebuilding three period snapshots. */
+export async function listBloomShelf(accountId:string,now=new Date()){
+ return inTransaction(async client=>{
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+  const timeZone=await zone(accountId,client);
+  const windows=(["weekly","monthly","yearly"] as const).flatMap(period=>bloomWindows(period,now,timeZone));
+  const saved=(await client.query(`SELECT recap_id,time_zone,snapshot->>'worldId' AS world_id,snapshot->>'version' AS version,
+   jsonb_array_length(snapshot->'chapters') AS chapter_count,completed_at,
+   CASE WHEN completed_at IS NOT NULL THEN snapshot->'listening' END AS listening
+   FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=ANY($2::text[])`,[accountId,windows.map(item=>item.id)])).rows;
+  const items:BloomShelfItem[]=[];
+  for(const item of windows){
+   const row=saved.find(value=>value.recap_id===item.id),effective=row?window(item.id,now,row.time_zone):item;
+   let status:BloomShelfItem["status"]=effective.status;
+   if(status==="available"){
+    const hasListening=row?Number(row.chapter_count)>0:(await client.query(`SELECT EXISTS(
+     SELECT 1 FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l
+      ON l.account_id=c.account_id AND l.event_id=c.event_id
+     WHERE c.account_id=$1::uuid AND c.occurred_at>=$2::timestamptz AND c.occurred_at<$3::timestamptz AND c.audible_ms>0) AS present`,[accountId,effective.periodStart,effective.periodEnd])).rows[0].present;
+    if(!hasListening)status="empty";
+   }
+   items.push({...effective,status,version:row?Number(row.version)||1:3,
+    worldId:row?.world_id||(row&&(Number(row.version)||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),
+    completed:Boolean(row?.completed_at),listening:row?.listening||undefined});
+  }
+  return {items,schedule:{timeZone}};
+ });
 }
 export async function getBloom(accountId:string,id:string,now=new Date()){
-  const timeZone=await zone(accountId);
   return inTransaction(async client=>{
     // A story cannot persist measurements while their owner is erasing them.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+    const timeZone=await zone(accountId,client);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-bloom:${accountId}:${id}`]);
     let row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,id])).rows[0];
     const item=window(id,now,row?.time_zone||timeZone);requireAvailable(item);
@@ -79,7 +133,9 @@ export async function revealBloom(accountId:string,id:string,rawChapterId:unknow
   const chapterId=text(rawChapterId,"Bloom chapter",80);const existing=await getBloom(accountId,id,now);
   if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
   return inTransaction(async client=>{
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR UPDATE`,[accountId,id])).rows[0];
+    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
     const item=window(id,now,row.time_zone);requireAvailable(item);
     const chapters=row.snapshot.chapters as BloomChapter[],index=chapters.findIndex(c=>c.id===chapterId);
     if(index<0)throw new ProductError(404,"Bloom chapter not found");
@@ -94,7 +150,9 @@ export async function completeBloom(accountId:string,id:string,now=new Date()){
   const existing=await getBloom(accountId,id,now);
   if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
   return inTransaction(async client=>{
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR UPDATE`,[accountId,id])).rows[0];
+    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
     const item=window(id,now,row.time_zone);requireAvailable(item);
     if(!row.snapshot.chapters.length)throw new ProductError(409,"This Bloom has no listening story yet");
     if(row.snapshot.chapters.some((c:BloomChapter)=>!row.revealed_chapters.includes(c.id)))throw new ProductError(409,"Reveal every chapter before completing this Bloom");
@@ -105,8 +163,11 @@ export async function completeBloom(accountId:string,id:string,now=new Date()){
 /** Only a completed yearly recap survives its opening window in the archive. */
 export async function archivedBloom(accountId:string,year:string|null,now=new Date()){
   if(year!==null&&!/^20\d{2}$/.test(year))throw new ProductError(400,"Invalid archive year");
-  const rows=(await getRebuildPool().query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id LIKE 'yearly-%'
+  return inTransaction(async client=>{
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+  const rows=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id LIKE 'yearly-%'
     AND completed_at IS NOT NULL AND ($2::text IS NULL OR recap_id='yearly-'||$2) ORDER BY recap_id DESC`,[accountId,year])).rows;
   const items=rows.flatMap(row=>{const item=window(row.recap_id,now,row.time_zone);return item.status==="expired"?[{...view(item,row),status:"archived"}]:[];});
   return {items};
+  });
 }

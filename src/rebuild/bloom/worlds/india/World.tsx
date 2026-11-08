@@ -2,6 +2,8 @@
 
 import { useId, type CSSProperties } from "react";
 import type { BloomSceneKind, BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 const detail = [0, 5, 9, 15, 23, 34] as const;
@@ -14,8 +16,23 @@ const leafSites = [
 ] as const;
 
 function noise(index: number) {
-  const value = Math.sin(index * 43.83 + 15.31) * 19421.471;
+  const value = stableSin(index * 43.83 + 15.31) * 19421.471;
   return value - Math.floor(value);
+}
+
+const pigments = ["#a15b53", "#426f68", "#af914f", "#66799a", "#a4778b", "#7a8a59"];
+function pigment(name: string) { return pigments[Array.from(name).reduce((sum,letter)=>sum + letter.charCodeAt(0),0) % pigments.length]; }
+function PigmentPools({ listening, quality, portrait = false }: { listening?: BloomListeningProfile; quality: number; portrait?: boolean }) {
+  const genres = listening?.genres?.slice(0, quality < 3 ? 3 : 6) || [];
+  if (!genres.length) return null;
+  return <g className={s.pigmentPools} data-listening-motif="folio-pigments" data-pigment-colours={genres.length} transform={portrait ? "translate(387 411) scale(.4)" : "translate(1270 393) scale(.9)"}>
+    {genres.map((genre,n)=><g key={genre.name} transform={`translate(${n % 2 ? -15 : 0} ${n * 60})`}>
+      <ellipse rx="23" ry="20" fill="#e7d5ac" stroke="#937950" strokeWidth="1"/>
+      <ellipse rx={9 + Math.max(0,Math.min(1,genre.share)) * 13} ry={8 + Math.max(0,Math.min(1,genre.share)) * 10} fill={pigment(genre.name)} opacity=".85"/>
+      <path d="M-13 5q8 5 16 1" fill="none" stroke="#efdbba" strokeWidth=".8" opacity=".55"/>
+    </g>)}
+    <path d="M-9-39 24-67M-4-33 29-61" stroke="#5e543d" strokeWidth="2"/>
+  </g>;
 }
 
 function Definitions({ id, quality }: { id: string; quality: number }) {
@@ -87,7 +104,7 @@ function Pavilion({ id, quality, close = false }: { id: string; quality: number;
   </g>;
 }
 
-function Garden({ id, quality, progress, scene, cover }: { id: string; quality: number; progress: number; scene: BloomSceneKind; cover: boolean }) {
+function Garden({ id, quality, progress, scene, cover, listening }: { id: string; quality: number; progress: number; scene: BloomSceneKind; cover: boolean; listening?: BloomListeningProfile }) {
   const music=musicScenes.includes(scene), close=music||scene==="artist"||scene==="artists",opening=scene==="opening";
   const pool=scene==="time"||scene==="comparison"||scene==="returns";
   return <g>
@@ -101,7 +118,7 @@ function Garden({ id, quality, progress, scene, cover }: { id: string; quality: 
     <g className={`${s.pool} ${pool?s.poolClose:""}`}>
       <path d="M625 626 1066 626 1279 887 331 887Z" fill="#d2c397" stroke="#ad9468" strokeWidth="1.7"/><path d="M638 640H1049L1238 864H378Z" fill={`url(#${id}-pool)`} stroke="#5e7d6d" strokeWidth="1.4"/>
       {Array.from({length:detail[quality]},(_,i)=><path key={i} d={`M${472+noise(i+8)*392} ${662+i*5.4}q${20+noise(i+61)*41} -${2+noise(i+37)*4} ${74+noise(i+85)*62} 0`} fill="none" stroke={i%3===0?"#d3c5a1":"#99b3a1"} strokeWidth={i%4===0?1.6:.65} opacity=".52"/>)}
-      {quality>=2&&[[586,731],[960,780],[732,840],[1110,849],[912,687]].slice(0,quality).map(([x,y],i)=><use key={i} href={`#${id}-lotus`} x={x-22} y={y-20} width="46" height="40"/>)}
+      {[[586,731],[960,780],[732,840],[1110,849],[912,687]].slice(0,listening?.returningRecordingCount == null ? quality >= 2 ? quality : 0 : Math.min(quality, listening.returningRecordingCount)).map(([x,y],i)=><use key={i} href={`#${id}-lotus`} x={x-22} y={y-20} width="46" height="40"/>)}
     </g>
     <Pavilion id={id} quality={quality} close={close}/>
     {!close&&!cover&&<g className={s.readingTerrace}>
@@ -132,13 +149,14 @@ function Garden({ id, quality, progress, scene, cover }: { id: string; quality: 
       </g>
     </g>
     {quality>=3&&<g className={s.flowers}>{Array.from({length:detail[quality]},(_,i)=>{const x=i%2?1140+noise(i+119)*130:89+noise(i+191)*174,y=785+noise(i+18)*128;return <g key={i} transform={`translate(${x} ${y}) rotate(${noise(i+218)*30-15})`}><path d="M0 23Q-8 7 1-18" fill="none" stroke="#526c46" strokeWidth="1.2"/><use href={`#${id}-leaf`} x="-16" y="-2" width="19" height="29" transform="rotate(-35)"/><use href={`#${id}-flower`} x="-12" y="-27" width="24" height="28"/></g>;})}</g>}
-    {quality>=4&&<g className={s.flyingBirds}>{[0,1,2,3,4].map(i=><use key={i} href={`#${id}-bird`} x={951+i*50} y={201+Math.sin(i)*21} width={27-i*2} height="15"/>)}</g>}
+    {quality>=4&&<g className={s.flyingBirds}>{[0,1,2,3,4].map(i=><use key={i} href={`#${id}-bird`} x={951+i*50} y={201+stableSin(i)*21} width={27-i*2} height="15"/>)}</g>}
     {quality>=5&&<g fill="#e7d9a9" opacity=".25">{Array.from({length:120},(_,i)=><circle key={i} cx={80+noise(i+912)*1240} cy={80+noise(i+771)*827} r={noise(i+522)*1.3+.3}/>)}</g>}
     <rect x="65" y="65" width="1270" height="869" fill={`url(#${id}-fibre)`} pointerEvents="none"/>
+    <PigmentPools listening={listening} quality={quality}/>
   </g>;
 }
 
-function PortraitGarden({ id, quality, scene, progress }: { id: string; quality: number; scene: BloomSceneKind; progress: number }) {
+function PortraitGarden({ id, quality, scene, progress, listening }: { id: string; quality: number; scene: BloomSceneKind; progress: number; listening?: BloomListeningProfile }) {
   const music=musicScenes.includes(scene)||scene==="artist"||scene==="artists";
   return <g>
     <rect x="20" y="20" width="390" height="960" fill={`url(#${id}-paper)`}/>
@@ -150,9 +168,10 @@ function PortraitGarden({ id, quality, scene, progress }: { id: string; quality:
     {music&&<><path d="M29 235H401M38 248H392" stroke="#ac9164" strokeWidth=".9"/><path d="M39 255V909M391 255V909" stroke="#c8b38c" strokeWidth="8"/><path d="M40 255V909M390 255V909" stroke="#af9367" strokeWidth=".9"/><path d="M48 308Q80 259 121 282Q147 254 170 282Q194 254 215 281Q238 254 263 282Q285 254 313 282Q352 258 383 310" stroke="#bca379" fill="none" strokeWidth="1.3"/></>}
     <g className={s.portraitTrees}><use href={`#${id}-tree`} x="-101" y="360" width="146" height="480"/><use href={`#${id}-tree`} x="385" y="483" width="146" height="425"/>{quality>=3&&<use href={`#${id}-cypress`} x="384" y="221" width="27" height="203"/>}</g>
     <path d="M83 922H340L392 978H36Z" fill="#91aca0" stroke="#81977c" strokeWidth="1"/>
-    {quality>=2&&[0,1,2,3].slice(0,quality-1).map(i=><use key={i} href={`#${id}-lotus`} x={93+i*65} y={933+(i%2)*15} width="35" height="30"/>)}
+    {[0,1,2,3].slice(0,listening?.returningRecordingCount == null ? Math.max(0,quality - 1) : Math.min(quality,listening.returningRecordingCount)).map(i=><use key={i} href={`#${id}-lotus`} x={93+i*65} y={933+(i%2)*15} width="35" height="30"/>)}
     {quality>=4&&<g className={s.flowers}>{Array.from({length:quality*2},(_,i)=><use key={i} href={`#${id}-flower`} x={i%2?385:23} y={794+(i%5)*28} width="22" height="25"/>)}</g>}
     <rect x="20" y="20" width="390" height="960" fill={`url(#${id}-fibre)`}/>
+    <PigmentPools listening={listening} quality={quality} portrait/>
   </g>;
 }
 
@@ -176,14 +195,15 @@ function PaintedTitle({ id, quality }: { id: string; quality: number }) {
   </svg>;
 }
 
-export default function IndiaWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function IndiaWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
   const id=`miniature-${useId().replace(/:/g,"")}`;
-  const dawn=Math.max(0,Math.min(1,progress)),cover=view==="cover",still=reducedMotion||quality===1||view==="poster";
+  const journey=Math.max(0,Math.min(1,Number.isFinite(progress) ? progress : 0)),cover=view==="cover",still=reducedMotion||quality===1||view==="poster";
+  const dawn=listening?.peakHour == null ? journey : Math.max(.12, stableSin((listening.peakHour - 6) / 24 * Math.PI * 2));
   const music=musicScenes.includes(scene),opening=scene==="opening",artist=scene==="artist"||scene==="artists";
   const style={"--dawn":dawn,"--sky":dawn>.66?"#a8aea0":"#5f7272","--sky-low":dawn>.66?"#dbc99f":"#9ba48a","--rose":dawn>.66?"#d79695":"#c57f83"} as CSSProperties;
-  return <div className={s.world} data-theme={theme} data-scene={scene} data-stage={stage} data-view={view} data-quality={quality} data-motion={still?"still":"full"} data-music={music} data-artist={artist} data-opening={opening} style={style}>
-    <svg className={s.landscapeArt} viewBox="0 0 1400 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><Definitions id={id} quality={quality}/><Garden id={id} quality={quality} progress={dawn} scene={scene} cover={cover}/><FloralBorder id={id} quality={quality}/></svg>
-    <svg className={s.portraitArt} viewBox="0 0 430 1000" preserveAspectRatio="none" aria-hidden="true"><PortraitGarden id={id} quality={quality} scene={scene} progress={dawn}/><FloralBorder id={id} quality={quality} portrait/></svg>
+  return <div className={s.world} data-theme={theme} data-scene={scene} data-stage={stage} data-view={view} data-quality={quality} data-motion={still?"still":"full"} data-music={music} data-artist={artist} data-opening={opening} data-listening={Boolean(listening)} data-lotus-returns={listening?.returningRecordingCount == null ? undefined : Math.min(quality,listening.returningRecordingCount)} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)} style={style}>
+    <svg className={s.landscapeArt} viewBox="0 0 1400 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><Definitions id={id} quality={quality}/><Garden id={id} quality={quality} progress={dawn} scene={scene} cover={cover} listening={listening}/><FloralBorder id={id} quality={quality}/></svg>
+    <svg className={s.portraitArt} viewBox="0 0 430 1000" preserveAspectRatio="none" aria-hidden="true"><PortraitGarden id={id} quality={quality} scene={scene} progress={dawn} listening={listening}/><FloralBorder id={id} quality={quality} portrait/></svg>
     <div className={s.dawnLight} aria-hidden="true"/>
     {(opening||cover||view==="poster")&&<div className={s.titleObject}><PaintedTitle id={id} quality={quality}/><span>MONSOON MINIATURE</span><i>A GARDEN PAINTED FROM MUSIC</i></div>}
     {!cover&&<div className={s.content}>{children}</div>}

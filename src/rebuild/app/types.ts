@@ -2,6 +2,8 @@ import type { ProviderReference, RecordingVersion } from "../core/types";
 import type {ReadyPlayback} from "../data/catalog";
 import type {AudioTechnology} from "../audio/presets";
 import { collectionDate } from "../core/collectionDate";
+import type {InitialTasteProfile} from "../recommendations/initialTaste";
+export interface UserSettings {initialTasteProfile?:InitialTasteProfile}
 export interface MusicTrack {
  id: string;
  title: string;

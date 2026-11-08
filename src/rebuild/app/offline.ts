@@ -35,12 +35,14 @@ export async function verifiedAudio(response:Response,expectedBytes:number,signa
 export interface ListenChunk {eventId:string;recordingId:string;sequence:number;msPlayed:number;positionMs:number;completed:boolean;skipped?:boolean;context:string;contextId?:string|null;finished?:boolean;occurredAt?:string}
 const listenFlights=new Map<string,Promise<boolean>>();
 const listenControllers=new Map<string,AbortController>();
-const listenGeneration=new Map<string,number>();
 const listenClearRanges=new Map<string,{period:"week"|"month"|"all";cutoffMs:number}[]>();
 const listenFlightChunks=new Map<string,ListenChunk>();
+function validListenChunk(value:unknown):value is ListenChunk {
+ const chunk=value as Partial<ListenChunk>|null;
+ return !!chunk&&typeof chunk.eventId==="string"&&!!chunk.eventId&&typeof chunk.recordingId==="string"&&!!chunk.recordingId&&Number.isSafeInteger(chunk.sequence)&&chunk.sequence!>=0&&chunk.sequence!<=100000&&Number.isSafeInteger(chunk.msPlayed)&&chunk.msPlayed!>=0&&chunk.msPlayed!<=120000&&Number.isSafeInteger(chunk.positionMs)&&chunk.positionMs!>=0&&chunk.positionMs!<=21600000&&typeof chunk.completed==="boolean"&&(chunk.skipped===undefined||typeof chunk.skipped==="boolean")&&(chunk.finished===undefined||typeof chunk.finished==="boolean")&&typeof chunk.context==="string"&&!!chunk.context.trim()&&chunk.context.length<=40&&(chunk.contextId==null||typeof chunk.contextId==="string"&&!!chunk.contextId.trim()&&chunk.contextId.length<=120)&&(chunk.occurredAt===undefined||typeof chunk.occurredAt==="string"&&Number.isFinite(Date.parse(chunk.occurredAt)));
+}
 /** Clear only listening evidence; saved audio and collection choices stay on this device. */
 export async function clearListeningOutbox(accountId:string,period:"week"|"month"|"all"="all",cutoffMs=Date.now()) {
- listenGeneration.set(accountId,(listenGeneration.get(accountId)||0)+1);
  listenClearRanges.set(accountId,[...(listenClearRanges.get(accountId)||[]),{period,cutoffMs}]);
  const prefix="sakura-v2-outbox:"+accountId+":";
  const matches=(name:string)=>name.startsWith(prefix)&&listeningTimeFallsInPeriod(listenFlightChunks.get(name)?.occurredAt,period,cutoffMs);
@@ -53,14 +55,14 @@ export async function deliverListen(accountId:string,chunk:ListenChunk,timeoutMs
  const name="listen:"+chunk.eventId+":"+chunk.sequence,mirror="sakura-v2-outbox:"+accountId+":"+chunk.eventId+":"+chunk.sequence;
  const pending=listenFlights.get(mirror);if(pending)return pending;
  let mirrored=false;try{localStorage.setItem(mirror,JSON.stringify(chunk));mirrored=true;}catch{}
- const generation=listenGeneration.get(accountId)||0;
- const flight=(async()=>{await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});if((listenClearRanges.get(accountId)||[]).slice(generation).some(range=>listeningTimeFallsInPeriod(chunk.occurredAt,range.period,range.cutoffMs))){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return false;}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);listenControllers.set(mirror,controller);try{const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});if(response.ok){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}return false;}catch{/* The exact sequence remains queued for a later connection. */return false;}finally{clearTimeout(timer);if(listenControllers.get(mirror)===controller)listenControllers.delete(mirror);}})();
+ const flight=(async()=>{await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});if((listenClearRanges.get(accountId)||[]).some(range=>listeningTimeFallsInPeriod(chunk.occurredAt,range.period,range.cutoffMs))){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return false;}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);listenControllers.set(mirror,controller);try{const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});if(response.ok||[400,404,409,410].includes(response.status)){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}return false;}catch{/* The exact sequence remains queued for a later connection. */return false;}finally{clearTimeout(timer);if(listenControllers.get(mirror)===controller)listenControllers.delete(mirror);}})();
  listenFlights.set(mirror,flight);listenFlightChunks.set(mirror,chunk);try{return await flight;}finally{if(listenFlights.get(mirror)===flight){listenFlights.delete(mirror);listenFlightChunks.delete(mirror);}}
 }
 export async function drainListen(accountId:string,options:{timeoutMs?:number;maxDurationMs?:number;maxChunks?:number}={}){
  const deadline=performance.now()+(options.maxDurationMs??10000);
- const pending=new Map<string,ListenChunk>();
- try{let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){if(String(cursor.key).startsWith(key(accountId,"listen:"))){const chunk=cursor.value as ListenChunk;pending.set(chunk.eventId+":"+chunk.sequence,chunk);}cursor=await cursor.continue();}}catch{}
- try{for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith("sakura-v2-outbox:"+accountId+":")){const chunk=JSON.parse(localStorage.getItem(name)||"null") as ListenChunk;if(chunk)pending.set(chunk.eventId+":"+chunk.sequence,chunk);}}}catch{}
+ const pending=new Map<string,ListenChunk>(),invalidDisk:string[]=[],invalidMirror:string[]=[];
+ try{let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){const name=String(cursor.key);if(name.startsWith(key(accountId,"listen:"))){const chunk=cursor.value;if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidDisk.push(name.slice(key(accountId,"").length));}cursor=await cursor.continue();}}catch{}
+ try{for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith("sakura-v2-outbox:"+accountId+":")){try{const chunk:unknown=JSON.parse(localStorage.getItem(name)||"null");if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidMirror.push(name);}catch{invalidMirror.push(name);}}}for(const name of invalidMirror)localStorage.removeItem(name);}catch{}
+ await Promise.allSettled(invalidDisk.map(name=>localDelete(accountId,name)));
  for(const chunk of [...pending.values()].sort((a,b)=>a.eventId.localeCompare(b.eventId)||a.sequence-b.sequence).slice(0,options.maxChunks??100)){const remaining=deadline-performance.now();if(remaining<=0||!await deliverListen(accountId,chunk,Math.min(options.timeoutMs??10000,remaining)))break;}
 }

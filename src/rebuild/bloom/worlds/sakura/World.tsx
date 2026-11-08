@@ -2,6 +2,8 @@
 
 import { useId, type CSSProperties } from "react";
 import type { BloomWorldProps } from "../types";
+import type { BloomListeningProfile } from "../../uiTypes";
+import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
 
 type CanopyPoint = readonly [number, number, number, number, number];
@@ -28,7 +30,7 @@ const tierDetails = {
 } as const;
 
 function noise(value: number) {
- const x = Math.sin(value * 127.1 + 311.7) * 43758.5453123;
+ const x = stableSin(value * 127.1 + 311.7) * 43758.5453123;
  return x - Math.floor(x);
 }
 
@@ -102,7 +104,28 @@ function BranchLettering({ id }: { id: string }) {
  </svg>;
 }
 
-function MainTree({ id, quality, growth }: { id: string; quality: BloomWorldProps["quality"]; growth: number }) {
+function ListeningBranches({ id, quality, listening, portrait = false }: { id: string; quality: BloomWorldProps["quality"]; listening?: BloomListeningProfile; portrait?: boolean }) {
+ const returns = Math.min(quality + 2, Math.max(0, listening?.returningArtistCount ?? 0));
+ const discoveries = Math.min(quality + 2, Math.max(0, listening?.discoveredArtistCount ?? 0));
+ if (!returns && !discoveries) return null;
+ return <g className={s.listeningBranches} data-listening-motif="returning-blossoms-and-new-buds">
+  {Array.from({ length: returns }, (_, n) => {
+   const x = portrait ? n % 2 ? 368 : 21 : n % 2 ? 1298 : 148;
+   const y = portrait ? 442 + n * 48 : 335 + n * 61;
+   return <g key={`return-${n}`} transform={`translate(${x} ${y})`}>
+    <path d="M-9 11Q0-12 12-9M0 4Q-18-5-23-18" stroke="var(--sakura-vine)" strokeWidth="1.4" fill="none"/>
+    <use href={`#${id}-blossom`} x="-15" y="-14" width="23" height="23"/>
+    <use href={`#${id}-blossom`} x="3" y="-23" width="21" height="21"/>
+   </g>;
+  })}
+  {Array.from({ length: discoveries }, (_, n) => <g key={`new-${n}`} transform={`translate(${portrait ? n % 2 ? 363 : 27 : n % 2 ? 1262 : 174} ${portrait ? 477 + n * 46 : 360 + n * 62})`}>
+   <path d="M0 19Q5 5 0-7" stroke="var(--sakura-vine)" strokeWidth="1.2" fill="none"/>
+   <use href={`#${id}-bud`} x="-8" y="-20" width="16" height="28"/>
+  </g>)}
+ </g>;
+}
+
+function MainTree({ id, quality, growth, listening }: { id: string; quality: BloomWorldProps["quality"]; growth: number; listening?: BloomListeningProfile }) {
  const detail = tierDetails[quality];
  return <g className={s.mainTree}>
   <g className={s.leftLimb}>
@@ -122,10 +145,11 @@ function MainTree({ id, quality, growth }: { id: string; quality: BloomWorldProp
    <g fill="none" stroke="var(--sakura-bark-light)" strokeLinecap="round" opacity=".4"><path d="M1471 958C1400 829 1420 730 1415 596C1411 470 1390 362 1333 284C1280 212 1210 176 1133 149M1388 837Q1377 773 1400 703M1414 435Q1391 361 1357 330M1288 237 1262 220M1203 174 1189 111" strokeWidth="1.9"/></g>
   </g>
   {canopy.slice(0, detail.sprigs).map((point, index) => <Sprig key={index} id={id} point={point} index={index} flowers={detail.flowers} growth={growth}/>)}
+  <ListeningBranches id={id} quality={quality} listening={listening}/>
  </g>;
 }
 
-function PortraitBranches({ id, growth, quality }: { id: string; growth: number; quality: BloomWorldProps["quality"] }) {
+function PortraitBranches({ id, growth, quality, listening }: { id: string; growth: number; quality: BloomWorldProps["quality"]; listening?: BloomListeningProfile }) {
  const flowers = [3, 5, 8, 12, 17][quality - 1];
  return <svg className={s.portraitBranches} viewBox="0 0 390 844" preserveAspectRatio="none" aria-hidden="true">
   <g fill="none" stroke="var(--sakura-branch)" strokeLinecap="round" opacity=".72">
@@ -147,20 +171,24 @@ function PortraitBranches({ id, growth, quality }: { id: string; growth: number;
     <use href={`#${id}-leaf-shape`} x={right ? -17 : 2} y="7" width="20" height="13" transform={right ? "rotate(160 -7 13)" : undefined}/>
    </g>;
   })}
+  <ListeningBranches id={id} quality={quality} listening={listening} portrait/>
  </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
  const id = `sakura-${useId().replace(/:/g, "")}`;
  const growth = view === "cover" ? .76 : view === "poster" || scene === "finale" ? 1 : scene === "opening" ? .08 : Math.max(.15, Math.min(1, progress));
  const details = tierDetails[quality];
  const isMusic = ["songs", "song-winner", "artist-songs", "artists"].includes(scene);
+ const hour = listening?.peakHour;
+ const sunX = hour == null ? 949 : 645 + hour / 23 * 450;
+ const sunY = hour == null ? 378 : 305 + (1 - Math.max(0, stableSin((hour - 6) / 12 * Math.PI))) * 175;
  const style = { "--sakura-growth": growth, "--scene-index": stage, "--sakura-afterglow": Math.max(.05, growth), "--sakura-camera-x": `${scene === "artist" ? -2.5 : scene === "returns" ? 2 : 0}%` } as CSSProperties;
  return <section className={s.world} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-reduced-motion={reducedMotion} data-music={isMusic} style={style}>
   <svg className={s.landscape} viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
    <Definitions id={id} detailed={quality >= 3}/>
    <rect width="1440" height="1000" fill={`url(#${id}-sky)`}/>
-   <g className={s.sunlight}><circle cx="949" cy="378" r="440" fill={`url(#${id}-sun)`}/><circle cx="949" cy="378" r="63" fill="var(--sakura-sun)" opacity=".35"/><circle cx="949" cy="378" r="55" fill="var(--sakura-sun)" opacity=".18"/></g>
+   <g className={s.sunlight} data-listening-hour={hour ?? undefined}><circle cx={sunX} cy={sunY} r="440" fill={`url(#${id}-sun)`}/><circle cx={sunX} cy={sunY} r="63" fill="var(--sakura-sun)" opacity=".35"/><circle cx={sunX} cy={sunY} r="55" fill="var(--sakura-sun)" opacity=".18"/></g>
    <g className={s.hills}><path d="M-20 610C160 506 258 510 417 584C611 482 721 520 884 569C1048 478 1191 518 1470 595V1010H-20Z" fill="var(--sakura-hill-far)"/><path d="M-20 706C130 637 302 687 472 650C665 609 864 634 1039 670C1239 599 1358 632 1470 679V1010H-20Z" fill="var(--sakura-hill-near)"/><path d="M-20 813C255 694 436 763 666 737C934 704 1144 714 1470 806V1010H-20Z" fill="var(--sakura-ground)"/></g>
    <g className={s.distantOrchard}>{Array.from({ length: details.distant }, (_, n) => {
     const x = n / Math.max(1, details.distant - 1) * 1570 - 65;
@@ -173,7 +201,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
    <rect width="1440" height="1000" fill={`url(#${id}-paper)`} opacity={quality >= 3 ? .5 : .25}/>
   </svg>
   <svg className={s.orchard} viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-   <MainTree id={id} quality={quality} growth={growth}/>
+   <MainTree id={id} quality={quality} growth={growth} listening={listening}/>
    <g className={s.vines} fill="none" stroke="var(--sakura-vine)" strokeLinecap="round">
     <path d="M102 711C165 626 46 532 119 432C170 362 164 303 145 303C119 303 120 338 151 335C195 331 186 273 222 260C255 248 265 224 254 217C241 204 227 225 239 234C269 257 299 219 309 197" strokeWidth="2.5"/>
     <path d="M1358 706C1283 631 1414 542 1350 466C1309 415 1259 406 1288 372C1307 351 1299 335 1287 338C1273 339 1276 356 1294 355C1325 353 1317 306 1268 303C1220 300 1211 281 1223 269C1241 253 1258 276 1242 283C1211 297 1181 265 1168 245" strokeWidth="2"/>
@@ -187,7 +215,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
    })}</g>
    {growth > .3 && <g className={s.fireflies}>{Array.from({ length: details.fireflies }, (_, n) => <circle key={n} cx={180 + noise(n * 29 + 2) * 1050} cy={535 + noise(n * 21) * 395} r={.9 + noise(n * 5) * 1.6} fill="var(--sakura-pollen)" style={{ "--glint-delay": `${n * -.8}s` } as CSSProperties}/>)}</g>}
   </svg>
-  <PortraitBranches id={id} growth={growth} quality={quality}/>
+  <PortraitBranches id={id} growth={growth} quality={quality} listening={listening}/>
   <div className={s.clearing}>
    {(scene === "opening" || scene === "finale" || view === "cover" || view === "poster") && <div className={s.titleArt}><BranchLettering id={id}/><span className={s.titleCaption}>SAKURA AFTERGLOW</span></div>}
    <div className={s.content}>{children}</div>

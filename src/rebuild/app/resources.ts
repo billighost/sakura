@@ -7,7 +7,10 @@ const EMPTY:ResourceState<never>={data:undefined,loading:false,error:null,update
 type Resource={snapshot:ResourceState<unknown>;listeners:Set<()=>void>;flight:Promise<void>|null;controller:AbortController|null;generation:number;reload:boolean;cacheQueue:Promise<void>};
 const entries=new Map<string,Resource>();
 const storageKey=(accountId:string,path:string)=>"sakura-v2-resource-invalidated:"+accountId+":"+path;
-function invalidatedAt(accountId:string,path:string){try{const value=Number(localStorage.getItem(storageKey(accountId,path)));return Number.isFinite(value)?value:0;}catch{return 0;}}
+const erasureKey=(accountId:string)=>"sakura-v2-listening-resource-erased:"+accountId;
+const listeningResource=(path:string)=>/^\/api\/v2\/(bloom|history|profile|taste|feed|home|mixes|listening|personalization)(\/|\?|$)/.test(path)||path.startsWith("/api/v2/search/suggestions");
+function listeningErasedAt(accountId:string,path:string){try{const stamp=listeningResource(path)?Number(localStorage.getItem(erasureKey(accountId))):0;return Number.isFinite(stamp)?stamp:0;}catch{return 0;}}
+function invalidatedAt(accountId:string,path:string){try{const value=Number(localStorage.getItem(storageKey(accountId,path))),erased=listeningResource(path)?Number(localStorage.getItem(erasureKey(accountId))):0;return Math.max(Number.isFinite(value)?value:0,Number.isFinite(erased)?erased:0);}catch{return 0;}}
 function rememberInvalidation(accountId:string,path:string,updatedAt:number){const stamp=Math.max(Date.now(),updatedAt+1,invalidatedAt(accountId,path));try{localStorage.setItem(storageKey(accountId,path),String(stamp));}catch{}return stamp;}
 function resource(key:string):Resource{let item=entries.get(key);if(!item){item={snapshot:EMPTY,listeners:new Set(),flight:null,controller:null,generation:0,reload:false,cacheQueue:Promise.resolve()};entries.set(key,item);}return item;}
 function update(item:Resource,patch:Partial<ResourceState<unknown>>){item.snapshot={...item.snapshot,...patch};for(const listener of item.listeners)listener();}
@@ -19,8 +22,8 @@ export async function loadResource(accountId:string,path:string,force=false){
  item.flight=(async()=>{
   let allowSaved=!force&&!item.reload;
   try{do{
-   item.reload=false;const version=item.generation,controller=new AbortController();item.controller=controller;
-   const current=()=>!controller.signal.aborted&&entries.get(key)===item&&item.generation===version;
+   item.reload=false;const version=item.generation,erasure=listeningErasedAt(accountId,path),controller=new AbortController();item.controller=controller;
+   const current=()=>{if(!controller.signal.aborted&&entries.get(key)===item&&item.generation===version&&listeningErasedAt(accountId,path)!==erasure){invalidate(item,accountId,path,true);}return !controller.signal.aborted&&entries.get(key)===item&&item.generation===version;};
    update(item,{loading:item.snapshot.data===undefined,error:null});
    try{
     if(allowSaved&&item.snapshot.data===undefined){
@@ -47,7 +50,7 @@ export async function loadResource(accountId:string,path:string,force=false){
  })();return item.flight;
 }
 function cacheTask(item:Resource,task:()=>Promise<void>){const operation=item.cacheQueue.catch(()=>{}).then(task);item.cacheQueue=operation.catch(()=>{});return item.cacheQueue;}
-function invalidate(item:Resource,accountId:string,path:string){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);void cacheTask(item,()=>localDelete(accountId,"resource:"+path));update(item,{updatedAt:0});}
+function invalidate(item:Resource,accountId:string,path:string,dropData=false){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);void cacheTask(item,()=>localDelete(accountId,"resource:"+path));update(item,{updatedAt:0,...(dropData?{data:undefined,error:null}: {})});}
 function fresh(updatedAt:number){const age=Date.now()-updatedAt;return updatedAt>0&&age>=-1000&&age<120000;}
 /** Stable snapshots are shared by subscribers and explicit prefetch callers. */
 export function resourceSnapshot<T>(accountId:string,path:string):ResourceState<T>{return (entries.get(accountId+":"+path)?.snapshot||EMPTY) as ResourceState<T>;}
@@ -59,5 +62,16 @@ export function useResource<T>(accountId:string|null,path:string|null){const key
  // already pending, so show its loading UI instead of flashing an empty room.
  return {...result,loading:result.loading||!!(accountId&&path&&result.data===undefined&&!result.error),retry:()=>{if(accountId&&path)void loadResource(accountId,path,true);}};
 }
-export function invalidateResources(accountId:string,prefix="/api/v2/"){for(const [key,item]of entries){if(key.startsWith(accountId+":"+prefix)){const path=key.slice(accountId.length+1);invalidate(item,accountId,path);if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}}}
+export function invalidateResources(accountId:string,prefix="/api/v2/",dropData=false){
+ if(dropData){try{const stamp=Math.max(Date.now(),...Array.from(entries).filter(([key])=>key.startsWith(accountId+":")).map(([,item])=>item.snapshot.updatedAt+1));localStorage.setItem(erasureKey(accountId),String(stamp));for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key?.startsWith(`sakura-bloom-scene:${accountId}:`))localStorage.removeItem(key);}}catch{}}
+ for(const [key,item]of entries){if(key.startsWith(accountId+":"+prefix)){const path=key.slice(accountId.length+1);invalidate(item,accountId,path,dropData&&listeningResource(path));if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}}
+}
 export function clearResources(accountId:string){for(const [key,item] of entries)if(key.startsWith(accountId+":")){item.generation++;item.reload=false;item.controller?.abort();entries.delete(key);update(item,EMPTY);}}
+
+// Another tab's erasure also revokes mounted stories and pending cache writes.
+if(typeof window!=="undefined")window.addEventListener("storage",event=>{
+ const prefix="sakura-v2-listening-resource-erased:";if(!event.key?.startsWith(prefix))return;
+ const accountId=event.key.slice(prefix.length);
+ for(const [key,item]of entries){if(!key.startsWith(accountId+":"))continue;const path=key.slice(accountId.length+1);if(!listeningResource(path))continue;invalidate(item,accountId,path,true);if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}
+ window.dispatchEvent(new CustomEvent("sakura-listening-erased",{detail:{accountId}}));
+});

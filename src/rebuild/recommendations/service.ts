@@ -1,6 +1,6 @@
 import { getRebuildPool,inTransaction } from "../data/db";
 import type {PoolClient} from "pg";
-import { CARD_SELECT,VERIFIED,card,cardsForIds } from "../data/catalog";
+import { RANKING_CARD_SELECT,VERIFIED,card,cardsForIds } from "../data/catalog";
 import { getSettings } from "../data/settings";
 import { ProductError,uuid,ids,object } from "../data/validation";
 import { planMixes,type Candidate } from "./planner";
@@ -9,8 +9,9 @@ import {rankPersonalizedTracks,orderPersonalizedTracks,tasteExcluded,type TasteF
 import {FEED_DEFAULTS} from "../app/feedPreferences";
 
 const MIXES=SITUATIONAL_MIXES;
-export async function listMixes(accountId:string) {
-  const rows=(await getRebuildPool().query(`SELECT m.id,m.slot,m.kind,m.name,m.description,m.status,m.reason,
+type Queryable=Pick<PoolClient,"query">;
+export async function listMixes(accountId:string,sql:Queryable=getRebuildPool()) {
+  const rows=(await sql.query(`SELECT m.id,m.slot,m.kind,m.name,m.description,m.status,m.reason,
     m.eligible_count AS "eligibleCount",m.unique_artists AS "uniqueArtists",m.generated_at AS "generatedAt",m.expires_at AS "expiresAt",
     (SELECT jsonb_agg(r.metadata->>'coverUrl' ORDER BY x.position) FROM sakura_v2."MixRecording" x
       JOIN sakura_v2."Recording" r ON r.id=x.recording_id WHERE x.mix_id=m.id AND x.position<4) AS "coverUrls",
@@ -19,18 +20,20 @@ export async function listMixes(accountId:string) {
   return rows.map(row=>{const definition=MIXES.find(m=>m.id===row.slot);return {...row,situation:definition?.situation,surfaces:definition?.surfaces||["discover"],rules:definition?.rules||[],coverUrls:(row.coverUrls||[]).filter(Boolean),playability:row.status==="ready"?"resolvable":"unavailable"};});
 }
 
-export async function ensureMixes(accountId:string,refresh=false) {
-  const existing=await listMixes(accountId);
-  if(!refresh&&existing.length===MIXES.length&&existing.every(m=>new Date(m.expiresAt).getTime()>Date.now()))return existing;
-  await inTransaction(async client=>{
+export async function ensureMixes(accountId:string,refresh=false,sql?:PoolClient) {
+  if(sql)return ensureMixesFor(accountId,refresh,sql);
+  return inTransaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-mixes:${accountId}`]);
+    return ensureMixesFor(accountId,refresh,client);
+  });
+}
+async function ensureMixesFor(accountId:string,refresh:boolean,client:PoolClient){
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-mixes:${accountId}`]);
+  const existing=await listMixes(accountId,client);
+  if(!refresh&&existing.length===MIXES.length&&existing.every(m=>new Date(m.expiresAt).getTime()>Date.now()))return existing;
     const settings=await getSettings(accountId,client);
-    if(!refresh){
-      const current=(await client.query(`SELECT COUNT(*)::integer n FROM sakura_v2."Mix" WHERE account_id=$1::uuid AND expires_at>now()`,[accountId])).rows[0];
-      if(current.n===MIXES.length)return;
-    }
-    const rows=(await client.query(`${CARD_SELECT} WHERE ${VERIFIED} ORDER BY r.created_at DESC LIMIT 2500`,[accountId])).rows;
+    const startingIds=[...new Set((settings.initialTasteProfile?.artists||[]).flatMap((artist:{recordings:{id:string}[]})=>artist.recordings.map(recording=>recording.id)))];
+    const rows=(await client.query(`${RANKING_CARD_SELECT} WHERE ${VERIFIED} ORDER BY (r.id=ANY($2::uuid[])) DESC,r.created_at DESC,r.id LIMIT 2500`,[accountId,startingIds])).rows;
     const allCards=rows.map(card).filter(c=>settings.explicitContent||c.metadata.explicit!=="explicit");
     const listens=settings.learnFromListening===false?[]:(await client.query(`SELECT recording_id,audible_ms,play_count,completed_count,skipped_count,last_played_at
       FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid`,[accountId])).rows;
@@ -40,9 +43,9 @@ export async function ensureMixes(accountId:string,refresh=false) {
     const history:ListeningEvidence[]=listens.map(l=>({recordingId:l.recording_id,audibleMs:Number(l.audible_ms),playCount:Number(l.play_count),completedCount:Number(l.completed_count),skippedCount:Number(l.skipped_count),...(l.last_played_at?{lastPlayedAt:new Date(l.last_played_at).toISOString()}:{} )}));
     const ranked=rankPersonalizedTracks(allCards,{settings:settings as TasteSettings,history,feedback:normalizedFeedback,likedIds:[...favoriteIds] as string[],seed:accountId});
     const heard=new Set(ranked.filter(item=>item.heard).map(item=>item.track.id));
-    const occurrence=settings.learnFromListening===false?[]:(await client.query(`SELECT l.recording_id,MIN(COALESCE(c.occurred_at,c.created_at)) first_played_at,
-      BOOL_OR(EXTRACT(HOUR FROM COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $2)>=22 OR
-        EXTRACT(HOUR FROM COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $2)<4) late_night
+    const occurrence=settings.learnFromListening===false?[]:(await client.query(`SELECT l.recording_id,MIN(c.occurred_at) first_played_at,
+      BOOL_OR(EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $2)>=22 OR
+        EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $2)<4) late_night
       FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l ON l.account_id=c.account_id AND l.event_id=c.event_id
       WHERE c.account_id=$1::uuid AND c.audible_ms>0 GROUP BY l.recording_id`,[accountId,settings.timeZone])).rows;
     const occurrenceById=new Map(occurrence.map(r=>[r.recording_id,r]));
@@ -57,7 +60,7 @@ export async function ensureMixes(accountId:string,refresh=false) {
       const listened=byId.get(c.recordingId),artistId=artistBucket(c);
       const occurrence=occurrenceById.get(c.recordingId);
       const history={audibleMs:Number(listened?.audible_ms||0),lastPlayedAt:listened?.last_played_at?new Date(listened.last_played_at).getTime():undefined,
-        firstPlayedAt:occurrence?new Date(occurrence.first_played_at).getTime():undefined,lateNight:Boolean(occurrence?.late_night)};
+        firstPlayedAt:occurrence?.first_played_at?new Date(occurrence.first_played_at).getTime():undefined,lateNight:Boolean(occurrence?.late_night)};
       return {recordingId:c.recordingId,artistId,genres:c.genres,popularity:c.popularity,durationMs:c.durationMs,
         eligibleMixIds:eligibleSituations({...c,liked:favoriteIds.has(c.recordingId)},history),
         affinity:item.score};
@@ -85,20 +88,24 @@ export async function ensureMixes(accountId:string,refresh=false) {
     if(membership.length)await client.query(`INSERT INTO sakura_v2."MixRecording"(mix_id,recording_id,position)
       SELECT x.mix_id::uuid,x.recording_id::uuid,x.position FROM jsonb_to_recordset($1::jsonb) x(mix_id text,recording_id text,position integer)`,
       [JSON.stringify(membership.map(m=>({mix_id:m.mixId,recording_id:m.recordingId,position:m.position})))]);
-  });
-  return listMixes(accountId);
+  return listMixes(accountId,client);
 }
 export async function getMix(accountId:string,rawId:string) {
   const id=uuid(rawId,"mix ID");
-  const mix=(await getRebuildPool().query(`SELECT id,slot,kind,name,description,status,reason,generated_at AS "generatedAt",expires_at AS "expiresAt"
+  return inTransaction(async sql=>{
+  await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+  const mix=(await sql.query(`SELECT id,slot,kind,name,description,status,reason,generated_at AS "generatedAt",expires_at AS "expiresAt"
     FROM sakura_v2."Mix" WHERE account_id=$1::uuid AND id=$2::uuid`,[accountId,id])).rows[0];
   if(!mix)throw new ProductError(404,"Mix not found");
-  const membership=(await getRebuildPool().query(`SELECT recording_id FROM sakura_v2."MixRecording" WHERE mix_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.recording_id);
-  const [settings,feedbackRows,retained]=await Promise.all([getSettings(accountId),getRebuildPool().query(`SELECT target,target_id,kind,expires_at FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND (expires_at IS NULL OR expires_at>now())`,[accountId]),cardsForIds(accountId,membership)]);
+  const membership=(await sql.query(`SELECT recording_id FROM sakura_v2."MixRecording" WHERE mix_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.recording_id);
+  const settings=await getSettings(accountId,sql);
+  const feedbackRows=await sql.query(`SELECT target,target_id,kind,expires_at FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND (expires_at IS NULL OR expires_at>now())`,[accountId]);
+  const retained=await cardsForIds(accountId,membership,sql);
   const feedback:TasteFeedback[]=feedbackRows.rows.map(f=>({target:f.target,targetId:f.target_id,kind:f.kind,expiresAt:f.expires_at?new Date(f.expires_at).toISOString():null}));
   const recordings=retained.filter(recording=>(settings.explicitContent!==false||recording.metadata.explicit!=="explicit")&&!tasteExcluded(recording,feedback));
   return {...mix,recordings,tracks:recordings,trackCount:recordings.length,
     playability:mix.status==="ready"&&recordings.length?"resolvable":"unavailable",durationMs:recordings.reduce((s,r)=>s+(r.durationMs||0),0)};
+  });
 }
 export async function offlineMixes(accountId:string,value:unknown){
   return inTransaction(async client=>{
@@ -110,8 +117,8 @@ async function offlineMixesFor(accountId:string,value:unknown,pool:Pick<PoolClie
   const requested=ids(object(value).recordingIds,2000),settings=await getSettings(accountId,pool),cards=await cardsForIds(accountId,requested,pool);
   const favorites=new Set((await pool.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=ANY($2::uuid[])`,[accountId,requested])).rows.map(r=>r.recording_id));
   const rows=settings.learnFromListening===false?[]:(await pool.query(`SELECT s.recording_id,s.audible_ms,s.last_played_at,s.play_count,s.completed_count,s.skipped_count,
-    MIN(COALESCE(c.occurred_at,c.created_at)) first_played_at,
-    BOOL_OR(EXTRACT(HOUR FROM COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $3)>=22 OR EXTRACT(HOUR FROM COALESCE(c.occurred_at,c.created_at) AT TIME ZONE $3)<4) late_night
+    MIN(c.occurred_at) first_played_at,
+    BOOL_OR(EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $3)>=22 OR EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $3)<4) late_night
     FROM sakura_v2."ListeningRecordingSummary" s LEFT JOIN sakura_v2."ListeningEventLedger" l ON l.account_id=s.account_id AND l.recording_id=s.recording_id
     LEFT JOIN sakura_v2."ListeningChunk" c ON c.account_id=l.account_id AND c.event_id=l.event_id AND c.audible_ms>0
     WHERE s.account_id=$1::uuid AND s.recording_id=ANY($2::uuid[]) GROUP BY s.recording_id,s.audible_ms,s.last_played_at,s.play_count,s.completed_count,s.skipped_count`,[accountId,requested,settings.timeZone])).rows;

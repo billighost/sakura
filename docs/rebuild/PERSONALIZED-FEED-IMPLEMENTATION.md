@@ -1,6 +1,6 @@
 # Sakura's listening garden
 
-Implemented on 8 November 2026. The product research and source evidence are in
+Implemented and refined on 8 November 2026. The product research and source evidence are in
 [`PERSONALIZED-FEED-RESEARCH.md`](./PERSONALIZED-FEED-RESEARCH.md) and
 [`PERSONALIZED-FEED-SOURCES.json`](./PERSONALIZED-FEED-SOURCES.json).
 
@@ -19,8 +19,8 @@ candidates have clear refresh and empty states. The feed never fills a page with
 duplicate songs. Background catalog refresh uses exact provider identities and
 verified ingestion to acquire additional candidates without blocking a page.
 
-The initial candidate pool contains up to 2,500 verified recordings and reserves
-space for unfamiliar songs. Further catalog acquisition appears in new feed
+The initial candidate pool reserves up to 1,000 known and 1,500 unfamiliar
+verified recordings, plus the bounded sources from chosen artists. Further catalog acquisition appears in new feed
 selections; an existing scrolling selection stays stable. Availability still
 depends on the recording's audio providers.
 
@@ -112,9 +112,60 @@ layout. Fragment navigation waits for route content and skips hidden cached
 targets; ordinary route scroll restoration remains available. Data clearing
 uses a compact, bounded confirmation with the safe cancel choice focused.
 
+## Second implementation pass
+
+Onboarding creates a separate, bounded starting taste from the published genres
+of chosen artists. The same recipe guides Home, Discover, mixes, local queues,
+and Search artist suggestions. It is an account preference with catalog source
+provenance; it never creates listening events or Bloom statistics. Exact primary
+artists take precedence over names and featured credits. Unknown tags remain
+unknown. Explicit genre choices remain distinct and stronger. See
+[`INITIAL-TASTE-IMPLEMENTATION.md`](./INITIAL-TASTE-IMPLEMENTATION.md).
+
+Mounted onboarding drafts reconcile newer choices, including a choice changed
+and then changed back on another device. Save checks the original artist-choice
+version before staging a patch, and retry uses the current draft. Per-field
+preference revisions protect offline edits without overwriting newer device
+choices. Search reserves older primary recordings for chosen or explicitly
+requested artists instead of relying on six fixed names or recent guest credits.
+
+Listening now accounts for the audible boundary before pause, mute, seek, and
+natural completion. A failed playback request is not a skip. Queue response and
+account guards preserve manual choices and requested collection/download limits.
+Offline outboxes reconcile every deletion range; corrupt and permanently rejected
+chunks cannot prevent healthy uploads. Clear replies carry authoritative remaining
+feedback and precise ordering stamps. Newer choices, undo actions, and listening
+survive older replies; erased evidence cannot reappear through an older read.
+
+Home keeps music first, then shows an authored ready Bloom and the nearest
+opening across weekly, monthly, and yearly periods, ahead of the continuous feed.
+Cards include artwork, listening dates, opening time, and available-through date
+in the selected listening timezone. The shelf checks dated listening without
+building full stories. Completed cover details remain private until completion.
+Timezone changes refresh calendar views; saved stories retain their own timezone.
+
+Bloom v3 adds observed local hours, returns, first recorded discoveries, genre
+shares, artist continuity, and adjacent-period changes to every registered world.
+Each world has distinct art, chapter narration, and closing composition. Retained
+history stays independent of recommendation exclusions. Older snapshots remain
+readable; clearing listening removes derived stories and pending exports/audio.
+See [`BLOOM-LISTENING-INTEGRATION.md`](./BLOOM-LISTENING-INTEGRATION.md) for all ten
+world mappings, period arithmetic, staged disclosure, archives, and covers.
+
+The interface pass improves 320/390px cards, 44px actions, keyboard-accessible
+charts, long titles, short laptops, loading/empty states, and confirmation footers.
+Song explanations and controls use plain language. Recommendations use ordinary
+queue controls and keep **Find my soundtrack**. Dedicated source and rendered
+copy reviews follow [`SAKURA-VOICE.md`](./SAKURA-VOICE.md).
+
+Recommendation ranking uses a lean catalog projection. Full playback proofs and
+card details are hydrated for selected songs and visible shelves. Bounded WebP
+covers never mount cinematic scenes while scrolling. Unchanged background reads
+preserve the Bloom journey and avoid unnecessary resource refreshes.
+
 ## Verification commands
 
-Final verification passed: the core and personalization tests, isolated
+The original pass verified the core and personalization tests, isolated
 PostgreSQL product/data/service cases, account synchronization tests, ten
 navigation regressions, TypeScript, ESLint, production build, and 29 browser
 acceptance checks. ESLint has no errors and retains 14 existing warnings. The
@@ -122,7 +173,8 @@ browser run has no uncaught errors and verifies desktop, dark mode, and 390/320p
 mobile layouts. The final voice review found no material wrapping or copy issues.
 
 See [`PERSONALIZED-FEED-VERIFICATION.md`](./PERSONALIZED-FEED-VERIFICATION.md)
-for the tested behavior and the boundaries of fixture and live-database evidence.
+for original evidence, and [`SECOND-PASS-VERIFICATION.md`](./SECOND-PASS-VERIFICATION.md)
+for the integrated refinement results and fixture boundaries.
 
 ```powershell
 npm test
@@ -134,6 +186,11 @@ npx tsc --noEmit
 npm run build
 $env:SAKURA_TEST_URL='http://localhost:3014'
 npm run test:personalization:browser
+npm run test:bloom:listening
+npm run test:bloom:covers
+npm run test:bloom:browser
+npm run test:bloom:exports:browser
+npm run test:onboarding:browser
 ```
 
 The new database tests use isolated schemas and synthetic account fixtures. The
@@ -144,7 +201,8 @@ Local screenshots are under `.local/`.
 
 The additive schema migration has been applied with
 `node scripts/rebuild-migrate.mjs --apply`; no existing account or library was
-reset. This work is local and has not been deployed.
+reset. The completed refinement is delivered to the requested GitHub repository;
+no manual deployment was performed. Final verification servers are stopped.
 
 Mesh persistent memory was unavailable because the installed CLI supports an
 older schema than this project's memory database. This document records the
