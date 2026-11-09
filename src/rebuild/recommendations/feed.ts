@@ -8,6 +8,7 @@ import {FEED_DEFAULTS} from "../app/feedPreferences";
 import {rankPersonalizedTracks,orderPersonalizedTracks,planLocalQueue,recentRelease,tasteExcluded,
   type ListeningEvidence,type TasteFeedback,type TasteSettings,type RankedTrack} from "./personalization";
 import {encodeFeedCursor,parseFeedCursor,verifyFeedCursor} from "./feedCursor";
+import {personalizedHeroPicks} from "./hero";
 
 type FeedCard=RecordingCard&{releaseDate:string|null};
 interface FeedEntry {recordingId:string;reason:string;lane:RankedTrack<FeedCard>["lane"]}
@@ -86,6 +87,19 @@ export async function getPersonalizedFeed(accountId:string,url:URL){
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
     return personalizedFeedPage(accountId,url,client);
   });
+}
+/** Hero refreshes read current taste without creating or expiring scroll sessions. */
+export async function getPersonalizedHero(accountId:string,url:URL){
+ const {surface,mode}=feedInput(url);
+ return inTransaction(async client=>{
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+  const context=await tasteContext(accountId,client),now=Date.now();
+  const selection=personalizedHeroPicks(context.cards,{...context,settings:context.settings,mode,nowMs:now,seed:accountId});
+  const selected=selection[surface];
+  const track=selected?(await cardsForIds(accountId,[selected.track.id],client))[0]:undefined;
+  return {item:track&&selected?{track,reason:selected.reason,lane:selected.lane}:null,
+   generatedAt:new Date(now).toISOString(),refreshAt:selection.refreshAt};
+ });
 }
 async function personalizedFeedPage(accountId:string,url:URL,pool:Queryable){
   const {surface,mode,limit,cursor}=feedInput(url);

@@ -1,0 +1,24 @@
+.garden{position:absolute;inset:-45px -35px -20px auto;width:133%;max-width:none;height:120%;overflow:visible;pointer-events:none;z-index:-1;color:var(--ink-accent)}
+.home{transform:rotate(-3deg)}
+.discover{transform:rotate(4deg)}
+.wash{opacity:.85;animation:washAppear 2.6s ease both}
+.ink,.fineInk{stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:inkGrow 2.3s cubic-bezier(.2,.65,.3,1) .1s forwards}
+.fineInk{stroke-width:.65;opacity:.65;animation-delay:.4s;animation-duration:2.6s}
+.leaves{fill:color-mix(in srgb,var(--ink-accent) 12%,var(--ink-bg));stroke:currentColor;stroke-width:.6;animation:leavesAppear 1.4s ease 1s both}
+.flower{transform-box:fill-box;transform-origin:center;animation:blossomOpen 1.6s cubic-bezier(.16,.7,.2,1) both;animation-delay:calc(.6s + var(--order)*.13s)}
+.flower>path{stroke:color-mix(in srgb,var(--ink-petal) 60%,var(--ink-accent));stroke-width:.38}
+.stamens{stroke:currentColor;stroke-width:.45;fill:currentColor;opacity:.65}
+.orbits{stroke:color-mix(in srgb,var(--ink-petal) 60%,var(--ink-accent));stroke-width:.7;opacity:.5}
+.orbit{stroke-dasharray:1;stroke-dashoffset:1;animation:inkGrow 3.2s ease .2s forwards}
+.stars{stroke:var(--ink-petal);stroke-width:1;stroke-linecap:round}
+.stars>path{animation:leavesAppear 1.4s ease both;animation-delay:calc(.5s + var(--order)*.18s)}
+.driftingPetal{fill:var(--ink-petal);opacity:.55;transform-box:fill-box;transform-origin:center;animation:petalArrival 2.9s ease-out both;animation-delay:calc(.25s + var(--order)*.14s)}
+@keyframes inkGrow{to{stroke-dashoffset:0}}
+@keyframes washAppear{from{opacity:0}to{opacity:.85}}
+@keyframes leavesAppear{from{opacity:0}to{opacity:1}}
+@keyframes blossomOpen{from{opacity:0;transform:rotate(-16deg) scale(.2)}to{opacity:.95;transform:rotate(0) scale(1)}}
+@keyframes petalArrival{from{opacity:0;transform:translate(-30px,-32px) rotate(-35deg)}to{opacity:.55;transform:translate(0,0) rotate(0)}}
+@media(max-width:780px){.garden{width:145%;right:-12px;top:-37px;height:118%}}
+@media(max-width:520px){.garden{width:270%;height:135%;right:-22px;top:-36px}.wash{opacity:.6}.discover{transform:rotate(-4deg)}.home{transform:rotate(4deg)}}
+:global([data-reduced-motion]) .garden *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}
+@media(prefers-reduced-motion:reduce){.garden *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}}

@@ -35,3 +35,8 @@
 /* Story controls stay in one touch-safe row without competing with the Bloom artwork. */
 .story .brand{flex:none;white-space:nowrap}.story .headerControls{min-width:0;margin-left:auto;justify-content:flex-end;flex-wrap:nowrap}.story .headerControls button{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;flex:none;min-width:44px;min-height:44px}
 @media(max-width:750px){.story .headerControls .controlLabel{display:none}.story .headerControls button{width:44px;padding:9px}}
+
+/* Collection totals stay visible even when a chapter shows only selected sleeves. */
+.supportingStat{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 22px}.supportingStat strong{font:clamp(24px,3vw,38px)/1.1 var(--font-fraunces),Georgia,serif;letter-spacing:-.025em}.supportingStat span{font-size:11px;line-height:1.6;opacity:.78}
+
+.cardArt .coverEdition{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:#fff6df;stroke-width:.85;opacity:.45;pointer-events:none}.cardArt[data-theme=dark] .coverEdition{opacity:.3}

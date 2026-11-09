@@ -115,7 +115,7 @@ describe("Cinematic Bloom snapshot and compatibility",()=>{
  it("ranks actual audible time, keeps same-name artists distinct, and connects the artist's own songs",()=>{
   const cards=[recording("a","artist-a"),recording("b","artist-a"),recording("c","artist-b")];
   const data=buildBloomSnapshot([{id:"c",audible_ms:60000,plays:20,first_ever:"2026-09-01"},{id:"b",audible_ms:120000,plays:2,first_ever:"2026-10-02"},{id:"a",audible_ms:120000,plays:1,first_ever:"2026-10-01"}],cards,2,period);
-  assert.equal(data.version,3);assert.equal(data.summary.audibleMs,300000);
+  assert.equal(data.version,4);assert.equal(data.summary.audibleMs,300000);
   assert.equal(data.chapters.find(c=>c.id==="top-song")?.recordings?.[0].recording.id,"a");
   const winner=data.chapters.find(c=>c.id==="top-artist")!.artists![0];
   assert.equal(winner.key,"artist-a");assert.equal(winner.audibleMs,240000);

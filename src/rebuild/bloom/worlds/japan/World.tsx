@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
@@ -178,7 +180,7 @@ function ListeningMarks({ listening, quality, cover = false }: { listening?: Blo
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
   const id = `japan-${useId().replace(/:/g, "")}`;
   const tier = details[quality];
   const hour = listening?.peakHour;
@@ -188,7 +190,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const courtyard = ["artist", "artist-songs", "artists", "returns"].includes(scene);
   const opening = scene === "opening" || view === "cover";
   const style = { "--japan-dawn": morning, "--japan-travel": `${(progress - .5) * 9}%`, "--world-accent": "#ba6146" } as CSSProperties;
-  return <div className={s.world} style={style} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion ? "still" : "full"} data-music={music} data-courtyard={courtyard} data-opening={opening}>
+  return <div className={s.world} data-experience={experience?.composition} style={style} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion ? "still" : "full"} data-music={music} data-courtyard={courtyard} data-opening={opening}>
     <div className={s.tableGrain} aria-hidden="true"/>
     <svg className={s.bookArt} viewBox="0 0 1400 900" preserveAspectRatio="none" aria-hidden="true">
       <Definitions id={id} rich={quality >= 3}/>
@@ -228,7 +230,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
       <div className={s.coverInk}><InkTitle/><BloomLettering text="THE LANTERN BOOK" style="paper" className={s.coverSubtitle}/></div>
     </div>
     {view === "poster" && <div className={s.posterInk} aria-hidden="true"><InkTitle/><BloomLettering text="THE LANTERN BOOK" style="paper" className={s.coverSubtitle}/></div>}
-    <div className={s.content}>{children}</div>
+    <div className={s.content}><ListeningPainting world="japan" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     <div className={s.lanternGuide} key={`guide-${scene}`} aria-hidden="true"><Lantern id={id} amused={scene === "song-winner" || scene === "finale"}/></div>
     {!opening && companions > 0 && <div className={s.procession} key={`procession-${scene}`} aria-hidden="true" data-listening-motif={listening?.returningArtistCount === undefined ? undefined : "returning-procession"} data-motif-count={companions}>{Array.from({length: companions}, (_, n) => <div className={s.objectSpirit} key={n} style={{"--spirit-x": `${n < 3 ? 4 + n * 9 : 70 + (n - 3) * 8}%`, "--spirit-size": `${n % 3 === 2 ? 64 : 74}px`, "--spirit-delay": `${.15 + n * .13}s`, "--spirit-turn": `${n % 2 ? 3 : -3}deg`} as CSSProperties}><ObjectSpirit type={n} rich={quality >= 4}/></div>)}</div>}
     {quality >= 2 && <div className={s.paperLights} aria-hidden="true">{Array.from({length: tier.lights}, (_, n) => <i key={n} style={{left: `${68 + grain(n * 3) * 23}%`, top: `${22 + grain(n * 7) * 51}%`, "--light-delay": `${n * .12}s`, "--light-size": `${1.5 + grain(n * 5) * 2}px`} as CSSProperties}/>)}</div>}

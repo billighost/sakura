@@ -1,11 +1,13 @@
 import type {BloomWorldId,BloomSceneKind} from "./worlds/types";
+import type {BloomExperience} from "./experience";
 export type BloomDesign=BloomWorldId|"herbarium"|"nocturne"|"risograph";
 export type BloomPeriod="weekly"|"monthly"|"yearly";
-export interface BloomItem {id:string;period:BloomPeriod;periodStart:string;periodEnd:string;publishAt:string;expiresAt:string;timeZone:string;status:"locked"|"available"|"expired"|"empty"|"archived";chapterCount:number;teaser?:string;worldId?:BloomDesign;version?:number}
+export interface BloomItem {id:string;period:BloomPeriod;periodStart:string;periodEnd:string;publishAt:string;expiresAt:string;timeZone:string;status:"locked"|"available"|"expired"|"empty"|"archived";chapterCount:number;teaser?:string;worldId?:BloomDesign;version?:number;experience?:BloomExperience}
 export type BloomShelfItem=Omit<BloomItem,"chapterCount">&{completed?:boolean;listening?:BloomListeningProfile};
 export interface BloomRankedRecording {rank:number;audibleMs:number;plays:number;recording:Record<string,unknown>}
-export interface BloomArtistInsight {key:string;name:string;artistId:string|null;imageUrl:string|null;audibleMs:number;recordings:BloomRankedRecording[]}
+export interface BloomArtistInsight {key:string;name:string;artistId:string|null;imageUrl:string|null;audibleMs:number;recordings:BloomRankedRecording[];recordingCount?:number}
 export interface BloomComparison {title:string;detail:string;reference:string;referenceUrl?:string;approximate:boolean}
+export type BloomListeningSource="home"|"discover"|"search"|"playlist"|"mix"|"album"|"artist"|"track"|"library"|"collection"|"downloads"|"favorites"|"profile"|"bloom"|"queue"|"direct";
 /** Optional fields are disclosed as the corresponding listening chapters open.
  * Old archived stories have no profile and keep their original artwork. */
 export interface BloomListeningProfile {
@@ -16,6 +18,12 @@ export interface BloomListeningProfile {
  genres?:{name:string;audibleMs:number;share:number}[];genreCount?:number;unknownGenreMs?:number;
  returningRecordingCount?:number;returningArtistCount?:number;
  discoveredRecordingCount?:number;discoveredArtistCount?:number;
+ averageActiveDayMs?:number;repeatListeningShare?:number;discoveryListeningShare?:number;
+ peakDay?:{date:string;audibleMs:number};
+ longestStreak?:{days:number;startDate:string;endDate:string};
+ months?:{month:string;audibleMs:number}[];weekendListeningShare?:number;
+ listeningIdentity?:{name:string;detail:string};
+ sources?:{id:BloomListeningSource;name:string;audibleMs:number;share:number}[];unknownSourceMs?:number;
  comparison?:{periodLabel:string;audibleMs:number;changeMs:number;sharedRecordingCount:number;sharedArtistCount:number}|null;
 }
 export interface BloomChapter {id:string;title:string;prompt:string;stat:{label:string;value:number|string;unit:string}|null;relatedRecording:Record<string,unknown>|null;revealed:boolean;kind?:BloomSceneKind;detail?:string|null;recordings?:BloomRankedRecording[];artists?:BloomArtistInsight[];comparison?:BloomComparison|null}

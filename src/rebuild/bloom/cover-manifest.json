@@ -16,7 +16,7 @@
     {
       "world": "sakura",
       "theme": "light",
-      "sourceHash": "f77f96961a8e06925190662ca14bff016e8069f82c57149d23e98c83c64a2f87",
+      "sourceHash": "61b2f3e673b4962926f8c829b850bf59332f7cf0d4b0da73aa235699be3cd8d5",
       "files": [
         {
           "path": "/bloom/covers/sakura-light-480.webp",
@@ -37,7 +37,7 @@
     {
       "world": "sakura",
       "theme": "dark",
-      "sourceHash": "f77f96961a8e06925190662ca14bff016e8069f82c57149d23e98c83c64a2f87",
+      "sourceHash": "61b2f3e673b4962926f8c829b850bf59332f7cf0d4b0da73aa235699be3cd8d5",
       "files": [
         {
           "path": "/bloom/covers/sakura-dark-480.webp",
@@ -58,7 +58,7 @@
     {
       "world": "jungle",
       "theme": "light",
-      "sourceHash": "0cf029c5374ddc5fae0fd27b380962c8e36b6464883f6f2734987354d232469a",
+      "sourceHash": "0cd418b1b944b33e4ccc32a8715978ef8976494c6dc0b101fa1cbe049758f77e",
       "files": [
         {
           "path": "/bloom/covers/jungle-light-480.webp",
@@ -79,7 +79,7 @@
     {
       "world": "jungle",
       "theme": "dark",
-      "sourceHash": "0cf029c5374ddc5fae0fd27b380962c8e36b6464883f6f2734987354d232469a",
+      "sourceHash": "0cd418b1b944b33e4ccc32a8715978ef8976494c6dc0b101fa1cbe049758f77e",
       "files": [
         {
           "path": "/bloom/covers/jungle-dark-480.webp",
@@ -100,7 +100,7 @@
     {
       "world": "disco",
       "theme": "light",
-      "sourceHash": "f72e088649651517542c66e175687378d7a0a5b7c589858a11397fa2f9038261",
+      "sourceHash": "3d96e924b4334c8cec38b9ec357e7d642cb208b8958ac3b76f9122997c902543",
       "files": [
         {
           "path": "/bloom/covers/disco-light-480.webp",
@@ -121,7 +121,7 @@
     {
       "world": "disco",
       "theme": "dark",
-      "sourceHash": "f72e088649651517542c66e175687378d7a0a5b7c589858a11397fa2f9038261",
+      "sourceHash": "3d96e924b4334c8cec38b9ec357e7d642cb208b8958ac3b76f9122997c902543",
       "files": [
         {
           "path": "/bloom/covers/disco-dark-480.webp",
@@ -142,14 +142,14 @@
     {
       "world": "japan",
       "theme": "light",
-      "sourceHash": "e98697a8f0565ff4b030ee579f30174308d5f7e8cecb56118b5f5cff14bd6ec4",
+      "sourceHash": "419a5c1cae34ab1a718c14390e621445f0a43e4bbc419248155b28a2bcdc50bf",
       "files": [
         {
           "path": "/bloom/covers/japan-light-480.webp",
           "width": 480,
           "height": 360,
-          "bytes": 18248,
-          "sha256": "6e9516eca9bfe8ee62e5f2d2badd9b178b523c35a413305cfa25ea32fd571ec9"
+          "bytes": 18250,
+          "sha256": "03fd4e2d7ee982b9abff41209b5041d8decda0a5f5bb5f0ef49df2b50bab2ef1"
         },
         {
           "path": "/bloom/covers/japan-light-960.webp",
@@ -163,7 +163,7 @@
     {
       "world": "japan",
       "theme": "dark",
-      "sourceHash": "e98697a8f0565ff4b030ee579f30174308d5f7e8cecb56118b5f5cff14bd6ec4",
+      "sourceHash": "419a5c1cae34ab1a718c14390e621445f0a43e4bbc419248155b28a2bcdc50bf",
       "files": [
         {
           "path": "/bloom/covers/japan-dark-480.webp",
@@ -184,7 +184,7 @@
     {
       "world": "china",
       "theme": "light",
-      "sourceHash": "1aaf3a31e0bd0eb5dfc3659f80aeb87645a64dd05c07f1f00dd9c961077f9b1f",
+      "sourceHash": "127e27207ad4bffda97d2c831fa3d9f987bad853a51025a9f9951e08afff5b9c",
       "files": [
         {
           "path": "/bloom/covers/china-light-480.webp",
@@ -205,28 +205,28 @@
     {
       "world": "china",
       "theme": "dark",
-      "sourceHash": "1aaf3a31e0bd0eb5dfc3659f80aeb87645a64dd05c07f1f00dd9c961077f9b1f",
+      "sourceHash": "127e27207ad4bffda97d2c831fa3d9f987bad853a51025a9f9951e08afff5b9c",
       "files": [
         {
           "path": "/bloom/covers/china-dark-480.webp",
           "width": 480,
           "height": 360,
           "bytes": 13384,
-          "sha256": "14288fadea6d5202b0700cbb29f586f8b4b06bff685b44edddef4a60a55d853e"
+          "sha256": "cc9cef465528c688a67b6b74fc79560ba35a7ee15acdda63fa0137515bd80716"
         },
         {
           "path": "/bloom/covers/china-dark-960.webp",
           "width": 960,
           "height": 720,
-          "bytes": 33188,
-          "sha256": "217d420264c474fa97d63fe77410acbb1098876b79476505492765f68f67d931"
+          "bytes": 33190,
+          "sha256": "9a11602f9a11a532e786cb68a5a75e36ce7a02cb879ccf34b3ad26d737988629"
         }
       ]
     },
     {
       "world": "korea",
       "theme": "light",
-      "sourceHash": "f488625062ecd12c58e389b88edb31b0537fa7d1f091b3b7c798004d1a3c7eb2",
+      "sourceHash": "aba89116de3eb28a4992281ca35ad56366d676a4a3fc9efc3174aa7923ba36e3",
       "files": [
         {
           "path": "/bloom/covers/korea-light-480.webp",
@@ -247,7 +247,7 @@
     {
       "world": "korea",
       "theme": "dark",
-      "sourceHash": "f488625062ecd12c58e389b88edb31b0537fa7d1f091b3b7c798004d1a3c7eb2",
+      "sourceHash": "aba89116de3eb28a4992281ca35ad56366d676a4a3fc9efc3174aa7923ba36e3",
       "files": [
         {
           "path": "/bloom/covers/korea-dark-480.webp",
@@ -268,7 +268,7 @@
     {
       "world": "india",
       "theme": "light",
-      "sourceHash": "0e45519097b3d7f7686058236d4c4df8b3cf42e01d9fe17aa2f0c616fa3e02aa",
+      "sourceHash": "0fc8c9260b75e01eaadf14f7a8348ef253d16ead88cf42d5094f092fe3899088",
       "files": [
         {
           "path": "/bloom/covers/india-light-480.webp",
@@ -289,7 +289,7 @@
     {
       "world": "india",
       "theme": "dark",
-      "sourceHash": "0e45519097b3d7f7686058236d4c4df8b3cf42e01d9fe17aa2f0c616fa3e02aa",
+      "sourceHash": "0fc8c9260b75e01eaadf14f7a8348ef253d16ead88cf42d5094f092fe3899088",
       "files": [
         {
           "path": "/bloom/covers/india-dark-480.webp",
@@ -310,7 +310,7 @@
     {
       "world": "ocean",
       "theme": "light",
-      "sourceHash": "1150c452962488e8f31b317014bc8f4f801d2c6543b68fc4988dd477c652b6c9",
+      "sourceHash": "e50876469ee50068b2b026d716c400f7cb8a2189c38a49e29f4d2bd42add79cb",
       "files": [
         {
           "path": "/bloom/covers/ocean-light-480.webp",
@@ -331,7 +331,7 @@
     {
       "world": "ocean",
       "theme": "dark",
-      "sourceHash": "1150c452962488e8f31b317014bc8f4f801d2c6543b68fc4988dd477c652b6c9",
+      "sourceHash": "e50876469ee50068b2b026d716c400f7cb8a2189c38a49e29f4d2bd42add79cb",
       "files": [
         {
           "path": "/bloom/covers/ocean-dark-480.webp",
@@ -352,7 +352,7 @@
     {
       "world": "cosmos",
       "theme": "light",
-      "sourceHash": "e263ac1bd701a5f4b54a282fb55925170b21ea307fa154ba5a1d72d18501f981",
+      "sourceHash": "cff51f281288bf8683c707b762f009f5443c94001bd2866333484cadc420e4c1",
       "files": [
         {
           "path": "/bloom/covers/cosmos-light-480.webp",
@@ -373,28 +373,28 @@
     {
       "world": "cosmos",
       "theme": "dark",
-      "sourceHash": "e263ac1bd701a5f4b54a282fb55925170b21ea307fa154ba5a1d72d18501f981",
+      "sourceHash": "cff51f281288bf8683c707b762f009f5443c94001bd2866333484cadc420e4c1",
       "files": [
         {
           "path": "/bloom/covers/cosmos-dark-480.webp",
           "width": 480,
           "height": 360,
-          "bytes": 23610,
-          "sha256": "a54fb8161279f920c52d2f307f8f2047eae2b19861c30f9e629b08d0e26bad5f"
+          "bytes": 23690,
+          "sha256": "c47b5e04235b5a8ca3424db03eb4c39771184ce4a78067238827a5391496ee96"
         },
         {
           "path": "/bloom/covers/cosmos-dark-960.webp",
           "width": 960,
           "height": 720,
-          "bytes": 59342,
-          "sha256": "7b3b941fd62b23a287a1f213dbe6c1d00aa6c8866d786925b2573e79ab679f8c"
+          "bytes": 59270,
+          "sha256": "e1dd669c48dc1091248c88627cd9cd309e97a455668aee54b208d5c9e577d242"
         }
       ]
     },
     {
       "world": "glass",
       "theme": "light",
-      "sourceHash": "72085a2e5075dc5ec2eac3ff8133b9e393eacfbf10ee7246c9e219114dacd648",
+      "sourceHash": "1eb6e829f26d4194298c9bc3f26646bb779c5b0d2e8a986f9daa2cc13ef9905b",
       "files": [
         {
           "path": "/bloom/covers/glass-light-480.webp",
@@ -415,7 +415,7 @@
     {
       "world": "glass",
       "theme": "dark",
-      "sourceHash": "72085a2e5075dc5ec2eac3ff8133b9e393eacfbf10ee7246c9e219114dacd648",
+      "sourceHash": "1eb6e829f26d4194298c9bc3f26646bb779c5b0d2e8a986f9daa2cc13ef9905b",
       "files": [
         {
           "path": "/bloom/covers/glass-dark-480.webp",
@@ -434,6 +434,6 @@
       ]
     }
   ],
-  "totalBytes": 1427856,
-  "revision": "06efeae23820"
+  "totalBytes": 1427868,
+  "revision": "4e323b41f9a3"
 }

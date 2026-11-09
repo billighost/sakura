@@ -37,7 +37,7 @@ assert.ok(Math.abs(rich.listening.genres.reduce((sum,genre)=>sum+genre.audibleMs
 const sparseCard={...cards[5],artistId:null,artistCredits:[],genres:[]};
 const sparse=buildBloomSnapshot([{id:sparseCard.id,audible_ms:45000,plays:1,first_ever:null}],[sparseCard],1,item,{discoveryUnknownIds:[sparseCard.id]});
 const annual=bloomWindow('yearly-2025',new Date('2026-11-08T12:00:00Z'));
-const legacy={...buildBloomSnapshot(rows.map(row=>({...row,first_ever:row.first_ever?.replace('2026','2025')||null})),cards,19,annual),version:2,listening:undefined};
+const legacy={...buildBloomSnapshot(rows.map(row=>({...row,first_ever:row.first_ever?.replace('2026','2025')||null})),cards,19,annual),version:2,experience:undefined,listening:undefined};
 const related={version:1,summary:{audibleMs:900000,playCount:12,recordingCount:1,activeDays:4},chapters:[{id:'top-song',kind:'song-winner',title:'A saved listening moment.',prompt:'',stat:{label:'One Last Kiss',value:'15min',unit:''},relatedRecording:cards[0]}]};
 const empty=buildBloomSnapshot([],[],0,item);
 const rate=8000,wav=Buffer.alloc(44+rate*30*2);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(rate,24);wav.writeUInt32LE(rate*2,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(wav.length-44,40);

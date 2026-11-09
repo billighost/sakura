@@ -14,6 +14,8 @@ import { RecoveryNotice } from "./RecoveryNotice";
 import { requestJson } from "./errors";
 import type { SongMenuAnchor } from "./TrackActions";
 import { appendUniqueFeedItems } from "./feedItems";
+import { HeroGarden } from "./HeroGarden";
+import {useHeroRecommendation} from "./useHeroRecommendation";
 import s from "./personalized-feed.module.css";
 
 type Surface = "home" | "discover";
@@ -91,7 +93,7 @@ export function PersonalizedFeed({ surface, children }: { surface: Surface; chil
   const tasteKey = JSON.stringify([settings.discovery, settings.seedArtists, settings.seedGenres,
     settings.seedArtistSelections, settings.explicitContent, settings.artistVariety,
     settings.repeatTolerance, settings.newReleaseBias, settings.deepCutBias, settings.timeAware,
-    settings.learnFromListening, settings.timeZone]);
+    settings.learnFromListening, settings.timeZone, settings.privateSession, settings.initialTasteProfile]);
   return <FeedRoom key={(music.account?.id || "guest") + ":" + surface + ":" + tasteKey}
     surface={surface} tasteKey={tasteKey}>{children}</FeedRoom>;
 }
@@ -120,6 +122,15 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
   const [menu, setMenu] = useState<{ track: MusicTrack; anchor: SongMenuAnchor } | null>(null);
   const [showWhy, setShowWhy] = useState(false);
   const explanationId = useId();
+  const heroPickRef=useRef<FeedItem|null>(null);
+  const hero=useHeroRecommendation({accountId,cacheKey,surface,mode,hold:()=>{
+    const shown=heroPickRef.current;
+    const engaged=shown&&music.track&&music.effectiveId(shown.track)===music.effectiveId(music.track)&&["playing","buffering","resolving"].includes(music.status);
+    const artwork=root.current?.querySelector("[data-hero-music]");
+    return !!engaged||!!(shown&&menu?.track.id===shown.track.id)||!!(artwork&&document.activeElement&&artwork.contains(document.activeElement));
+  }});
+  const releaseHero=hero.release;
+  useEffect(()=>releaseHero(),[music.status,music.track,menu,releaseHero]);
 
   const load = useCallback(async (reset = false) => {
     if (!accountId || request.current && !reset) return;
@@ -194,9 +205,11 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     };
   }, [accountId, load]);
 
-  const pick = feed.items[0];
-  const allTracks = feed.items.map(item => item.track);
-  const feedItems = pick ? feed.items.slice(1) : feed.items;
+  const pick = hero.ready ? hero.item : feed.items[0];
+  useEffect(()=>{heroPickRef.current=pick||null;},[pick]);
+  const allTracks = [...new Map([...(pick?[pick.track]:[]),...feed.items.map(item => item.track)].map(track=>[track.id,track])).values()];
+  // The hero changes independently; cards below it keep their place while scrolling.
+  const feedItems = feed.items;
   const chapters: FeedItem[][] = [];
   for (let i = 0; i < feedItems.length; i += CHAPTER_SIZE) chapters.push(feedItems.slice(i, i + CHAPTER_SIZE));
   const discovery = mode === "familiar" ? 0 : mode === "explore" ? 1 : music.settings.discovery;
@@ -220,7 +233,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
         <div className={s.tasteNote}><span className={s.tasteDot}/>{discoveryLabel}
           <button type="button" onClick={() => setShowWhy(value => !value)} aria-expanded={showWhy} aria-controls={explanationId}>About recommendations</button></div>
       </div>
-      <div className={s.heroMusic}><GardenDrawing/>
+      <div className={s.heroMusic} data-hero-music><HeroGarden surface={surface}/>
         {pick ? <HeroPick item={pick} tracks={allTracks} source={source} onOptions={openMenu}/> : <div className={s.waitingSleeve} aria-hidden="true"><Blossom/><span>your next<br/><em>good song</em></span><i/></div>}
         <span className={s.cornerNote}>{home ? "music, with room to breathe" : "another side of music"}</span>
       </div>
@@ -338,13 +351,6 @@ function FeedSong({ item, tracks, number, featured, source, onOptions }: {
       <p className={s.songReason}>{item.reason}</p><div className={s.songBottom}><span className={s.songDetails}>{track.genres?.[0] && <span>{track.genres[0]}</span>}<span>{time(track.durationMs)}</span>
         {track.versionLabel !== "Original recording" && <span title={track.versionLabel}>{track.versionLabel}</span>}</span><SongTools track={track} onOptions={onOptions}/></div></div>
   </SongGesture>;
-}
-function GardenDrawing() {
-  return <svg className={s.gardenDrawing} viewBox="0 0 440 410" fill="none" aria-hidden="true"><path pathLength="1" className={s.growingStem} d="M394 424C347 366 383 301 351 269C311 229 386 180 346 110C332 84 305 71 269 61M355 270C317 286 283 302 254 285M347 140C384 124 400 99 411 57M305 78C300 51 318 28 342 12"/>
-    <path d="M254 285C222 276 210 258 221 248C242 247 253 263 254 285M411 57C412 32 426 22 437 25C439 40 427 53 411 57M270 61C248 67 235 59 234 46C249 36 264 44 270 61M342 12C345 0 349-5 362-7C365 9 354 17 342 12" className={s.leaves}/>
-    {[[350, 269, 0], [346, 110, 22], [306, 77, -10], [379, 342, 15]].map(([x,y,angle],index) => <g key={index} transform={`translate(${x} ${y}) rotate(${angle}) scale(${index % 2 ? .58 : .8})`} className={s.drawnBloom}>
-      {[0,72,144,216,288].map(rotation => <path key={rotation} transform={`rotate(${rotation})`} d="M0 0C-12-7-15-21-6-25L0-20L6-25C15-21 12-7 0 0Z"/>)}<circle r="2.5"/></g>)}
-    <path className={s.passingPetal} d="M51 91Q34 71 43 60Q60 66 51 91M106 302Q96 280 109 275Q121 290 106 302M217 22Q205 11 210 1Q224 5 217 22"/></svg>;
 }
 function FeedSkeleton() {
   return <div className={s.skeleton} role="status" aria-label="Finding songs for your feed"><span className={s.srOnly}>Finding songs for your feed</span>{[0,1,2,3,4,5].map(value => <div key={value}><i/><b/><span/><span/></div>)}</div>;

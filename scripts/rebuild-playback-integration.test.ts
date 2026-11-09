@@ -31,7 +31,7 @@ function song(index=1):MusicTrack{
 }
 
 /** Runs the real provider with deterministic media, storage and React host adapters. */
-async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[];recordListening?:boolean;clock?:boolean;remoteSettings?:Record<string,unknown>;preferenceDraft?:PreferenceDraft;deferSettingsPatch?:boolean;deferHistoryClear?:boolean}={}){
+async function player(options:{rejectFallbackOnce?:boolean;startupRace?:boolean;deferFirstChunk?:boolean;rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[];recordListening?:boolean;clock?:boolean;remoteSettings?:Record<string,unknown>;preferenceDraft?:PreferenceDraft;deferSettingsPatch?:boolean;deferHistoryClear?:boolean}={}){
  let holdTaste=false;const tasteRequests:Array<(response:unknown)=>void>=[];
  let remoteTaste:Record<string,unknown>={feedback:[],tasteEvidence:[],historyClearedAt:null};const historyClears:Array<{accountId:string;period:string;cutoff:number}>=[],historyClearResolvers:Array<()=>void>=[];
  let remoteSettings:Record<string,unknown>={privateSession:!options.recordListening,revision:0,...options.remoteSettings},preferenceDraft=options.preferenceDraft;
@@ -45,6 +45,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  const registrations:Array<{accountId:string;track:MusicTrack;ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>;resolve?:(url:string|undefined)=>void}>=[],resolvers:Array<{track:MusicTrack;resolve:(result:unknown)=>void;reject:(error:unknown)=>void;signal:AbortSignal}>=[],ensured:Array<{id:string;offset:number;signal?:AbortSignal}>=[];
  const prepares:string[]=[],enqueues:Array<{id:string;requested:boolean}>=[],disposed:string[]=[],objectUrls:string[]=[],revokedUrls:string[]=[],partials=new Map<string,{fingerprint:{assetId:string;sizeBytes:number;sha256:string};blob:Blob;cachedSeconds:number}>();
  const downloadResolvers:Array<(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>>=[];
+ const chunkWaiters:Array<{resolve:()=>void;signal?:AbortSignal}>=[];
  const entries:Record<string,{recordingId:string;requested:boolean;status:string;track:MusicTrack}>={};
  const accountEntries=new Map([[accountId,entries]]),accountStorage=new Map([[accountId,saved]]);
  let media:FixtureAudio|undefined,revocations=0,closed=false,renderQueued=false,stateSlot=0,refSlot=0,effectSlot=0,profileId=accountId,loggedOut=false,value:MusicState;
@@ -57,7 +58,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  function captureMedia(audio:FixtureAudio){media=audio;}
  class FixtureAudio {
   private address="";preload="";volume=.8;muted=false;seeking=false;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;error:{code:number}|null=null;
-  listeners=new Map<string,Set<{listener:()=>void;once:boolean}>>();
+  fallbackRejected=false;loads:string[]=[];listeners=new Map<string,Set<{listener:()=>void;once:boolean}>>();
   constructor(){captureMedia(this);}
   get src(){return this.address;}set src(address:string){this.address=address?new URL(address,location.href).href:"";}
   addEventListener(name:string,listener:()=>void,options?:{once?:boolean}){const group=this.listeners.get(name)||new Set();group.add({listener,once:!!options?.once});this.listeners.set(name,group);}
@@ -66,9 +67,9 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
   pause(){if(!this.paused)queueMicrotask(()=>this.emit("pause"));this.paused=true;}
   removeAttribute(name:string){if(name==="src")this.src="";}
   metadata(){this.duration=180;this.emit("loadedmetadata");}
-  load(){this.error=null;this.currentTime=0;this.duration=Number.NaN;const address=this.src;if(!address||options.deferMetadata||options.failFallbackBeforeMetadata&&address.includes("/api/v2/recordings/"))return;queueMicrotask(()=>{if(this.src===address)this.metadata();});}
+  load(){this.loads.push(this.src);this.error=null;this.currentTime=0;this.duration=Number.NaN;const address=this.src;if(!address||options.deferMetadata||options.failFallbackBeforeMetadata&&address.includes("/api/v2/recordings/"))return;queueMicrotask(()=>{if(this.src===address)this.metadata();});}
   networkFailure(code=2){this.error={code};this.emit("error");}
-  async play(){if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");this.paused=false;this.emit("playing");}
+  async play(){if(options.rejectFallbackOnce&&!this.fallbackRejected&&this.src.includes("/api/v2/recordings/")){this.fallbackRejected=true;throw new DOMException("The fallback connection briefly stopped","NetworkError");}if(options.startupRace&&this.src.includes("/_sakura/audio/")){this.networkFailure(4);throw new DOMException("The initial transport stopped","NotSupportedError");}if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");if(options.startupRace)await tick();this.paused=false;this.emit("playing");}
  }
  class Manager {
   constructor(private options:{accountId:string;onChange:(value:unknown)=>void;resolve:(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>}){downloadResolvers.push(options.resolve);}
@@ -77,7 +78,7 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
   setPriorities(){}
   enqueue(track:MusicTrack,{requested}:{requested:boolean}){enqueues.push({id:track.id,requested});this.records[track.id]={recordingId:track.id,requested:this.records[track.id]?.requested||requested,status:"downloading",track};this.options.onChange({...this.records});return Promise.resolve();}
   async prepare(id:string){if(!this.records[id]?.requested){prepares.push(id);if(this.records[id])this.records[id].status="prepared";this.options.onChange({...this.records});}}
-  ensureChunk(id:string,offset:number,signal?:AbortSignal){ensured.push({id,offset,signal});return Promise.resolve();}
+  ensureChunk(id:string,offset:number,signal?:AbortSignal){ensured.push({id,offset,signal});return options.deferFirstChunk?new Promise<void>((resolve,reject)=>{chunkWaiters.push({resolve,signal});signal?.addEventListener("abort",()=>reject(signal.reason),{once:true});}):Promise.resolve();}
   getPartial(id:string){return Promise.resolve(this.options.accountId===accountId?partials.get(id):undefined);}
   dispose(){disposed.push(this.options.accountId);}
  }
@@ -100,8 +101,47 @@ async function player(options:{rejectPlay?:boolean;deferRegistration?:boolean;fa
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {chunkWaiters,holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
+
+test("startup error event and original Play rejection share one surviving fallback transport",async()=>{
+ const p=await player({startupRace:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");await tick();
+  assert.equal(p.media.src,"https://sakura.example"+song().readyPlayback!.fallbackUrl);
+  assert.equal(p.media.loads.filter(url=>url.includes("/api/v2/recordings/")).length,1);
+  assert.equal(p.value.error,null);assert.deepEqual(p.prepares,[]);
+ }finally{p.close();}
+});
+
+test("progressive startup waits for its first verified chunk without a media deadline or full-file wait",async()=>{
+ const p=await player({deferFirstChunk:true});try{
+  p.value.play(song());await until(()=>p.chunkWaiters.length===1);
+  assert.equal(p.value.status,"buffering");assert.equal(p.media.src,"");assert.equal(p.value.error,null);
+  assert.equal(await p.fireTimer(12000),false);assert.equal(p.entries[song().id].status,"downloading");
+  p.chunkWaiters[0].resolve();await until(()=>p.value.status==="playing");
+  assert.equal(p.entries[song().id].status,"downloading");assert.equal(p.ensured[0].offset,0);
+ }finally{p.close();}
+});
+
+test("a fallback Play promise's transient network rejection recovers without an error event",async()=>{
+ const p=await player({rejectFallbackOnce:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=12.5;
+  p.media.networkFailure();await until(()=>p.value.status==="buffering"&&p.media.src==="");
+  assert.equal(p.value.error,null);assert.equal(p.value.positionMs,12500);assert.deepEqual(p.prepares,[]);
+  assert.equal(await p.fireTimer(750),true);await until(()=>p.value.status==="playing");await tick();
+  assert.equal(p.media.currentTime,12.5);assert.equal(p.value.error,null);
+ }finally{p.close();}
+});
+
+test("pausing before the first chunk arrives cancels media startup and preserves an explicit download",async()=>{
+ const p=await player({deferFirstChunk:true});try{
+  p.value.play(song());await until(()=>p.chunkWaiters.length===1);
+  p.value.requestDownload(song());await until(()=>p.entries[song().id].requested);
+  p.value.pause();await tick();p.chunkWaiters[0].resolve();await tick();
+  assert.equal(p.chunkWaiters[0].signal?.aborted,true);assert.equal(p.value.status,"paused");
+  assert.equal(p.media.src,"");assert.equal(p.value.error,null);assert.equal(p.entries[song().id].requested,true);
+ }finally{p.close();}
+});
 
 test("smart queue appends suggestions without interrupting current music or removing manual picks",async()=>{
  const p=await player({smartTracks:[song(2),song(3),song(4)]});try{
@@ -332,7 +372,7 @@ test("a saved Blob stored under another recording id is never used for playback"
 });
 
 test("a persisted partial source can start offline and request only its canonical missing chunk",async()=>{
- const p=await player({offline:true});try{const track=song(),ready=track.readyPlayback!;p.partials.set(track.id,{fingerprint:{assetId:ready.assetId,sizeBytes:ready.sizeBytes,sha256:ready.sha256!},blob:new Blob(["prefix"],{type:"audio/mpeg"}),cachedSeconds:22});p.value.play(track);await until(()=>p.value.status==="playing");assert.match(p.media.src,/\/_sakura\/audio\//);assert.equal(p.requests.some(path=>path.includes("recordings/resolve")),false);await p.registrations.at(-1)!.ensure(524288,new AbortController().signal);assert.deepEqual(p.ensured.map(item=>({id:item.id,offset:item.offset})),[{id:track.id,offset:524288}]);}finally{p.close();}
+ const p=await player({offline:true});try{const track=song(),ready=track.readyPlayback!;p.partials.set(track.id,{fingerprint:{assetId:ready.assetId,sizeBytes:ready.sizeBytes,sha256:ready.sha256!},blob:new Blob(["prefix"],{type:"audio/mpeg"}),cachedSeconds:22});p.value.play(track);await until(()=>p.value.status==="playing");assert.match(p.media.src,/\/_sakura\/audio\//);assert.equal(p.requests.some(path=>path.includes("recordings/resolve")),false);await p.registrations.at(-1)!.ensure(524288,new AbortController().signal);assert.deepEqual(p.ensured.map(item=>({id:item.id,offset:item.offset})),[{id:track.id,offset:0},{id:track.id,offset:524288}]);}finally{p.close();}
 });
 
 test("offline playback without complete or partial bytes fails without resolver traffic",async()=>{

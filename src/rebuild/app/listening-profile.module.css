@@ -13,6 +13,21 @@
 .hourGenres{display:flex;flex-wrap:wrap;gap:10px;grid-column:1/-1;margin-top:5px}.hourGenres>span{padding:6px 9px;border:1px solid color-mix(in srgb,var(--ink-petal) 36%,var(--ink-line));border-radius:13px 4px 13px 4px}.hourGenres b{display:block;font-size:9px;font-weight:500;color:var(--ink-accent)}.hourGenres small{display:block;font-size:8px;color:var(--ink-muted);margin-top:2px}
 .profileHero{overflow:clip}
 @media(max-width:760px){.tasteNote>div{flex:1 1 calc(100% - 76px)}.tasteNote>.confidenceBloom{align-self:flex-start;margin-top:4px}}
+
+.soundPrint>svg:first-child circle{transform-box:fill-box;transform-origin:center;animation:journalRing 2s cubic-bezier(.16,.7,.2,1) both}
+.soundPrint>svg:first-child circle:nth-child(2){animation-delay:.12s}.soundPrint>svg:first-child circle:nth-child(3){animation-delay:.24s}.soundPrint>svg:first-child circle:nth-child(4){animation-delay:.36s}.soundPrint>svg:first-child circle:nth-child(5){animation-delay:.48s}.soundPrint>svg:first-child circle:nth-child(6){animation-delay:.6s}
+.soundPrint>svg:first-child path{stroke-dasharray:1;stroke-dashoffset:1;animation:journalInk 2.3s ease .3s forwards}
+.centerBlossom>g>path{transform-box:fill-box;transform-origin:center bottom;animation:journalPetal 1.5s cubic-bezier(.16,.7,.2,1) .65s both}
+.centerBlossom>g>path:nth-child(2){animation-delay:.75s}.centerBlossom>g>path:nth-child(3){animation-delay:.85s}.centerBlossom>g>path:nth-child(4){animation-delay:.95s}.centerBlossom>g>path:nth-child(5){animation-delay:1.05s}
+.soundPrint>span{animation:journalCaption 1.2s ease 1s both}
+.orbitPetal{animation:journalDrift 2.5s ease-out .2s both}.orbitPetal:last-child{animation-delay:.7s}
+@keyframes journalRing{from{transform:scale(.82) rotate(-9deg)}to{transform:none}}
+@keyframes journalInk{to{stroke-dashoffset:0}}
+@keyframes journalPetal{from{opacity:0;scale:.2}to{opacity:1;scale:1}}
+@keyframes journalCaption{from{opacity:0;translate:0 8px}to{opacity:1;translate:0 0}}
+@keyframes journalDrift{from{opacity:0;translate:-20px -28px;rotate:-25deg}to{opacity:.6;translate:0 0;rotate:0deg}}
+:global([data-reduced-motion]) .soundPrint *{animation:none!important;stroke-dashoffset:0!important}
+@media(prefers-reduced-motion:reduce){.soundPrint *{animation:none!important;stroke-dashoffset:0!important}}
 @media(max-width:500px){.tasteNote>div{flex-basis:calc(100% - 56px)}}
 @media(max-width:500px){.soundPrint{right:8px}}
 

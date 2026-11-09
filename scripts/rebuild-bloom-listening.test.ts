@@ -88,7 +88,7 @@ describe("Bloom's richer retained listening measurements",()=>{
  it("keeps sparse snapshots honest and does not double up time comparisons",()=>{
   const data=buildBloomSnapshot([heard("a",60000)],[song("a","a",["Jazz","Soul"])],1,item,
    {hours:[{hour:8,audibleMs:60000}],previous:{periodLabel:"Previous month",rows:[heard("a",30000)],cards:[song("a","a")]}});
-  assert.equal(data.version,3);assert.equal(data.listening?.genreCount,2);assert.ok(data.chapters.some(chapter=>chapter.id==="period-comparison"));
+  assert.equal(data.version,4);assert.equal(data.listening?.genreCount,2);assert.ok(data.chapters.some(chapter=>chapter.id==="period-comparison"));
   assert.ok(!data.chapters.some(chapter=>chapter.id==="time-comparison"));assert.ok(!data.chapters.some(chapter=>chapter.id==="listening-moments"));
   assert.equal(buildBloomSnapshot([],[],0,item).listening,undefined);
   const unknown=buildBloomSnapshot([heard("a",60000,1,null)],[song("a","a")],1,item);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {sameBloomStory,mergeBloomRefresh} from "../src/rebuild/bloom/refresh";
+import {sameBloomStory,mergeBloomRefresh,bloomProgressRecord,restoredBloomIndex} from "../src/rebuild/bloom/refresh";
+import {createBloomExperience} from "../src/rebuild/bloom/experience";
 import type {BloomRecap} from "../src/rebuild/bloom/uiTypes";
 
 function story():BloomRecap{return {id:"monthly-2026-10",version:3,worldId:"sakura",timeZone:"Africa/Lagos",period:"monthly",periodStart:"2026-09-30T23:00:00Z",periodEnd:"2026-10-31T23:00:00Z",publishAt:"2026-10-31T23:00:00Z",expiresAt:"2026-11-23T23:00:00Z",snapshotCreatedAt:"2026-11-08T10:00:00Z",status:"available",chapterCount:2,summary:{audibleMs:60000,playCount:1,recordingCount:1,activeDays:1},chapters:[{id:"time",kind:"time",title:"Listening",prompt:"",revealed:false,stat:null,relatedRecording:null},{id:"songs",kind:"songs",title:"Songs",prompt:"",revealed:false,stat:null,relatedRecording:null}]};}
@@ -25,4 +26,44 @@ test("legacy stories without a creation marker remain compatible with ordinary r
  const current=story(),incoming=story();delete current.snapshotCreatedAt;delete incoming.snapshotCreatedAt;current.version=incoming.version=1;
  current.chapters[0].revealed=true;assert.equal(mergeBloomRefresh(current,incoming).chapters[0].revealed,true);
  incoming.timeZone="America/New_York";assert.equal(sameBloomStory(current,incoming),false);
+});
+
+test("saved experience changes replace the story rather than mixing revealed chapters",()=>{
+ const current=story();current.version=4;current.experience=createBloomExperience("account|October","sakura");current.chapters[0].revealed=true;
+ const incoming={...story(),version:4,experience:createBloomExperience("account|November","sakura")};
+ assert.equal(sameBloomStory(current,incoming),false);assert.equal(mergeBloomRefresh(current,incoming),incoming);
+ const edited={...current,experience:{...current.experience,opening:"A different saved opening."}};
+ assert.equal(sameBloomStory(current,edited),false);
+ assert.equal(sameBloomStory(current,{...current,experience:{...current.experience}}),true);
+});
+
+test("a background completion stays completed even when an earlier reveal response arrives",()=>{
+ const current=story(),incoming=story();current.completed=true;current.completedAt="2026-11-08T10:05:00Z";
+ current.chapters=current.chapters.map(chapter=>({...chapter,revealed:true}));incoming.chapters[0].revealed=true;
+ const merged=mergeBloomRefresh(current,incoming);assert.equal(merged.completed,true);assert.equal(merged.completedAt,current.completedAt);assert.ok(merged.chapters.every(chapter=>chapter.revealed));
+});
+
+test("undefined old profile fields cannot hide measurements added by another device",()=>{
+ const current=story(),incoming=story();current.listening={timeZone:current.timeZone,audibleMs:60000,peakHour:undefined};incoming.listening={timeZone:incoming.timeZone,peakHour:20};
+ const merged=mergeBloomRefresh(current,incoming);assert.equal(merged.listening?.peakHour,20);assert.equal(merged.listening?.audibleMs,60000);
+});
+
+test("progress resumes only the same saved experience and creation",()=>{
+ const recap=story();recap.version=4;recap.experience=createBloomExperience("account|October","sakura");recap.chapters[0].revealed=true;
+ const record=bloomProgressRecord(recap,1);assert.equal(restoredBloomIndex(recap,record),1);
+ assert.equal(restoredBloomIndex(recap,{...record,version:3}),0);
+ assert.equal(restoredBloomIndex(recap,{...record,experienceSeed:recap.experience.seed+1}),0);
+ assert.equal(restoredBloomIndex(recap,{...record,snapshotCreatedAt:"2026-11-08T11:00:00Z"}),0);
+ assert.equal(restoredBloomIndex(recap,{index:1,version:4}),0);
+ assert.equal(restoredBloomIndex({...recap,completed:true},record),0);
+});
+
+test("legacy progress is bounded by the reveal frontier and rejects invalid values",()=>{
+ const recap=story();recap.chapters[0].revealed=true;
+ assert.equal(restoredBloomIndex(recap,{index:99,version:3}),1);
+ assert.equal(restoredBloomIndex(recap,{index:1}),1);
+ assert.equal(restoredBloomIndex(recap,{index:"1",version:3}),0);
+ assert.equal(restoredBloomIndex(recap,{index:1,version:2}),0);
+ assert.equal(restoredBloomIndex(recap,null),0);
+ assert.equal(restoredBloomIndex(recap,[]),0);
 });

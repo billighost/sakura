@@ -4,7 +4,7 @@ import {randomUUID} from "node:crypto";
 import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {after,before,describe,it} from "node:test";
 import {getRebuildPool} from "../src/rebuild/data/db";
-import {recordHistory} from "../src/rebuild/data/history";
+import {recordHistory,compactHistory} from "../src/rebuild/data/history";
 import {syncCatalog} from "../src/rebuild/data/catalog";
 import {patchSettings} from "../src/rebuild/data/settings";
 import {setTaste} from "../src/rebuild/data/taste";
@@ -31,7 +31,7 @@ const pool=new Proxy(actual,{get(target,key){
 }});
 (globalThis as unknown as {sakuraV2ProductPool:typeof pool}).sakuraV2ProductPool=pool;
 const now=new Date("2026-11-07T12:00:00Z"),recapId="monthly-2026-10";
-const play=(accountId:string,recordingId:string,occurredAt:string,msPlayed=60000,eventId=randomUUID())=>recordHistory(accountId,{eventId,recordingId,occurredAt,msPlayed,positionMs:msPlayed,sequence:0,finished:true,context:"bloom-fixture"});
+const play=(accountId:string,recordingId:string,occurredAt:string,msPlayed=60000,eventId=randomUUID())=>recordHistory(accountId,{eventId,recordingId,occurredAt,msPlayed,positionMs:msPlayed,sequence:0,finished:true,context:"playlist"});
 
 describe("Bloom retained data and erasure with isolated PostgreSQL",()=>{
  before(async()=>{
@@ -54,6 +54,9 @@ describe("Bloom retained data and erasure with isolated PostgreSQL",()=>{
   for(const account of [revealRace,completeRace])await play(account,ids[0],"2026-10-10T12:00:00Z");
   await play(unmapped,ids[3],"2026-10-10T12:00:00Z");
   await pool.query(`INSERT INTO sakura_v2."ArchivedListeningRecording"(account_id,legacy_recording_id,metadata_snapshot,audible_ms,play_count,source_snapshot_id) VALUES($1::uuid,'unmapped-fixture','{"title":"Unmapped fixture"}'::jsonb,30000,1,$2::uuid)`,[unmapped,randomUUID()]);
+  // The history UI can discard these rows. Bloom must still keep their actual
+  // playlist origin from the retained ledger, together with audible chunks.
+  assert.equal((await compactHistory(first,new Date("2100-01-01T00:00:00Z"))).compacted,4);
   await recordFixture("active");
  });
  after(async()=>{
@@ -82,7 +85,8 @@ describe("Bloom retained data and erasure with isolated PostgreSQL",()=>{
  it("keeps listening history independent of recommendation exclusions and discloses progressively",async()=>{
   await setTaste(first,{target:"recording",targetId:ids[0],kind:"block"});
   let recap=await getBloom(first,recapId,now);
-  assert.equal(recap.version,3);assert.equal(recap.summary.audibleMs,240000);assert.equal(recap.summary.activeDays,2);assert.equal(recap.listening,undefined);
+  assert.equal(recap.version,4);assert.equal(recap.summary.audibleMs,240000);assert.equal(recap.summary.activeDays,2);assert.equal(recap.listening,undefined);
+  assert.ok(recap.experience);assert.equal(recap.experience.version,1);
   assert.equal((await getBloom(second,recapId,now)).status,"empty");
   recap=await revealBloom(first,recapId,recap.chapters[0].id,now);
   const firstReveal:BloomListeningProfile={timeZone:"Africa/Lagos",audibleMs:240000};
@@ -93,12 +97,39 @@ describe("Bloom retained data and erasure with isolated PostgreSQL",()=>{
   assert.equal(recap.listening?.discoveredRecordingCount,2);assert.equal(recap.listening?.discoveredArtistCount,1);
   assert.equal(recap.listening?.comparison?.audibleMs,60000);assert.equal(recap.listening?.comparison?.sharedRecordingCount,1);assert.equal(recap.listening?.comparison?.sharedArtistCount,1);
   assert.equal(recap.listening?.genres?.reduce((sum,row)=>sum+row.audibleMs,0),180000);
+  assert.deepEqual(recap.listening?.peakDay,{date:"2026-10-10",audibleMs:180000});
+  assert.deepEqual(recap.listening?.longestStreak,{days:2,startDate:"2026-10-10",endDate:"2026-10-11"});
+  assert.deepEqual(recap.listening?.sources,[{id:"playlist",name:"Playlists",audibleMs:240000,share:1}]);
+  assert.equal(recap.listening?.unknownSourceMs,0);
   assert.equal((await completeBloom(first,recapId,now)).completed,true);
  });
  it("uses completed listening details for Home covers without leaking them to another account",async()=>{
   const item=(await listBloomShelf(first,now)).items.find(value=>value.id===recapId);
   assert.equal(item?.completed,true);assert.equal(item?.listening?.audibleMs,240000);
   assert.equal((await listBloomShelf(second,now)).items.find(value=>value.id===recapId)?.listening,undefined);
+ });
+ it("keeps a created Bloom unchanged after late history arrives and the account changes time zone",async()=>{
+  const original=await getBloom(first,recapId,now);
+  const stored=(await pool.query(`SELECT snapshot FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[first,recapId])).rows[0].snapshot;
+  await play(first,ids[3],"2026-10-12T12:00:00Z");
+  await patchSettings(first,{timeZone:"Pacific/Honolulu"});
+  try{
+   const nextDay=new Date("2026-11-08T12:00:00Z"),reopened=await getBloom(first,recapId,nextDay);
+   assert.deepEqual(reopened,original);
+   assert.deepEqual((await pool.query(`SELECT snapshot FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[first,recapId])).rows[0].snapshot,stored);
+   const listed=(await listBloom(first,"monthly",nextDay)).items.find(item=>item.id===recapId);
+   const shelf=(await listBloomShelf(first,nextDay)).items.find(item=>item.id===recapId);
+   assert.equal(listed?.timeZone,"Africa/Lagos");assert.equal(shelf?.timeZone,"Africa/Lagos");
+   assert.deepEqual(listed?.experience,original.experience);assert.deepEqual(shelf?.experience,original.experience);
+  }finally{await patchSettings(first,{timeZone:"Africa/Lagos"});}
+ });
+ it("uses a stable personal experience from the teaser through the saved story",async()=>{
+  const teased=(await listBloom(unknown,"monthly",now)).items.find(item=>item.id===recapId);
+  const shelf=(await listBloomShelf(unknown,now)).items.find(item=>item.id===recapId);
+  const recap=await getBloom(unknown,recapId,now);
+  assert.deepEqual(teased?.experience,recap.experience);assert.deepEqual(shelf?.experience,recap.experience);
+  assert.notEqual(recap.experience?.seed,(await getBloom(first,recapId,now)).experience?.seed);
+  assert.deepEqual((await getBloom(unknown,recapId,new Date("2026-11-08T12:00:00Z"))).experience,recap.experience);
  });
  it("preserves prior journal measurements when learning pauses and rejects new recorded plays",async()=>{
   await patchSettings(first,{learnFromListening:false});

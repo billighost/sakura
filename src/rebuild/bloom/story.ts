@@ -1,6 +1,7 @@
 import type {BloomChapter,BloomRecap} from "./uiTypes";
 import type {BloomSceneKind} from "./worlds/types";
 import {bloomWorld} from "./worlds/registry";
+import {experienceChoice,type BloomExperience} from "./experience";
 
 interface WorldVoice {opening:string;closing:string;titles:Partial<Record<BloomSceneKind,string>>}
 const voices:Record<string,WorldVoice>={
@@ -16,7 +17,7 @@ const voices:Record<string,WorldVoice>={
  glass:{opening:"A botanical window assembles from the music recorded in this listening period.",closing:"The final pane joins the window. This period's music is held in the assembled light.",titles:{time:"Listening fills the window with light.",comparison:"This window beside the last.",days:"Dates held between the panes.",breadth:"Songs gathered in the glass.",songs:"Songs gathering into the window.","song-winner":"The song in the central pane.",artist:"A voice traced through the leadwork.","artist-songs":"Songs on the same botanical stem.",artists:"Voices along the botanical stems.",discoveries:"First listens bloom in the glass.",returns:"A song returns along the leadwork.",genres:"Colours between the panes.",pattern:"The recorded hours light the window."}},
 };
 const finales:Record<string,string>={sakura:"The orchard in afterglow",jungle:"Where the tributaries meet",disco:"The complete listening bill",japan:"The procession's final page",china:"The unfolded listening scroll",korea:"The collected courtyard",india:"The completed garden folio",ocean:"The tide's collection",cosmos:"The assembled paper sky",glass:"The completed botanical window"};
-export function bloomWorldVoice(worldId:string){const id=bloomWorld(worldId).id;return {...voices[id],titles:{...voices[id].titles,finale:finales[id]}};}
+export function bloomWorldVoice(worldId:string,experience?:BloomExperience){const id=bloomWorld(worldId).id;return {...voices[id],...(experience?{opening:experience.opening,closing:experience.closing}:{}),titles:{...voices[id].titles,finale:experience?.finaleTitle||finales[id]}};}
 const chapterTitles:Record<string,Record<string,string>>={
  sakura:{"listening-moments":"Recorded plays along the branches.","time-comparison":"A measure of the passing light.","artist-continuity":"Voices return to familiar branches.","runner-up":"The blossom beside the centre.","most-replayed":"The song with the most return visits."},
  jungle:{"listening-moments":"Recorded plays along the river.","time-comparison":"A measure of the painted river.","artist-continuity":"Voices return along familiar banks.","runner-up":"The bend before the widest current.","most-replayed":"The song with the most river turns."},
@@ -29,12 +30,57 @@ const chapterTitles:Record<string,Record<string,string>>={
  cosmos:{"listening-moments":"Recorded plays in the paper chart.","time-comparison":"A measure of the listening orbit.","artist-continuity":"Familiar artists rejoin the constellations.","runner-up":"The song beside the central star.","most-replayed":"The song with the most recorded orbits."},
  glass:{"listening-moments":"Recorded plays between the panes.","time-comparison":"A measure held in the window.","artist-continuity":"Familiar artists return along the stems.","runner-up":"The song beside the central pane.","most-replayed":"The song with the most leadwork returns."},
 };
-export function bloomChapterTitle(worldId:string,kind:BloomSceneKind,chapterId?:string){const id=bloomWorld(worldId).id;return (chapterId?chapterTitles[id][chapterId]:undefined)||bloomWorldVoice(id).titles[kind]||"The recorded music in this period.";}
+const sceneLines:Partial<Record<BloomSceneKind,readonly string[]>>={
+ time:["You gave your music this much time.","Every minute helped this world grow.","The soundtrack was bigger than you think."],
+ comparison:["Put your soundtrack into perspective.","See how far those minutes travelled.","Your listening has a bigger picture."],
+ days:["The days your soundtrack showed up.","You kept the music close.","Little listening days. One big story."],
+ breadth:["Every song had a place in your soundtrack.","The music you chose became part of your story.","Meet the music that filled your world."],
+ songs:["The countdown is on.","These songs are climbing into the spotlight.","Your favourites are ready for their close-up."],
+ "song-winner":["And your number one is…","One song claimed the spotlight.","Meet the song at the heart of your Bloom."],
+ artist:["This voice led your soundtrack.","Your leading artist takes the stage.","One artist made the biggest impression."],
+ "artist-songs":["You found a whole world in this artist.","One voice. A collection of favourites.","The songs behind your leading artist."],
+ artists:["More voices. More of your world.","Your supporting cast deserves a spotlight.","Meet the artists who made it yours."],
+ discoveries:["Look who just entered your story.","You let new music in.","Your next favourites started here."],
+ returns:["Some songs earn another encore.","The music you found your way back to.","Familiar songs. Fresh memories."],
+ genres:["Your soundtrack came in these colours.","There is a whole palette in your music.","Follow the colours of your listening."],
+ pattern:["Your music had its own rhythm.","The hours behind your soundtrack.","When did your listening come alive?"],
+};
+const insightLines:Record<string,readonly string[]>={
+ "listening-character":["Meet your listening personality.","Your listening has a signature.","This is how your soundtrack moved."],
+ "top-song-share":["How much of your world belonged to one song?","Your number one had this much gravity.","One song. This much of your soundtrack."],
+ "average-day":["A little music went a long way.","Your typical listening day, revealed.","The daily dose behind your Bloom."],
+ "discovery-share":["You made room for something new.","This much of your soundtrack was a first.","Fresh music found its way into your world."],
+ "replay-share":["You knew what you wanted to hear again.","Favourites kept finding their way back.","Your encore energy, revealed."],
+ "top-five-share":["Five songs. A whole lot of your world.","Your leading five had serious pull.","The inner circle of your soundtrack."],
+ "artist-count":["Your soundtrack had this many voices.","Meet the scale of your musical cast.","You made space for all these artists."],
+ "genre-leader":["One colour rose above the rest.","Your soundtrack's leading flavour.","The genre that coloured your world."],
+ "time-of-day":["Your music found its favourite light.","This part of the day was yours.","When your soundtrack came alive."],
+ "peak-day":["One day turned the music up.","The biggest listening day in your story.","This day deserves its own encore."],
+ "listening-streak":["You kept the soundtrack going.","Your longest run of listening days.","The music stayed with you, day after day."],
+ "active-months":["Your music, across the calendar.","The months that held your soundtrack.","A year's soundtrack, one month at a time."],
+ "peak-month":["One month stole the show.","The month your music went big.","Your year's loudest chapter."],
+ "year-opening":["Remember which month started your soundtrack?","The first month in this year's listening story.","Every great soundtrack has an opening chapter."],
+ "year-closing":["The final month of your recorded soundtrack.","Your year's closing chapter.","The month that closed this listening story."],
+ "season-spotlight":["A chapter found its own soundtrack.","Your year had a standout stretch.","This part of the year carried the music."],
+ "weekend-rhythm":["Your weekdays and weekends had a rhythm.","How did your week meet the weekend?","Two sides of your weekly soundtrack."],
+ "half-year-shift":["Your year had a second act.","Your soundtrack moved through two halves.","One year. Two chapters in music."],
+ "most-replayed":["You pressed play on this one again.","Your most revisited song earns an encore.","The song that kept coming back."],
+ "runner-up":["So close to number one.","Your runner-up deserves a moment.","The song right beside the spotlight."],
+ "artist-continuity":["Some voices stayed in your story.","Familiar artists found you again.","The voices that crossed into this chapter."],
+ "listening-moments":["Every play added another moment.","The listening moments behind your Bloom.","Your soundtrack, one play at a time."],
+};
+export function bloomChapterTitle(worldId:string,kind:BloomSceneKind,chapterId?:string,experience?:BloomExperience){
+ const id=bloomWorld(worldId).id,original=(chapterId?chapterTitles[id][chapterId]:undefined)||bloomWorldVoice(id).titles[kind]||"The recorded music in this period.";
+ if(!experience)return original;
+ if(kind==="finale")return experience.finaleTitle;
+ const lines=chapterId?insightLines[chapterId]:undefined;
+ return experienceChoice(lines||[original,...(sceneLines[kind]||[])],experience.seed,`${id}|title|${chapterId||kind}`);
+}
 export function chapterScene(chapter:BloomChapter|undefined):BloomSceneKind{
  if(chapter?.kind)return chapter.kind;
  const legacy:Record<string,BloomSceneKind>={"listening-time":"time","top-song":"song-winner","top-artist":"artist","song-count":"breadth","listening-days":"days","discoveries":"discoveries","returning-songs":"returns","catalog-genre":"genres"};return legacy[chapter?.id||""]||"pattern";
 }
-export function chapterHold(chapter:BloomChapter|undefined){return chapter?.kind==="artist-songs"||chapter?.kind==="songs"?16000:chapter?.kind==="song-winner"||chapter?.kind==="artist"?15000:11500;}
+export function chapterHold(chapter:BloomChapter|undefined,experience?:BloomExperience){const base=chapter?.kind==="artist-songs"||chapter?.kind==="songs"?16000:chapter?.kind==="song-winner"||chapter?.kind==="artist"?15000:11500;return experience?Math.round(base*[1,1.04,1.08,1.12][experience.tempo]):base;}
 /** Unfinished stories resume at their saved frontier. A completed story is a
  * revisit, so it opens as a new viewing from chapter one instead of dropping
  * the listener back at the finale. */

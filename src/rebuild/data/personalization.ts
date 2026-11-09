@@ -99,7 +99,8 @@ export async function exportPersonalizationData(accountId:string) {
   const preferences=await getSettings(accountId,pool),taste=await getTaste(accountId,pool);
   const listening=await pool.query(`SELECT l.event_id AS "eventId",l.recording_id AS "recordingId",l.audible_ms::text AS "audibleMs",
       l.completed,l.skipped,l.finished,l.started_at AS "startedAt",l.last_position_ms AS "positionMs",l.max_position_ms AS "maxPositionMs",
-      h.context,h.context_id AS "contextId" FROM sakura_v2."ListeningEventLedger" l
+      COALESCE(to_jsonb(l)->>'context',h.context) AS context,
+      CASE WHEN to_jsonb(l)->>'context' IS NOT NULL THEN to_jsonb(l)->>'context_id' ELSE h.context_id END AS "contextId" FROM sakura_v2."ListeningEventLedger" l
       LEFT JOIN sakura_v2."ListeningEvent" h ON h.account_id=l.account_id AND h.event_id=l.event_id
       WHERE l.account_id=$1::uuid ORDER BY l.started_at DESC,l.event_id`,[accountId]);
   const recordings=await pool.query(`SELECT recording_id AS "recordingId",audible_ms::text AS "audibleMs",play_count::text AS "playCount",

@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import type { BloomWorldProps, BloomQuality } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
@@ -253,7 +255,7 @@ function PaperAperture({ quality }: { quality: BloomQuality }) {
   </svg>;
 }
 
-export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
+export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
   const id = `cosmos-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const opening = scene === "opening" || view === "cover";
   const music = ["songs", "song-winner", "artist-songs", "discoveries", "returns", "finale"].includes(scene);
@@ -263,7 +265,7 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
   const shot = opening ? "entrance" : scene === "song-winner" ? "aperture" : portrait ? "portrait" : scene === "finale" ? "panorama" : scene === "days" ? "calendar" : music || scene === "breadth" ? "gallery" : scene === "comparison" ? "chart" : "instrument";
   const style = { "--cosmos-completion": completion, "--cosmos-stage": stage, "--world-accent": "#a27849", "--world-ink": shot === "aperture" ? "#efe2bd" : "#243a47" } as CSSProperties;
   const hasOrbit = listening && (listening.artistCount != null || listening.peakHour != null);
-  return <div className={s.world} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} data-listening={Boolean(listening)} data-calendar-pages={listening?.activeDays == null ? undefined : Math.min(quality + 3,listening.activeDays)} style={style}>
+  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} data-listening={Boolean(listening)} data-calendar-pages={listening?.activeDays == null ? undefined : Math.min(quality + 3,listening.activeDays)} style={style}>
     <svg className={s.environment} viewBox="0 0 1440 900" preserveAspectRatio={view === "poster" ? "none" : "xMidYMid slice"} aria-hidden="true">
       <Definitions id={id}/><Sky id={id} quality={quality} progress={completion} listening={listening}/>
       <Architecture id={id} quality={quality} progress={completion}/>
@@ -286,7 +288,7 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
       <div className={s.titleFooter}><svg viewBox="0 0 280 25"><path d="M0 13H94M186 13H280" stroke="currentColor"/><path d="M118 13 128 3 139 13 151 3 164 13 151 23 139 13 128 23Z" fill="none" stroke="currentColor"/></svg></div>
     </div>}
     {!opening && <div className={s.paperShutters} key={`${scene}-${stage}`} aria-hidden="true"><i/><i/></div>}
-    <div className={s.content}>{children}</div>
+    <div className={s.content}><ListeningPainting world="cosmos" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     <div className={`${s.guideStar} ${hasOrbit ? s.listeningOrbit : ""}`} key={`star-${scene}-${stage}`} aria-hidden="true">{hasOrbit ? <ListeningOrbit listening={listening} quality={quality}/> : <svg viewBox="-36 -36 72 72"><path d="M-27 10Q-38-5-13-27" fill="none" stroke="#d4b778" strokeWidth=".8" strokeDasharray="2 4"/><Star x={0} y={0} size={24} colour="#e0bc75" folded/><circle r="33" stroke="#d7c298" fill="none" strokeWidth=".6" opacity=".6"/></svg>}</div>
   </div>;
 }

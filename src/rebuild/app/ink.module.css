@@ -70,7 +70,7 @@
 .heroBranch>path:first-child{stroke-dasharray:1;stroke-dashoffset:1;animation:inkVineGrow 2.8s cubic-bezier(.2,.65,.3,1) forwards}
 .heroBranch>g,.heroBranch>path:last-child{opacity:0;animation:inkVineBloom .9s ease-out 1.5s forwards}
 .heroBranch>g:nth-of-type(2n){animation-delay:2s}.heroBranch>g:nth-of-type(3n){animation-delay:2.4s}
-.app:has(.opening) .heroBranch>path,.app:has(.opening) .heroBranch>g{animation-play-state:paused}
+.app:has(.opening[data-active=true]) .heroBranch>path,.app:has(.opening[data-active=true]) .heroBranch>g{animation-play-state:paused}
 @keyframes inkVineGrow{to{stroke-dashoffset:0}}@keyframes inkVineBloom{to{opacity:1}}
 .searchBox{position:relative;border:0;border-radius:26px 7px 25px 8px;padding:14px 20px 19px;background:linear-gradient(115deg,color-mix(in srgb,var(--ink-petal) 10%,var(--ink-card)),var(--ink-card) 65%);box-shadow:0 4px 18px color-mix(in srgb,var(--ink-text) 3%,transparent);transition:background .2s}
 .searchBox:focus-within{outline:none;box-shadow:0 4px 18px color-mix(in srgb,var(--ink-petal) 14%,transparent)}

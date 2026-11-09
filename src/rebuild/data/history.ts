@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { getRebuildPool,inIdempotentTransaction } from "./db";
 import { CARD_SELECT,VERIFIED,card } from "./catalog";
 import { ProductError,encodeCursor,integer,object,pageInput,text,uuid } from "./validation";
+import { retainListeningOrigin } from "./listeningOrigin";
 
 export function historyChunk(value:unknown) {
   const raw=object(value),eventId=uuid(raw.eventId,"event ID"),recordingId=uuid(raw.recordingId,"recording ID");
@@ -75,6 +76,7 @@ export async function recordHistory(accountId:string,value:unknown) {
       [accountId,chunk.eventId,chunk.msPlayed,chunk.completed,chunk.skipped,chunk.finished,chunk.occurredAt||null,chunk.sequence,chunk.positionMs]);
     await client.query(`INSERT INTO sakura_v2."ListeningEvent"(account_id,event_id,context,context_id) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT DO NOTHING`,
       [accountId,chunk.eventId,chunk.context,chunk.contextId]);
+    await retainListeningOrigin(client,accountId,chunk.eventId,chunk.context,chunk.contextId);
     await client.query(`INSERT INTO sakura_v2."LifetimeListeningSummary"(account_id,audible_ms,play_count,completed_count,skipped_count)
       VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(account_id) DO UPDATE SET
       audible_ms=sakura_v2."LifetimeListeningSummary".audible_ms+EXCLUDED.audible_ms,
@@ -98,7 +100,8 @@ export async function getHistory(accountId:string,url:URL) {
   const {limit,cursor}=pageInput(url);
   const rows=await getRebuildPool().query(`${CARD_SELECT.replace('FROM sakura_v2."Recording" r',`,l.event_id AS "eventId",l.started_at AS "playedAt",
     l.audible_ms AS "audibleMs",l.completed,l.skipped,l.last_position_ms AS "positionMs",l.max_position_ms AS "maxPositionMs",
-    l.finished,h.context,h.context_id AS "contextId" FROM sakura_v2."Recording" r`)}
+    l.finished,COALESCE(to_jsonb(l)->>'context',h.context) AS context,
+    CASE WHEN to_jsonb(l)->>'context' IS NOT NULL THEN to_jsonb(l)->>'context_id' ELSE h.context_id END AS "contextId" FROM sakura_v2."Recording" r`)}
     JOIN sakura_v2."ListeningEventLedger" l ON l.recording_id=r.id AND l.account_id=$1::uuid
     JOIN sakura_v2."ListeningEvent" h ON h.account_id=l.account_id AND h.event_id=l.event_id
     WHERE ${VERIFIED} AND l.audible_ms>0 AND ($2::timestamptz IS NULL OR (l.started_at,l.event_id)<($2::timestamptz,$3::uuid))

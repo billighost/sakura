@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import type { BloomQuality, BloomWorldProps } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
@@ -130,7 +132,7 @@ function Palm({ x, y, flip = false, quality }: { x: number; y: number; flip?: bo
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
   const token = useId().replace(/:/g, "");
   const id = `glass-${token}`;
   const cover = view === "cover";
@@ -145,7 +147,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const windowPositions = opening ? [{ x: 805, y: 55, scale: 1.02 }, { x: 1314, y: 198, scale: .58 }] : finale ? [{ x: -100, y: 72, scale: .65 }, { x: 1230, y: 74, scale: .65 }] : scene === "comparison" ? [{ x: 965, y: 50, scale: .97 }, { x: -233, y: 58, scale: .72 }] : scene === "song-winner" ? [{ x: 890, y: 38, scale: 1.05 }, { x: -153, y: 55, scale: .72 }] : scene === "time" || scene === "breadth" ? [{ x: -124, y: 45, scale: 1.06 }, { x: 1268, y: 100, scale: .74 }] : scene === "days" || scene === "pattern" || scene === "genres" ? [{ x: 1030, y: 152, scale: .86 }, { x: -189, y: 145, scale: .86 }] : [{ x: -132, y: 95, scale: .82 }, { x: 1190, y: 58, scale: .82 }];
   const portrait = opening ? { left: -174, right: 341, y: 118, scale: .63 } : scene === "song-winner" ? { left: -231, right: 344, y: 89, scale: .69 } : scene === "artist" || scene === "artists" ? { left: -178, right: 348, y: 221, scale: .54 } : scene === "days" || scene === "pattern" || scene === "genres" ? { left: -163, right: 345, y: 177, scale: .51 } : scene === "comparison" ? { left: -216, right: 345, y: 116, scale: .64 } : { left: -193, right: 345, y: 121, scale: .57 };
 
-  return <div className={s.world} data-scene={scene} data-theme={theme} data-view={view} data-opening={opening} data-music={music} data-still={still} data-quality={quality} data-stage={stage} data-listening={Boolean(listening)} data-genre-pigments={listening?.genreCount} data-discovery-buds={listening?.discoveredRecordingCount == null ? undefined : Math.min(tier.flowers,listening.discoveredRecordingCount)} data-return-joints={listening?.returningArtistCount == null ? undefined : Math.min(quality + 2,listening.returningArtistCount)} data-hour-light={listening?.peakHour == null ? undefined : daylight.toFixed(3)} style={style}>
+  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-theme={theme} data-view={view} data-opening={opening} data-music={music} data-still={still} data-quality={quality} data-stage={stage} data-listening={Boolean(listening)} data-genre-pigments={listening?.genreCount} data-discovery-buds={listening?.discoveredRecordingCount == null ? undefined : Math.min(tier.flowers,listening.discoveredRecordingCount)} data-return-joints={listening?.returningArtistCount == null ? undefined : Math.min(quality + 2,listening.returningArtistCount)} data-hour-light={listening?.peakHour == null ? undefined : daylight.toFixed(3)} style={style}>
     <svg className={s.architecture} viewBox="0 0 1400 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs><pattern id={`${id}-texture`} width="53" height="41" patternUnits="userSpaceOnUse"><path d="M3 8 13 7M39 24 48 25M19 36 22 34" stroke="#fff6da" strokeWidth=".6" opacity=".28"/><circle cx="31" cy="11" r=".8" fill="#214e46" opacity=".1"/></pattern></defs>
       <path d="M0 0H1400V1000H0Z" fill="var(--glass-room)"/>
@@ -191,7 +193,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     </svg>
     {opening && <div className={s.title} aria-hidden="true"><span className={s.titleLabel}>THE PRISMATIC GARDEN</span><GlassTitle id={id}/><span className={s.titleCaption}>your music, held in light</span></div>}
     {!opening && <div className={s.windowSeal} aria-hidden="true"><span>PRISMATIC GARDEN</span><svg viewBox="0 0 70 18"><path d="M0 9H22M48 9H70M25 9l10-6 10 6-10 6Z" fill="none" stroke="currentColor"/></svg></div>}
-    <div className={s.content}>{children}</div>
+    <div className={s.content}><ListeningPainting world="glass" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     {!still && <div className={s.lightPassage} aria-hidden="true" key={`lights-${scene}-${stage}`}>{Array.from({ length: tier.lights }, (_, n) => <i key={n} style={{ "--delay": `${n * .17}s`, "--light-x": `${n % 2 ? 80 - n * 2 : 8 + n * 2}%`, "--light-angle": `${n % 2 ? -18 + n * 2 : 19 + n * 2}deg`, "--light-colour": GLASS[(n + 3) % GLASS.length] } as CSSProperties}/>)}</div>}
     {!still && <div className={s.rosePane} key={`rose-${scene}-${stage}`} aria-hidden="true"><svg viewBox="0 0 72 92"><path d="M34 82C5 64-2 32 34 4C64 26 78 51 34 82Z" fill="#c49091" stroke={LEAD} strokeWidth="3"/><path d="m34 81 0-75 25 29-9 29Z" fill="#e9b6a5" opacity=".6" stroke={LEAD} strokeWidth="1"/><path d="M34 51 16 30M35 38 55 36" fill="none" stroke={LEAD}/></svg></div>}
   </div>;

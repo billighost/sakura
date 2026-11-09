@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
@@ -169,14 +171,14 @@ function Title({ cover }: { cover: boolean }) {
   </div>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
   const id = `jungle-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const isCover = view === "cover";
   const hour = listening?.peakHour;
   const dawn = hour == null ? scene === "finale" || view === "poster" ? 1 : scene === "opening" ? 0 : Math.min(.88, Math.max(stage / 18, progress * .78)) : .12 + Math.max(0, stableSin((hour - 6) / 12 * Math.PI)) * .78;
   const shot = ["time", "comparison", "days", "breadth"].includes(scene) ? "river" : ["song-winner", "artist", "artist-songs"].includes(scene) ? "clearing" : ["songs", "artists", "discoveries", "returns", "genres"].includes(scene) ? "pool" : scene === "finale" ? "lagoon" : "canopy";
   const vars = { "--dawn": dawn, "--travel": Math.max(0, Math.min(1, progress)), "--shade": theme === "dark" ? .27 - dawn * .13 : .16 - dawn * .12 } as CSSProperties;
-  return <div className={s.world} data-world="jungle" data-scene={scene} data-shot={shot} data-view={view} data-quality={quality} data-reduced-motion={reducedMotion || view === "poster"} data-theme={theme} style={vars}>
+  return <div className={s.world} data-experience={experience?.composition} data-world="jungle" data-scene={scene} data-shot={shot} data-view={view} data-quality={quality} data-reduced-motion={reducedMotion || view === "poster"} data-theme={theme} style={vars}>
     <div className={s.paintedWorld} data-listening-hour={hour ?? undefined}><Landscape id={id} quality={quality} dawn={dawn} listening={listening}/></div>
     <div className={s.shade} aria-hidden="true" />
     <Foreground quality={quality} side="left" id={id} />
@@ -187,7 +189,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     <svg className={s.travellingLeaf} viewBox="0 0 100 50" aria-hidden="true"><path d="M3 33C14 2 67-5 91 13C82 33 48 46 3 33Z" fill="#d2b576" /><path d="M3 33Q38 20 91 13M25 28 35 10M47 22 59 5M26 28 43 37M53 22 69 28" fill="none" stroke="#806b41" strokeWidth="1.2" /><path d="M1 34Q-4 42 5 44" fill="none" stroke="#a18d54" strokeWidth="2" /><path d="M16 45Q47 48 84 37" fill="none" stroke="#d9e1b7" strokeOpacity=".55" /></svg>
     <div className={s.clearing} key={`${scene}:${view}`}>
       {isCover ? <Title cover /> : null}
-      <div className={s.content}>{children}</div>
+      <div className={s.content}><ListeningPainting world="jungle" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     </div>
     {!isCover && <Title cover={false} />}
     <svg className={s.waterFrame} viewBox="0 0 1600 100" preserveAspectRatio="none" aria-hidden="true"><path d="M-10 60Q180 32 367 64T799 59T1203 69T1620 53M-10 89Q203 60 367 88T804 86T1203 88T1620 79" fill="none" stroke="#ccdbad" strokeWidth="1" strokeOpacity=".25" /></svg>

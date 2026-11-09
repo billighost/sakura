@@ -16,13 +16,6 @@
 .tasteDot{width:5px;height:5px;background:var(--ink-petal);border-radius:70% 30% 65% 30%;transform:rotate(-30deg)}
 .tasteNote>button{padding:5px 0 5px 9px;margin-left:2px;background:none;border:0;border-left:1px solid var(--ink-line);font-size:9px;color:var(--ink-accent);text-decoration:underline;text-decoration-color:var(--ink-line);text-underline-offset:4px}
 .heroMusic{position:relative;display:grid;place-items:center;min-height:345px;padding:10px 38px 22px 0;isolation:isolate}
-.gardenDrawing{position:absolute;inset:-39px -27px 0 auto;width:110%;height:115%;z-index:-1;overflow:visible;pointer-events:none;color:var(--ink-accent)}
-.growingStem{stroke:currentColor;stroke-width:1.15;stroke-dasharray:1;stroke-dashoffset:1;animation:stemGrow 2.4s cubic-bezier(.23,.69,.32,1) forwards}
-.leaves{fill:var(--ink-surface);stroke:var(--ink-accent);stroke-width:.7}
-.drawnBloom{fill:var(--ink-petal);opacity:.72;animation:flowerOpen 1.5s ease both}
-.drawnBloom:nth-of-type(2){animation-delay:.3s}.drawnBloom:nth-of-type(3){animation-delay:.7s}.drawnBloom:nth-of-type(4){animation-delay:1s}
-.drawnBloom>circle{fill:var(--ink-accent)}
-.passingPetal{fill:var(--ink-petal);opacity:.48}
 .heroPick{position:relative;max-width:285px;width:100%;padding-top:13px}
 .pickLabel{display:flex;align-items:center;gap:6px;font-size:8px;letter-spacing:.13em;color:var(--ink-muted);margin:0 0 18px 5px;transform:rotate(-3deg)}
 .pickLabel>svg{color:var(--ink-petal)}
@@ -250,3 +243,48 @@
   .chapter{contain-intrinsic-size:auto 3600px}
 }
 @media(max-width:380px){.song{grid-template-columns:76px minmax(0,1fr);gap:10px;padding:9px}.songTitle{font-size:21px}.songBottom{flex-wrap:wrap;justify-content:flex-end}.songDetails{max-width:100%;flex:1 1 100%}.songArtist{font-size:10px}.featuredSong{grid-template-columns:minmax(0,1fr);gap:0;padding:8px}.featuredSong .songTitle{font-size:27px}.featuredSong .songBottom{flex-wrap:nowrap}.featuredSong .songDetails{flex:initial;max-width:calc(100% - 92px)}.heroMusic{padding-right:30px}.modeChoices>button{font-size:9px!important}}
+
+/* The artwork belongs to the opening composition, including on a phone. */
+.heroMusic{animation:recordArrival 1.1s cubic-bezier(.16,.7,.2,1) .18s both}
+@keyframes recordArrival{from{opacity:0;transform:translate3d(14px,9px,0) rotate(2deg)}to{opacity:1;transform:none}}
+@media(max-width:780px) and (min-width:651px){
+  .hero,.feedRoom[data-surface=discover] .hero{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:8px;min-height:350px}
+  .heroCopy h1,.feedRoom[data-surface=discover] .heroCopy h1{font-size:44px}
+  .heroMusic{min-height:310px;justify-items:center;padding:4px 23px 20px 6px}
+  .heroPick{max-width:210px}.pickCaption>div:first-child>a{font-size:21px}
+}
+@media(max-width:520px){
+  .hero,.feedRoom[data-surface=discover] .hero{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:auto auto auto auto auto;gap:0 8px;min-height:0;padding:14px 0 35px;isolation:isolate}
+  .heroCopy{display:contents}
+  .handwritten{grid-column:1;grid-row:1;font-size:13px;align-self:end;line-height:1.65;padding-top:8px}
+  .heroCopy h1,.feedRoom[data-surface=discover] .heroCopy h1{grid-column:1;grid-row:2;align-self:start;font-size:clamp(33px,9.9vw,44px);line-height:1.08;margin:16px 0 14px!important;letter-spacing:-.055em!important;z-index:2}
+  .heroCopy>p{grid-column:1/-1;grid-row:3;max-width:310px;font-size:11px;line-height:1.9;position:relative;z-index:2;margin-top:20px!important}
+  .heroActions{grid-column:1/-1;grid-row:4;position:relative;z-index:2;gap:10px 16px;margin-top:18px}
+  .tasteNote{grid-column:1/-1;grid-row:5;position:relative;z-index:2;font-size:9px;margin-top:13px;max-width:100%;line-height:1.7}
+  .tasteNote>button{font-size:9px;min-height:34px}
+  .heroMusic{grid-column:2;grid-row:1/span 2;align-self:start;justify-items:center;min-height:0;margin:0;padding:13px 10px 0 0;isolation:isolate}
+  .heroMusic::before{display:none}
+  .heroPick{width:100%;max-width:190px;padding-top:7px}
+  .pickLabel{font-size:6.5px;line-height:1.7;letter-spacing:.07em;margin:0 0 14px 0;max-width:100%}
+  .sleeveArt{width:77%;margin:0 0 17px 0;aspect-ratio:1}
+  .sleeveArt>div:nth-child(2){border-width:4px}
+  .sleevePlay{width:44px;height:44px;right:5px;bottom:5px}
+  .sleeveSeal{width:23px;height:23px;padding:4px;left:-7px;bottom:10px}
+  .pickCaption{margin-left:0;gap:0;flex-wrap:wrap}
+  .pickCaption>div:first-child{flex:1 1 100%;max-width:100%}
+  .pickCaption>div:first-child>a{font-size:20px;line-height:1.25}
+  .pickCaption>div:first-child>span{font-size:10px;line-height:1.6;margin-top:4px}
+  .pickCaption .songTools{margin-left:0;margin-top:3px;gap:1px}
+  .pickCaption .songTools>button{width:44px;height:44px}
+  .pickCaption .songTools>button>svg{width:17px;height:17px}
+  .pickReason{font-size:11px;line-height:1.65;margin:2px 0 0!important;max-width:100%;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .cornerNote{right:3px;bottom:-22px;font-size:8px;white-space:nowrap;transform:rotate(-2deg)}
+  .waitingSleeve{width:95%;border-width:4px;gap:12px;margin-top:24px}
+  .waitingSleeve>svg{width:32px;height:32px}.waitingSleeve>span{font-size:22px}
+}
+@media(max-width:360px){
+  .hero,.feedRoom[data-surface=discover] .hero{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);column-gap:7px}
+  .handwritten{font-size:12px}.heroCopy h1,.feedRoom[data-surface=discover] .heroCopy h1{font-size:34px}
+  .heroMusic{padding-right:8px}.pickCaption>div:first-child>a{font-size:18px}.pickLabel{font-size:6px;letter-spacing:.025em}.pickReason{font-size:10px}
+  .cornerNote{font-size:7px;right:0}.heroCopy>p{margin-top:19px!important}
+}

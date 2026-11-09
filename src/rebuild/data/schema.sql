@@ -101,6 +101,12 @@ ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS occurred_at time
 ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS last_position_ms integer NOT NULL DEFAULT 0 CHECK(last_position_ms BETWEEN 0 AND 21600000);
 ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS max_position_ms integer NOT NULL DEFAULT 0 CHECK(max_position_ms BETWEEN 0 AND 21600000);
 ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS last_sequence integer NOT NULL DEFAULT -1;
+-- Playback origin belongs to retained listening evidence, not only the history
+-- display row. NULL marks old plays whose original source is no longer known.
+ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS context text CHECK(context IS NULL OR length(trim(context)) BETWEEN 1 AND 40);
+ALTER TABLE sakura_v2."ListeningEventLedger" ADD COLUMN IF NOT EXISTS context_id text CHECK(context_id IS NULL OR length(trim(context_id)) BETWEEN 1 AND 120);
+UPDATE sakura_v2."ListeningEventLedger" l SET context=e.context,context_id=e.context_id
+  FROM sakura_v2."ListeningEvent" e WHERE e.account_id=l.account_id AND e.event_id=l.event_id AND l.context IS NULL;
 ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS position_ms integer;
 ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS completed boolean;
 ALTER TABLE sakura_v2."ListeningChunk" ADD COLUMN IF NOT EXISTS skipped boolean;

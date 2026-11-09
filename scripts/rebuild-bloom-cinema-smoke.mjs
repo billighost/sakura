@@ -1,4 +1,6 @@
 /** Complete cinematic journeys with intercepted synthetic accounts, music and listening data. */
+import 'dotenv/config';
+import {encode} from 'next-auth/jwt';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
@@ -10,8 +12,9 @@ const worlds=(process.env.SAKURA_BLOOM_WORLDS||'sakura,jungle,disco,japan,china,
 const widths=(process.env.SAKURA_BLOOM_WIDTHS||'1280,390').split(',').map(Number);
 const profile=process.env.SAKURA_BLOOM_PROFILE==='1';
 const output='.local/bloom-cinema-review';await fs.mkdir(output,{recursive:true});
-const session=JSON.parse(await fs.readFile('.local/rebuild-test-account.json','utf8'));
 const account={id:'90000000-0000-4000-8000-000000000041',username:'Bloom review',email:'bloom@example.invalid'};
+const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;assert.ok(secret);
+const token=await encode({token:{id:account.id,name:account.username},secret,salt:'authjs.session-token'});
 const cards=Array.from({length:5},(_,i)=>{
  const id=`80000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`;
  const name=i<3?'宇多田ヒカル':i===3?'Tyler, The Creator':'Burna Boy';
@@ -28,7 +31,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});let debug;
 try{
  for(const width of widths)for(const world of worlds){
   const context=await browser.newContext({viewport:{width,height:width<500?844:900},reducedMotion:profile?'no-preference':'reduce',acceptDownloads:true,serviceWorkers:'block'});
-  await context.addCookies(session.cookie.split('; ').map(value=>{const split=value.indexOf('=');return{name:value.slice(0,split),value:value.slice(split+1),url:base};}));
+  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
   await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.__bloomAudios=[];window.Audio=function(...args){const audio=new NativeAudio(...args);window.__bloomAudios.push(audio);return audio;};window.Audio.prototype=NativeAudio.prototype;});
   const page=await context.newPage();debug=page;page.setDefaultTimeout(30000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));

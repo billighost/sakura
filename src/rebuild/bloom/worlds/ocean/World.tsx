@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
@@ -176,7 +178,7 @@ const sceneShots: Partial<Record<BloomSceneKind, string>> = {
   artists: "reef", discoveries: "gallery", returns: "reef", genres: "reef", pattern: "deep", finale: "shore",
 };
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
   const id = `ocean-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const shot = sceneShots[scene] || "deep";
   const cover = view === "cover";
@@ -186,7 +188,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const currents = Math.min(quality + 1,Math.max(0,listening?.returningRecordingCount || 0));
   const shells = listening?.discoveredRecordingCount == null ? undefined : Math.min(quality + 3,Math.max(0,listening.discoveredRecordingCount));
   const style = { "--ocean-dawn": dawn, "--ocean-stage": stage } as CSSProperties;
-  return <section className={s.world} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"} data-listening={Boolean(listening)} data-return-currents={listening?.returningRecordingCount == null ? undefined : currents} data-discovery-shells={shells} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)}>
+  return <section className={s.world} data-experience={experience?.composition} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"} data-listening={Boolean(listening)} data-return-currents={listening?.returningRecordingCount == null ? undefined : currents} data-discovery-shells={shells} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)}>
     <div className={s.environment}><SeaPainting id={id} quality={quality} shore={shore} deep={shot === "deep" || shot === "portrait" || shot === "gallery"} poster={view === "poster"} listening={listening}/><svg className={s.currentPainting} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><ReturningCurrents amount={currents}/></svg></div>
     <div className={s.portraitGarden} aria-hidden="true"><svg viewBox="0 0 390 900" preserveAspectRatio="none" fill="none">
       <g opacity={shore ? .3 : .56}>
@@ -207,7 +209,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     <div className={s.ribbon} aria-hidden="true"><svg viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" fill="none"><path d={shore ? "M-30 625Q194 569 368 696Q539 841 786 784Q967 718 1235 818" : shot === "portrait" ? "M-30 664Q46 563 158 519Q295 477 412 650Q511 782 725 743Q859 728 958 626Q1077 510 1240 594" : shot === "gallery" ? "M-30 665Q138 608 293 705Q523 852 766 739Q997 625 1255 705" : "M-60 542Q158 473 331 570Q490 653 686 565Q927 444 1240 522"} stroke="var(--ocean-ribbon)" strokeWidth="3" opacity=".35" /><path d="M-23 810Q175 749 269 805M948 812Q1088 775 1216 829" stroke="var(--ocean-ribbon)" opacity=".23" /></svg></div>
     {scene === "song-winner" && <div className={s.recognition} aria-hidden="true"><svg viewBox="0 0 600 460" fill="none"><path d="M92 344Q-22 175 150 72Q365-46 533 142Q654 320 442 398Q209 475 92 344Z" stroke="var(--ocean-ribbon)" strokeWidth="1.2" opacity=".5" /><path d="M112 354Q-3 171 170 92Q379 8 508 162Q603 310 421 383Q219 450 112 354Z" stroke="var(--ocean-foam)" opacity=".3" /><path d="M129 60Q178 25 233 28M487 364Q533 327 541 282" stroke="var(--ocean-pearl)" strokeWidth="3" strokeLinecap="round" /></svg></div>}
     {(cover || scene === "opening" || view === "poster") && <div className={s.titleArt}><PaintedTitle cover={cover} /><div className={s.titleRule} aria-hidden="true" /></div>}
-    <div className={s.content}>{children}</div>
+    <div className={s.content}><ListeningPainting world="ocean" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     <div className={s.edgeMark} aria-hidden="true"><svg viewBox="0 0 100 36" fill="none"><path d="M3 19Q18 3 31 18Q47 34 60 18Q76 2 93 18M7 26Q22 10 35 25Q48 36 63 25" stroke="currentColor" strokeWidth=".9" /><circle cx="94" cy="18" r="1.5" fill="currentColor" /></svg></div>
   </section>;
 }

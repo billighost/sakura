@@ -34,7 +34,7 @@ async function device(name,viewport,{dark=false,reduced=false}={}){
  const context=await browser.newContext({viewport,colorScheme:dark?'dark':'light',reducedMotion:reduced?'reduce':'no-preference',serviceWorkers:'block'});contexts.push(context);
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  const settings={...defaults,theme:dark?'dark':'light',reducedMotion:reduced},network=[],feedback=[],history=[],clears=[];
- let session=null,smartCount=0,failNextFeed=false,emptyFeed=false,emptyProfile=false,slowFeed=false;
+ let session=null,smartCount=0,heroCount=0,failNextFeed=false,emptyFeed=false,emptyProfile=false,slowFeed=false;
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const a=new NativeAudio(...args);window.__gardenAudio=a;return a;};window.Audio.prototype=NativeAudio.prototype;window.__dataClearEvents=[];window.addEventListener('sakura-personalization-cleared',event=>window.__dataClearEvents.push(event.detail));});
  const page=await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(name+': '+error.message));page.on('console',message=>{if(message.type()==='error'&&/hydration|hydrated|did not match|uncaught|minified react error/i.test(message.text()))errors.push(name+': '+message.text());});
  async function audio(route){const range=route.request().headers().range?.match(/bytes=(\d+)-(\d*)/);if(!range)return route.fulfill({body:wav,contentType:'audio/wav',headers:{'Accept-Ranges':'bytes','Content-Length':String(wav.length)}});const start=Number(range[1]),end=range[2]?Math.min(wav.length-1,Number(range[2])):wav.length-1;return route.fulfill({status:206,body:wav.subarray(start,end+1),contentType:'audio/wav',headers:{'Content-Range':`bytes ${start}-${end}/${wav.length}`,'Accept-Ranges':'bytes','Content-Length':String(end-start+1)}});}
@@ -56,6 +56,12 @@ async function device(name,viewport,{dark=false,reduced=false}={}){
    return route.fulfill({json:{feedback}});
   }
   if(path==='/api/v2/personalization/data'){if(method==='DELETE')clears.push(request.postDataJSON());return route.fulfill({json:method==='DELETE'?{cleared:true}:{profile:account,history,taste:feedback,settings}});}
+  if(path==='/api/v2/feed/hero'){
+   if(failNextFeed)return route.fulfill({status:503,json:{error:'The service is temporarily unavailable'}});
+   const available=tracks.filter(track=>!feedback.some(item=>item.targetId===track.id&&(item.kind==='block'||item.kind==='snooze')));
+   const index=((url.searchParams.get('surface')==='discover'?18:0)+(process.env.SAKURA_VERIFY_HERO_ROTATION==='1'?heroCount++:0))%available.length;
+   return route.fulfill({json:{item:emptyFeed||!available.length?null:{track:available[index],reason:'Matches the music in your saved listening and chosen preferences.',lane:'similar'},generatedAt:new Date().toISOString()}});
+  }
   if(path==='/api/v2/feed'){
    if(slowFeed){slowFeed=false;await new Promise(resolve=>setTimeout(resolve,1500));}
    if(failNextFeed){return route.fulfill({status:503,json:{error:'The service is temporarily unavailable'}});}
@@ -77,6 +83,68 @@ async function device(name,viewport,{dark=false,reduced=false}={}){
  async function overflow(label){const value=await page.evaluate(()=>{const main=document.querySelector('#music-main'),right=main.getBoundingClientRect().right;return {document:document.documentElement.scrollWidth-innerWidth,main:main.scrollWidth-main.clientWidth,elements:[...main.querySelectorAll('*')].filter(element=>element.getBoundingClientRect().right>right+1).slice(0,8).map(element=>({tag:element.tagName,cls:element.className?.baseVal??element.className,right:element.getBoundingClientRect().right}))};});if(value.document>1||value.main>1){issues.push(`${name}: ${label} horizontal overflow ${value.main}px`);console.log(JSON.stringify({overflow:name+' '+label,...value}));}else checks.push(`${name}: ${label} has no horizontal overflow`);}
  async function caption(label){const value=await page.locator('[data-personalized-feed="home"] [class*="cornerNote"]').evaluate(note=>{const hero=note.closest('section[aria-label="Your soundtrack"]'),range=document.createRange();range.selectNodeContents(note);return {text:note.textContent,note:note.getBoundingClientRect().toJSON(),textBounds:range.getBoundingClientRect().toJSON(),hero:hero.getBoundingClientRect().toJSON()};});captions.push({device:name,label,...value});assert.equal(value.text,'music, with room to breathe');assert.ok(value.textBounds.right<=value.hero.right+.5&&value.textBounds.left>=value.hero.left-.5,`${name} ${label} caption is clipped by the hero bounds`);}
  return {name,page,context,settings,network,feedback,history,clears,load,screenshot,overflow,caption,session:()=>session,failFeed:()=>{failNextFeed=true;},allowFeed:()=>{failNextFeed=false;},emptyFeed:()=>{emptyFeed=true;},emptyProfile:()=>{emptyProfile=true;},slowFeed:()=>{slowFeed=true;}};
+}
+if(process.env.SAKURA_VERIFY_HERO_LAYOUT==='1'){
+ try{
+  for(const shape of [{name:'hero-mobile-320',width:320,height:720},{name:'hero-mobile-390',width:390,height:844},{name:'hero-mobile-520',width:520,height:844},{name:'hero-tablet-700',width:700,height:900},{name:'hero-desktop',width:1440,height:1000},{name:'hero-dark',width:390,height:844,dark:true}]){
+   const view=await device(shape.name,{width:shape.width,height:shape.height},{dark:!!shape.dark});
+   for(const surface of ['home','discover']){
+    await view.load('/'+surface);const music=view.page.locator('[data-hero-music]');await music.locator('[data-song-id]').first().waitFor();
+    await expect(view.page.locator('[data-hero-garden]')).toHaveAttribute('data-hero-garden',surface);
+    await view.page.waitForTimeout(3100);await view.overflow(surface);await view.page.locator('[data-personalized-feed] section').first().evaluate(node=>node.scrollIntoView({block:'start'}));await view.screenshot(surface);
+    const bounds=await view.page.evaluate(()=>{const hero=document.querySelector('[data-personalized-feed] section'),heading=hero.querySelector('h1'),music=hero.querySelector('[data-hero-music]'),play=music.querySelector('button[aria-label^="Play "]');return {heading:heading.getBoundingClientRect().toJSON(),music:music.getBoundingClientRect().toJSON(),hero:hero.getBoundingClientRect().toJSON(),play:play?.getBoundingClientRect().toJSON()};});
+    if(shape.width<=520){assert.ok(bounds.music.top<bounds.heading.bottom,'Mobile song starts beside heading');assert.ok(bounds.music.left>bounds.heading.left,'Mobile song occupies the right of the opening');assert.ok(bounds.music.bottom<bounds.hero.bottom,'Mobile song fits inside the hero');assert.ok(bounds.play.width>=43.9&&bounds.play.height>=43.9,'Mobile play target is at least 44px');}
+    const stem=view.page.locator('[data-hero-garden] [class*="ink"]').first();assert.equal(await stem.evaluate(node=>parseFloat(getComputedStyle(node).strokeDashoffset)),0);
+    checks.push(shape.name+' '+surface+': distinct visible bloom, song beside text, no overflow');
+   }
+   await view.load('/profile');await view.page.locator('[data-profile-bloom]').waitFor();await view.page.waitForTimeout(3100);await view.overflow('profile');await view.screenshot('profile');assert.equal(await view.page.locator('[data-profile-bloom] svg path[pathLength]').evaluate(node=>parseFloat(getComputedStyle(node).strokeDashoffset)),0);checks.push(shape.name+': profile ink animation finishes into visible artwork');
+  }
+  const still=await device('hero-reduced-motion',{width:390,height:844},{reduced:true});await still.load('/home');await still.page.locator('[data-hero-garden]').waitFor();assert.equal(await still.page.locator('[data-hero-garden] path').first().evaluate(node=>getComputedStyle(node).animationName),'none');assert.equal(await still.page.locator('[data-hero-garden] [class*="ink"]').first().evaluate(node=>parseFloat(getComputedStyle(node).strokeDashoffset)),0);await still.screenshot('home');await still.load('/profile');assert.equal(await still.page.locator('[data-profile-bloom] svg path[pathLength]').evaluate(node=>parseFloat(getComputedStyle(node).strokeDashoffset)),0);checks.push('Reduced-motion heroes display fully drawn flowers without entry animation');
+  assert.deepEqual(errors,[]);assert.deepEqual(issues,[]);const report={passed:checks.length,checks,errors,screenshots,fixture:'Signed synthetic account and intercepted product APIs; no production listener writes.'};await fs.writeFile('.local/hero-blooms-browser-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+ }finally{await browser.close();}
+ process.exit(0);
+}
+if(process.env.SAKURA_VERIFY_HERO_ROTATION==='1'){
+ try{
+  const view=await device('hero-rotation',{width:390,height:844},{reduced:true}),page=view.page;
+  await page.clock.install({time:new Date()});await view.load('/home');
+  const hero=page.locator('[data-hero-music] [data-song-id]');await expect(hero).toHaveCount(1);
+  await expect(hero).toContainText('Matches the music in your saved listening');
+  const heroRequestsBefore=view.network.filter(item=>item.path==='/api/v2/feed/hero').length;
+  const initial=await hero.getAttribute('data-song-id');
+  const grid=page.locator('[class*="songChapters"] [data-song-id]');await expect.poll(()=>grid.count()).toBeGreaterThan(0);
+  const feedBefore=await grid.evaluateAll(elements=>elements.map(element=>element.dataset.songId));
+  const requestsBefore=view.network.filter(item=>item.path==='/api/v2/feed').length;
+  await hero.getByRole('button',{name:/^Play /}).focus();await page.clock.fastForward(601000);
+  await expect.poll(()=>view.network.filter(item=>item.path==='/api/v2/feed/hero').length).toBeGreaterThan(heroRequestsBefore);
+  assert.equal(await hero.getAttribute('data-song-id'),initial,'Refreshing must retain the song beneath a focused play button');
+  await page.getByRole('button',{name:'About recommendations',exact:true}).focus();await page.clock.runFor(20);
+  await expect.poll(()=>hero.getAttribute('data-song-id')).not.toBe(initial);
+  assert.deepEqual(await grid.evaluateAll(elements=>elements.map(element=>element.dataset.songId)),feedBefore);
+  assert.equal(view.network.filter(item=>item.path==='/api/v2/feed').length,requestsBefore);
+  checks.push('Ten-minute hero refresh changes the personalized song after focus leaves, without replacing feed cards or fetching a new scroll session');
+  const refreshed=await hero.getAttribute('data-song-id');
+  await page.evaluate(owner=>window.dispatchEvent(new CustomEvent('sakura-taste-updated',{detail:{accountId:owner}})),'different-account');
+  await page.clock.runFor(50);assert.equal(await hero.getAttribute('data-song-id'),refreshed);
+  view.failFeed();await page.evaluate(owner=>window.dispatchEvent(new CustomEvent('sakura-listening-erased',{detail:{accountId:owner}})),account.id);
+  await expect(hero).toHaveCount(0);await page.clock.runFor(50);await expect(hero).toHaveCount(0);
+  checks.push('Other accounts cannot invalidate this hero; erasure immediately removes the old recommendation even while requests fail');
+  view.allowFeed();await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect(hero).toHaveCount(1);
+  const restored=await hero.getAttribute('data-song-id');
+  await hero.getByRole('button',{name:/^Play /}).click();await page.waitForFunction(()=>window.__gardenAudio?.currentTime>.1);
+  await page.getByRole('button',{name:'About recommendations',exact:true}).focus();
+  const playingRequests=view.network.filter(item=>item.path==='/api/v2/feed/hero').length;await page.clock.fastForward(601000);
+  await expect.poll(()=>view.network.filter(item=>item.path==='/api/v2/feed/hero').length).toBeGreaterThan(playingRequests);
+  assert.equal(await hero.getAttribute('data-song-id'),restored,'The playing hero must keep its pause control until listening stops');
+  await hero.getByRole('button',{name:/^Pause /}).click();await page.getByRole('button',{name:'About recommendations',exact:true}).focus();await page.clock.runFor(20);
+  await expect.poll(()=>hero.getAttribute('data-song-id')).not.toBe(restored);
+  checks.push('An actively playing hero retains the same song and pause control during refresh, then updates when playback stops');
+  await view.load('/discover');await expect(hero).toHaveCount(1);
+  assert.notEqual(await hero.getAttribute('data-song-id'),restored);
+  checks.push('Reconnection restores a current recommendation and Discover receives its own song');
+  assert.deepEqual(errors,[]);await fs.writeFile('.local/hero-recommendations-browser-report.json',JSON.stringify({checks,errors,fixture:'Signed synthetic account and intercepted APIs; Playwright clock advances ten minutes without real listener mutations.'},null,2));console.log(JSON.stringify({checks,errors},null,2));
+ }finally{await browser.close();}
+ process.exit(0);
 }
 if(process.env.SAKURA_VERIFY_ARTIST_NAV==='1'){
  try{

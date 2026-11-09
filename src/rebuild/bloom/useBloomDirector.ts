@@ -1,8 +1,8 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import type {BloomRecap} from "./uiTypes";
-import {chapterHold,resumeBloomIndex} from "./story";
-import {sameBloomStory,mergeBloomRefresh} from "./refresh";
+import {chapterHold} from "./story";
+import {sameBloomStory,mergeBloomRefresh,bloomProgressRecord,restoredBloomIndex} from "./refresh";
 
 export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initial:BloomRecap;onReveal:(id:string)=>Promise<BloomRecap>;onComplete:()=>Promise<BloomRecap>;storageKey?:string}){
  const [recap,setRecap]=useState(initial),[index,setIndex]=useState(0),[begun,setBegun]=useState(false),[finished,setFinished]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[autoplay,setAutoplay]=useState(false),[paused,setPaused]=useState(false),[reading,setReading]=useState(false),[hidden,setHidden]=useState(false),[elapsed,setElapsed]=useState(0);
@@ -24,12 +24,13 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
   try{const chapter=current.chapters[target];const result=chapter.revealed?current:await callbacks.current.onReveal(chapter.id);
    if(!alive.current||epoch!==generation.current)return;
    if(!sameBloomStory(current,result)||result.chapters[target]?.id!==chapter.id||!result.chapters[target]?.revealed)throw new Error("This part of your Bloom has changed. Open the story again to continue.");
-   state.current={recap:result,index:target,begun:true,finished:false};failedAction.current=null;
-   clock.current={index:target,elapsed:0};setRecap(result);setIndex(target);setBegun(true);setFinished(false);setElapsed(0);
-   if(storageKey)try{localStorage.setItem(storageKey,JSON.stringify({index:target,version:result.version||1}));}catch{}
+   const merged=mergeBloomRefresh(state.current.recap,result);
+   state.current={recap:merged,index:target,begun:true,finished:false};failedAction.current=null;
+   clock.current={index:target,elapsed:0};setRecap(merged);setIndex(target);setBegun(true);setFinished(false);setElapsed(0);
+   if(storageKey)try{localStorage.setItem(storageKey,JSON.stringify(bloomProgressRecord(merged,target)));}catch{}
   }catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={target};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
  },[storageKey]);
- const begin=useCallback(()=>{let saved=0;if(storageKey)try{saved=Number(JSON.parse(localStorage.getItem(storageKey)||"{}").index)||0;}catch{}return enter(resumeBloomIndex(state.current.recap,saved));},[enter,storageKey]);
+ const begin=useCallback(()=>{let stored:unknown;if(storageKey)try{stored=JSON.parse(localStorage.getItem(storageKey)||"{}");}catch{}return enter(restoredBloomIndex(state.current.recap,stored));},[enter,storageKey]);
  const next=useCallback(async()=>{
   if(lock.current)return;const current=state.current;
   if(!current.begun){await begin();return;}
@@ -42,7 +43,7 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
  useEffect(()=>{
   if(!autoplay||paused||reading||hidden||busy||!begun||finished)return;
   if(clock.current.index!==index)clock.current={index,elapsed:0};
-  const activeClock=clock.current,started=performance.now(),hold=chapterHold(recap.chapters[index]);
+  const activeClock=clock.current,started=performance.now(),hold=chapterHold(recap.chapters[index],recap.experience);
   const timer=setTimeout(()=>void next(),Math.max(0,hold-clock.current.elapsed));
   return()=>{clearTimeout(timer);activeClock.elapsed+=performance.now()-started;if(alive.current&&clock.current===activeClock)setElapsed(activeClock.elapsed);};
  },[autoplay,paused,reading,hidden,busy,begun,finished,index,recap,next]);

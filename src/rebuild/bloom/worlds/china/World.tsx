@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
@@ -203,11 +205,11 @@ function ScrollMount({ id }: { id:string }) {
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
   const id=`ink-${useId().replace(/[^a-zA-Z0-9]/g,"")}`;
   const shot=shots[scene],tier=detail[quality],opening=scene==="opening"||view==="cover",still=reducedMotion||quality===1||view!=="story";
   const growth=Math.min(1,Math.max(0,progress)),hour=listening?.peakHour,style={"--ink-dawn":`${hour == null ? growth*.22 : .03 + Math.max(0, stableSin((hour - 6) / 12 * Math.PI)) * .19}`,"--ink-growth":`${.85+growth*.15}`} as CSSProperties;
-  return <div className={s.world} data-scene={scene} data-shot={shot} data-quality={quality} data-motion={still?"still":"full"} data-opening={opening} data-view={view} data-theme={theme} style={style}>
+  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-shot={shot} data-quality={quality} data-motion={still?"still":"full"} data-opening={opening} data-view={view} data-theme={theme} style={style}>
     {view!=="poster"&&<svg className={s.definitions} aria-hidden="true"><Definitions id={id} tier={tier}/></svg>}
     <svg className={s.scrollArt} viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
       <ScrollMount id={id}/>
@@ -218,7 +220,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     <svg className={s.portraitArt} viewBox="0 0 480 960" preserveAspectRatio="none" aria-hidden="true">{view==="poster"&&<Definitions id={id} tier={tier}/>}<path d="M0 0H480V960H0Z" fill="var(--ink-paper)"/><path d="M0 0H480V960H0Z" fill={`url(#${id}-fibres)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={view==="poster"?"var(--ink-silk)":`url(#${id}-silk)`}/><path d="M0 0H19V960H0ZM461 0H480V960H461Z" fill={`url(#${id}-brocade)`}/><path d="M17 0V960M463 0V960" stroke="var(--ink-trunk)" strokeWidth=".7" opacity=".44"/><g className={s.paintedWorld} key={`portrait-${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot} portrait quality={quality} listening={listening}/></g></svg>
     <div className={s.dawnLight} aria-hidden="true"/>
     {(opening||view==="poster")&&<div className={s.titleArtwork} aria-hidden="true"><InkTitle/><BloomLettering className={s.subtitle} text="RIVER OF INK" style="brush"/><div className={s.titleRule}/></div>}
-    <div className={s.content}>{children}</div>
+    <div className={s.content}><ListeningPainting world="china" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     {tier.washes>0&&!still&&<div className={s.inkWashes} key={`washes-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.washes},(_,n)=><svg key={n} viewBox="0 0 210 95" style={{left:`${n%2?78+grain(n)*14:4+grain(n)*12}%`,top:`${14+grain(n*7)*64}%`,width:`${70+grain(n*3)*94}px`,"--arrival":`${n*.075}s`,"--tilt":`${grain(n*17)*24-12}deg`} as CSSProperties}><path d="M0 66Q17 52 44 35L65 29 79 8 92 17 112 9 149 41 184 47 210 67Q165 77 149 70L106 86 43 78Z" fill="var(--ink-mountain)" opacity=".12"/></svg>)}</div>}
     {tier.mist>0&&<div className={s.mistPassage} key={`mist-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.mist},(_,n)=><svg key={n} viewBox="0 0 700 95" style={{left:`${n%2?57:-3}%`,top:`${32+n*8}%`,width:`${39+grain(n)*17}%`,"--arrival":`${n*.11}s`,"--drift":`${n%2?19:-19}px`} as CSSProperties}><path d="M0 73Q112 60 143 48Q212 24 291 39Q384 57 450 31Q514 12 597 38Q651 57 700 64Q597 76 506 61Q427 55 342 79Q219 104 107 80Z" fill="var(--ink-paper)" opacity=".76"/></svg>)}</div>}
     {tier.flecks>0&&<div className={s.paperFlecks} key={`flecks-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.flecks},(_,n)=><i key={n} style={{left:`${n%2?81+grain(n*13)*12:7+grain(n*19)*9}%`,top:`${22+grain(n*5)*51}%`,"--arrival":`${.5+n*.09}s`,"--fall":`${11+grain(n*29)*12}px`} as CSSProperties}/>)}</div>}

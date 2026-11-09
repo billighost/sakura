@@ -140,3 +140,11 @@
   .edgeMark{left:10%;bottom:5%}
 }
 @media(prefers-reduced-motion:reduce){.world *,.world *::before,.world *::after{animation:none!important;transition:none!important}}
+
+/* A saved edition chooses its illustrated camera without moving the reading column. */
+.world[data-experience="0"] .painting { translate:-1% .6%; scale:1.025; }
+.world[data-experience="1"] .painting { translate:-2.4% 1.1%; scale:1.055; }
+.world[data-experience="2"] .painting { translate:2.2% -1%; scale:1.05; }
+.world[data-experience="3"] .painting { translate:.5% 1.7%; scale:1.07; }
+
+.world[data-experience][data-scene="time"] .content,.world[data-experience][data-scene="pattern"] .content { display:flex; flex-direction:column; align-items:stretch; }

@@ -14,6 +14,7 @@ import { VolumeControl } from "./ListeningControls";
 import { AudioTechnologySettings } from "../audio/AudioTechnologySettings";
 import { BloomPerformanceSettings } from "../bloom/BloomPerformanceSettings";
 import { BloomShelf } from "../bloom/BloomPage";
+import { BloomPromotion } from "../bloom/BloomPromotion";
 import { planOfflineMixes } from "../recommendations/situations";
 import { groupArtistCards } from "../data/artistSelection";
 import type {ProviderReference} from "../core/types";
@@ -46,7 +47,7 @@ function ResourceBody({resource,children}:{resource:ReturnType<typeof useApi>;ch
 type Mix={surfaces?:string[];situation?:string;slot?:string;id:string;name:string;description?:string;coverUrls?:string[];trackCount?:number;status?:string;playability?:string;reason?:string};
 function MixCard({mix}:{mix:Mix}){const p=useMusic();const [busy,setBusy]=useState(false);const actions=useScreenActions(p.account?.id,mix.id);async function play(){const controller=actions.begin("play");if(!controller)return;setBusy(true);try{const data=await requestJson("/api/v2/mixes/"+encodeURIComponent(mix.id),{signal:controller.signal},{context:"playback",accountId:p.account?.id});if(!actions.current("play",controller))return;const tracks=list(data.recordings||data.tracks);if(!tracks.length)throw new Error("This mix is not ready yet. Choose another mix or browse the catalog.");p.play(tracks[0],tracks);}catch(e){if(actions.current("play",controller))p.reportError(e,"playback",()=>void play());}finally{if(actions.finish("play",controller))setBusy(false);}}return <article className={s.mixCard}><Link href={"/mix/"+mix.id} className={s.mixArtwork}>{mix.coverUrls?.length?<div className={s.coverGrid}>{mix.coverUrls.slice(0,4).map((url,i)=><Artwork key={url+i} url={url} title={mix.name}/>)}</div>:<div className={s.mixFallback}><Branch/><span>{mix.name}</span></div>}<span className={s.mixStamp}>sakura selects</span></Link><div><Link href={"/mix/"+mix.id}>{mix.name}</Link><IconButton icon="play" label={"Play "+mix.name} disabled={busy||mix.playability==="unavailable"||mix.status==="insufficient-candidates"} onClick={()=>void play()}/></div><p>{mix.description||"A different path through your music."}</p></article>;}
 function MixShelf(){const resource=useApi("/api/v2/mixes");const mixes=((resource.data?.mixes||[]) as Mix[]).filter(mix=>mix.status==="ready").slice(0,6);return mixes.length?<section aria-label="Listening collections"><SectionTitle title="Music for different moments" note="Short sessions, favorite genres, and familiar artists."/><div className={s.mixGrid}>{mixes.map(mix=><MixCard key={mix.id} mix={mix}/>)}</div></section>:null;}
-function Home(){return <PersonalizedFeed surface="home"><BloomShelf/><MixShelf/></PersonalizedFeed>;}
+function Home(){return <><BloomPromotion/><PersonalizedFeed surface="home"><BloomShelf/><MixShelf/></PersonalizedFeed></>;}
 
 function Search(){
  const p=useMusic(),query=useSearchParams(),router=useRouter(),urlQuery=query.get("q")||"";

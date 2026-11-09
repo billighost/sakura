@@ -34,6 +34,20 @@ function setup(options:{data?:Uint8Array;storage?:MemoryStorage;delay?:number;li
 async function until(condition:()=>boolean,timeout=2000){const end=Date.now()+timeout;while(!condition()){if(Date.now()>end)throw new Error("Condition did not become true");await new Promise(resolve=>setTimeout(resolve,5));}}
 async function withoutWebLocks(operation:()=>Promise<void>){const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator");Object.defineProperty(globalThis,"navigator",{value:{onLine:true},configurable:true});try{await operation();}finally{if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}}
 
+test("the first verified playback chunk has a persisted audio format before its reader wakes",async()=>{
+ class PlaybackStorage extends MemoryStorage {
+  formats:Array<string|undefined>=[];
+  async putChunk(id:string,chunk:DownloadChunk){this.formats.push(this.records.get(id)?.mimeType);await super.putChunk(id,chunk);}
+ }
+ const storage=new PlaybackStorage(),f=setup({storage,delay:20});
+ try{
+  void f.manager.enqueue(track("1"),{mode:"playback",requested:false}).catch(()=>{});
+  const chunk=await f.manager.ensureChunk("1",0);
+  assert.equal(chunk?.blob.type,"audio/mpeg");assert.equal(storage.formats[0],"audio/mpeg");
+  assert.equal((await storage.read("1"))?.mimeType,"audio/mpeg");assert.equal(storage.audio.has("1"),false);
+ }finally{f.manager.dispose();}
+});
+
 test("range reader rejects shifted/unknown totals and HTML, accepts whole200 only at zero",async()=>{
  const signal=new AbortController().signal,data=bytes(4),headers={"Content-Type":"audio/mpeg","Content-Range":"bytes 0-3/4","Content-Length":"4"};
  const good=await readAudioRange(new Response(data,{status:206,headers}),0,3,4,signal);assert.equal(good.whole,false);

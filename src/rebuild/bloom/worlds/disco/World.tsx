@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomWorldProps } from "../types";
@@ -206,11 +208,11 @@ function Valance({ quality }: { quality: BloomWorldProps["quality"] }) {
   </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
   const id = `disco-${useId().replace(/:/g, "")}`;
   const shot = scene === "opening" ? "entrance" : scene === "finale" ? "dawn" : ["songs", "discoveries", "returns", "breadth"].includes(scene) ? "lounge" : ["artist", "artist-songs", "artists", "song-winner"].includes(scene) ? "stage" : "chandelier";
   const growth = Math.min(1, Math.max(0, stage / 14));
-  return <div className={s.world} data-world="disco" data-scene={scene} data-shot={shot} data-quality={quality} data-reduced-motion={reducedMotion} data-view={view} data-theme={theme} style={{ "--disco-progress": Math.min(1, Math.max(0, progress)), "--disco-growth": growth } as CSSProperties}>
+  return <div className={s.world} data-experience={experience?.composition} data-world="disco" data-scene={scene} data-shot={shot} data-quality={quality} data-reduced-motion={reducedMotion} data-view={view} data-theme={theme} style={{ "--disco-progress": Math.min(1, Math.max(0, progress)), "--disco-growth": growth } as CSSProperties}>
     <div className={s.backdrop}><Architecture id={id} quality={quality} growth={growth} /></div>
     <div className={s.roseWash} aria-hidden="true" />
     <div className={s.afterhours} aria-hidden="true" />
@@ -230,7 +232,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
         <BloomLettering text="DISCO" style="deco" className={s.titleSecond} />
         <span className={s.titleEdition}>SAKURA BLOOM · VELVET EDITION</span>
       </div>}
-      <div className={s.content}>{children}</div>
+      <div className={s.content}><ListeningPainting world="disco" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     </div>
     <svg className={s.signature} viewBox="0 0 200 68" aria-hidden="true"><path d="M8 43H62M138 43H192" stroke="#cead8d" strokeWidth=".7" /><Fan x={100} y={45} size={.38} detail={11} /><path d={ornament} transform="translate(100 40) scale(.27)" fill="none" stroke="#e4c6a2" strokeWidth="1.7" /></svg>
     <div className={s.vignette} aria-hidden="true" />

@@ -1,5 +1,7 @@
 "use client";
 
+import { ListeningPainting } from "../illustrations/ListeningPainting";
+
 import { useId, type CSSProperties } from "react";
 import { BloomLettering } from "../Lettering";
 import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
@@ -246,7 +248,7 @@ function shotFor(scene: BloomSceneKind) {
   return "alcove";
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
   const id = `korea-${useId().replace(/:/g, "")}`;
   const journey = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
   const evening = listening?.peakHour != null ? listening.peakHour / 23 : journey;
@@ -254,7 +256,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const opening = scene === "opening" || view === "cover";
   const shot = view === "poster" ? "screen" : shotFor(scene);
   const style = { "--evening": evening, "--world-travel": `${(evening - .5) * 5}%`, "--world-accent": "#a76155" } as CSSProperties;
-  return <div className={s.world} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || view === "poster" ? "still" : "full"} data-opening={opening} data-listening={Boolean(listening)} data-gold-bindings={listening?.returningRecordingCount == null ? undefined : Math.min(detail.books,listening.returningRecordingCount)} data-fresh-bookmarks={listening?.discoveredRecordingCount == null ? undefined : Math.min(detail.books,listening.discoveredRecordingCount)} style={style}>
+  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || view === "poster" ? "still" : "full"} data-opening={opening} data-listening={Boolean(listening)} data-gold-bindings={listening?.returningRecordingCount == null ? undefined : Math.min(detail.books,listening.returningRecordingCount)} data-fresh-bookmarks={listening?.discoveredRecordingCount == null ? undefined : Math.min(detail.books,listening.discoveredRecordingCount)} style={style}>
     <div className={s.paintedRoom} aria-hidden="true"><PaintedScreen id={id} detail={detail} quality={quality} evening={evening} listening={listening}/></div>
     <div className={s.eveningLight} aria-hidden="true"/>
     <Pine side="left" quality={quality} detail={detail}/><Pine side="right" quality={quality} detail={detail}/>
@@ -263,7 +265,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     <div className={s.tiger} aria-hidden="true"><Tiger rich={quality >= 3}/></div>
     <div className={s.readingSpace}>
       {(opening || view === "poster") && <div className={s.drawnTitle} aria-hidden="true"><CourtyardTitle/><BloomLettering text="PAINTED COURTYARD" style="paper" className={s.titleSecond}/></div>}
-      <div className={s.content}>{children}</div>
+      <div className={s.content}><ListeningPainting world="korea" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     </div>
     {!opening && <div className={s.signature} aria-hidden="true"><BloomLettering text="PAINTED COURTYARD" style="paper"/></div>}
     {detail.dust > 0 && <div className={s.paperDust} aria-hidden="true">{Array.from({ length: detail.dust }, (_, i) => <i key={i} style={{ left: `${15 + seed(i + 344) * 70}%`, top: `${12 + seed(i + 381) * 71}%`, "--delay": `${-i * .83}s`, "--float": `${8 + seed(i + 421) * 19}px`, "--size": `${1 + seed(i + 401) * 2}px` } as CSSProperties}/>)}</div>}
