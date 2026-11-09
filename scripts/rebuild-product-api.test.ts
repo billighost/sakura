@@ -85,6 +85,7 @@ async function main(){
     const totals=await first.json("/api/v2/profile");assert.equal(totals.data.stats.audibleMs,5000);assert.equal(totals.data.stats.playCount,1);
     const mix=home.data.mixes.find((m:{status:string})=>m.status==="ready");assert.ok(mix);
     const mixResult=await first.json("/api/v2/mixes/"+mix.id);assert.equal(mixResult.response.status,200);assert.ok(mixResult.data.recordings.length>0);assert.equal(mixResult.data.playability,"resolvable");
+    const mixPlaylist=await first.json("/api/v2/playlists","POST",{name:mix.name,requestId:randomUUID(),recordingIds:mixResult.data.recordings.slice(0,5).map((recording:{recordingId:string;id:string})=>recording.recordingId||recording.id)});assert.equal(mixPlaylist.response.status,200);assert.equal(mixPlaylist.data.trackCount,Math.min(5,mixResult.data.recordings.length));
     assert.equal((await second.json("/api/v2/mixes/"+mix.id)).response.status,404);
     const search=await first.json("/api/v2/search?q=Bruno%20Mars");assert.equal(search.response.status,200);
     assert.ok(search.data.artists[0].id.startsWith("deezer:"));

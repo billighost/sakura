@@ -9,7 +9,7 @@ import ts from "typescript";
 const accountId="90000000-0000-4000-8000-000000000001",recordingId="80000000-0000-4000-8000-000000000001",assetId="81000000-0000-4000-8000-000000000001",token="82000000-0000-4000-8000-000000000001";
 const source=readFileSync(new URL("../public/sw.js",import.meta.url),"utf8");
 async function hash(bytes:Uint8Array){return Buffer.from(await webcrypto.subtle.digest("SHA-256",bytes)).toString("hex");}
-async function fixture(options:{ready?:boolean;manager?:boolean}={}){
+async function fixture(options:{ready?:boolean;manager?:boolean;managerStatus?:string}={}){
  const bytes=Uint8Array.from({length:590001},(_,index)=>(index*17+index%29)%256),sha256=await hash(bytes),entries=new Map<string,unknown>(),network:Array<{start:number;end:number}>=[],joined:number[]=[];
  const prefix=`account:${accountId}:`,fingerprint={assetId,sizeBytes:bytes.length,sha256};
  const bridge={accountId,recordingId,...fingerprint,fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`,mimeType:"audio/mpeg"};
@@ -18,7 +18,7 @@ async function fixture(options:{ready?:boolean;manager?:boolean}={}){
  async function save(offset:number){const data=bytes.slice(offset,offset+262144);entries.set(prefix+"chunk:"+recordingId+":"+offset,{offset,blob:new Blob([data],{type:"audio/mpeg"}),sha256:await hash(data)});}
  await save(0);
  if(options.ready)entries.set(prefix+"audio:"+recordingId,{track:{id:recordingId},blob:new Blob([bytes],{type:"audio/mpeg"}),sizeBytes:bytes.length,sha256});
- const client={postMessage(data:{type:string;offset:number},ports:MessagePort[]){if(data.type!=="sakura-audio-chunk")return;void(async()=>{if(options.manager){joined.push(data.offset);await save(data.offset);ports[0].postMessage({status:"ready"});}else ports[0].postMessage({status:"unavailable"});ports[0].close();})();}};
+  const client={postMessage(data:{type:string;offset:number},ports:MessagePort[]){if(data.type!=="sakura-audio-chunk")return;void(async()=>{if(options.manager){joined.push(data.offset);await save(data.offset);ports[0].postMessage({status:"ready"});}else ports[0].postMessage({status:options.managerStatus||"unavailable"});ports[0].close();})();}};
  const handlers=new Map<string,(event:unknown)=>void>();
  const context=vm.createContext({self:{location:{origin:"https://sakura.example"},clients:{get:async()=>client},addEventListener(name:string,handler:(event:unknown)=>void){handlers.set(name,handler);},skipWaiting(){},},indexedDB:{},crypto:webcrypto,Blob,Uint8Array,Response,Request,Headers,ReadableStream,AbortController,DOMException,MessageChannel,setTimeout,clearTimeout,URL,
   async fetch(_url:URL,init:RequestInit){const range=/^bytes=(\d+)-(\d+)$/.exec(new Headers(init.headers).get("Range")||"")!;const start=Number(range[1]),end=Number(range[2]);network.push({start,end});return new Response(bytes.slice(start,end+1),{status:206,headers:{"Content-Type":"audio/mpeg","Content-Range":`bytes ${start}-${end}/${bytes.length}`}});},
@@ -41,6 +41,16 @@ test("progressive audio serves persisted prefix and fetches only missing aligned
 test("progressive playback joins manager chunk flights rather than creating duplicate fetches",async()=>{
  const f=await fixture({manager:true}),response=await f.serve();
  assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes);assert.deepEqual(f.joined,[262144,524288]);assert.deepEqual(f.network,[]);
+});
+
+test("a transient page chunk failure falls back to the exact gateway without ending playback",async()=>{
+ const f=await fixture({managerStatus:"failed"}),response=await f.serve("bytes=262144-262999");
+ assert.equal(response.status,206);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(262144,263000));assert.deepEqual(f.network,[{start:262144,end:524287}]);
+});
+
+test("an integrity chunk failure never falls through to unverified gateway bytes",async()=>{
+ const f=await fixture({managerStatus:"invalid"}),response=await f.serve("bytes=262144-262999");
+ assert.equal(response.status,503);assert.deepEqual(f.network,[]);
 });
 
 test("client capabilities cannot expose another tab or expired account source",async()=>{
@@ -109,15 +119,19 @@ test("a late helper registration acknowledgement cannot recreate a revoked accou
  const fresh=partial(accountId,input);assert.equal(pending.length,2,"A fresh request must register again rather than reuse the revoked lease");pending[1].port.postMessage({status:"ready",version:1});pending[1].port.close();assert.match((await fresh)!,/^\/_sakura\/audio\//);revoke();
 });
 
-test("the page bridge reports an unavailable manager chunk instead of claiming it is ready",async()=>{
+test("the page bridge distinguishes transient manager failures from recording-integrity failures",async()=>{
  const pending:Array<{data:{type:string;token:string};port:MessagePort}>=[],listeners=new Map<string,(event:{data:{type:string;token:string;requestId:string;offset:number};ports:Array<{postMessage:(value:{status:string})=>void;close:()=>void}>})=>void>(),exports:Record<string,unknown>={};
  const controller={postMessage(data:{type:string;token:string},ports?:MessagePort[]){if(data.type==="sakura-audio-register")pending.push({data,port:ports![0]});}};
  const serviceWorker={controller,addEventListener(name:string,listener:(event:{data:{type:string;token:string;requestId:string;offset:number};ports:Array<{postMessage:(value:{status:string})=>void;close:()=>void}>})=>void){listeners.set(name,listener);}};
  const context=vm.createContext({exports,module:{exports},navigator:{serviceWorker},location:{origin:"https://sakura.example"},crypto:webcrypto,MessageChannel,setTimeout,clearTimeout,URL,AbortController});
  const js=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/partialPlayback.ts",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInContext(js,context);
- const partial=exports.partialPlaybackUrl as (id:string,source:unknown,ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>Promise<string|undefined>,revoke=exports.revokePartialPlayback as ()=>void;
+  const partial=exports.partialPlaybackUrl as (id:string,source:unknown,ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>Promise<string|undefined>,revoke=exports.revokePartialPlayback as ()=>void;
  const input={track:{id:recordingId},assetId,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`};
- const registration=partial(accountId,input,async()=>undefined);pending[0].port.postMessage({status:"ready",version:1});pending[0].port.close();const address=await registration,registeredToken=address!.split("/").at(-1)!;
- const replies:string[]=[];listeners.get("message")!({data:{type:"sakura-audio-chunk",token:registeredToken,requestId:"range-1",offset:0},ports:[{postMessage(value){replies.push(value.status);},close(){}}]});
- await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(replies,["unavailable"]);revoke();
+  const cases=[{error:undefined,status:"unavailable"},{error:new Error("Temporary network failure"),status:"unavailable"},{error:Object.assign(new Error("Fingerprint mismatch"),{name:"DownloadIntegrityError"}),status:"invalid"}];
+  for(const [index,item] of cases.entries()){
+   const registration=partial(accountId,input,async()=>{if(item.error)throw item.error;return undefined;});pending[index].port.postMessage({status:"ready",version:1});pending[index].port.close();const address=await registration,registeredToken=address!.split("/").at(-1)!;
+   const replies:string[]=[];listeners.get("message")!({data:{type:"sakura-audio-chunk",token:registeredToken,requestId:"range-"+index,offset:0},ports:[{postMessage(value){replies.push(value.status);},close(){}}]});
+   await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(replies,[item.status]);
+   revoke();
+  }
 });

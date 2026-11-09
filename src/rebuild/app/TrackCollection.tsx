@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useMusic } from "./MusicContext";
 import { TrackList } from "./Elements";
-import { CollectionToolbar, sortRoomTracks, useRoomLayout, type RoomSort, type RoomSortDirection } from "./CollectionRoom";
+import { CollectionToolbar, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
 import type { MusicTrack } from "./types";
 
 /** Shared presentation controls for catalog lists and collection previews. */
@@ -15,14 +14,13 @@ export function TrackCollection({ tracks, room, label, firstSortLabel = "Origina
  dateSortLabel?: string;
 }) {
  const music = useMusic();
- const [layout, setLayout] = useRoomLayout(music.account?.id, room);
- const [sort, setSort] = useState<RoomSort>("kept");
- const [direction, setDirection] = useState<RoomSortDirection>("asc");
+ const [presentation, setPresentation] = useRoomPresentation(music.account?.id, room);
+ const {layout,sort,direction}=presentation;
  const unique = [...new Map(tracks.map(track => [music.effectiveId(track), track])).values()];
  const ordered = sortRoomTracks(unique, sort, direction);
 
  return <section aria-label={label}>
-  <CollectionToolbar layout={layout} onLayout={setLayout} sort={sort} onSort={setSort} direction={direction} onDirection={setDirection} count={ordered.length} firstSortLabel={firstSortLabel} dateSortLabel={dateSortLabel}/>
+  <CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={ordered.length} firstSortLabel={firstSortLabel} dateSortLabel={dateSortLabel}/>
   <TrackList tracks={ordered} layout={layout} dateLabel={dateSortLabel}/>
  </section>;
 }

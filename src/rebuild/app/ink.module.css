@@ -103,3 +103,12 @@
 .playerBar{z-index:20}
 .playerError{display:block;width:min(480px,calc(100vw - 24px));max-height:calc(100dvh - 110px);overflow:auto;overscroll-behavior:contain;border-radius:18px}
 @media(max-width:650px){.playerError{max-height:calc(100dvh - 160px - env(safe-area-inset-bottom,0px))}}
+
+/* Toggle controls read as small pressed paper seals instead of only changing ink colour. */
+.iconButton{position:relative;isolation:isolate;transition:color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease,border-radius .18s ease}
+.iconButton.active{color:var(--ink-accent);background:linear-gradient(135deg,color-mix(in srgb,var(--ink-petal) 22%,var(--ink-card)),color-mix(in srgb,var(--ink-accent) 8%,var(--ink-surface)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink-accent) 48%,var(--ink-line)),0 3px 10px color-mix(in srgb,var(--ink-petal) 16%,transparent);border-radius:65% 35% 62% 38%;transform:rotate(-2deg)}
+.iconButton.active::after{content:"";position:absolute;right:1px;bottom:1px;width:7px;height:10px;border-radius:70% 25% 70% 25%;background:var(--ink-petal);box-shadow:0 0 0 2px var(--ink-bg);transform:rotate(30deg);z-index:1;pointer-events:none}
+.iconButton.active svg{fill:color-mix(in srgb,var(--ink-accent) 24%,transparent);filter:drop-shadow(0 1px 0 color-mix(in srgb,var(--ink-bg) 65%,transparent))}
+.repeatControl{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.repeatControl>b{position:absolute;right:-1px;top:-3px;z-index:2;display:grid;place-items:center;width:14px;height:14px;border-radius:65% 35% 65% 35%;background:var(--ink-accent);color:var(--ink-on);box-shadow:0 0 0 2px var(--ink-bg);font:700 8px/1 var(--font-inter),Arial,sans-serif;pointer-events:none}
+@media(prefers-reduced-motion:reduce){.iconButton{transition:none}.iconButton.active{transform:none}}

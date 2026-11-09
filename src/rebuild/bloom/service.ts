@@ -6,7 +6,7 @@ import { ProductError,text } from "../data/validation";
 import { bloomWindow,bloomWindows,validTimeZone,DEFAULT_BLOOM_TIME_ZONE,type BloomWindow,type BloomPeriod } from "./calendar";
 
 import {buildBloomSnapshot,discloseBloomChapter,type BloomSnapshot,type SavedBloomChapter} from "./snapshot";
-import {bloomDesignForMonth,legacyBloomDesignForMonth} from "./design";
+import {bloomDesignForItem,legacyBloomDesignForMonth} from "./design";
 import {bloomArtistKey,discloseBloomListening} from "./listening";
 import type {BloomShelfItem} from "./uiTypes";
 export type BloomChapter = SavedBloomChapter;
@@ -16,6 +16,7 @@ function requireAvailable(item:BloomWindow){
   if(item.status==="locked")throw new ProductError(423,"This Bloom opens after the listening period ends");
   if(item.status==="expired")throw new ProductError(410,"This Bloom window has closed");
 }
+function fallbackWorld(item:BloomWindow,version:number){return version===1?legacyBloomDesignForMonth(item.periodStart,item.timeZone):bloomDesignForItem({...item,version});}
 async function snapshot(accountId:string,item:BloomWindow,client:PoolClient):Promise<BloomSnapshot>{
   const previous=bloomWindows(item.period,new Date(item.periodStart),item.timeZone)[0];
   const args=[accountId,item.periodStart,item.periodEnd,previous.periodStart];
@@ -57,7 +58,7 @@ async function snapshot(accountId:string,item:BloomWindow,client:PoolClient):Pro
 function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at?:Date|string}) {
   const revealed=new Set(row.revealed_chapters);
   const kinds=new Set(row.snapshot.chapters.filter(chapter=>revealed.has(chapter.id)).flatMap(chapter=>[chapter.kind||"",chapter.id]));
-  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||((row.snapshot.version||1)>=2?bloomDesignForMonth:legacyBloomDesignForMonth)(item.periodStart,item.timeZone),status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
+  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||fallbackWorld(item,row.snapshot.version||1),status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
     snapshotCreatedAt:row.created_at?new Date(row.created_at).toISOString():undefined,
     listening:discloseBloomListening(row.snapshot.listening,kinds,Boolean(row.completed_at)),
     chapters:row.snapshot.chapters.map(c=>discloseBloomChapter(c,revealed.has(c.id))),
@@ -76,7 +77,8 @@ export async function listBloom(accountId:string,rawPeriod:string|null,now=new D
       count=(await snapshot(accountId,item,client)).chapters.length;
       if(!count)status="empty";
     }else if(status==="available"&&!count)status="empty";
-    items.push({...effective,version:saved?saved.snapshot.version||1:3,worldId:saved?.snapshot?.worldId||(saved&&(saved.snapshot.version||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),status,chapterCount:count,completed:Boolean(saved?.completed_at),listening:saved?.completed_at?saved.snapshot.listening:undefined,teaser:status==="locked"?"This story opens after the listening period ends.":status==="empty"?"No dated listening was recorded during this period.":"A story made from the music recorded in this period."});
+    const version=saved?saved.snapshot.version||1:3;
+    items.push({...effective,version,worldId:saved?.snapshot?.worldId||fallbackWorld(effective,version),status,chapterCount:count,completed:Boolean(saved?.completed_at),listening:saved?.completed_at?saved.snapshot.listening:undefined,teaser:status==="locked"?"This story opens after the listening period ends.":status==="empty"?"No dated listening was recorded during this period.":"A story made from the music recorded in this period."});
   }
   return {items,schedule:{timeZone,weekStartsOn:"monday",weeklyAvailableThrough:"saturday",monthlyClosesDaysBeforeNextMonth:7}};
   });
@@ -104,7 +106,7 @@ export async function listBloomShelf(accountId:string,now=new Date()){
     if(!hasListening)status="empty";
    }
    items.push({...effective,status,version:row?Number(row.version)||1:3,
-    worldId:row?.world_id||(row&&(Number(row.version)||1)===1?legacyBloomDesignForMonth:bloomDesignForMonth)(effective.periodStart,effective.timeZone),
+    worldId:row?.world_id||fallbackWorld(effective,row?Number(row.version)||1:3),
     completed:Boolean(row?.completed_at),listening:row?.listening||undefined});
   }
   return {items,schedule:{timeZone}};

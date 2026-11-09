@@ -91,7 +91,10 @@ async function loadAudioChunk(capability,token,offset,size,signal){
  signal.throwIfAborted();const local=await localAudioChunk(capability,offset,size).catch(()=>undefined);if(local)return local;
  const result=await askClientForChunk(capability,token,offset,signal);
  if(result==="ready"){const saved=await localAudioChunk(capability,offset,size).catch(()=>undefined);if(saved)return saved;throw new Error("The saved audio range did not match this recording.");}
- if(result==="failed")throw new Error("The audio range could not be prepared.");
+ if(result==="invalid")throw new Error("The audio range did not match this verified recording.");
+ // `failed` is retained as a transient result for compatibility with an older
+ // page bundle during a rolling service-worker update. The gateway is scoped to
+ // this exact recording and asset and validates every returned byte interval.
  return remoteAudioChunk(capability,offset,size,signal);
 }
 async function serveDeviceAudio(request,clientId,token){

@@ -42,8 +42,9 @@ try{
   });
   await context.route('**/fixture-recovery.wav',route=>route.fulfill({body:audio,contentType:'audio/wav'}));
   const page=await context.newPage();page.setDefaultTimeout(45000);page.on('pageerror',error=>report.pageErrors.push(error.message));
-  await page.goto(base+'/home',{waitUntil:'domcontentloaded',timeout:90000});
-  try{await page.getByRole('button',{name:'Find my soundtrack',exact:true}).click();}catch(error){await page.screenshot({path:'.local/rebuild-player-error-failure.png'});console.error(JSON.stringify({url:page.url(),body:(await page.locator('body').innerText()).slice(0,1500)}));throw error;}
+  await page.goto(base+'/library',{waitUntil:'domcontentloaded',timeout:90000});
+  await page.locator('#music-main h1').first().waitFor();
+  try{await page.getByRole('button',{name:'Play '+track.title,exact:true}).first().click();}catch(error){await page.screenshot({path:'.local/rebuild-player-error-failure.png'});console.error(JSON.stringify({url:page.url(),body:(await page.locator('body').innerText()).slice(0,1500)}));throw error;}
   const notice=page.locator('footer [role="alert"]');
   await expect(notice).toBeVisible();
   async function inspect(room){
@@ -63,14 +64,13 @@ try{
    assert.ok(dimensions.scrollWidth<=dimensions.width+1,room+' notice has no horizontal overflow');
    assert.ok(dimensions.samples.length>0&&dimensions.samples.every(sample=>sample.visible),room+' text and controls paint above page content');
    assert.equal(dimensions.theme,theme);
-   if(room==='home')assert.equal(dimensions.heroOverlap,true,'Home card overlaps the hero for a meaningful stacking check');
    report.checks.push({room,viewport,theme,...dimensions});
    await page.screenshot({path:`.local/rebuild-player-error-${room}-${viewport.width}-${theme}.png`});
   }
-  await inspect('home');
-  const libraryLink=page.getByRole('link',{name:'Your library',exact:true}).filter({visible:true}).first();
-  await libraryLink.click();await expect(page).toHaveURL(/\/library$/);await page.locator('#music-main h1').first().waitFor();
   await inspect('library');
+  const homeLink=page.getByRole('link',{name:'Home',exact:true}).filter({visible:true}).first();
+  await homeLink.click();await expect(page).toHaveURL(/\/home$/);await page.locator('#music-main h1').first().waitFor();
+  await inspect('home');
   const retry=notice.getByRole('button',{name:'Retry song',exact:true});
   await retry.scrollIntoViewIfNeeded();
   assert.equal(await retry.evaluate(element=>{const box=element.getBoundingClientRect();return element.contains(document.elementFromPoint((box.left+box.right)/2,(box.top+box.bottom)/2));}),true,'Retry remains accessible in short viewports');

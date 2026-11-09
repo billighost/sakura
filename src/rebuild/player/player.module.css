@@ -123,3 +123,10 @@
 .dialog[data-reduced-motion="true"][open],.dialog[data-reduced-motion="true"][open] *, .dialog[data-reduced-motion="true"]::backdrop{animation:none!important;transition:none!important}
 .dialog[data-reduced-motion="true"]::backdrop{backdrop-filter:none}
 @media(prefers-reduced-motion:reduce){.dialog[open],.dialog[open] *, .dialog::backdrop{animation:none!important;transition:none!important}.dialog::backdrop{backdrop-filter:none}}
+
+/* Player toggles use the same pressed botanical seal language as the compact player. */
+.iconButton{position:relative;isolation:isolate;transition:color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease,border-radius .18s ease}
+.active{color:var(--p-accent)!important;background:linear-gradient(135deg,color-mix(in srgb,var(--p-petal) 24%,var(--p-card)),color-mix(in srgb,var(--p-accent) 9%,var(--p-surface)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--p-accent) 52%,var(--p-line)),0 4px 13px color-mix(in srgb,var(--p-petal) 18%,transparent);border-radius:65% 35% 62% 38%;transform:rotate(-2deg)}
+.active::after{content:"";position:absolute;right:1px;bottom:1px;width:8px;height:11px;border-radius:70% 25% 70% 25%;background:var(--p-petal);box-shadow:0 0 0 2px var(--p-bg);transform:rotate(30deg);pointer-events:none}
+.active svg{fill:color-mix(in srgb,var(--p-accent) 28%,transparent);filter:drop-shadow(0 1px 0 color-mix(in srgb,var(--p-bg) 70%,transparent))}
+@media(prefers-reduced-motion:reduce){.iconButton{transition:none}.active{transform:none}}

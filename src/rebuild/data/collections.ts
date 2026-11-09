@@ -8,11 +8,19 @@ import type {PoolClient} from "pg";
 export async function listPlaylists(accountId:string,sql:Pick<PoolClient,"query">=getRebuildPool()) {
   const rows=await sql.query(`SELECT p.id,p.name,p.description,p.cover_url AS "coverUrl",p.revision,
     p.created_at AS "createdAt",p.updated_at AS "updatedAt",COUNT(pr.recording_id)::integer AS "trackCount",
-    (SELECT r.metadata->>'coverUrl' FROM sakura_v2."PlaylistRecording" x JOIN sakura_v2."Recording" r ON r.id=x.recording_id
-      WHERE x.playlist_id=p.id ORDER BY x.position LIMIT 1) AS "firstCoverUrl"
+    (SELECT array_agg(art."coverUrl" ORDER BY art."firstPosition") FROM (
+      SELECT r.metadata->>'coverUrl' AS "coverUrl",MIN(x.position) AS "firstPosition"
+      FROM sakura_v2."PlaylistRecording" x JOIN sakura_v2."Recording" r ON r.id=x.recording_id
+      WHERE x.playlist_id=p.id AND NULLIF(r.metadata->>'coverUrl','') IS NOT NULL
+      GROUP BY r.metadata->>'coverUrl' ORDER BY MIN(x.position) LIMIT 4
+    ) art) AS "trackCoverUrls"
     FROM sakura_v2."Playlist" p LEFT JOIN sakura_v2."PlaylistRecording" pr ON pr.playlist_id=p.id
     WHERE p.account_id=$1::uuid GROUP BY p.id ORDER BY p.updated_at DESC,p.id LIMIT 200`,[accountId]);
-  return rows.rows.map(p=>({...p,revision:Number(p.revision),coverUrl:p.coverUrl||p.firstCoverUrl||null}));
+  return rows.rows.map(p=>{
+    const coverUrls=[p.coverUrl,...(Array.isArray(p.trackCoverUrls)?p.trackCoverUrls:[])].filter((url,index,all)=>typeof url==="string"&&url&&all.indexOf(url)===index).slice(0,4);
+    const {trackCoverUrls:_,...playlist}=p;void _;
+    return {...playlist,revision:Number(p.revision),coverUrl:coverUrls[0]||null,coverUrls};
+  });
 }
 export async function getLibrary(accountId:string,url:URL) {
   const {limit,cursor}=pageInput(url);
@@ -54,10 +62,24 @@ export async function setFavorite(accountId:string,value:unknown) {
 export async function createPlaylist(accountId:string,value:unknown) {
   const input=object(value),name=text(input.name,"playlist name",120),description=input.description===undefined?"":text(input.description,"description",2000,true);
   const id=input.requestId===undefined?randomUUID():uuid(input.requestId,"playlist request ID");
-  await getRebuildPool().query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(id) DO NOTHING`,[id,accountId,name,description]);
-  const row=(await getRebuildPool().query(`SELECT id,name,description,revision,created_at AS "createdAt",updated_at AS "updatedAt" FROM sakura_v2."Playlist" WHERE id=$1::uuid AND account_id=$2::uuid`,[id,accountId])).rows[0];
-  if(!row||row.name!==name||row.description!==description)throw new ProductError(409,"Playlist request has already been used");
-  return {...row,revision:Number(row.revision),trackCount:0,recordings:[],tracks:[]};
+  const recordingIds=input.recordingIds===undefined?[]:ids(input.recordingIds,2000);
+  await inTransaction(async client=>{
+    const inserted=await client.query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description)
+      VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(id) DO NOTHING RETURNING id`,[id,accountId,name,description]);
+    if(!inserted.rowCount){
+      const existing=(await client.query(`SELECT name,description FROM sakura_v2."Playlist" WHERE id=$1::uuid AND account_id=$2::uuid`,[id,accountId])).rows[0];
+      if(!existing||existing.name!==name||existing.description!==description)throw new ProductError(409,"Playlist request has already been used");
+      const existingIds=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows.map(row=>row.recording_id as string);
+      if(existingIds.length!==recordingIds.length||existingIds.some((recordingId,index)=>recordingId!==recordingIds[index]))throw new ProductError(409,"Playlist request has already been used");
+      return;
+    }
+    if(!recordingIds.length)return;
+    const recordings=await cardsForIds(accountId,recordingIds,client);
+    if(recordings.length!==recordingIds.length)throw new ProductError(404,"A selected recording is unavailable");
+    await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
+      SELECT $1::uuid,x.id,x.position-1 FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position)`,[id,recordingIds]);
+  });
+  return getPlaylist(accountId,id);
 }
 export async function getPlaylist(accountId:string,rawId:string) {
   const id=uuid(rawId,"playlist ID"),pool=getRebuildPool();
@@ -70,7 +92,8 @@ export async function getPlaylist(accountId:string,rawId:string) {
     const addedAt=dates.get(recording.id);
     return {...recording,...(addedAt?{addedAt}:{})};
   });
-  return {...playlist,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
+  const coverUrls=[playlist.coverUrl,...recordings.map(recording=>recording.coverUrl)].filter((url,index,all)=>typeof url==="string"&&url&&all.indexOf(url)===index).slice(0,4);
+  return {...playlist,coverUrl:coverUrls[0]||null,coverUrls,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
     durationMs:recordings.reduce((sum,r)=>sum+(r.durationMs||0),0)};
 }
 export async function updatePlaylist(accountId:string,rawId:string,value:unknown) {

@@ -18,6 +18,14 @@ let listening=false;
 let bridgeEpoch=0;
 const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
+function chunkFailureStatus(error:unknown):"unavailable"|"invalid"{
+ const value=error&&typeof error==="object"?error as {name?:unknown;issue?:{kind?:unknown}}:undefined;
+ // A fingerprint/range mismatch must never be hidden by another byte source.
+ // Network, timeout, storage and cancellation failures may safely fall back to
+ // the capability's exact same-origin asset gateway, which rechecks the range.
+ return value?.name==="DownloadIntegrityError"||value?.issue?.kind==="version"||value?.issue?.kind==="validation"?"invalid":"unavailable";
+}
+
 function listenForChunks(){
  if(listening)return;
  listening=true;
@@ -29,7 +37,7 @@ function listenForChunks(){
   const port=event.ports[0],lease=leases.get(data.token);
   if(!lease?.ensureChunk||typeof data.offset!=="number"||!Number.isSafeInteger(data.offset)||data.offset<0){port.postMessage({status:"unavailable"});port.close();return;}
   const controller=new AbortController();requests.set(data.requestId,controller);
-  void lease.ensureChunk(data.offset!,controller.signal).then(chunk=>port.postMessage({status:chunk===undefined?"unavailable":"ready"}),()=>port.postMessage({status:"failed"})).finally(()=>{requests.delete(data.requestId!);port.close();});
+  void lease.ensureChunk(data.offset!,controller.signal).then(chunk=>port.postMessage({status:chunk===undefined?"unavailable":"ready"}),error=>port.postMessage({status:chunkFailureStatus(error)})).finally(()=>{requests.delete(data.requestId!);port.close();});
  });
 }
 

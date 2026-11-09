@@ -40,6 +40,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 let context,page,session=null,delayMs=1200,forceSourceError=false,inFlight=0,maxInFlight=0;
 let networkAvailable=true;
 let fixtureProxy;
+const collectionViews=new Map();
 let interruptedRanges=0;
 const pageNames=new WeakMap();
 const malformedRanges=new Set();
@@ -204,6 +205,13 @@ async function fixtureApi(route){
  if(connectionOnly&&!networkAvailable){report.offlineApiRequests??=[];report.offlineApiRequests.push({path,method:request.method(),at:Date.now()});return route.abort('internetdisconnected');}
  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
  if(path==='/api/v2/settings'){if(request.method()==='PATCH')Object.assign(settings,request.postDataJSON());return route.fulfill({json:settings});}
+ if(path==='/api/v2/collection-view'){
+  if(request.method()==='PATCH'){
+   const input=request.postDataJSON(),preference={layout:input.layout,sort:input.sort,direction:input.direction,updatedAt:new Date().toISOString()};
+   collectionViews.set(String(input.room),preference);return route.fulfill({json:{room:input.room,preference}});
+  }
+  const room=new URL(request.url()).searchParams.get('room');return route.fulfill({json:{room,preference:collectionViews.get(String(room))||null}});
+ }
  if(path==='/api/v2/home')return route.fulfill({json:{featured:tracks,mixes:[],recent:[],needsOnboarding:false}});
  if(path==='/api/v2/library')return route.fulfill({json:{recordings:progressiveOnly?[...tracks,catalogAlias]:tracks,playlists:[{id:'72000000-0000-4000-8000-000000000071',name:'Notes from the garden',trackCount:6,coverUrl:cover(1)}]}});
  if(path==='/api/v2/listening-session'){
@@ -268,7 +276,11 @@ try{
  if(connectionOnly||recoveryOnly)fixtureProxy=await startFixtureProxy();
  context=await browser.newContext({viewport:{width:1440,height:960},colorScheme:'light',serviceWorkers:progressiveOnly||connectionOnly||recoveryOnly?'allow':'block'});await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(input=>{
-  sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const element=new NativeAudio(...args);window.downloadTestAudio=element;return element;};window.Audio.prototype=NativeAudio.prototype;
+  // Chromium also evaluates init scripts in the initial opaque about:blank
+  // document, where Web Storage is intentionally unavailable. Seed the app
+  // preference only after the page has a usable origin.
+  try{sessionStorage.setItem('sakura-ink-opening','1');}catch{}
+  const NativeAudio=window.Audio;window.Audio=function(...args){const element=new NativeAudio(...args);window.downloadTestAudio=element;return element;};window.Audio.prototype=NativeAudio.prototype;
   window.downloadNetworkEvents=[];for(const type of ['online','offline'])window.addEventListener(type,()=>window.downloadNetworkEvents.push({type,online:navigator.onLine,at:Date.now()}));
   if(!input.progressive)return;
   let release;const gate={target:input.target,armed:false,reached:false,released:false,promise:new Promise(resolve=>release=resolve),release:()=>{gate.released=true;release();}};window.downloadFinalizeGate=gate;
@@ -352,8 +364,8 @@ try{
   await page.getByRole('button',{name:'Change appearance',exact:true}).click();await expect.poll(()=>page.evaluate(()=>document.documentElement.dataset.inkTheme)).toBe('dark');await fit('Library dark '+width+'px');await screenshot('library-mobile-'+width+'-dark');await page.getByRole('button',{name:'Change appearance',exact:true}).click();
  }
  check('Saved songs, library layouts and mini-player fit 390px and 320px phones in light and dark themes');
- await go('/library/downloaded');await saved();const disposable=tracks[7],removeSaved=page.getByRole('button',{name:'Remove '+disposable.title+' from this device',exact:true});await removeSaved.click();let removalDialog=page.getByRole('dialog',{name:'Let this song leave the garden?',exact:true});await expect(removalDialog).toBeVisible();await expect(removalDialog.getByText(disposable.title,{exact:true})).toBeVisible();await removalDialog.getByRole('button',{name:'Keep this song',exact:true}).click();await expect(removalDialog).toHaveCount(0);await expect(removeSaved).toBeFocused();assert.equal((await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id),true,'Cancel keeps the saved audio');
- await removeSaved.click();removalDialog=page.getByRole('dialog',{name:'Let this song leave the garden?',exact:true});await page.evaluate(()=>{const original=IDBObjectStore.prototype.delete;Object.defineProperty(window,'downloadTestOriginalDelete',{value:original,configurable:true});IDBObjectStore.prototype.delete=function(){throw new DOMException('Synthetic removal failure','UnknownError');};});await removalDialog.getByRole('button',{name:'Remove download',exact:true}).click();await expect(removalDialog.locator('[role="alert"]').filter({hasText:'This download is still on your device.'})).toHaveText('This download is still on your device. Please try removing it again.');assert.equal((await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id),true,'Failed removal keeps the saved audio');await page.evaluate(()=>{IDBObjectStore.prototype.delete=window.downloadTestOriginalDelete;delete window.downloadTestOriginalDelete;});await removalDialog.getByRole('button',{name:'Remove download',exact:true}).click();await expect(removalDialog).toHaveCount(0);await expect.poll(async()=>!(await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id)).toBe(true);check('Saved-song removal uses an accessible confirmation sheet; cancel and storage failure preserve the song, while confirmation removes it');
+ await go('/library/downloaded');await saved();const disposable=tracks[7],removeSaved=page.getByRole('button',{name:'Remove '+disposable.title+' from this device',exact:true});await removeSaved.click();let removalDialog=page.getByRole('dialog',{name:'Remove this download?',exact:true});await expect(removalDialog).toBeVisible();await expect(removalDialog.getByText(disposable.title,{exact:true})).toBeVisible();await removalDialog.getByRole('button',{name:'Keep this song',exact:true}).click();await expect(removalDialog).toHaveCount(0);await expect(removeSaved).toBeFocused();assert.equal((await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id),true,'Cancel keeps the saved audio');
+ await removeSaved.click();removalDialog=page.getByRole('dialog',{name:'Remove this download?',exact:true});await page.evaluate(()=>{const original=IDBObjectStore.prototype.delete;Object.defineProperty(window,'downloadTestOriginalDelete',{value:original,configurable:true});IDBObjectStore.prototype.delete=function(){throw new DOMException('Synthetic removal failure','UnknownError');};});await removalDialog.getByRole('button',{name:'Remove download',exact:true}).click();await expect(removalDialog.locator('[role="alert"]').filter({hasText:'This download is still on your device.'})).toHaveText('This download is still on your device. Please try removing it again.');assert.equal((await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id),true,'Failed removal keeps the saved audio');await page.evaluate(()=>{IDBObjectStore.prototype.delete=window.downloadTestOriginalDelete;delete window.downloadTestOriginalDelete;});await removalDialog.getByRole('button',{name:'Remove download',exact:true}).click();await expect(removalDialog).toHaveCount(0);await expect.poll(async()=>!(await persisted()).some(row=>row.key==='account:'+account.id+':audio:'+disposable.id)).toBe(true);check('Saved-song removal uses an accessible confirmation sheet; cancel and storage failure preserve the song, while confirmation removes it');
  }
  await verifySavedBytes();assert.deepEqual(report.unexpectedMutations,[]);assert.deepEqual(report.pageErrors,[]);assert.deepEqual(report.issues,[]);report.maxConcurrentRequests=maxInFlight;report.maxConcurrentPerSong=Object.fromEntries(maxPerSong);report.status='passed';
 }catch(error){report.status='failed';report.failure=error instanceof Error?error.message:String(error);await page?.screenshot({path:'.local/download-browser-failure.png'}).catch(()=>{});throw error;}

@@ -6,6 +6,20 @@
 @keyframes downloadBreathe{50%{opacity:.45}}@keyframes downloadPetal{50%{fill:color-mix(in srgb,var(--ink-petal) 70%,var(--ink-bg))}}@keyframes downloadWander{50%{transform:translateX(180%)}}
 @media(max-width:700px){.summary{padding:17px;gap:16px;min-height:97px;flex-wrap:wrap;border-radius:21px 5px 21px 5px;margin-top:19px}.summary>div:first-child>b{font-size:39px}.summary>div:first-child{gap:12px}.summary>div:first-child>span{font-size:10px}.summary small{font-size:8px}.summaryNote{font-size:11px;max-width:46%;gap:8px;line-height:1.35}.summaryNote>svg{width:17px;height:17px;flex-shrink:0}.activityPeek{border-left:0;border-top:1px solid var(--ink-line);max-width:100%;width:100%;padding:13px 0 0;gap:11px;min-height:61px}.activityPeek b{font-size:10px}.activityPeek>svg{margin-left:auto;width:15px}.flower{width:36px;height:36px}.tabs{gap:20px;margin:22px 0 16px}.tabs>button{font-size:10px;gap:6px;min-height:45px}.tabsNote{display:none}.activityHeading{margin:23px 0 19px;display:block}.activityHeading h2{font-size:25px}.activityHeading p{font-size:9px}.bulkActions{max-width:100%;justify-content:flex-start;margin-top:12px;gap:6px}.bulkActions button{font-size:9px;min-height:38px;padding:8px 10px}.job{gap:11px;padding:15px 0;min-height:99px}.job>div:first-child{width:39px;height:39px}.jobIdentity{padding-right:0}.jobIdentity>a{font-size:11px}.jobIdentity>[data-artist-credits]{font-size:8px}.jobStatus{font-size:8px}.job>.flower{display:none}.jobActions{gap:0}.jobActions>button{width:33px;height:40px}.jobActions>button svg{width:16px;height:16px}.jobError{font-size:8px;margin-top:5px}.jobProgress{margin-top:7px}.storage{margin-top:28px}.storage>summary{font-size:9px;gap:7px}.storage>summary>span{font-size:8px}.storage>div{font-size:9px}.activityEmpty{padding:35px 10px}.activityEmpty h3{font-size:25px}.heroNote{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.flower *, .jobProgress>i{animation:none!important;transition:none!important}}
+
+.mobileDownloadToggle{display:none}
+.desktopDownloadToggle{display:inline-flex;align-items:center;justify-content:center}
+.desktopDownloadToggle>button{width:36px;height:38px}
+.desktopDownloadToggle>button>svg{width:17px;height:17px}
+@media(max-width:700px){
+ .desktopDownloadToggle{display:none}
+ .mobileDownloadToggle{position:relative;display:grid;place-items:center;width:44px!important;height:44px!important;padding:0;border:0;background:transparent;color:var(--ink-accent);isolation:isolate}
+ .mobileDownloadToggle>.flower{display:block;grid-area:1/1;width:42px;height:42px}
+ .mobileDownloadToggle>.flower>svg{width:100%;height:100%}
+ .mobileDownloadToggle>span{grid-area:1/1;z-index:1;display:grid;place-items:center;width:23px;height:23px;border-radius:60% 40% 62% 38%;background:var(--ink-bg);color:var(--ink-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--ink-petal) 48%,var(--ink-line))}
+ .mobileDownloadToggle:hover>span{background:var(--ink-surface)}
+ .mobileDownloadToggle:focus-visible{outline:2px solid var(--ink-accent);outline-offset:2px;border-radius:50%}
+}
 .job[data-download-status=paused] .jobProgress>i,.job[data-download-status=prepared] .jobProgress>i{animation:none}.job[data-download-status=paused] .jobProgress:not([aria-valuenow])>i,.job[data-download-status=prepared] .jobProgress:not([aria-valuenow])>i{width:0!important}
 .room>header{min-height:245px;padding-top:6px;padding-bottom:24px;margin:6px 0 21px}.room>header h1{font-size:clamp(35px,3.1vw,49px);max-width:570px;margin:13px 0}.room>header>div:nth-child(2){height:225px;transform:scale(.86);transform-origin:right center}.room>header>div:first-child>div{margin-top:18px}
 @media(max-width:700px){.room>header{min-height:228px;padding-top:4px;padding-bottom:24px;margin-top:3px}.room>header h1{font-size:35px;max-width:280px;line-height:1.13}.room>header>div:nth-child(2){height:218px;transform:scale(.86);transform-origin:right top;right:-28px;top:5px}.room>header>div:first-child>div{margin-top:17px}.room>header p{font-size:10px}}

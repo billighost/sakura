@@ -59,7 +59,7 @@ try{
    return route.fulfill({json:{}});
   });
   await page.goto(`${base}/bloom/${window.id}?world=${world}`,{waitUntil:'domcontentloaded',timeout:90000});
-  const dialog=page.locator('dialog[open]');await dialog.locator('[data-bloom-action="begin"]').waitFor();
+  const dialog=page.locator('dialog[open]');await dialog.locator('[data-bloom-action="begin"]').waitFor();await expect(dialog.getByRole('combobox',{name:'Bloom world',exact:true})).toHaveCount(0);
   await dialog.locator('[data-bloom-world]').waitFor();await page.screenshot({path:`${output}/${world}-opening-${width}.png`});
   await dialog.locator('[data-bloom-action="begin"]').click();
   let motionProfile;

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir,readFile,writeFile } from "node:fs/promises";
 import { after,before,describe,it } from "node:test";
 import { getRebuildPool,inTransaction } from "../src/rebuild/data/db";
-import { getLibrary,createPlaylist,getPlaylist,mutatePlaylistTracks,setFavorite,updatePlaylist,deletePlaylist } from "../src/rebuild/data/collections";
+import { getLibrary,createPlaylist,getPlaylist,listPlaylists,mutatePlaylistTracks,setFavorite,updatePlaylist,deletePlaylist } from "../src/rebuild/data/collections";
 import { recordHistory,getHistory,compactHistory,historyChunk } from "../src/rebuild/data/history";
 import { getSettings,patchSettings } from "../src/rebuild/data/settings";
 import { getProfile,getArtist,getAlbum } from "../src/rebuild/data/product";
@@ -101,7 +101,13 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     const playlist=await createPlaylist(first,{name:"Fixture collection"});
     await mutatePlaylistTracks(first,playlist.id,{recordingIds:recordingIds.slice(0,3)});
     await mutatePlaylistTracks(first,playlist.id,{recordingIds:[recordingIds[0]]});
+    const songCovers=recordingIds.slice(0,3).map((_,index)=>`https://e-cdns-images.dzcdn.net/images/cover/playlist-${index}/500x500-000000-80-0-0.jpg`);
+    for(const [index,id] of recordingIds.slice(0,3).entries())await pool.query(`UPDATE sakura_v2."Recording" SET metadata=jsonb_set(metadata,'{coverUrl}',to_jsonb($2::text)) WHERE id=$1::uuid`,[id,songCovers[index]]);
+    const explicitCover="https://e-cdns-images.dzcdn.net/images/cover/playlist-custom/500x500-000000-80-0-0.jpg";
+    await pool.query(`UPDATE sakura_v2."Playlist" SET cover_url=$2 WHERE id=$1::uuid`,[playlist.id,explicitCover]);
+    const [listed]=await listPlaylists(first);assert.deepEqual(listed.coverUrls,[explicitCover,...songCovers]);assert.equal(listed.coverUrl,explicitCover);
     const loaded=await getPlaylist(first,playlist.id);assert.equal(loaded.trackCount,3);
+    assert.deepEqual(loaded.coverUrls,[explicitCover,...songCovers]);
     assert.ok(loaded.recordings.every((recording:RecordingCard)=>typeof recording.addedAt==="string"&&Number.isFinite(Date.parse(recording.addedAt))));
     const dates=new Map(loaded.recordings.map((recording:RecordingCard)=>[recording.id,recording.addedAt]));
     await assert.rejects(getPlaylist(second,playlist.id),e=>e instanceof ProductError&&e.status===404);
@@ -113,6 +119,18 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     assert.equal((await getPlaylist(first,playlist.id)).trackCount,2);
     await assert.rejects(updatePlaylist(first,playlist.id,{recordingIds:[recordingIds[0]]}),e=>e instanceof ProductError&&e.status===409);
     await deletePlaylist(first,playlist.id);
+    for(const id of recordingIds.slice(0,3))await pool.query(`UPDATE sakura_v2."Recording" SET metadata=jsonb_set(metadata,'{coverUrl}',to_jsonb($2::text)) WHERE id=$1::uuid`,[id,"https://e-cdns-images.dzcdn.net/images/cover/fixture/500x500-000000-80-0-0.jpg"]);
+  });
+  it("creates a populated playlist atomically and keeps request retries idempotent",async()=>{
+    const requestId=randomUUID(),selected=recordingIds.slice(8,12);
+    const playlist=await createPlaylist(first,{name:"A generated mix, kept",description:"Saved from a Sakura mix.",requestId,recordingIds:selected});
+    assert.deepEqual(playlist.recordings.map((recording:{recordingId:string})=>recording.recordingId),selected);
+    const retry=await createPlaylist(first,{name:"A generated mix, kept",description:"Saved from a Sakura mix.",requestId,recordingIds:selected});
+    assert.equal(retry.id,playlist.id);assert.equal(retry.trackCount,selected.length);
+    await assert.rejects(createPlaylist(first,{name:"A generated mix, kept",description:"Saved from a Sakura mix.",requestId,recordingIds:[...selected].reverse()}),error=>error instanceof ProductError&&error.status===409);
+    const failedId=randomUUID();
+    await assert.rejects(createPlaylist(first,{name:"Should roll back",requestId:failedId,recordingIds:[randomUUID()]}),error=>error instanceof ProductError&&error.status===404);
+    await assert.rejects(getPlaylist(first,failedId),error=>error instanceof ProductError&&error.status===404);
   });
   it("commits concurrent retries once and accepts delayed earlier increments",async()=>{
     const duplicate=await Promise.all([recordHistory(first,input(2,15000)),recordHistory(first,input(2,15000))]);

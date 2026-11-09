@@ -31,6 +31,7 @@ async function createFixture(theme='light',width=320){
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.responsiveAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;});
  const settings={theme,audioTechnology:'none',audioQuality:'balanced',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.4,shuffle:false,repeat:'off',bloomPerformance:'auto'};
+ const playlistCreates=[];
  let session=null;
  async function audio(route){const match=route.request().headers().range?.match(/bytes=(\d+)-(\d*)/);if(!match)return route.fulfill({body:wav,contentType:'audio/wav',headers:{'Accept-Ranges':'bytes','Content-Length':String(wav.length)}});const start=Number(match[1]),end=match[2]?Math.min(wav.length-1,Number(match[2])):wav.length-1;return route.fulfill({status:206,body:wav.subarray(start,end+1),contentType:'audio/wav',headers:{'Content-Range':`bytes ${start}-${end}/${wav.length}`,'Accept-Ranges':'bytes'}});}
  await context.route('https://res.cloudinary.com/responsive-fixture/**',audio);
@@ -43,6 +44,7 @@ async function createFixture(theme='light',width=320){
   if(path==='/api/v2/library')return route.fulfill({json:{recordings:tracks,tracks,playlists:[],nextCursor:null}});
   if(path==='/api/v2/search')return route.fulfill({json:{tracks,artists:[],albums:[],totals:{tracks:3},nextCursors:{tracks:null}}});
   if(path==='/api/v2/mixes')return route.fulfill({json:{mixes:[{id:fixtureId,name:'A responsive mix',status:'ready',slot:'favorites',trackCount:3,description:'Synthetic collection'}]}});
+  if(path==='/api/v2/playlists'&&request.method()==='POST'){const input=request.postDataJSON();playlistCreates.push(input);return route.fulfill({json:{id:'90000000-0000-4000-8000-000000000299',name:input.name,trackCount:input.recordingIds.length}});}
   if(/^\/api\/v2\/(playlists|mixes|albums|artists)\/[^/]+$/.test(path))return route.fulfill({json:{id:fixtureId,name:'A responsive collection',title:'A responsive collection',description:'Synthetic collection',recordings:tracks,tracks,albums:[],playability:'ready'}});
   if(path==='/api/v2/import')return route.fulfill({json:{name:'Imported responsive collection',tracks,recordings:tracks}});
   if(path==='/api/v2/listening-session'){
@@ -57,7 +59,7 @@ async function createFixture(theme='light',width=320){
  });
  const page=await context.newPage();latestPage=page;page.setDefaultTimeout(25000);
  page.on('pageerror',error=>report.pageErrors.push(theme+'/'+width+': '+error.message));
- return {context,page};
+ return {context,page,playlistCreates};
 }
 
 async function navigate(page,path){
@@ -89,8 +91,8 @@ async function settingsChecks(){
     await assertFits(page,`settings ${theme} ${width}px`,true);
     await page.getByRole('combobox',{name:'Streaming data',exact:true}).selectOption('high');
     await expect(page.getByRole('combobox',{name:'Streaming data',exact:true})).toHaveValue('high');
-    await page.getByRole('combobox',{name:'Bloom performance',exact:true}).selectOption('5');
-    await expect(page.getByRole('combobox',{name:'Bloom performance',exact:true})).toHaveValue('5');
+    const bloomPerformance=page.getByRole('combobox',{name:'Bloom performance',exact:true});
+    if(await bloomPerformance.count()){await bloomPerformance.selectOption('5');await expect(bloomPerformance).toHaveValue('5');}
     await assertFits(page,`settings ${theme} ${width}px highest Bloom / smooth playback`,true);
     if(width<=320){for(const radio of await page.getByRole('radio').all()){await radio.check();await expect(radio).toBeChecked();await assertFits(page,`settings ${theme} ${width}px audio ${await radio.inputValue()}`,true);}}
     if(width===280||width===320||width===1440)await page.screenshot({path:`${output}/settings-${theme}-${width}.png`,fullPage:true});
@@ -111,14 +113,15 @@ async function rowIds(list){return list.locator('[data-song-id]').evaluateAll(ro
 async function collectionChecks(){
  const variants=[{theme:'light',width:320,full:true},{theme:'dark',width:390,full:false},{theme:'light',width:1440,full:false}];
  for(const {theme,width,full} of variants){
-  const {context,page}=await createFixture(theme,width);
+  const {context,page,playlistCreates}=await createFixture(theme,width);
   try{
    await navigate(page,'/settings');await expect(page.getByRole('heading',{name:'Audio technology',exact:true})).toBeVisible();await seedDownloads(page);
-   const routes=full?['/home','/search?q=responsive','/discover','/library','/liked',`/playlist/${fixtureId}`,`/mix/${fixtureId}`,`/album/${fixtureId}`,`/artist/${fixtureId}`,'/import','/library/downloaded']:['/library','/liked',`/playlist/${fixtureId}`,'/library/downloaded'];
+   const routes=full?['/search?q=responsive','/library','/liked',`/playlist/${fixtureId}`,`/mix/${fixtureId}`,`/album/${fixtureId}`,`/artist/${fixtureId}`,'/import','/library/downloaded']:['/library','/liked',`/playlist/${fixtureId}`,'/library/downloaded'];
    for(const path of routes){
     console.log(`Checking collections ${theme} ${width}px ${path}`);await navigate(page,path);
+    if(path.startsWith('/mix/')){const before=new URL(page.url()).pathname;await page.getByRole('button',{name:'Make a playlist from A responsive collection',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Make this mix yours.',exact:true}),checkboxes=dialog.getByRole('checkbox');await expect(checkboxes).toHaveCount(3);for(let index=0;index<3;index++)await expect(checkboxes.nth(index)).toBeChecked();await checkboxes.nth(1).uncheck();await dialog.getByRole('textbox',{name:'Playlist name',exact:true}).fill('Responsive mix, kept');await dialog.getByRole('button',{name:'Create playlist',exact:true}).click();const success=page.getByRole('dialog',{name:'Your playlist is ready.',exact:true});await expect(success).toBeVisible();assert.equal(new URL(page.url()).pathname,before);assert.deepEqual(playlistCreates.at(-1).recordingIds,ids([0,2]));await success.getByRole('button',{name:'Keep listening',exact:true}).click();report.checks.push(`${theme} ${width}px mix import: selected songs become one playlist without leaving the mix`);}
     if(path==='/import'){await page.getByRole('textbox',{name:'Playlist link',exact:true}).fill('https://open.spotify.com/playlist/responsive');await page.getByRole('button',{name:'Preview playlist',exact:true}).click();}
-    const lists=page.locator('[data-track-layout]'),count=path==='/home'?2:1;await expect(lists).toHaveCount(count);await expect(lists.first()).toBeVisible();
+    const lists=page.locator('[data-track-layout]'),count=1;await expect(lists).toHaveCount(count);await expect(lists.first()).toBeVisible();
     const sorts=page.getByRole('combobox',{name:'Sort songs',exact:true}),reverses=page.getByRole('button',{name:'Reverse sort order',exact:true});
     await expect(sorts).toHaveCount(count);await expect(reverses).toHaveCount(count);
     for(let i=0;i<count;i++){

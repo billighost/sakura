@@ -35,8 +35,8 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
   if(!current.begun){await begin();return;}
   if(current.index<current.recap.chapters.length-1){await enter(current.index+1);return;}
   lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
-  try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){if(!sameBloomStory(current.recap,result)||!result.completed||result.chapters.some(chapter=>!chapter.revealed))throw new Error("This Bloom could not be finished. Open the story again to continue.");state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
- },[begin,enter]);
+  try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){if(!sameBloomStory(current.recap,result)||!result.completed||result.chapters.some(chapter=>!chapter.revealed))throw new Error("This Bloom could not be finished. Open the story again to continue.");state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);if(storageKey)try{localStorage.removeItem(storageKey);}catch{}}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
+ },[begin,enter,storageKey]);
  const previous=useCallback(()=>{setPaused(true);if(state.current.finished){state.current={...state.current,finished:false};setFinished(false);setElapsed(0);return;}if(state.current.index>0)void enter(state.current.index-1);},[enter]);
  const jump=useCallback((target:number)=>{if(state.current.recap.chapters[target]?.revealed){setPaused(true);void enter(target);}},[enter]);
  useEffect(()=>{

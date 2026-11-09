@@ -30,3 +30,7 @@
 @media(max-width:750px){.qualityChoices{grid-template-columns:repeat(3,minmax(0,1fr))}.autoChoice{width:100%}.autoChoice select{width:100%}}
 @media(max-width:480px){.qualityChoices{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.qualityChoices>button{padding:14px 12px}.autoChoice{gap:14px}}
 @media(max-width:320px){.qualityChoices{grid-template-columns:minmax(0,1fr)}.qualityChoices>button{display:grid;grid-template-columns:35px minmax(0,1fr);gap:4px 10px;align-items:start}.qualityChoices>button>span{grid-row:1/3}.qualityChoices>button>b{margin:2px 0 0}.qualityChoices>button>small{grid-column:2}}
+
+/* Story controls stay in one touch-safe row without competing with the Bloom artwork. */
+.story .brand{flex:none;white-space:nowrap}.story .headerControls{min-width:0;margin-left:auto;justify-content:flex-end;flex-wrap:nowrap}.story .headerControls button{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;flex:none;min-width:44px;min-height:44px}
+@media(max-width:750px){.story .headerControls .controlLabel{display:none}.story .headerControls button{width:44px;padding:9px}}

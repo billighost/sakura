@@ -41,6 +41,20 @@ test("Bloom records completed audible playback once, including its final paused 
  const f=fixture();try{f.api.play(raw);await tick();f.advance(180000);f.finish();await tick();f.api.stop();assert.equal(f.deliveries.reduce((sum,c)=>sum+Number(c.msPlayed),0),180000);assert.equal(f.deliveries.filter(c=>c.completed).length,1);assert.equal(f.deliveries.at(-1)?.finished,true);}finally{f.destroy();}
 });
 
+test("Bloom enters a likely highlight instead of replaying a long song's intro",async()=>{
+ const f=fixture();try{f.api.play(raw);await tick();assert.ok(f.media.currentTime>=60&&f.media.currentTime<=75);}finally{f.destroy();}
+});
+
+test("Bloom does not count its initial highlight seek as listening",async()=>{
+ const f=fixture();try{f.api.play(raw);await tick();f.advance(1000);f.media.emit("timeupdate");f.api.stop();assert.equal(f.deliveries.reduce((sum,chunk)=>sum+Number(chunk.msPlayed),0),1000);}finally{f.destroy();}
+});
+
+test("Bloom honors an analyzed chorus marker and leaves short recordings at the start",async()=>{
+ const marked=fixture();try{marked.api.play({...raw,metadata:{title:raw.title,artists:raw.artists,durationMs:180000,chorusStartMs:42000}});await tick();assert.equal(marked.media.currentTime,42);}finally{marked.destroy();}
+ const clamped=fixture();try{clamped.api.play({...raw,metadata:{title:raw.title,artists:raw.artists,durationMs:180000,highlightStartMs:179000}});await tick();assert.equal(clamped.media.currentTime,135);}finally{clamped.destroy();}
+ const short=fixture();try{short.api.play({...raw,metadata:{title:raw.title,artists:raw.artists,durationMs:45000}});await tick();assert.equal(short.media.currentTime,0);}finally{short.destroy();}
+});
+
 test("Bloom seeking to the end does not manufacture completion",async()=>{
  const f=fixture();try{f.api.play(raw);await tick();f.advance(1000);f.media.emit("timeupdate");f.media.currentTime=179;f.media.emit("timeupdate");f.advance(1000);f.finish();assert.equal(f.deliveries.reduce((sum,c)=>sum+Number(c.msPlayed),0),2000);assert.equal(f.deliveries.some(c=>c.completed),false);}finally{f.destroy();}
 });

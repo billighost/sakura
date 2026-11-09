@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import { describe,it } from "node:test";
 import { bloomWindow,bloomWindows,currentBloomId,validTimeZone } from "../src/rebuild/bloom/calendar";
-import { bloomDesignForMonth,legacyBloomDesignForMonth,bloomDesignForItem } from "../src/rebuild/bloom/design";
+import { bloomDesignForMonth,bloomDesignForPeriod,legacyBloomDesignForMonth,bloomDesignForItem } from "../src/rebuild/bloom/design";
 import { groupArtistCards } from "../src/rebuild/data/artistSelection";
 import { preferencesPatch } from "../src/rebuild/data/validation";
 import { eligibleSituations,planOfflineMixes,SITUATIONAL_MIXES } from "../src/rebuild/recommendations/situations";
@@ -21,6 +22,23 @@ describe("Bloom calendar and truthful discovery rules",()=>{
     for(let index=0;index<30;index+=10)assert.deepEqual(selected.slice(index,index+10).sort(),worlds);
     assert.equal(bloomDesignForMonth("2026-11-01T00:30:00+01:00","Africa/Lagos"),bloomDesignForMonth("2026-11-01T00:30:00+01:00","Africa/Lagos"));
     assert.notEqual(bloomDesignForMonth("2026-10-31T23:30:00Z","Africa/Lagos"),bloomDesignForMonth("2026-10-31T23:30:00Z","America/New_York"));
+  });
+  it("advances weekly Bloom worlds across month and year boundaries without repeats",()=>{
+    const mondays=Array.from({length:80},(_,index)=>new Date(Date.UTC(2025,9,27+index*7)));
+    const selected=mondays.map(date=>bloomDesignForPeriod("weekly",date,"Africa/Lagos"));
+    for(let index=1;index<selected.length;index++)assert.notEqual(selected[index],selected[index-1]);
+    assert.equal(new Set(selected).size,10);
+    assert.notEqual(bloomDesignForPeriod("weekly",new Date("2026-10-26T00:00:00Z")),bloomDesignForPeriod("weekly",new Date("2026-11-02T00:00:00Z")));
+    assert.notEqual(bloomDesignForPeriod("weekly",new Date("2026-12-28T00:00:00Z")),bloomDesignForPeriod("weekly",new Date("2027-01-04T00:00:00Z")));
+    assert.equal(bloomDesignForPeriod("weekly",new Date("2027-01-04T00:00:00Z")),bloomDesignForPeriod("weekly",new Date("2027-01-04T00:00:00Z")));
+  });
+  it("keeps the assigned world fixed and centers touch-safe header controls",()=>{
+    const story=readFileSync("src/rebuild/bloom/CinematicBloomStory.tsx","utf8"),page=readFileSync("src/rebuild/bloom/CinematicBloomPage.tsx","utf8"),shelf=readFileSync("src/rebuild/bloom/BloomShelf.tsx","utf8"),css=readFileSync("src/rebuild/bloom/cinema.module.css","utf8");
+    assert.doesNotMatch(story,/aria-label="Bloom world"/);assert.doesNotMatch(page,/Open in this world/);
+    assert.match(page,/process\.env\.NODE_ENV!=="production"\?query\.get\("world"\):null/);
+    assert.match(css,/\.story \.headerControls button\{display:inline-flex;align-items:center;justify-content:center;gap:7px/);
+    assert.match(css,/min-width:44px;min-height:44px/);assert.match(css,/@media\(max-width:750px\)\{\.story \.headerControls \.controlLabel\{display:none\}/);
+    assert.doesNotMatch(page,/BloomSurpriseCover/);assert.doesNotMatch(shelf,/BloomSurpriseCover/);
   });
   it("unlocks Monday locally and expires before Sunday starts",()=>{
     const id="weekly-2026-10-26";
@@ -118,6 +136,7 @@ describe("Cinematic Bloom snapshot and compatibility",()=>{
   assert.equal(old,legacyBloomDesignForMonth(period.periodStart,period.timeZone));
   assert.ok(["herbarium","nocturne","risograph"].includes(old));
   assert.equal(bloomDesignForItem({periodStart:period.periodStart,timeZone:period.timeZone,version:2,worldId:"jungle"}),"jungle");
+  assert.equal(bloomDesignForItem({...period,version:3,worldId:"cosmos"}),"cosmos");
  });
  it("uses explicit comparison arithmetic and preserves a manual device-tier choice",()=>{
   assert.equal(listeningDuration(0),"0 sec");assert.equal(listeningDuration(3.6*3600000),"3 h 36 min");
@@ -130,5 +149,6 @@ describe("Cinematic Bloom snapshot and compatibility",()=>{
  it("resumes at most at the first undisclosed chapter",()=>{
   const recap={chapters:[{revealed:true},{revealed:false},{revealed:false}]} as BloomRecap;
   assert.equal(resumeBloomIndex(recap,99),1);assert.equal(resumeBloomIndex(recap,-1),0);assert.equal(resumeBloomIndex(recap,NaN),0);
+  assert.equal(resumeBloomIndex({...recap,completed:true,chapters:recap.chapters.map(chapter=>({...chapter,revealed:true}))},2),0);
  });
 });

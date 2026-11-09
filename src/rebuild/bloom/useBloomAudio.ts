@@ -12,6 +12,26 @@ import {MediaAudioEngine} from "../audio/engine";
 
 interface Receipt {id:string;accountId:string;recordingId:string;sequence:number;ms:number;totalMs:number;last:number;wall:number;durationMs:number;terminal:boolean}
 
+function record(value:unknown):Record<string,unknown>|null{return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:null;}
+function startMs(value:unknown){const number=Number(value);return Number.isFinite(number)&&number>=0?number:null;}
+/** Prefer catalog/audio-analysis highlight markers. When none exist, enter far
+ * enough past the intro to reach a likely hook while retaining a full passage. */
+export function bloomHighlightStart(raw:Record<string,unknown>,rawDurationMs:number):number{
+ const metadata=record(raw.metadata),analysis=record(raw.analysis)||record(metadata?.analysis);
+ const sources=[raw,metadata,analysis].filter((value):value is Record<string,unknown>=>Boolean(value));
+ const durationMs=startMs(rawDurationMs)||startMs(metadata?.durationMs)||0;
+ if(durationMs<60000)return 0;
+ const maximum=Math.max(0,durationMs-45000);
+ for(const source of sources)for(const key of ["highlightStartMs","chorusStartMs","hookStartMs","bestPartStartMs","previewStartMs"]){
+  const value=startMs(source[key]);if(value!==null)return Math.min(value,maximum);
+ }
+ const highlights=sources.flatMap(source=>Array.isArray(source.highlights)?source.highlights:[]).map(record).filter((value):value is Record<string,unknown>=>Boolean(value))
+  .map(value=>({start:startMs(value.startMs??value.startTimeMs),score:Number(value.confidence??value.score??0)})).filter(value=>value.start!==null)
+  .sort((a,b)=>(Number.isFinite(b.score)?b.score:0)-(Number.isFinite(a.score)?a.score:0));
+ if(highlights[0]?.start!==null&&highlights[0]?.start!==undefined)return Math.min(highlights[0].start,maximum);
+ return Math.min(Math.max(durationMs*.38,30000),75000,maximum);
+}
+
 /** Recap sound accompanies a chapter without replacing the listener's queue. */
 export function useBloomAudio(){
  const music=useMusic(),latest=useRef(music);
@@ -80,6 +100,9 @@ export function useBloomAudio(){
     if(!fallback||new URL(fallback,location.href).origin!==location.origin)throw new Error("Sound unavailable");url=fallback;
    }
    sound.setVolume(latest.current.volume);audio.src=url;
+   let highlightApplied=false;
+   const enterHighlight=(metadataReady=false)=>{if(highlightApplied||!current()||media.current!==audio)return;const actualDuration=metadataReady&&Number.isFinite(audio.duration)&&audio.duration>0?audio.duration*1000:track.durationMs;if(actualDuration<=0)return;const start=bloomHighlightStart(raw,actualDuration);if(start<=0){highlightApplied=true;return;}try{audio.currentTime=start/1000;highlightApplied=true;}catch{/* Metadata will provide a seekable duration shortly. */}};
+   audio.addEventListener("loadedmetadata",()=>enterHighlight(true));enterHighlight();
    receipt.current={id:crypto.randomUUID(),accountId,recordingId,sequence:0,ms:0,totalMs:0,last:0,wall:performance.now(),durationMs:track.durationMs,terminal:false};
    audio.addEventListener("playing",()=>{if(!current()||media.current!==audio)return;if(receipt.current?.terminal)renewReceipt();const r=receipt.current;if(r){r.last=audio.currentTime;r.wall=performance.now();}});
    audio.addEventListener("timeupdate",()=>{if(current()&&media.current===audio)collect();});

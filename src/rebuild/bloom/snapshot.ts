@@ -1,7 +1,7 @@
 import type {RecordingCard} from "../data/catalog";
 import type {BloomArtistInsight,BloomChapter,BloomRankedRecording,BloomListeningProfile} from "./uiTypes";
 import type {BloomWindow} from "./calendar";
-import {bloomDesignForMonth} from "./design";
+import {bloomDesignForPeriod} from "./design";
 import {listeningComparison,listeningDuration} from "./comparisons";
 import {buildBloomListening,bloomArtistKey,bloomGenres,type BloomListeningContext,type BloomListeningRow} from "./listening";
 import {bloomChapterTitle} from "./story";
@@ -17,7 +17,7 @@ export function buildBloomSnapshot(rows:readonly ListeningRow[],cards:readonly R
  const total=sorted.reduce((n,row)=>n+Number(row.audible_ms),0),plays=sorted.reduce((n,row)=>n+Number(row.plays),0);
  const summary={audibleMs:total,playCount:plays,recordingCount:sorted.length,activeDays};
  const measurements=buildBloomListening(sorted,cards,activeDays,item,context),listening=measurements.profile;
- const base={version:3,worldId:bloomDesignForMonth(item.periodStart,item.timeZone),summary,...(total?{listening}:{})};
+ const base={version:3,worldId:bloomDesignForPeriod(item.period,item.periodStart,item.timeZone),summary,...(total?{listening}:{})};
  if(!total)return {...base,chapters:[]};
  const ranked:BloomRankedRecording[]=sorted.flatMap((row,index)=>{const recording=byId.get(row.id);return recording?[{rank:index+1,audibleMs:Number(row.audible_ms),plays:Number(row.plays),recording:card(recording)}]:[];});
  const winner=ranked.find(entry=>entry.rank===1),runnerUp=ranked.find(entry=>entry.rank===2),top=winner?.recording||null;
