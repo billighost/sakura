@@ -19,6 +19,7 @@
 /.next-refine/
 /.next-bloom-verify/
 /.next-bloom-build/
+/.next-bloom-openings-build/
 /.next-download-ui/
 /.next-track-ui/
 /.next-player-overlays/

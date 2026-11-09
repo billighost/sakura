@@ -31,7 +31,7 @@ function song(index=1):MusicTrack{
 }
 
 /** Runs the real provider with deterministic media, storage and React host adapters. */
-async function player(options:{rejectFallbackOnce?:boolean;startupRace?:boolean;deferFirstChunk?:boolean;rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[];recordListening?:boolean;clock?:boolean;remoteSettings?:Record<string,unknown>;preferenceDraft?:PreferenceDraft;deferSettingsPatch?:boolean;deferHistoryClear?:boolean}={}){
+async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce?:boolean;startupRace?:boolean;deferFirstChunk?:boolean;rejectPlay?:boolean;deferRegistration?:boolean;failFallbackBeforeMetadata?:boolean;bridge?:boolean;deferResolve?:boolean;offline?:boolean;deferMetadata?:boolean;deferSmartQueue?:boolean;smartTracks?:MusicTrack[];recordListening?:boolean;clock?:boolean;remoteSettings?:Record<string,unknown>;preferenceDraft?:PreferenceDraft;deferSettingsPatch?:boolean;deferHistoryClear?:boolean}={}){
  let holdTaste=false;const tasteRequests:Array<(response:unknown)=>void>=[];
  let remoteTaste:Record<string,unknown>={feedback:[],tasteEvidence:[],historyClearedAt:null};const historyClears:Array<{accountId:string;period:string;cutoff:number}>=[],historyClearResolvers:Array<()=>void>=[];
  let remoteSettings:Record<string,unknown>={privateSession:!options.recordListening,revision:0,...options.remoteSettings},preferenceDraft=options.preferenceDraft;
@@ -69,7 +69,7 @@ async function player(options:{rejectFallbackOnce?:boolean;startupRace?:boolean;
   metadata(){this.duration=180;this.emit("loadedmetadata");}
   load(){this.loads.push(this.src);this.error=null;this.currentTime=0;this.duration=Number.NaN;const address=this.src;if(!address||options.deferMetadata||options.failFallbackBeforeMetadata&&address.includes("/api/v2/recordings/"))return;queueMicrotask(()=>{if(this.src===address)this.metadata();});}
   networkFailure(code=2){this.error={code};this.emit("error");}
-  async play(){if(options.rejectFallbackOnce&&!this.fallbackRejected&&this.src.includes("/api/v2/recordings/")){this.fallbackRejected=true;throw new DOMException("The fallback connection briefly stopped","NetworkError");}if(options.startupRace&&this.src.includes("/_sakura/audio/")){this.networkFailure(4);throw new DOMException("The initial transport stopped","NotSupportedError");}if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");if(options.startupRace)await tick();this.paused=false;this.emit("playing");}
+  async play(){if(options.rejectFallbackOnce&&!this.fallbackRejected&&this.src.includes("/api/v2/recordings/")){this.fallbackRejected=true;throw new DOMException("The fallback connection briefly stopped","NetworkError");}if(options.startupPromiseFailure&&this.src.includes("/_sakura/audio/")){this.error={code:4};throw new DOMException("The initial transport stopped","NotSupportedError");}if(options.startupRace&&this.src.includes("/_sakura/audio/")){this.networkFailure(4);throw new DOMException("The initial transport stopped","NotSupportedError");}if(this.rejectNextPlay){this.rejectNextPlay=false;throw new Error("The generated media source cannot resume.");}if(options.rejectPlay||options.failFallbackBeforeMetadata&&this.src.includes("/api/v2/recordings/"))throw new Error("The generated media source cannot start.");if(options.startupRace)await tick();this.paused=false;this.emit("playing");}
  }
  class Manager {
   constructor(private options:{accountId:string;onChange:(value:unknown)=>void;resolve:(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>}){downloadResolvers.push(options.resolve);}
@@ -80,6 +80,7 @@ async function player(options:{rejectFallbackOnce?:boolean;startupRace?:boolean;
   async prepare(id:string){if(!this.records[id]?.requested){prepares.push(id);if(this.records[id])this.records[id].status="prepared";this.options.onChange({...this.records});}}
   ensureChunk(id:string,offset:number,signal?:AbortSignal){ensured.push({id,offset,signal});return options.deferFirstChunk?new Promise<void>((resolve,reject)=>{chunkWaiters.push({resolve,signal});signal?.addEventListener("abort",()=>reject(signal.reason),{once:true});}):Promise.resolve();}
   getPartial(id:string){return Promise.resolve(this.options.accountId===accountId?partials.get(id):undefined);}
+  playbackSourceFor(id:string){const partial=this.options.accountId===accountId?partials.get(id):undefined;if(!partial)return;const track=song(Number.parseInt(id.slice(-12),10)),url="/api/v2/recordings/"+id+"/audio?assetId="+partial.fingerprint.assetId;return {track,url,fallbackUrl:url,...partial.fingerprint};}
   dispose(){disposed.push(this.options.accountId);}
  }
  const resolved=(track:MusicTrack)=>({status:"resolved",recording:{recordingId:track.id,references:track.references,reference:track.reference,metadata:{title:track.title,artists:track.artists,durationMs:track.durationMs}},playback:track.readyPlayback});
@@ -113,6 +114,18 @@ test("startup error event and original Play rejection share one surviving fallba
  }finally{p.close();}
 });
 
+test("a queued error from the rejected source cannot stop the replacement media transport",async()=>{
+ const p=await player({startupPromiseFailure:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");
+  const fallback=p.media.src;assert.ok(fallback.includes("/api/v2/recordings/"));assert.equal(p.media.error,null);
+  // WebKit checkpoints promise callbacks between native event listeners. The
+  // original rejection can load the fallback before its queued error arrives.
+  p.media.emit("error");await tick();
+  assert.equal(p.value.status,"playing");assert.equal(p.value.error,null);assert.equal(p.media.src,fallback);
+  assert.equal(p.media.loads.filter(url=>url===fallback).length,1);
+ }finally{p.close();}
+});
+
 test("progressive startup waits for its first verified chunk without a media deadline or full-file wait",async()=>{
  const p=await player({deferFirstChunk:true});try{
   p.value.play(song());await until(()=>p.chunkWaiters.length===1);
@@ -120,6 +133,16 @@ test("progressive startup waits for its first verified chunk without a media dea
   assert.equal(await p.fireTimer(12000),false);assert.equal(p.entries[song().id].status,"downloading");
   p.chunkWaiters[0].resolve();await until(()=>p.value.status==="playing");
   assert.equal(p.entries[song().id].status,"downloading");assert.equal(p.ensured[0].offset,0);
+ }finally{p.close();}
+});
+
+test("a restored partial asset starts playback from saved chunks without a new catalog lookup",async()=>{
+ const p=await player({deferResolve:true});try{
+  const track=song(),ready=track.readyPlayback!;
+  p.partials.set(track.id,{fingerprint:{assetId:ready.assetId,sizeBytes:ready.sizeBytes,sha256:ready.sha256!},blob:new Blob([new Uint8Array(4096)],{type:"audio/mpeg"}),cachedSeconds:8});
+  p.value.play({...track,readyPlayback:undefined});await until(()=>p.value.status==="playing");
+  assert.equal(p.resolvers.length,0);assert.equal(p.requests.includes("/api/v2/recordings/resolve"),false);
+  assert.equal(p.registrations[0].track.id,track.id);assert.equal(p.ensured[0].offset,0);assert.equal(p.value.error,null);
  }finally{p.close();}
 });
 
@@ -184,7 +207,7 @@ test("reconnecting reconciles another device’s partial history clear before re
 });
 test("Retry song refreshes a failed ready source and its cached resolution while keeping the position",async()=>{
  const p=await player({bridge:false,deferResolve:true});try{
-  const track=song();p.value.play(track);await until(()=>p.value.status==="playing");assert.equal(p.resolvers.length,0);p.media.currentTime=37.25;p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.value.status==="error");
+  const track=song();p.value.play(track);await until(()=>p.value.status==="playing");assert.equal(p.resolvers.length,0);p.media.currentTime=37.25;p.media.networkFailure(3);await tick();p.media.networkFailure(3);await until(()=>p.value.status==="error");
   p.value.togglePlay();await until(()=>p.resolvers.length===1);const fresh={...track,readyPlayback:{...track.readyPlayback!,url:track.readyPlayback!.url.replace("/v123/","/v124/")}};p.resolve(0,fresh);await until(()=>p.value.status==="playing");await tick();assert.equal(p.media.src,fresh.readyPlayback.url);assert.equal(p.media.currentTime,37.25);assert.equal(p.requests.filter(path=>path.includes("recordings/resolve")).length,1);
  }finally{p.close();}
 });
@@ -324,13 +347,13 @@ test("terminal media failures stop automatic full-file work but preserve explici
  const p=await player();try{
   const track=song();p.value.play(track);await until(()=>p.states[5]==="playing");
   assert.equal(p.enqueues.at(-1)?.requested,false);
-  p.media.emit("error"); // The first error changes to the same-asset gateway.
-  await tick();p.media.emit("error");
+  p.media.networkFailure(3); // The first error changes to the same-asset gateway.
+  await tick();p.media.networkFailure(3);
   await until(()=>p.states[5]==="error");
   assert.deepEqual(p.prepares,[track.id]);
   assert.ok(p.revocations>2,"The failed progressive capability must be revoked.");
   p.value.requestDownload(track);await until(()=>p.entries[track.id].requested);
-  p.value.play(track);await until(()=>p.states[5]==="playing");p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.states[5]==="error");
+  p.value.play(track);await until(()=>p.states[5]==="playing");p.media.networkFailure(3);await tick();p.media.networkFailure(3);await until(()=>p.states[5]==="error");
   assert.deepEqual(p.prepares,[track.id],"A user download must continue after playback stops.");
  }finally{p.close();}
 });
@@ -348,7 +371,7 @@ test("progressive pause and resume keep the saved position and do not fetch anot
 });
 
 test("fallback failure before metadata preserves the position for another play attempt",async()=>{
- const p=await player({failFallbackBeforeMetadata:true});try{p.value.play(song());await until(()=>p.states[5]==="playing");p.media.currentTime=42.4;p.media.emit("error");await until(()=>p.states[5]==="error");assert.equal(p.states[7],42400);p.value.togglePlay();await until(()=>p.states[5]==="playing");await tick();assert.equal(p.media.currentTime,42.4);}finally{p.close();}
+ const p=await player({failFallbackBeforeMetadata:true});try{p.value.play(song());await until(()=>p.states[5]==="playing");p.media.currentTime=42.4;p.media.networkFailure(3);await until(()=>p.states[5]==="error");assert.equal(p.states[7],42400);p.value.togglePlay();await until(()=>p.states[5]==="playing");await tick();assert.equal(p.media.currentTime,42.4);}finally{p.close();}
 });
 
 for(const phase of ["resolve","bridge"] as const)test(`seeking while ${phase} is pending applies the latest position when media is ready`,async()=>{
@@ -408,15 +431,15 @@ test("queue navigation, repeat and shuffle preserve manual picks and canonical i
 });
 
 test("ordinary verified streaming avoids automatic full cache work and falls back to the same asset",async()=>{
- const p=await player({bridge:false});try{const track=song();p.value.play(track);await until(()=>p.value.status==="playing");assert.equal(p.media.src,track.readyPlayback!.url);assert.equal(p.enqueues.some(entry=>entry.id===track.id),false);p.media.currentTime=61;p.media.emit("error");await tick();assert.equal(new URL(p.media.src).pathname,`/api/v2/recordings/${track.id}/audio`);assert.equal(new URL(p.media.src).searchParams.get("assetId"),track.readyPlayback!.assetId);assert.equal(p.media.currentTime,61);p.value.pause();p.value.togglePlay();await until(()=>p.value.status==="playing");assert.equal(p.media.currentTime,61);}finally{p.close();}
+ const p=await player({bridge:false});try{const track=song();p.value.play(track);await until(()=>p.value.status==="playing");assert.equal(p.media.src,track.readyPlayback!.url);assert.equal(p.enqueues.some(entry=>entry.id===track.id),false);p.media.currentTime=61;p.media.networkFailure(3);await tick();assert.equal(new URL(p.media.src).pathname,`/api/v2/recordings/${track.id}/audio`);assert.equal(new URL(p.media.src).searchParams.get("assetId"),track.readyPlayback!.assetId);assert.equal(p.media.currentTime,61);p.value.pause();p.value.togglePlay();await until(()=>p.value.status==="playing");assert.equal(p.media.currentTime,61);}finally{p.close();}
 });
 
 test("a seek during fallback metadata loading replaces the earlier restore position",async()=>{
- const p=await player({bridge:false,deferMetadata:true});try{p.value.play(song());await until(()=>p.value.status==="playing");p.media.metadata();p.media.currentTime=61.2;p.media.emit("error");await tick();p.value.seek(93750);p.media.metadata();await tick();assert.equal(p.media.currentTime,93.75);assert.equal(p.value.positionMs,93750);}finally{p.close();}
+ const p=await player({bridge:false,deferMetadata:true});try{p.value.play(song());await until(()=>p.value.status==="playing");p.media.metadata();p.media.currentTime=61.2;p.media.networkFailure(3);await tick();p.value.seek(93750);p.media.metadata();await tick();assert.equal(p.media.currentTime,93.75);assert.equal(p.value.positionMs,93750);}finally{p.close();}
 });
 
 test("a mid-song outage and recovery retry keep the last position and explicit download",async()=>{
- const p=await player();try{const track=song();p.value.play(track);await until(()=>p.value.status==="playing");p.value.requestDownload(track);await until(()=>p.entries[track.id].requested);p.media.currentTime=25.3;await p.connection(false);p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.value.status==="error");assert.equal(p.value.positionMs,25300);await p.connection(true);p.value.togglePlay();await until(()=>p.states[5]==="playing");await tick();assert.equal(p.media.currentTime,25.3);assert.equal(p.entries[track.id].requested,true);}finally{p.close();}
+ const p=await player();try{const track=song();p.value.play(track);await until(()=>p.value.status==="playing");p.value.requestDownload(track);await until(()=>p.entries[track.id].requested);p.media.currentTime=25.3;await p.connection(false);p.media.networkFailure(3);await tick();p.media.networkFailure(3);await until(()=>p.value.status==="error");assert.equal(p.value.positionMs,25300);await p.connection(true);p.value.togglePlay();await until(()=>p.states[5]==="playing");await tick();assert.equal(p.media.currentTime,25.3);assert.equal(p.entries[track.id].requested,true);}finally{p.close();}
 });
 
 test("a rejected repeat-one restart stops automatic transfer work until the next play gesture",async()=>{
@@ -475,7 +498,7 @@ test("reconnecting reconciles every selective clear performed while this device 
 
 test("leaving a failed audio source records an ending without claiming a deliberate skip",async()=>{
  const p=await player({recordListening:true,clock:true,bridge:false});try{
-  p.value.play(song(),[song(),song(2)]);await until(()=>p.value.status==="playing");p.advance(1000);p.media.emit("error");await tick();p.media.emit("error");await until(()=>p.value.status==="error");p.value.next();await until(()=>p.value.track?.id===song(2).id&&p.value.status==="playing");const failed=p.delivered.filter(chunk=>chunk.recordingId===song().id);assert.equal(failed.reduce((sum,c)=>sum+Number(c.msPlayed),0),1000);assert.equal(failed.some(c=>c.skipped),false);assert.equal(failed.at(-1)?.finished,true);
+  p.value.play(song(),[song(),song(2)]);await until(()=>p.value.status==="playing");p.advance(1000);p.media.networkFailure(3);await tick();p.media.networkFailure(3);await until(()=>p.value.status==="error");p.value.next();await until(()=>p.value.track?.id===song(2).id&&p.value.status==="playing");const failed=p.delivered.filter(chunk=>chunk.recordingId===song().id);assert.equal(failed.reduce((sum,c)=>sum+Number(c.msPlayed),0),1000);assert.equal(failed.some(c=>c.skipped),false);assert.equal(failed.at(-1)?.finished,true);
  }finally{p.close();}
 });
 

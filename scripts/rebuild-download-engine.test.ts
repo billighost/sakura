@@ -48,6 +48,34 @@ test("the first verified playback chunk has a persisted audio format before its 
  }finally{f.manager.dispose();}
 });
 
+test("joining playback cannot demote an explicit full download or leave it prepared",async()=>{
+ const f=setup({delay:30,data:bytes(4096*12)});
+ try{
+  const download=f.manager.enqueue(track("1"));
+  await f.manager.ensureChunk("1",0);
+  void f.manager.enqueue(track("1"),{mode:"playback",requested:false}).catch(()=>{});
+  assert.equal(f.snapshot["1"].mode,"full");
+  await download;
+  assert.equal(f.snapshot["1"].status,"ready");assert.equal(f.storage.audio.get("1")?.blob.size,f.data.length);
+ }finally{f.manager.dispose();}
+});
+
+test("reopening exposes the saved exact asset for playback independently of resolver availability",async()=>{
+ const recordingId="80000000-0000-4000-8000-000000000081",assetId="81000000-0000-4000-8000-000000000081",song=track(recordingId),storage=new MemoryStorage();
+ const fingerprint={assetId,sizeBytes:4096*12,sha256:sha(bytes(4096*12))};
+ storage.records.set(recordingId,{version:1,recordingId,track:song,status:"paused",mode:"full",requested:true,priority:0,chunkBytes:4096,createdAt:Date.now(),updatedAt:Date.now(),fingerprint,mimeType:"audio/mpeg"});
+ const chunk=bytes(4096);await storage.putChunk(recordingId,{offset:0,blob:new Blob([chunk],{type:"audio/mpeg"}),sha256:sha(chunk)});
+ let lookups=0;const f=setup({storage,resolve:async()=>{lookups++;throw new Error("Network unavailable");}});
+ try{
+  await f.manager.hydrate();const source=f.manager.playbackSourceFor(recordingId)!;
+  assert.deepEqual({assetId:source.assetId,sizeBytes:source.sizeBytes,sha256:source.sha256},fingerprint);
+  assert.equal(source.url,`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`);assert.equal(source.track.id,recordingId);assert.equal(source.mimeType,"audio/mpeg");
+  assert.equal((await f.manager.ensureChunk(recordingId,0))?.blob.size,4096);assert.equal(lookups,0);
+  storage.records.get(recordingId)!.fingerprint!.assetId="../wrong-asset";
+ }finally{f.manager.dispose();}
+ const invalid=setup({storage});try{await invalid.manager.hydrate();assert.equal(invalid.manager.playbackSourceFor(recordingId),undefined);}finally{invalid.manager.dispose();}
+});
+
 test("range reader rejects shifted/unknown totals and HTML, accepts whole200 only at zero",async()=>{
  const signal=new AbortController().signal,data=bytes(4),headers={"Content-Type":"audio/mpeg","Content-Range":"bytes 0-3/4","Content-Length":"4"};
  const good=await readAudioRange(new Response(data,{status:206,headers}),0,3,4,signal);assert.equal(good.whole,false);

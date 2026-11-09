@@ -255,7 +255,21 @@ function PaperAperture({ quality }: { quality: BloomQuality }) {
   </svg>;
 }
 
-export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
+function ObservatoryOpening({id,quality}:{id:string;quality:BloomQuality}) {
+  return <div className={s.observatoryOpening} aria-hidden="true">
+    <div className={s.observatoryNight}/>
+    <div className={s.foldedMap}><div className={s.mapLeft}/><div className={s.mapRight}/></div>
+    <svg className={s.orbitalTheatre} viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs><radialGradient id={`${id}-opening-starshine`}><stop stopColor="#e8d8a7" stopOpacity=".35"/><stop offset=".3" stopColor="#94adac" stopOpacity=".12"/><stop offset="1" stopColor="#516d88" stopOpacity="0"/></radialGradient></defs>
+      <circle className={s.observatoryGlow} cx="720" cy="370" r="415" fill={`url(#${id}-opening-starshine)`}/>
+      <g className={s.openingOrbits} transform="translate(720 370)" fill="none" stroke="#d8c494" strokeWidth=".8"><circle r="175"/><ellipse rx="325" ry="130" transform="rotate(-24)"/><ellipse rx="310" ry="160" transform="rotate(33)"/><circle r="230" strokeDasharray="1 12"/>{Array.from({length:24+quality*5},(_,n)=>{const angle=n*Math.PI*2/(24+quality*5);return <path key={n} d={`M${stableCos(angle)*226} ${stableSin(angle)*226}l${stableCos(angle)*(n%4===0?10:4)} ${stableSin(angle)*(n%4===0?10:4)}`}/>;})}</g>
+      <g className={s.openingStarChart} fill="none" stroke="#e5d2a0" strokeWidth="1"><path className={s.chartLine} d="M443 279 513 172 623 243 722 178 834 258 955 214 1045 304M447 464 534 509 602 442 743 526 843 453 965 518"/>{[[443,279],[513,172],[623,243],[722,178],[834,258],[955,214],[1045,304],[447,464],[534,509],[602,442],[743,526],[843,453],[965,518]].map(([x,y],n)=><g key={n} className={s.chartStar} style={{"--star-delay":`${n*.06}s`} as CSSProperties}><Star x={x} y={y} size={n%3===0?9:4} colour="#e9d7a7" folded/><circle cx={x} cy={y} r={n%3===0?14:8} opacity=".4"/></g>)}</g>
+      <g className={s.paperComets} fill="none" stroke="#c5c7ac" strokeLinecap="round"><path d="M73 123Q290 251 408 212"/><path d="M1116 545Q1220 487 1380 540"/><Star x={408} y={212} size={8} colour="#ead39b"/><Star x={1116} y={545} size={7} colour="#ead39b"/></g>
+    </svg>
+  </div>;
+}
+
+export default function CosmosWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience, openingPhase }: BloomWorldProps) {
   const id = `cosmos-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const opening = scene === "opening" || view === "cover";
   const music = ["songs", "song-winner", "artist-songs", "discoveries", "returns", "finale"].includes(scene);
@@ -265,7 +279,7 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
   const shot = opening ? "entrance" : scene === "song-winner" ? "aperture" : portrait ? "portrait" : scene === "finale" ? "panorama" : scene === "days" ? "calendar" : music || scene === "breadth" ? "gallery" : scene === "comparison" ? "chart" : "instrument";
   const style = { "--cosmos-completion": completion, "--cosmos-stage": stage, "--world-accent": "#a27849", "--world-ink": shot === "aperture" ? "#efe2bd" : "#243a47" } as CSSProperties;
   const hasOrbit = listening && (listening.artistCount != null || listening.peakHour != null);
-  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} data-listening={Boolean(listening)} data-calendar-pages={listening?.activeDays == null ? undefined : Math.min(quality + 3,listening.activeDays)} style={style}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={quiet ? "still" : "full"} data-shot={shot} data-opening={opening} data-music={music} data-portrait={portrait} data-listening={Boolean(listening)} data-calendar-pages={listening?.activeDays == null ? undefined : Math.min(quality + 3,listening.activeDays)} style={style}>
     <svg className={s.environment} viewBox="0 0 1440 900" preserveAspectRatio={view === "poster" ? "none" : "xMidYMid slice"} aria-hidden="true">
       <Definitions id={id}/><Sky id={id} quality={quality} progress={completion} listening={listening}/>
       <Architecture id={id} quality={quality} progress={completion}/>
@@ -290,5 +304,6 @@ export default function CosmosWorld({ scene, stage, progress, quality, reducedMo
     {!opening && <div className={s.paperShutters} key={`${scene}-${stage}`} aria-hidden="true"><i/><i/></div>}
     <div className={s.content}><ListeningPainting world="cosmos" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     <div className={`${s.guideStar} ${hasOrbit ? s.listeningOrbit : ""}`} key={`star-${scene}-${stage}`} aria-hidden="true">{hasOrbit ? <ListeningOrbit listening={listening} quality={quality}/> : <svg viewBox="-36 -36 72 72"><path d="M-27 10Q-38-5-13-27" fill="none" stroke="#d4b778" strokeWidth=".8" strokeDasharray="2 4"/><Star x={0} y={0} size={24} colour="#e0bc75" folded/><circle r="33" stroke="#d7c298" fill="none" strokeWidth=".6" opacity=".6"/></svg>}</div>
+    {openingPhase && <ObservatoryOpening id={id} quality={quality}/>}
   </div>;
 }

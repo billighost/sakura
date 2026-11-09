@@ -178,7 +178,21 @@ const sceneShots: Partial<Record<BloomSceneKind, string>> = {
   artists: "reef", discoveries: "gallery", returns: "reef", genres: "reef", pattern: "deep", finale: "shore",
 };
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
+function PearlOpening({id,quality}:{id:string;quality:BloomWorldProps["quality"]}) {
+  return <div className={s.pearlOpening} aria-hidden="true">
+    <div className={s.openingDeep}/>
+    <svg className={s.pearlTheatre} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
+      <defs><radialGradient id={`${id}-pearl-light`} cx=".35" cy=".27"><stop stopColor="#fff9dd"/><stop offset=".33" stopColor="#f7e4b9"/><stop offset=".72" stopColor="#b9c6bf"/><stop offset="1" stopColor="#547a84"/></radialGradient><radialGradient id={`${id}-pearl-aura`}><stop stopColor="#c9e1cc" stopOpacity=".46"/><stop offset=".33" stopColor="#8caebe" stopOpacity=".13"/><stop offset="1" stopColor="#72959d" stopOpacity="0"/></radialGradient></defs>
+      <g className={s.pearlReflection}><path d="M600 460 525 725 675 725Z" fill={`url(#${id}-pearl-aura)`}/>{Array.from({length:8+quality*2},(_,n)=><path key={n} d={`M${582-n*3} ${477+n*14}q${15+n*2} -${3+n%3} ${36+n*6} 0`} stroke="#d9e4c8" strokeWidth={n%2?1:2} fill="none" opacity={.33-n*.013}/>)}</g>
+      <g className={s.tidalRings} fill="none" stroke="#badbd2">{Array.from({length:4+quality},(_,n)=><ellipse className={s.tidalRing} key={n} cx="600" cy="469" rx={72+n*48} ry={11+n*9} opacity={.36-n*.025} style={{"--ring-delay":`${n*.16}s`} as CSSProperties}/>)}</g>
+      <g className={s.tidalPearl}><circle cx="600" cy="394" r="220" fill={`url(#${id}-pearl-aura)`}/><circle cx="600" cy="394" r="48" fill={`url(#${id}-pearl-light)`}/><path d="M570 376q15-22 38-15M566 400q7-12 14-14M608 423q16-4 24-23" stroke="#fff2cf" strokeWidth="1.7" opacity=".5" fill="none"/><circle cx="584" cy="374" r="4" fill="#fff9e5" opacity=".75"/></g>
+      <g className={s.pearlStars} fill="#cde0ce">{Array.from({length:8+quality*4},(_,n)=><circle key={n} cx={176+n*71%850} cy={248+n*57%337} r={n%3===0?1.8:.8} style={{"--mote-delay":`${n*.065}s`} as CSSProperties}/>)}</g>
+      <g className={s.openingTide} fill="none" stroke="#c9ddc7"><path d="M-60 562Q157 474 365 567T775 562T1260 547" strokeWidth="2.4" opacity=".6"/><path d="M-20 579Q199 496 412 584T829 568T1240 568" strokeWidth=".8" opacity=".4"/></g>
+    </svg>
+  </div>;
+}
+
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience, openingPhase }: BloomWorldProps) {
   const id = `ocean-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const shot = sceneShots[scene] || "deep";
   const cover = view === "cover";
@@ -188,7 +202,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const currents = Math.min(quality + 1,Math.max(0,listening?.returningRecordingCount || 0));
   const shells = listening?.discoveredRecordingCount == null ? undefined : Math.min(quality + 3,Math.max(0,listening.discoveredRecordingCount));
   const style = { "--ocean-dawn": dawn, "--ocean-stage": stage } as CSSProperties;
-  return <section className={s.world} data-experience={experience?.composition} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"} data-listening={Boolean(listening)} data-return-currents={listening?.returningRecordingCount == null ? undefined : currents} data-discovery-shells={shells} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)}>
+  return <section className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} style={style} data-scene={scene} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={still ? "still" : "full"} data-listening={Boolean(listening)} data-return-currents={listening?.returningRecordingCount == null ? undefined : currents} data-discovery-shells={shells} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)}>
     <div className={s.environment}><SeaPainting id={id} quality={quality} shore={shore} deep={shot === "deep" || shot === "portrait" || shot === "gallery"} poster={view === "poster"} listening={listening}/><svg className={s.currentPainting} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><ReturningCurrents amount={currents}/></svg></div>
     <div className={s.portraitGarden} aria-hidden="true"><svg viewBox="0 0 390 900" preserveAspectRatio="none" fill="none">
       <g opacity={shore ? .3 : .56}>
@@ -211,5 +225,6 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     {(cover || scene === "opening" || view === "poster") && <div className={s.titleArt}><PaintedTitle cover={cover} /><div className={s.titleRule} aria-hidden="true" /></div>}
     <div className={s.content}><ListeningPainting world="ocean" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>
     <div className={s.edgeMark} aria-hidden="true"><svg viewBox="0 0 100 36" fill="none"><path d="M3 19Q18 3 31 18Q47 34 60 18Q76 2 93 18M7 26Q22 10 35 25Q48 36 63 25" stroke="currentColor" strokeWidth=".9" /><circle cx="94" cy="18" r="1.5" fill="currentColor" /></svg></div>
+    {openingPhase && <PearlOpening id={id} quality={quality}/>}
   </section>;
 }

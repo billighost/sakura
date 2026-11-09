@@ -169,3 +169,41 @@
 .world[data-experience="3"] .landscape,.world[data-experience="3"] .orchard { translate:.5% 1.7%; scale:1.07; }
 
 .world[data-experience][data-scene="time"] .content,.world[data-experience][data-scene="pattern"] .content { display:flex; flex-direction:column; align-items:stretch; }
+
+/* A seed in darkness becomes the first blossom in the actual ink orchard. */
+.prelude{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.preludeNight{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 47%,#263332 0%,#111d23 55%,#091217 100%);opacity:0}
+.seedTheatre{position:absolute;width:min(86%,860px);height:100%;left:50%;top:0;transform:translateX(-50%) translate(-36%,25%) scale(.19);transform-origin:50% 49%;overflow:visible;opacity:.9}
+.seedHalo{opacity:.12}
+.seedStem{opacity:.7}
+.seedStem>path{stroke-dasharray:650;stroke-dashoffset:0}
+.seedPetal,.seedPetalVein{transform-origin:0 0;transform-box:view-box}
+.seedOrbit{opacity:.3}
+.seedInk{position:absolute;inset:0;width:100%;height:100%;opacity:.16}
+.seedInk path{stroke-dasharray:1300;stroke-dashoffset:0}
+.world[data-opening-phase="arriving"] .preludeNight{animation:seedNightOpen 7.6s ease both}
+.world[data-opening-phase="arriving"] .seedTheatre{animation:seedPlant 7.6s cubic-bezier(.22,.67,.26,1) both}
+.world[data-opening-phase="arriving"] .seedHalo{animation:seedLuminance 7.6s ease both}
+.world[data-opening-phase="arriving"] .seedPetal{animation:seedPetalOpen 2.5s cubic-bezier(.2,.7,.23,1) var(--seed-petal-delay) both}
+.world[data-opening-phase="arriving"] .seedPetalVein{animation:seedVeinOpen 3s ease 1.7s both}
+.world[data-opening-phase="arriving"] .seedStem>path{animation:seedDraw 3.2s ease 2.1s both}
+.world[data-opening-phase="arriving"] .seedOrbit>circle{animation:seedSpark 4.5s ease calc(1.5s + var(--spark-delay)) both}
+.world[data-opening-phase="arriving"] .seedInk path{animation:seedDraw 3.5s ease 3.3s both}
+.world[data-opening-phase="arriving"] .orchard,.world[data-opening-phase="arriving"] .portraitBranches{animation:orchardWake 7.6s cubic-bezier(.22,.61,.36,1) both}
+.world[data-opening-phase="arriving"] .titleArt{animation:orchardTitleWake 7.6s ease both}
+.world[data-opening-phase="entering"] .seedTheatre{transition:opacity .95s;opacity:.36}
+.world[data-opening-phase="entered"] .seedTheatre{opacity:.32}
+.world[data-opening-phase="entered"] .seedInk{opacity:.08}
+@keyframes seedNightOpen{0%,35%{opacity:1}74%,100%{opacity:0}}
+@keyframes seedPlant{0%{opacity:0;transform:translateX(-50%) scale(.25)}12%{opacity:1;transform:translateX(-50%) scale(.32)}48%{opacity:1;transform:translateX(-50%) scale(.62)}78%,100%{opacity:.9;transform:translateX(-50%) translate(-36%,25%) scale(.19)}}
+@keyframes seedLuminance{0%{opacity:0;transform:scale(.7);transform-origin:500px 390px}28%{opacity:1;transform:scale(1)}56%{opacity:.72}100%{opacity:.12}}
+@keyframes seedPetalOpen{0%{opacity:.1;transform:scale(.03,.18)}40%{opacity:1}100%{opacity:1;transform:scale(1)}}
+@keyframes seedVeinOpen{from{opacity:0}to{opacity:.54}}
+@keyframes seedDraw{from{stroke-dashoffset:1300;opacity:0}to{stroke-dashoffset:0;opacity:.7}}
+@keyframes seedSpark{0%{opacity:0;translate:0 14px}32%{opacity:1}100%{opacity:.3;translate:0 -18px}}
+@keyframes orchardWake{0%,34%{opacity:0;scale:1.15}73%,100%{opacity:1;scale:1}}
+@keyframes orchardTitleWake{0%,65%{opacity:0;translate:0 12px}100%{opacity:1;translate:0 0}}
+@media(max-width:540px){.seedTheatre{width:140%;transform:translateX(-50%) translate(-24%,32%) scale(.16)}@keyframes seedPlant{0%{opacity:0;transform:translateX(-50%) scale(.2)}12%{opacity:1;transform:translateX(-50%) scale(.27)}48%{opacity:1;transform:translateX(-50%) scale(.48)}78%,100%{opacity:.9;transform:translateX(-50%) translate(-24%,32%) scale(.16)}}}
+.world[data-reduced-motion="true"] .preludeNight,.world[data-quality="1"] .preludeNight{opacity:0}
+.world[data-reduced-motion="true"] .seedTheatre,.world[data-quality="1"] .seedTheatre{animation:none!important}
+@media(prefers-reduced-motion:reduce){.preludeNight{opacity:0}.seedTheatre{animation:none!important}}

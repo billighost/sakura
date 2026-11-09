@@ -88,7 +88,10 @@ export function useLyricFollow({ targetIndex, selecting, reducedMotion, viewRef,
     }
     function onScroll() {
       lastInteraction = performance.now();
-      if (!programmatic.current) {
+      // Replacing/loading a song can clamp the dialog's old scroll position.
+      // Only an actual browsing gesture may turn off follow; layout shifts and
+      // automatic focus/scroll anchoring must leave the new song following.
+      if (!programmatic.current && (!current.current.follow || userScrolled || touching || dragging)) {
         userScrolled = true;
         if (current.current.follow && !inView()) { current.current.follow = false; setFollow(false); }
       }

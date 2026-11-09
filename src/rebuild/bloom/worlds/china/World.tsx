@@ -8,6 +8,7 @@ import type { BloomQuality, BloomSceneKind, BloomWorldProps } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
 import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
+import {BookMount, BookPrelude} from "./BookPrelude";
 
 // Prepared ink marks, rather than a live ink simulation. Detail changes the
 // geometry as well as the moving groups; the paper clearing belongs to music.
@@ -205,14 +206,14 @@ function ScrollMount({ id }: { id:string }) {
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience, openingPhase }: BloomWorldProps) {
   const id=`ink-${useId().replace(/[^a-zA-Z0-9]/g,"")}`;
   const shot=shots[scene],tier=detail[quality],opening=scene==="opening"||view==="cover",still=reducedMotion||quality===1||view!=="story";
   const growth=Math.min(1,Math.max(0,progress)),hour=listening?.peakHour,style={"--ink-dawn":`${hour == null ? growth*.22 : .03 + Math.max(0, stableSin((hour - 6) / 12 * Math.PI)) * .19}`,"--ink-growth":`${.85+growth*.15}`} as CSSProperties;
-  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-shot={shot} data-quality={quality} data-motion={still?"still":"full"} data-opening={opening} data-view={view} data-theme={theme} style={style}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-scene={scene} data-shot={shot} data-quality={quality} data-motion={still?"still":"full"} data-opening={opening} data-view={view} data-theme={theme} style={style}>
     {view!=="poster"&&<svg className={s.definitions} aria-hidden="true"><Definitions id={id} tier={tier}/></svg>}
     <svg className={s.scrollArt} viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-      <ScrollMount id={id}/>
+      {openingPhase?<BookMount id={id}/>:<ScrollMount id={id}/>}
       <g clipPath={`url(#${id}-paper)`}><g className={s.paintedWorld} key={`${shot}-${stage}`}><Landscape id={id} tier={tier} shot={shot} quality={quality} listening={listening}/></g></g>
       <path d="M1261 117h34v46h-34Z" fill="var(--ink-cinnabar)" opacity=".55"/><path d="M1266 122h24v35h-24Z" fill="none" stroke="var(--ink-paper)" strokeWidth="1" opacity=".6"/>
       <path d="M1271 129h14m-14 8h14m-14 9h14" stroke="var(--ink-paper)" strokeWidth="1.5" opacity=".58"/>
@@ -224,5 +225,6 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     {tier.washes>0&&!still&&<div className={s.inkWashes} key={`washes-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.washes},(_,n)=><svg key={n} viewBox="0 0 210 95" style={{left:`${n%2?78+grain(n)*14:4+grain(n)*12}%`,top:`${14+grain(n*7)*64}%`,width:`${70+grain(n*3)*94}px`,"--arrival":`${n*.075}s`,"--tilt":`${grain(n*17)*24-12}deg`} as CSSProperties}><path d="M0 66Q17 52 44 35L65 29 79 8 92 17 112 9 149 41 184 47 210 67Q165 77 149 70L106 86 43 78Z" fill="var(--ink-mountain)" opacity=".12"/></svg>)}</div>}
     {tier.mist>0&&<div className={s.mistPassage} key={`mist-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.mist},(_,n)=><svg key={n} viewBox="0 0 700 95" style={{left:`${n%2?57:-3}%`,top:`${32+n*8}%`,width:`${39+grain(n)*17}%`,"--arrival":`${n*.11}s`,"--drift":`${n%2?19:-19}px`} as CSSProperties}><path d="M0 73Q112 60 143 48Q212 24 291 39Q384 57 450 31Q514 12 597 38Q651 57 700 64Q597 76 506 61Q427 55 342 79Q219 104 107 80Z" fill="var(--ink-paper)" opacity=".76"/></svg>)}</div>}
     {tier.flecks>0&&<div className={s.paperFlecks} key={`flecks-${scene}-${stage}`} aria-hidden="true">{Array.from({length:tier.flecks},(_,n)=><i key={n} style={{left:`${n%2?81+grain(n*13)*12:7+grain(n*19)*9}%`,top:`${22+grain(n*5)*51}%`,"--arrival":`${.5+n*.09}s`,"--fall":`${11+grain(n*29)*12}px`} as CSSProperties}/>)}</div>}
+    {openingPhase&&<BookPrelude quality={quality} id={id}/>}
   </div>;
 }

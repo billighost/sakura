@@ -140,6 +140,49 @@
 }
 .world[data-view="story"] .foreground { margin-top:0; }
 
+/* The room is revealed by its own velvet, light and hanging mirror. */
+.openingLight{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.openingDark{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 37%,#281729 0,#09070e 64%);opacity:0}
+.champagneLight{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.openingHalo{transform-origin:600px 330px}
+.openingRays{transform-origin:600px 330px}
+.openingMarquee{opacity:0;transform-origin:600px 330px}
+.world[data-opening-phase="arriving"] .openingDark{animation:velvetDark 7.6s ease both}
+.world[data-opening-phase="arriving"] .champagneLight{animation:champagneRise 7.6s ease both}
+.world[data-opening-phase="arriving"] .openingHalo{animation:champagneHalo 7.6s ease both}
+.world[data-opening-phase="arriving"] .openingRays{animation:champagneRays 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"] .openingMarquee{animation:marqueeDraw 7.6s ease both}
+.world[data-opening-phase="arriving"] .openingScintillas g{animation:velvetSpark 4.5s calc(1.4s + var(--spark-delay)) ease both}
+.world[data-opening-phase="arriving"] .curtain{width:60%;left:auto;right:auto;z-index:2;opacity:1;transition:none}
+.world[data-opening-phase="arriving"] .curtainLeft{left:-7%;animation:velvetLeft 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"] .curtainRight{right:-7%;animation:velvetRight 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"] .mirrorBall{z-index:3;animation:mirrorReveal 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"] .foreground{animation:velvetCopy 7.6s ease both}
+.world[data-opening-phase="arriving"] .valance{z-index:2}
+.world[data-opening-phase="arriving"] .chandelier,.world[data-opening-phase="arriving"] .furniture{animation:velvetFurniture 7.6s ease both}
+.world[data-opening-phase="entering"] .architecture{animation:velvetEnter .95s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="settled"] .champagneLight{opacity:.12}
+.world[data-opening-phase="entered"] .champagneLight{opacity:.07}
+@keyframes velvetDark{0%,34%{opacity:1}72%,100%{opacity:0}}
+@keyframes champagneRise{0%,9%{opacity:0}25%,48%{opacity:1}78%,100%{opacity:.12}}
+@keyframes champagneHalo{0%{transform:scale(.1);opacity:0}19%{opacity:.5}39%{transform:scale(1);opacity:1}100%{transform:scale(1.1);opacity:.4}}
+@keyframes champagneRays{0%,19%{transform:scaleX(.01);opacity:0}46%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1.1);opacity:.2}}
+@keyframes marqueeDraw{0%,24%{opacity:0;transform:scale(.75)}42%,62%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.13)}}
+@keyframes velvetSpark{0%{opacity:0;scale:.2}20%,45%{opacity:1;scale:1.5}100%{opacity:.15;scale:1}}
+@keyframes velvetLeft{0%,14%{transform:translateX(3%) rotate(0)}55%{transform:translateX(-47%) rotate(2deg)}100%{transform:translateX(-62%) rotate(1deg)}}
+@keyframes velvetRight{0%,14%{transform:translateX(-3%) rotate(0)}55%{transform:translateX(47%) rotate(-2deg)}100%{transform:translateX(62%) rotate(-1deg)}}
+@keyframes mirrorReveal{0%{opacity:0;transform:translate(-170%,110%) scale(.45)}14%{opacity:1;transform:translate(-170%,110%) scale(1.15)}40%{opacity:1;transform:translate(-170%,110%) scale(1.15) rotate(-4deg)}77%,100%{opacity:.45;transform:translate(0,0) scale(1) rotate(0)}}
+@keyframes velvetCopy{0%,53%{opacity:0;transform:translateY(18px)}79%,100%{opacity:1;transform:translateY(0)}}
+@keyframes velvetFurniture{0%,36%{opacity:0}82%,100%{opacity:1}}
+@keyframes velvetEnter{from{transform:scale(1.17)}to{transform:scale(1.27) translateY(-1%)}}
+@media(max-width:600px){.world[data-opening-phase="arriving"] .curtainLeft{left:-8%}.world[data-opening-phase="arriving"] .curtainRight{right:-8%}.world[data-opening-phase="arriving"] .mirrorBall{animation-name:mirrorRevealPortrait}}
+@keyframes mirrorRevealPortrait{0%{opacity:0;transform:translate(-115%,175%) scale(.35)}14%{opacity:1;transform:translate(-115%,175%) scale(1.1)}40%{opacity:1;transform:translate(-115%,175%) scale(1.1) rotate(-4deg)}77%,100%{opacity:.45;transform:translate(0,0) scale(1) rotate(0)}}
+.world[data-reduced-motion="true"] .openingLight,.world[data-quality="1"] .openingLight{display:none}
+.world[data-reduced-motion="true"][data-opening-phase="arriving"] .curtain,.world[data-quality="1"][data-opening-phase="arriving"] .curtain{width:30%;z-index:-2}
+.world[data-reduced-motion="true"][data-opening-phase="arriving"] .curtainLeft,.world[data-quality="1"][data-opening-phase="arriving"] .curtainLeft{left:-5%;transform:translateX(-14%)}
+.world[data-reduced-motion="true"][data-opening-phase="arriving"] .curtainRight,.world[data-quality="1"][data-opening-phase="arriving"] .curtainRight{right:-5%;transform:translateX(14%)}
+@media(prefers-reduced-motion:reduce){.openingLight{display:none}.world[data-opening-phase="arriving"] .curtain{width:30%;z-index:-2}.world[data-opening-phase="arriving"] .curtainLeft{left:-5%;transform:translateX(-14%)}.world[data-opening-phase="arriving"] .curtainRight{right:-5%;transform:translateX(14%)}}
+
 /* A saved edition chooses its illustrated camera without moving the reading column. */
 .world[data-experience="0"] .architecture { translate:-1% .6%; scale:1.025; }
 .world[data-experience="1"] .architecture { translate:-2.4% 1.1%; scale:1.055; }

@@ -7,6 +7,7 @@ import type { BloomSceneKind, BloomWorldProps } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
 import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
+import {IndiaPrelude} from "./Prelude";
 
 const detail = [0, 5, 9, 15, 23, 34] as const;
 const musicScenes: readonly BloomSceneKind[] = ["songs", "song-winner", "artist-songs", "discoveries", "finale"];
@@ -197,15 +198,16 @@ function PaintedTitle({ id, quality }: { id: string; quality: number }) {
   </svg>;
 }
 
-export default function IndiaWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
+export default function IndiaWorld({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience, openingPhase }: BloomWorldProps) {
   const id=`miniature-${useId().replace(/:/g,"")}`;
   const journey=Math.max(0,Math.min(1,Number.isFinite(progress) ? progress : 0)),cover=view==="cover",still=reducedMotion||quality===1||view==="poster";
   const dawn=listening?.peakHour == null ? journey : Math.max(.12, stableSin((listening.peakHour - 6) / 24 * Math.PI * 2));
   const music=musicScenes.includes(scene),opening=scene==="opening",artist=scene==="artist"||scene==="artists";
   const style={"--dawn":dawn,"--sky":dawn>.66?"#a8aea0":"#5f7272","--sky-low":dawn>.66?"#dbc99f":"#9ba48a","--rose":dawn>.66?"#d79695":"#c57f83"} as CSSProperties;
-  return <div className={s.world} data-experience={experience?.composition} data-theme={theme} data-scene={scene} data-stage={stage} data-view={view} data-quality={quality} data-motion={still?"still":"full"} data-music={music} data-artist={artist} data-opening={opening} data-listening={Boolean(listening)} data-lotus-returns={listening?.returningRecordingCount == null ? undefined : Math.min(quality,listening.returningRecordingCount)} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)} style={style}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-theme={theme} data-scene={scene} data-stage={stage} data-view={view} data-quality={quality} data-motion={still?"still":"full"} data-music={music} data-artist={artist} data-opening={opening} data-listening={Boolean(listening)} data-lotus-returns={listening?.returningRecordingCount == null ? undefined : Math.min(quality,listening.returningRecordingCount)} data-hour-light={listening?.peakHour == null ? undefined : dawn.toFixed(3)} style={style}>
     <svg className={s.landscapeArt} viewBox="0 0 1400 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><Definitions id={id} quality={quality}/><Garden id={id} quality={quality} progress={dawn} scene={scene} cover={cover} listening={listening}/><FloralBorder id={id} quality={quality}/></svg>
     <svg className={s.portraitArt} viewBox="0 0 430 1000" preserveAspectRatio="none" aria-hidden="true"><PortraitGarden id={id} quality={quality} scene={scene} progress={dawn} listening={listening}/><FloralBorder id={id} quality={quality} portrait/></svg>
+    {view === "story" && openingPhase && <IndiaPrelude id={id} quality={quality}/>}
     <div className={s.dawnLight} aria-hidden="true"/>
     {(opening||cover||view==="poster")&&<div className={s.titleObject}><PaintedTitle id={id} quality={quality}/><span>MONSOON MINIATURE</span><i>A GARDEN PAINTED FROM MUSIC</i></div>}
     {!cover&&<div className={s.content}><ListeningPainting world="india" experience={experience} scene={scene} stage={stage} listening={listening} quality={quality} reducedMotion={reducedMotion} view={view}/>{children}</div>}

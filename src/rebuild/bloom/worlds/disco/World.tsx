@@ -208,11 +208,24 @@ function Valance({ quality }: { quality: BloomWorldProps["quality"] }) {
   </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
+function OpeningLight({id,quality}:{id:string;quality:BloomWorldProps["quality"]}) {
+  return <div className={s.openingLight} aria-hidden="true">
+    <div className={s.openingDark}/>
+    <svg className={s.champagneLight} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
+      <defs><radialGradient id={`${id}-opening-glow`}><stop stopColor="#ffe0b4" stopOpacity=".7"/><stop offset=".26" stopColor="#e6a7a5" stopOpacity=".17"/><stop offset="1" stopColor="#d898a4" stopOpacity="0"/></radialGradient></defs>
+      <circle className={s.openingHalo} cx="600" cy="330" r="400" fill={`url(#${id}-opening-glow)`}/>
+      <g className={s.openingRays} fill="#eec49e">{Array.from({length:6+quality*2},(_,n)=><path key={n} d={`M600 330 ${-100+n*120} 950 ${-45+n*120} 950Z`} opacity={n%2?.032:.07}/>)}</g>
+      <g className={s.openingScintillas} fill="#f8deb6">{Array.from({length:8+quality*5},(_,n)=><g key={n} style={{"--spark-delay":`${n*.045}s`} as CSSProperties} transform={`translate(${160+n*97%890} ${133+n*71%610})`}><path d="M-4 0H4M0-4V4" stroke="#edd2ac" strokeWidth=".8"/><circle r="1.1"/></g>)}</g>
+      <g className={s.openingMarquee} fill="none" stroke="#e2b78f" strokeWidth=".8"><path d="M420 366Q600 473 780 366M462 399Q600 469 738 399"/><path d="M600 456v23m-7-12 7-6 7 6-7 6Z"/><circle cx="600" cy="330" r="93" strokeDasharray="1 13" opacity=".65"/></g>
+    </svg>
+  </div>;
+}
+
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience, openingPhase }: BloomWorldProps) {
   const id = `disco-${useId().replace(/:/g, "")}`;
   const shot = scene === "opening" ? "entrance" : scene === "finale" ? "dawn" : ["songs", "discoveries", "returns", "breadth"].includes(scene) ? "lounge" : ["artist", "artist-songs", "artists", "song-winner"].includes(scene) ? "stage" : "chandelier";
   const growth = Math.min(1, Math.max(0, stage / 14));
-  return <div className={s.world} data-experience={experience?.composition} data-world="disco" data-scene={scene} data-shot={shot} data-quality={quality} data-reduced-motion={reducedMotion} data-view={view} data-theme={theme} style={{ "--disco-progress": Math.min(1, Math.max(0, progress)), "--disco-growth": growth } as CSSProperties}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-world="disco" data-scene={scene} data-shot={shot} data-quality={quality} data-reduced-motion={reducedMotion} data-view={view} data-theme={theme} style={{ "--disco-progress": Math.min(1, Math.max(0, progress)), "--disco-growth": growth } as CSSProperties}>
     <div className={s.backdrop}><Architecture id={id} quality={quality} growth={growth} /></div>
     <div className={s.roseWash} aria-hidden="true" />
     <div className={s.afterhours} aria-hidden="true" />
@@ -236,5 +249,6 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     </div>
     <svg className={s.signature} viewBox="0 0 200 68" aria-hidden="true"><path d="M8 43H62M138 43H192" stroke="#cead8d" strokeWidth=".7" /><Fan x={100} y={45} size={.38} detail={11} /><path d={ornament} transform="translate(100 40) scale(.27)" fill="none" stroke="#e4c6a2" strokeWidth="1.7" /></svg>
     <div className={s.vignette} aria-hidden="true" />
+    {openingPhase && <OpeningLight id={id} quality={quality}/>}
   </div>;
 }

@@ -13,6 +13,42 @@
 .currentPainting{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .returningCurrents,.foundShells{pointer-events:none}
 
+/* One pearl becomes the moon, and its rings become the painted tide. */
+.pearlOpening{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.openingDeep{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 43%,#0a2231,#030b15 68%);opacity:0}
+.pearlTheatre{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.tidalPearl{transform-origin:600px 394px}
+.tidalRing{transform-origin:600px 469px}
+.pearlReflection{opacity:0}
+.openingTide{opacity:0;transform-origin:600px 562px}
+.world[data-opening-phase="arriving"] .openingDeep{animation:seaAwakens 7.6s ease both}
+.world[data-opening-phase="arriving"] .pearlTheatre{animation:pearlTheatre 7.6s ease both}
+.world[data-opening-phase="arriving"] .tidalPearl{animation:pearlAscends 7.6s cubic-bezier(.23,.75,.2,1) both}
+.world[data-opening-phase="arriving"] .tidalRing{animation:pearlRipple 5.1s calc(1.05s + var(--ring-delay)) cubic-bezier(.16,.6,.2,1) both}
+.world[data-opening-phase="arriving"] .pearlReflection{animation:pearlReflects 7.6s ease both}
+.world[data-opening-phase="arriving"] .pearlStars circle{animation:seaMotes 4.6s calc(1.2s + var(--mote-delay)) ease both;transform-box:fill-box;transform-origin:center}
+.world[data-opening-phase="arriving"] .openingTide{animation:firstTide 7.6s ease both}
+.world[data-view="story"][data-opening-phase="arriving"] .titleArt{animation:tidalTitle 7.6s ease both}
+.world[data-opening-phase="arriving"] .moon,.world[data-opening-phase="arriving"] .portraitMoon{animation:paintedMoon 7.6s ease both}
+.world[data-opening-phase="entering"] .environment{animation:diveIntoPainting .95s cubic-bezier(.23,.75,.2,1) both}
+.world[data-opening-phase="settled"] .pearlTheatre,.world[data-opening-phase="entered"] .pearlTheatre{opacity:.13}
+.world[data-opening-phase="settled"] .tidalPearl,.world[data-opening-phase="entered"] .tidalPearl{opacity:0}
+.world[data-opening-phase="settled"] .openingTide,.world[data-opening-phase="entered"] .openingTide{opacity:.4}
+@keyframes seaAwakens{0%,34%{opacity:1}82%,100%{opacity:0}}
+@keyframes pearlTheatre{0%{opacity:0}10%,74%{opacity:1}100%{opacity:.13}}
+@keyframes pearlAscends{0%{transform:translateY(98px) scale(.08);opacity:0}17%{transform:translateY(0) scale(1);opacity:1}36%{transform:translateY(0) scale(1.07);opacity:1}72%{transform:translate(396px,-250px) scale(.64);opacity:.8}88%,100%{transform:translate(396px,-250px) scale(.64);opacity:0}}
+@keyframes pearlRipple{0%{transform:scale(.04);opacity:0}14%{opacity:.8}75%{opacity:.27}100%{transform:scale(3.3);opacity:0}}
+@keyframes pearlReflects{0%,12%{opacity:0}27%,44%{opacity:.7}72%,100%{opacity:0}}
+@keyframes seaMotes{0%{opacity:0;transform:translateY(38px) scale(.3)}32%{opacity:.8;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(.4)}}
+@keyframes firstTide{0%,33%{opacity:0;transform:translateY(60px) scaleX(.6)}63%{opacity:.8;transform:translateY(0) scaleX(1)}100%{opacity:.4;transform:translateY(0) scaleX(1)}}
+@keyframes tidalTitle{0%,57%{opacity:0;transform:translateY(15px)}87%,100%{opacity:1;transform:translateY(0)}}
+@keyframes paintedMoon{0%,47%{opacity:0}83%,100%{opacity:1}}
+@keyframes diveIntoPainting{from{transform:scale(1)}to{transform:scale(1.12) translateY(-2%)}}
+@media(max-width:600px){.world[data-opening-phase="arriving"] .tidalPearl{animation-name:pearlAscendsPortrait}}
+@keyframes pearlAscendsPortrait{0%{transform:translateY(98px) scale(.08);opacity:0}17%{transform:translateY(0) scale(1);opacity:1}36%{transform:translateY(0) scale(1.07);opacity:1}72%{transform:translate(85px,-260px) scale(.55);opacity:.8}88%,100%{transform:translate(85px,-260px) scale(.55);opacity:0}}
+.world[data-motion="still"] .pearlOpening{display:none}
+@media(prefers-reduced-motion:reduce){.pearlOpening{display:none}}
+
 /* Current and shore chapters share one growing cinema scroll surface. */
 .world[data-view="story"] {
   height:auto;
@@ -84,6 +120,7 @@
 .world[data-motion="full"] .swell{animation:tidalSwell 4.8s var(--swell-delay) ease-in-out 3 both}
 .world[data-motion="full"] .ribbon{animation:ribbonArrive 2.2s ease-out both}
 .world[data-motion="full"] .titleArt{animation:titleArrive 1.7s cubic-bezier(.2,.7,.2,1) both}
+.world[data-view="story"][data-opening-phase="settled"] .titleArt,.world[data-view="story"][data-opening-phase="entering"] .titleArt{animation:none;opacity:1;transform:none}
 .world[data-motion="full"] .recognition{animation:recognition 2.4s ease-out both}
 .world[data-motion="full"] .titleLetters{animation:paintTitle 2.2s .25s ease-out both;stroke-dasharray:350;stroke-dashoffset:0}
 .world[data-motion="full"][data-quality="5"] .shoal{animation:shoalPass 6s .4s ease-out 2 both;transform-box:fill-box;transform-origin:center}

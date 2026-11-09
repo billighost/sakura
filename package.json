@@ -34,7 +34,10 @@
     "test:initial-taste": "node --import tsx --test scripts/rebuild-initial-taste.test.ts",
     "test:initial-taste:db": "node --import tsx --test --test-concurrency=1 scripts/rebuild-initial-taste-db.test.ts",
     "test:onboarding:browser": "node --import tsx scripts/rebuild-onboarding-preview-browser.mjs",
-    "test:bloom:promotions:browser": "node --import tsx scripts/rebuild-bloom-promotions-browser.mjs"
+    "test:bloom:promotions:browser": "node --import tsx scripts/rebuild-bloom-promotions-browser.mjs",
+    "test:bloom:openings": "node --import tsx --test scripts/rebuild-bloom-opening-audio.test.ts",
+    "test:bloom:opening-audio:browser": "node scripts/rebuild-bloom-opening-audio-browser.mjs",
+    "test:bloom:openings:browser": "node --import tsx scripts/rebuild-bloom-openings-browser.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

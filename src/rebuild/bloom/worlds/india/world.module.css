@@ -154,3 +154,51 @@
 .world[data-experience="3"] .landscapeArt,.world[data-experience="3"] .portraitArt { translate:.5% 1.7%; scale:1.07; }
 
 .world[data-experience][data-scene="time"] .content,.world[data-experience][data-scene="pattern"] .content { display:flex; flex-direction:column; align-items:stretch; }
+
+/* The gilt folio and its lotus settle into the miniature garden's real pool. */
+.prelude{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;perspective:1400px}
+.preludeNight{position:absolute;inset:0;background:radial-gradient(ellipse at center,#343332,#16202b 65%,#09121e);opacity:0}
+.folioLeaves{position:absolute;inset:6% 5%;perspective:1400px;opacity:0}
+.folioLeaf{position:absolute;top:0;bottom:0;width:50%;background:repeating-linear-gradient(90deg,transparent 0 10px,#dfb2790c 11px 12px),linear-gradient(135deg,#46334a,#263e48);border:1px solid #d9b17d;box-shadow:inset 0 0 0 8px #263a40,inset 0 0 0 9px #b99c70,inset 0 0 0 19px #263a40,inset 0 0 0 20px #b99c7066;backface-visibility:hidden}
+.folioLeaf::after{content:"";position:absolute;inset:27px;border:1px solid #c7a97677;border-radius:45% 45% 0 0}
+.folioLeafLeft{left:0;transform-origin:0 50%;transform:rotateY(-105deg)}
+.folioLeafRight{right:0;transform-origin:100% 50%;transform:rotateY(105deg)}
+.lotusTheatre{position:absolute;width:min(80%,730px);height:100%;left:50%;top:0;transform:translateX(-50%) translate(18%,35%) scale(.18);transform-origin:50% 50%;overflow:visible;opacity:.72}
+.lotusHalo{opacity:.28;transform-origin:400px 400px}
+.lotusAura{opacity:.25}
+.lotusPetal{transform-origin:0 0}
+.lotusPigments{opacity:.25}
+.giltRevelation{position:absolute;inset:6% 5%;border:1px solid #b4956660;box-shadow:inset 0 0 0 5px #eacb9530;opacity:.46}
+.world[data-opening-phase="arriving"] .preludeNight{animation:folioNight 7.6s ease both}
+.world[data-opening-phase="arriving"] .folioLeaves{animation:folioLeavesOpen 7.6s ease both}
+.world[data-opening-phase="arriving"] .folioLeafLeft{animation:folioLeftOpen 7.6s cubic-bezier(.3,.7,.25,1) both}
+.world[data-opening-phase="arriving"] .folioLeafRight{animation:folioRightOpen 7.6s cubic-bezier(.3,.7,.25,1) both}
+.world[data-opening-phase="arriving"] .lotusTheatre{animation:lotusPlant 7.6s cubic-bezier(.22,.67,.26,1) both}
+.world[data-opening-phase="arriving"] .lotusHalo{animation:lotusHaloOpen 7.6s cubic-bezier(.22,.67,.26,1) both}
+.world[data-opening-phase="arriving"] .lotusPetal{animation:lotusPetalOpen 2.8s cubic-bezier(.22,.67,.26,1) var(--lotus-delay) both}
+.world[data-opening-phase="arriving"] .lotusInner{animation:lotusPetalOpen 2.8s cubic-bezier(.22,.67,.26,1) 1.8s both;transform-origin:0 0}
+.world[data-opening-phase="arriving"] .lotusAura{animation:lotusAuraOpen 7.6s ease both}
+.world[data-opening-phase="arriving"] .lotusPigments>circle{animation:lotusPigmentArrival 4s ease calc(1.8s + var(--pigment-delay)) both}
+.world[data-opening-phase="arriving"] .giltRevelation{animation:folioGiltOpen 7.6s ease both}
+.world[data-opening-phase="arriving"] .landscapeArt,.world[data-opening-phase="arriving"] .portraitArt{animation:folioGardenOpen 7.6s ease both}
+.world[data-opening-phase="arriving"] .titleObject{animation:folioTitleOpen 7.6s ease both}
+.world[data-opening-phase="entering"] .lotusTheatre{transition:opacity .95s;opacity:.36}
+.world[data-opening-phase="entered"] .lotusTheatre{opacity:.32}
+.world[data-opening-phase="entered"] .giltRevelation{opacity:.2}
+@keyframes folioNight{0%,38%{opacity:1}78%,100%{opacity:0}}
+@keyframes folioLeavesOpen{0%{opacity:0}10%,53%{opacity:1}78%,100%{opacity:0}}
+@keyframes folioLeftOpen{0%,29%{transform:rotateY(0deg)}76%,100%{transform:rotateY(-105deg)}}
+@keyframes folioRightOpen{0%,29%{transform:rotateY(0deg)}76%,100%{transform:rotateY(105deg)}}
+@keyframes lotusPlant{0%{opacity:0;transform:translateX(-50%) scale(.26)}14%{opacity:1;transform:translateX(-50%) scale(.33)}47%{opacity:1;transform:translateX(-50%) scale(.55)}79%,100%{opacity:.72;transform:translateX(-50%) translate(18%,35%) scale(.18)}}
+@keyframes lotusHaloOpen{0%{opacity:0;transform:rotate(-25deg) scale(.8)}45%{opacity:1;transform:rotate(15deg) scale(1)}100%{opacity:.28;transform:rotate(30deg) scale(1)}}
+@keyframes lotusPetalOpen{from{opacity:0;transform:scale(.08,.2)}to{opacity:1;transform:scale(1)}}
+@keyframes lotusAuraOpen{0%{opacity:0}35%,55%{opacity:1}100%{opacity:.25}}
+@keyframes lotusPigmentArrival{0%{opacity:0;translate:0 10px}32%{opacity:1}100%{opacity:.25;translate:0 -15px}}
+@keyframes folioGiltOpen{0%,38%{opacity:0;scale:.86}80%,100%{opacity:.46;scale:1}}
+@keyframes folioGardenOpen{0%,35%{opacity:0;scale:.96}85%,100%{opacity:1;scale:1}}
+@keyframes folioTitleOpen{0%,67%{opacity:0;translate:0 12px}100%{opacity:1;translate:0 0}}
+@media(max-width:650px){.folioLeaves{inset:3% 5%}.lotusTheatre{width:130%;transform:translateX(-50%) translate(0,37%) scale(.15)}.giltRevelation{inset:2% 4%}@keyframes lotusPlant{0%{opacity:0;transform:translateX(-50%) scale(.2)}14%{opacity:1;transform:translateX(-50%) scale(.26)}47%{opacity:1;transform:translateX(-50%) scale(.42)}79%,100%{opacity:.72;transform:translateX(-50%) translate(0,37%) scale(.15)}}}
+.world[data-motion="still"] .preludeNight{opacity:0}
+.world[data-motion="still"] .folioLeaves{opacity:0}
+.world[data-motion="still"] .prelude *{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.preludeNight,.folioLeaves{opacity:0}}

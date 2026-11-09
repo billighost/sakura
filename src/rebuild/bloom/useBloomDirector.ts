@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useRef,useState} from "react";
+import {useCallback,useEffect,useLayoutEffect,useRef,useState} from "react";
 import type {BloomRecap} from "./uiTypes";
 import {chapterHold} from "./story";
 import {sameBloomStory,mergeBloomRefresh,bloomProgressRecord,restoredBloomIndex} from "./refresh";
@@ -7,16 +7,26 @@ import {sameBloomStory,mergeBloomRefresh,bloomProgressRecord,restoredBloomIndex}
 export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initial:BloomRecap;onReveal:(id:string)=>Promise<BloomRecap>;onComplete:()=>Promise<BloomRecap>;storageKey?:string}){
  const [recap,setRecap]=useState(initial),[index,setIndex]=useState(0),[begun,setBegun]=useState(false),[finished,setFinished]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[autoplay,setAutoplay]=useState(false),[paused,setPaused]=useState(false),[reading,setReading]=useState(false),[hidden,setHidden]=useState(false),[elapsed,setElapsed]=useState(0);
  const state=useRef({recap,index,begun,finished}),lock=useRef(false),alive=useRef(true),generation=useRef(0),clock=useRef({index:-1,elapsed:0}),callbacks=useRef({onReveal,onComplete}),loaded=useRef(initial);
- const failedAction=useRef<{target:number}|{complete:true}|null>(null);
+ const failedAction=useRef<{target:number}|{complete:true}|null>(null),replayFromStart=useRef(false);
+ const [resumeIndex,setResumeIndex]=useState(0);
+ useEffect(()=>{let stored:unknown;if(storageKey)try{stored=JSON.parse(localStorage.getItem(storageKey)||"{}");}catch{}const current=sameBloomStory(state.current.recap,initial)?mergeBloomRefresh(state.current.recap,initial):initial;setResumeIndex(replayFromStart.current?0:restoredBloomIndex(current,stored));},[initial,storageKey]);
  useEffect(()=>{callbacks.current={onReveal,onComplete};},[onReveal,onComplete]);
  useEffect(()=>{
   if(loaded.current===initial)return;
   if(sameBloomStory(state.current.recap,initial)){loaded.current=initial;const merged=mergeBloomRefresh(state.current.recap,initial);state.current={...state.current,recap:merged};setRecap(merged);return;}
-  loaded.current=initial;generation.current++;lock.current=false;failedAction.current=null;
+  loaded.current=initial;generation.current++;lock.current=false;failedAction.current=null;replayFromStart.current=false;
   state.current={recap:initial,index:0,begun:false,finished:false};clock.current={index:-1,elapsed:0};
   setRecap(initial);setIndex(0);setBegun(false);setFinished(false);setBusy(false);setError(null);setElapsed(0);setPaused(true);
  },[initial]);
- useEffect(()=>{const epoch=generation.current;alive.current=true;return()=>{alive.current=false;generation.current=epoch+1;};},[]);
+ // Next's Activity preserves this director when its route is hidden. Reset
+ // the transient entrance before hiding; the durable bookmark stays intact.
+ useLayoutEffect(()=>{alive.current=true;return()=>{
+  // Advance the latest numeric epoch so replay and pending requests stay invalidated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  alive.current=false;generation.current++;lock.current=false;failedAction.current=null;replayFromStart.current=false;
+  state.current={...state.current,index:0,begun:false,finished:false};clock.current={index:-1,elapsed:0};
+  setIndex(0);setBegun(false);setFinished(false);setBusy(false);setError(null);setElapsed(0);setReading(false);setPaused(false);
+ };},[]);
  useEffect(()=>{const change=()=>setHidden(document.hidden);change();document.addEventListener("visibilitychange",change);return()=>document.removeEventListener("visibilitychange",change);},[]);
  const enter=useCallback(async(target:number)=>{
   if(lock.current)return;const current=state.current.recap;if(target<0||target>=current.chapters.length)return;
@@ -30,16 +40,18 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
    if(storageKey)try{localStorage.setItem(storageKey,JSON.stringify(bloomProgressRecord(merged,target)));}catch{}
   }catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={target};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
  },[storageKey]);
- const begin=useCallback(()=>{let stored:unknown;if(storageKey)try{stored=JSON.parse(localStorage.getItem(storageKey)||"{}");}catch{}return enter(restoredBloomIndex(state.current.recap,stored));},[enter,storageKey]);
+ // Restoring a bookmark is an explicit entrance action. Merely opening the
+ // dialog or clicking its chapter rail never skips the world's introduction.
+ const begin=useCallback(()=>{let stored:unknown;if(storageKey)try{stored=JSON.parse(localStorage.getItem(storageKey)||"{}");}catch{}const target=replayFromStart.current?0:restoredBloomIndex(state.current.recap,stored);replayFromStart.current=false;return enter(target);},[enter,storageKey]);
  const next=useCallback(async()=>{
   if(lock.current)return;const current=state.current;
-  if(!current.begun){await begin();return;}
+  if(!current.begun)return;
   if(current.index<current.recap.chapters.length-1){await enter(current.index+1);return;}
   lock.current=true;setBusy(true);setError(null);const epoch=generation.current;
   try{const result=await callbacks.current.onComplete();if(alive.current&&epoch===generation.current){if(!sameBloomStory(current.recap,result)||!result.completed||result.chapters.some(chapter=>!chapter.revealed))throw new Error("This Bloom could not be finished. Open the story again to continue.");state.current={...current,recap:result,finished:true};failedAction.current=null;setRecap(result);setFinished(true);setElapsed(0);if(storageKey)try{localStorage.removeItem(storageKey);}catch{}}}catch(problem){if(alive.current&&epoch===generation.current){failedAction.current={complete:true};setError(problem);setPaused(true);}}finally{if(epoch===generation.current){lock.current=false;if(alive.current)setBusy(false);}}
- },[begin,enter,storageKey]);
- const previous=useCallback(()=>{if(state.current.finished){state.current={...state.current,finished:false};setFinished(false);setElapsed(0);return;}if(state.current.index>0)void enter(state.current.index-1);},[enter]);
- const jump=useCallback((target:number)=>{if(state.current.recap.chapters[target]?.revealed)void enter(target);},[enter]);
+ },[enter,storageKey]);
+ const previous=useCallback(()=>{if(!state.current.begun)return;if(state.current.finished){state.current={...state.current,finished:false};setFinished(false);setElapsed(0);return;}if(state.current.index>0)void enter(state.current.index-1);},[enter]);
+ const jump=useCallback((target:number)=>{if(state.current.begun&&state.current.recap.chapters[target]?.revealed)void enter(target);},[enter]);
  useEffect(()=>{
   if(!autoplay||paused||reading||hidden||busy||!begun||finished)return;
   if(clock.current.index!==index)clock.current={index,elapsed:0};
@@ -48,6 +60,6 @@ export function useBloomDirector({initial,onReveal,onComplete,storageKey}:{initi
   return()=>{clearTimeout(timer);activeClock.elapsed+=performance.now()-started;if(alive.current&&clock.current===activeClock)setElapsed(activeClock.elapsed);};
  },[autoplay,paused,reading,hidden,busy,begun,finished,index,recap,next]);
 
- function replay(){setFinished(false);setPaused(false);void enter(0);}
- return {recap,index,begun,finished,busy,error,autoplay,paused,reading,hidden,elapsed,setAutoplay,setPaused,setReading,begin,next,previous,jump,replay,retry:()=>void (failedAction.current&&"target" in failedAction.current?enter(failedAction.current.target):next()),motionPaused:paused||hidden||reading};
+ function replay(){if(lock.current)return;generation.current++;failedAction.current=null;replayFromStart.current=true;state.current={...state.current,index:0,begun:false,finished:false};clock.current={index:-1,elapsed:0};setIndex(0);setBegun(false);setFinished(false);setReading(false);setPaused(false);setError(null);setElapsed(0);setResumeIndex(0);}
+ return {recap,index,begun,finished,busy,error,autoplay,paused,reading,hidden,elapsed,resumeIndex,setAutoplay,setPaused,setReading,begin,next,previous,jump,replay,retry:()=>void (failedAction.current&&"target" in failedAction.current?enter(failedAction.current.target):next()),motionPaused:paused||hidden||reading};
 }

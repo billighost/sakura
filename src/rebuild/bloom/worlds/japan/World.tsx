@@ -180,7 +180,7 @@ function ListeningMarks({ listening, quality, cover = false }: { listening?: Blo
   </g>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience, openingPhase }: BloomWorldProps) {
   const id = `japan-${useId().replace(/:/g, "")}`;
   const tier = details[quality];
   const hour = listening?.peakHour;
@@ -190,7 +190,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const courtyard = ["artist", "artist-songs", "artists", "returns"].includes(scene);
   const opening = scene === "opening" || view === "cover";
   const style = { "--japan-dawn": morning, "--japan-travel": `${(progress - .5) * 9}%`, "--world-accent": "#ba6146" } as CSSProperties;
-  return <div className={s.world} data-experience={experience?.composition} style={style} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion ? "still" : "full"} data-music={music} data-courtyard={courtyard} data-opening={opening}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} style={style} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || quality===1 ? "still" : "full"} data-music={music} data-courtyard={courtyard} data-opening={opening}>
     <div className={s.tableGrain} aria-hidden="true"/>
     <svg className={s.bookArt} viewBox="0 0 1400 900" preserveAspectRatio="none" aria-hidden="true">
       <Definitions id={id} rich={quality >= 3}/>
@@ -236,5 +236,12 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     {quality >= 2 && <div className={s.paperLights} aria-hidden="true">{Array.from({length: tier.lights}, (_, n) => <i key={n} style={{left: `${68 + grain(n * 3) * 23}%`, top: `${22 + grain(n * 7) * 51}%`, "--light-delay": `${n * .12}s`, "--light-size": `${1.5 + grain(n * 5) * 2}px`} as CSSProperties}/>)}</div>}
     {!opening && !reducedMotion && <div className={s.pageTurn} key={`page-${scene}-${stage}`} aria-hidden="true"><i/><i/><i/></div>}
     <div className={s.dawnWash} aria-hidden="true"/>
+    {openingPhase&&<>
+     <div className={s.lanternNight} aria-hidden="true"/>
+     <div className={s.lanternBookGlow} aria-hidden="true"/>
+     {opening&&<div className={s.preludeTitle} aria-hidden="true"><InkTitle/><BloomLettering text="THE LANTERN BOOK" style="paper" className={s.coverSubtitle}/></div>}
+     <div className={s.openingLeaves} aria-hidden="true">{Array.from({length:quality>2?5:3},(_,n)=><i key={n} style={{"--opening-leaf-delay":`${2+n*.28}s`} as CSSProperties}><span/><b/></i>)}</div>
+     <div className={s.skyLanterns} aria-hidden="true">{Array.from({length:quality>2?5:3},(_,n)=><svg key={n} viewBox="0 0 60 90" style={{"--lantern-x":`${68+n*4}%`,"--lantern-y":`${18+n%3*8}%`,"--lantern-flight-x":`${-18-n*4}vw`,"--lantern-delay":`${2.5+n*.27}s`,"--lantern-scale":`${.8-n*.1}`} as CSSProperties}><ellipse cx="30" cy="40" rx="28" ry="34" fill="#e7b86a" opacity=".11"/><path d="M12 16Q30 6 48 16L44 54Q30 63 16 54Z" fill="#ecc185" stroke="#bc8651" strokeWidth="1.2"/><path d="M20 14v41m10-43v46m10-44v41" stroke="#fff1bf" strokeWidth="1"/><path d="M15 54h30m-19 5 4 13 4-13" fill="#a26b45"/><path d="M28 50q-5-7 2-14 7 8 2 14Z" fill="#fff2b8"/></svg>)}</div>
+    </>}
   </div>;
 }

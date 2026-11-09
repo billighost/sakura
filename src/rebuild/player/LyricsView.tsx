@@ -18,7 +18,7 @@ export function LyricsView(props: LyricsViewProps) {
   const music = useMusic();
   // Reset song-specific interaction state without remounting the open dialog.
   // A temporary-to-canonical ID resolution keeps the same lyric identity.
-  const content = <LyricsContent key={music.track ? lyricInputKey(music.track) : "no-track"} {...props}/>;
+  const content = <LyricsContent key={`${music.currentEntryId || "no-entry"}:${music.track ? lyricInputKey(music.track) : "no-track"}`} {...props}/>;
   return props.onClose ? <PlayerDialog appearance="lyrics" title="A little closer to the words." subtitle="LYRICS" onClose={props.onClose} wide fullscreen className={s.lyricsDialog}>{content}</PlayerDialog> : content;
 }
 

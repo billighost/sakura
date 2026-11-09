@@ -149,3 +149,38 @@
 .world[data-experience="3"] .paintedRoom { translate:.5% 1.7%; scale:1.07; }
 
 .world[data-experience][data-scene="time"] .content,.world[data-experience][data-scene="pattern"] .content { display:flex; flex-direction:column; align-items:stretch; }
+
+/* Six gilded leaves unfold; their magpie lands in the finished painted room. */
+.courtyardNight{position:absolute;inset:0;z-index:7;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,#293831 0%,#111b22 60%,#090e17 100%);opacity:0}
+.screenPrelude{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;perspective:1400px}
+.screenAura{position:absolute;inset:4%;background:radial-gradient(ellipse at 50% 47%,#d8b96f30 0%,#8ea27816 31%,transparent 65%);opacity:0}
+.foldingKeepsake{position:absolute;left:50%;top:47%;width:min(850px,76%);aspect-ratio:960/430;transform:translate(-50%,-50%);transform-style:preserve-3d;filter:drop-shadow(0 18px 24px #0007)}
+.keepsakePanel{position:absolute;left:calc(var(--panel-number) * 100% / 6);top:0;width:calc(100% / 6 + 1px);height:100%;transform-origin:left center;transform-style:preserve-3d;border-right:1px solid #d5b679;box-shadow:3px 0 8px #18241740}
+.keepsakePanel:nth-child(even){transform-origin:right center}
+.keepsakePanel svg{display:block;width:100%;height:100%}
+.unfoldingPigments{position:absolute;inset:18% 12%;overflow:visible}
+.unfoldingPigments i{position:absolute;left:var(--pigment-x);top:var(--pigment-y);width:17px;height:12px;border-radius:45% 15% 42% 25%;background:var(--pigment-colour);border:1px solid #e2c187;opacity:0;transform:rotate(var(--pigment-turn))}
+.world[data-opening-phase="arriving"][data-motion="full"] .courtyardNight{animation:courtNightReveal 7.6s both}
+.world[data-opening-phase="arriving"][data-motion="full"] .screenPrelude{animation:courtScreenResolve 7.6s both}
+.world[data-opening-phase="arriving"][data-motion="full"] .screenAura{animation:courtGoldGlow 7.6s ease both}
+.world[data-opening-phase="arriving"][data-motion="full"] .foldingKeepsake{animation:courtKeepsakeExpand 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .keepsakePanel{animation:courtPanelUnfold 4.1s var(--panel-delay) cubic-bezier(.24,.7,.23,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .unfoldingPigments i{animation:courtPigmentScatter 3.2s var(--pigment-delay) cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .paintedRoom{animation:courtPaintingReveal 7.6s both}
+.world[data-opening-phase="arriving"][data-motion="full"] .magpie{z-index:9;animation:courtMagpieLanding 7.2s cubic-bezier(.24,.7,.2,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .drawnTitle{animation:courtTitleBrush 7.6s both}
+.world[data-opening-phase="arriving"][data-motion="full"] .screenWingLeft,.world[data-opening-phase="arriving"][data-motion="full"] .screenWingRight{animation:courtOriginalScreenUnfold 6.4s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="entering"] .screen{animation:courtEnterScreen .95s cubic-bezier(.2,.7,.2,1) both}
+@keyframes courtNightReveal{0%,27%{opacity:1}56%{opacity:.86}87%,100%{opacity:0}}
+@keyframes courtScreenResolve{0%,65%{opacity:1}86%,100%{opacity:0}}
+@keyframes courtGoldGlow{0%{opacity:0;scale:.4}30%,60%{opacity:1;scale:1}100%{opacity:0;scale:1.8}}
+@keyframes courtKeepsakeExpand{0%{transform:translate(-50%,-39%) rotateX(14deg) scale(.65)}27%{transform:translate(-50%,-50%) rotateX(9deg) scale(.82)}58%{transform:translate(-50%,-50%) rotateX(0) scale(1)}100%{transform:translate(-50%,-50%) scale(1.95)}}
+@keyframes courtPanelUnfold{0%{transform:rotateY(var(--panel-fold)) scaleX(.21);opacity:.2}28%{opacity:1}100%{transform:rotateY(0) scaleX(1);opacity:1}}
+@keyframes courtPigmentScatter{0%{opacity:0;translate:calc(50% - var(--pigment-x)) 10vh;scale:.1}16%{opacity:.8}75%{opacity:.65;translate:0 -3vh;scale:1;rotate:12deg}100%{opacity:0;translate:0 -7vh;scale:.45;rotate:28deg}}
+@keyframes courtPaintingReveal{0%,35%{opacity:0}74%{opacity:.7}100%{opacity:1}}
+@keyframes courtMagpieLanding{0%,35%{opacity:0;transform:translate(23vw,33vh) scale(.2) rotate(-24deg)}47%{opacity:1;transform:translate(33vw,7vh) scale(1.2) rotate(-12deg)}65%{transform:translate(10vw,-5vh) scale(1.1) rotate(5deg)}88%{transform:translate(0,-5px) scale(1) rotate(-2deg)}100%{opacity:1;transform:none}}
+@keyframes courtTitleBrush{0%,77%{opacity:0;translate:0 10px}100%{opacity:1;translate:0 0}}
+@keyframes courtOriginalScreenUnfold{0%,32%{scale:.04 1;opacity:0}100%{scale:1 1;opacity:1}}
+@keyframes courtEnterScreen{from{transform:scale(1.035)}50%{transform:scale(1.07)}to{transform:scale(1.035)}}
+@media(max-width:620px){.foldingKeepsake{width:93%;aspect-ratio:960/640;top:44%}.keepsakePanel svg{height:100%;width:100%}.unfoldingPigments{inset:21% 4%}.unfoldingPigments i{width:11px;height:8px}}
+@media(prefers-reduced-motion:reduce){.courtyardNight,.screenPrelude{opacity:0!important}.world[data-opening-phase] .paintedRoom,.world[data-opening-phase] .magpie,.world[data-opening-phase] .drawnTitle{opacity:1!important;transform:none!important}}

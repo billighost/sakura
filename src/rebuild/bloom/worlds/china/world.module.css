@@ -159,3 +159,45 @@
 .world[data-experience="3"] .paintedWorld { translate:.5% 1.7%; scale:1.07; }
 
 .world[data-experience][data-scene="time"] .content,.world[data-experience][data-scene="pattern"] .content { display:flex; flex-direction:column; align-items:stretch; }
+
+/* A lacquer book releases the very birds that inhabit its painted pages. */
+.bookMount{filter:drop-shadow(0 14px 18px #10221955)}
+.bookNight{position:absolute;inset:0;z-index:7;pointer-events:none;background:radial-gradient(ellipse at 50% 46%,#1e342b 0%,#0a1514 57%,#050a0b 100%);opacity:0}
+.bookPrelude{position:absolute;inset:0;z-index:8;pointer-events:none;display:grid;place-items:center;opacity:0;perspective:1600px}
+.bookHalo{position:absolute;width:min(740px,90%);height:65%;top:11%;background:radial-gradient(ellipse,#d6bd6a35 0%,#75ad7c19 30%,transparent 69%);transform:scale(.65);opacity:0}
+.lacquerBook{position:absolute;left:50%;top:46%;width:clamp(185px,23vw,330px);aspect-ratio:340/440;transform:translate(-50%,-50%);transform-style:preserve-3d;filter:drop-shadow(0 20px 28px #0007)}
+.closedBook{position:absolute;inset:0;transform-origin:left center;backface-visibility:visible;transform:rotateY(-174deg);opacity:0}
+.closedBook svg{width:100%;height:100%;overflow:visible}
+.turningLeaf{position:absolute;inset:2% 1% 2% 2%;transform-origin:left center;transform:rotateY(-172deg);background:linear-gradient(90deg,#a9a07c,#f4ebcf 13%,#e5d7b1 90%,#b2a57d);border:1px solid #e2cf9c;box-shadow:inset 3px 0 9px #786b4660;opacity:0;overflow:hidden}
+.turningLeaf span{position:absolute;inset:17%;border:1px solid #bfaa7455;background:linear-gradient(145deg,transparent 38%,#55725d2b 38.5%,transparent 65%),linear-gradient(30deg,transparent 48%,#43674e39 49%,transparent 69%);clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}
+.turningLeaf b{position:absolute;width:70%;left:15%;bottom:18%;height:21%;border-radius:50%;border-top:1px solid #7b9b8566;transform:rotate(-9deg)}
+.craneFlight{position:absolute;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+.bookCrane{position:absolute;left:50%;top:50%;width:clamp(75px,10vw,150px);transform:translate(var(--flight-x),var(--flight-y)) scale(var(--crane-scale));opacity:.7}
+.bookCrane svg{width:100%;overflow:visible}
+.craneWing,.craneWingOther{transform-box:fill-box;transform-origin:95% 95%}
+.craneWingOther{transform-origin:5% 95%}
+.world[data-opening-phase="arriving"][data-motion="full"] .bookNight{animation:inkNightLift 7.6s ease both}
+.world[data-opening-phase="arriving"][data-motion="full"] .bookPrelude{animation:inkBookResolve 7.6s both}
+.world[data-opening-phase="arriving"][data-motion="full"] .bookHalo{animation:inkBookLight 6.6s ease both}
+.world[data-opening-phase="arriving"][data-motion="full"] .lacquerBook{animation:inkBookFloat 7.6s cubic-bezier(.2,.7,.2,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .closedBook{animation:inkCoverOpen 3.8s .15s cubic-bezier(.25,.72,.22,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .turningLeaf{animation:inkLeafTurn 1.45s var(--leaf-delay) cubic-bezier(.22,.63,.22,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .bookCrane{animation:inkCraneFlight 4.5s var(--crane-delay) cubic-bezier(.23,.66,.23,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .craneWing{animation:inkWingBeat .62s 2.4s ease-in-out 7 alternate}
+.world[data-opening-phase="arriving"][data-motion="full"] .craneWingOther{animation:inkWingBeat .62s 2.55s ease-in-out 7 alternate-reverse}
+.world[data-opening-phase="arriving"][data-motion="full"] .scrollArt,.world[data-opening-phase="arriving"][data-motion="full"] .portraitArt{animation:inkPageLandscape 7.6s cubic-bezier(.22,.7,.2,1) both}
+.world[data-opening-phase="arriving"][data-motion="full"] .titleArtwork{animation:inkTitleEmerge 7.6s both}
+.world[data-opening-phase="entering"] .craneFlight{transition:opacity .9s;opacity:.4}
+.world[data-opening-phase="entered"] .bookCrane{opacity:.38}
+@keyframes inkNightLift{0%,25%{opacity:1}57%{opacity:.85}82%,100%{opacity:0}}
+@keyframes inkBookResolve{0%,63%{opacity:1}85%,100%{opacity:0}}
+@keyframes inkBookLight{0%{opacity:0;transform:scale(.4)}30%{opacity:1;transform:scale(1)}68%{opacity:.8;transform:scale(1.65)}100%{opacity:0;transform:scale(2)}}
+@keyframes inkBookFloat{0%{transform:translate(-50%,-36%) rotateX(20deg) rotateZ(-7deg) scale(.72)}20%{transform:translate(-50%,-50%) rotateX(11deg) rotateZ(-3deg) scale(1)}55%{transform:translate(-18%,-48%) rotateX(5deg) rotateZ(0deg) scale(1.2)}100%{transform:translate(-18%,-50%) rotateX(0deg) scale(2.7)}}
+@keyframes inkCoverOpen{0%,31%{transform:rotateY(0);opacity:1}85%{transform:rotateY(-158deg);opacity:1}100%{transform:rotateY(-174deg);opacity:0}}
+@keyframes inkLeafTurn{0%{transform:rotateY(0);opacity:0}12%{opacity:1}85%{opacity:1}100%{transform:rotateY(-172deg);opacity:0}}
+@keyframes inkCraneFlight{0%{opacity:0;transform:translate(-10%,-8%) scale(.25) rotate(-20deg)}12%{opacity:1}48%{transform:translate(calc(var(--flight-x) * .46),calc(var(--flight-y) * 1.4)) scale(1.1) rotate(7deg)}100%{opacity:.7;transform:translate(var(--flight-x),var(--flight-y)) scale(var(--crane-scale)) rotate(0)}}
+@keyframes inkWingBeat{from{rotate:-9deg;scale:1 .7}to{rotate:13deg;scale:1 1}}
+@keyframes inkPageLandscape{0%,30%{opacity:0;transform:scale(.35)}64%{opacity:.5;transform:scale(.8)}100%{opacity:1;transform:scale(1)}}
+@keyframes inkTitleEmerge{0%,73%{opacity:0}100%{opacity:1}}
+@media(max-width:620px){.lacquerBook{top:43%;width:clamp(185px,52vw,260px)}.bookCrane{width:84px;top:45%}.world[data-opening-phase] .portraitArt{border-left:12px double #a89770;border-right:12px double #a89770;box-shadow:inset 0 0 0 1px #897553}.world[data-opening-phase] .bookMount{filter:none}}
+@media(prefers-reduced-motion:reduce){.bookNight,.bookPrelude{opacity:0!important}.bookCrane{transform:translate(var(--flight-x),var(--flight-y)) scale(var(--crane-scale))!important;opacity:.55!important}}

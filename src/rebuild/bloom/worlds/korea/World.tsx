@@ -248,7 +248,7 @@ function shotFor(scene: BloomSceneKind) {
   return "alcove";
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, children, listening, experience, openingPhase }: BloomWorldProps) {
   const id = `korea-${useId().replace(/:/g, "")}`;
   const journey = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
   const evening = listening?.peakHour != null ? listening.peakHour / 23 : journey;
@@ -256,7 +256,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
   const opening = scene === "opening" || view === "cover";
   const shot = view === "poster" ? "screen" : shotFor(scene);
   const style = { "--evening": evening, "--world-travel": `${(evening - .5) * 5}%`, "--world-accent": "#a76155" } as CSSProperties;
-  return <div className={s.world} data-experience={experience?.composition} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || view === "poster" ? "still" : "full"} data-opening={opening} data-listening={Boolean(listening)} data-gold-bindings={listening?.returningRecordingCount == null ? undefined : Math.min(detail.books,listening.returningRecordingCount)} data-fresh-bookmarks={listening?.discoveredRecordingCount == null ? undefined : Math.min(detail.books,listening.discoveredRecordingCount)} style={style}>
+  return <div className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-scene={scene} data-stage={stage} data-shot={shot} data-view={view} data-theme={theme} data-quality={quality} data-motion={reducedMotion || quality===1 || view === "poster" ? "still" : "full"} data-opening={opening} data-listening={Boolean(listening)} data-gold-bindings={listening?.returningRecordingCount == null ? undefined : Math.min(detail.books,listening.returningRecordingCount)} data-fresh-bookmarks={listening?.discoveredRecordingCount == null ? undefined : Math.min(detail.books,listening.discoveredRecordingCount)} style={style}>
     <div className={s.paintedRoom} aria-hidden="true"><PaintedScreen id={id} detail={detail} quality={quality} evening={evening} listening={listening}/></div>
     <div className={s.eveningLight} aria-hidden="true"/>
     <Pine side="left" quality={quality} detail={detail}/><Pine side="right" quality={quality} detail={detail}/>
@@ -270,5 +270,23 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
     {!opening && <div className={s.signature} aria-hidden="true"><BloomLettering text="PAINTED COURTYARD" style="paper"/></div>}
     {detail.dust > 0 && <div className={s.paperDust} aria-hidden="true">{Array.from({ length: detail.dust }, (_, i) => <i key={i} style={{ left: `${15 + seed(i + 344) * 70}%`, top: `${12 + seed(i + 381) * 71}%`, "--delay": `${-i * .83}s`, "--float": `${8 + seed(i + 421) * 19}px`, "--size": `${1 + seed(i + 401) * 2}px` } as CSSProperties}/>)}</div>}
     {scene === "finale" && <div className={s.bojagi} aria-hidden="true">{Array.from({ length: detail.silk }, (_, i) => <i key={i} style={{ "--cloth": inks[i % inks.length], "--delay": `${i * .04}s`, "--turn": `${i % 2 ? -13 : 13}deg`, left: `${(i * 113 / detail.silk) - 7}%`, width: `${14 + seed(i + 430) * 9}%`, height: `${48 + seed(i + 448) * 36}px` } as CSSProperties}/>)}</div>}
+    {openingPhase&&<>
+     <div className={s.courtyardNight} aria-hidden="true"/>
+     <div className={s.screenPrelude} aria-hidden="true">
+      <div className={s.screenAura}/>
+      <div className={s.foldingKeepsake}>{Array.from({length:6},(_,n)=><div key={n} className={s.keepsakePanel} style={{"--panel-number":n,"--panel-delay":`${.65+Math.abs(n-2.5)*.25}s`,"--panel-fold":`${n%2?-86:86}deg`,"--panel-ink":["#708779","#9ba487","#c4a873","#9b715a","#627766","#8e967c"][n]} as CSSProperties}>
+       <svg viewBox="0 0 160 430" preserveAspectRatio="none">
+        <path d="M0 0h160v430H0Z" fill="#25382f"/><path d="M8 9h144v410H8Z" fill="#b59768"/><path d="M13 14h134v400H13Z" fill="#e1d2ae"/><path d="M19 20h122v389H19Z" fill="none" stroke="#9b7e51" strokeWidth=".8"/>
+        <path d={`M14 ${210+n*8} 49 ${137+n*12} 78 ${166-n*5} 104 ${109+n*9} 146 ${221+n*8}V414H14Z`} fill="var(--panel-ink)" opacity=".46"/>
+        <path d="M17 343Q67 277 144 330M18 369Q79 318 145 355" fill="none" stroke="#76876b" strokeWidth="2" opacity=".55"/>
+        <path d="M79 372Q86 328 64 285Q44 246 81 202m-5 115q42-29 48-72M63 278q-31-12-26-37" fill="none" stroke="#536b53" strokeWidth="3"/>
+        {[0,1,2,3,4].map(k=><g key={k} transform={`translate(${42+(k%3)*31} ${210+(k%2)*64-k*8}) scale(${.68+(k%2)*.2})`}><path d="M0 0Q-32-28-17-39Q-5-47 0-19Q12-50 27-34Q40-18 8-5Q42 4 28 23Q15 33 3 7Q-7 43-26 27Q-38 12-7 2Z" fill={n%2?"#b77c68":"#beaa78"} stroke="#d8c199" strokeWidth="1"/><circle r="7" fill="#e8d29e"/><path d="M-2-3 3 3m-7 1 8-8" stroke="#8b7854" strokeWidth="1"/></g>)}
+        <path d="M42 76q17-20 32 2q15-25 38-6m-48 27q12-13 23 1q8-17 22-8" stroke="#607260" strokeWidth="1.8" fill="none"/>
+        <path d="M21 34h13m-13 0v13m118-13h-13m13 0v13M21 397h13m-13 0v-13m118 13h-13m13 0v-13" stroke="#ae8b56" fill="none"/>
+       </svg>
+      </div>)}</div>
+      <div className={s.unfoldingPigments}>{Array.from({length:quality>2?12:6},(_,n)=><i key={n} style={{"--pigment-x":`${seed(n+750)*100}%`,"--pigment-y":`${seed(n+751)*100}%`,"--pigment-delay":`${1.8+n*.12}s`,"--pigment-turn":`${n*31}deg`,"--pigment-colour":inks[n%inks.length]} as CSSProperties}/>)}</div>
+     </div>
+    </>}
   </div>;
 }

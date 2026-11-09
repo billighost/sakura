@@ -340,7 +340,10 @@ export function MusicProvider({children}:{children:ReactNode}){
   const playing=()=>{if(!a.src||a.paused)return;runtime.current.status="playing";setStatus("playing");audible.current.last=performance.now();audible.current.media=a.currentTime;armWatchdog();};
   const paused=()=>{if(!a.paused||playbackRecovery.current)return;clearWatchdog();collectAudible({paused:false});flushListen();if(!["resolving","error","idle"].includes(runtime.current.status)){runtime.current.status="paused";setStatus("paused");}};
   const waiting=()=>{if(!a.src||!["resolving","buffering","playing"].includes(runtime.current.status))return;collectAudible();runtime.current.status="buffering";setStatus("buffering");armWatchdog();};
-  const failure=()=>{if(!a.src||!["buffering","playing"].includes(runtime.current.status))return;clearWatchdog();if(!switchToFallback())failPlayback();};
+  // A rejected Play promise can load the fallback before WebKit delivers the
+  // original error event. load() clears MediaError; that queued event no longer
+  // belongs to the attached source and must not stop its replacement.
+  const failure=()=>{if(!a.src||!a.error||!["buffering","playing"].includes(runtime.current.status))return;clearWatchdog();if(!switchToFallback())failPlayback();};
   const ended=()=>{if(!a.src)return;clearWatchdog();collectAudible({paused:false});const outcome=listeningOutcome({naturalEnd:true,explicitSkip:false,audibleMs:audible.current.totalMs,durationMs:runtime.current.track?.durationMs||a.duration*1000});flushListen(outcome.completed,true,false);if(runtime.current.repeat==="one"){audible.current={eventId:cryptoId(),sequence:0,ms:0,totalMs:0,terminal:false,last:performance.now(),media:0,context:audible.current.context,contextId:audible.current.contextId};a.currentTime=0;const token=generation.current;void a.play().catch(()=>{if(token===generation.current)pause(false);});}else nextRef.current();};
   const volumeChanged=()=>{collectAudible({muted:nativeSound.current.muted||nativeSound.current.volume===0});nativeSound.current={muted:a.muted,volume:a.volume};};
   a.addEventListener("volumechange",volumeChanged);a.addEventListener("loadstart",armWatchdog);a.addEventListener("stalled",armWatchdog);a.addEventListener("timeupdate",time);a.addEventListener("playing",playing);a.addEventListener("pause",paused);a.addEventListener("waiting",waiting);a.addEventListener("error",failure);a.addEventListener("ended",ended);
@@ -352,6 +355,7 @@ export function MusicProvider({children}:{children:ReactNode}){
   return sourceFlights.current.run(key,signal,sharedSignal=>resolveSource(t,sharedSignal,!!options.refresh));
  }
  async function resolveSource(t:MusicTrack,signal:AbortSignal,refresh=false):Promise<Resolved>{
+  signal.throwIfAborted();const savedSource=!refresh&&downloadManager.current?.manager.playbackSourceFor(effectiveId(t));if(savedSource)return {...savedSource,resolvedAt:Date.now()};
   const epoch=accountGeneration.current;const owner=activeAccountId.current;if(!owner)throw new UserFacingError(responseIssue(401,null));const ready=!refresh&&readyPlaybackFor(t);if(ready){const value:Resolved={track:t,url:ready.url,assetId:ready.assetId,sizeBytes:ready.sizeBytes,resolvedAt:Date.now(),fallbackUrl:ready.fallbackUrl,sha256:ready.sha256,mimeType:ready.mimeType};readySources.current.set(t.id,value);return value;}const cached=!refresh&&readySources.current.get(effectiveId(t));if(cached&&Date.now()-cached.resolvedAt<4*60000)return cached;
  let result=await requestJson<ResolveRecordingResult>("/api/v2/recordings/resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference:t.reference,expected:{title:t.title,artists:t.artists,artistsComplete:t.artistsComplete,version:t.version,durationMs:t.durationMs||undefined}}),signal},{context:"playback",accountId:owner});
  result=await waitForRecording(result,{signal,accountId:owner,origin:location.origin});

@@ -8,6 +8,7 @@ import type { BloomWorldProps } from "../types";
 import type { BloomListeningProfile } from "../../uiTypes";
 import { stableSin } from "../stableTrig";
 import s from "./world.module.css";
+import {SakuraPrelude} from "./Prelude";
 
 type CanopyPoint = readonly [number, number, number, number, number];
 
@@ -182,7 +183,7 @@ function PortraitBranches({ id, growth, quality, listening, seed }: { id: string
  </svg>;
 }
 
-export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience }: BloomWorldProps) {
+export default function World({ scene, stage, progress, quality, reducedMotion, view, theme, listening, children, experience, openingPhase }: BloomWorldProps) {
  const id = `sakura-${useId().replace(/:/g, "")}`;
  const growth = view === "cover" ? .76 : view === "poster" || scene === "finale" ? 1 : scene === "opening" ? .08 : Math.max(.15, Math.min(1, progress));
  const details = tierDetails[quality];
@@ -191,7 +192,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
  const sunX = (hour == null ? 949 : 645 + hour / 23 * 450) + (experience ? (paintingFraction(experience.seed, 401) - .5) * 180 : 0);
  const sunY = (hour == null ? 378 : 305 + (1 - Math.max(0, stableSin((hour - 6) / 12 * Math.PI))) * 175) + (experience ? (paintingFraction(experience.seed, 402) - .5) * 48 : 0);
  const style = { "--sakura-growth": growth, "--scene-index": stage, "--sakura-afterglow": Math.max(.05, growth), "--sakura-camera-x": `${scene === "artist" ? -2.5 : scene === "returns" ? 2 : 0}%` } as CSSProperties;
- return <section className={s.world} data-experience={experience?.composition} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-reduced-motion={reducedMotion} data-music={isMusic} style={style}>
+ return <section className={s.world} data-opening-phase={openingPhase} data-experience={experience?.composition} data-scene={scene} data-view={view} data-theme={theme} data-quality={quality} data-reduced-motion={reducedMotion} data-music={isMusic} style={style}>
   <svg className={s.landscape} viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
    <Definitions id={id} detailed={quality >= 3}/>
    <rect width="1440" height="1000" fill={`url(#${id}-sky)`}/>
@@ -222,6 +223,7 @@ export default function World({ scene, stage, progress, quality, reducedMotion, 
    })}</g>
    {growth > .3 && <g className={s.fireflies}>{Array.from({ length: details.fireflies }, (_, n) => <circle key={n} cx={180 + noise(n * 29 + 2) * 1050} cy={535 + noise(n * 21) * 395} r={.9 + noise(n * 5) * 1.6} fill="var(--sakura-pollen)" style={{ "--glint-delay": `${n * -.8}s` } as CSSProperties}/>)}</g>}
   </svg>
+  {view === "story" && openingPhase && <SakuraPrelude id={id} quality={quality}/>}
   <PortraitBranches id={id} growth={growth} quality={quality} listening={listening} seed={experience?.seed}/>
   <div className={s.clearing}>
    {(scene === "opening" || scene === "finale" || view === "cover" || view === "poster") && <div className={s.titleArt}><BranchLettering id={id}/><span className={s.titleCaption}>SAKURA AFTERGLOW</span></div>}
