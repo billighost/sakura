@@ -28,13 +28,14 @@ self.addEventListener("message",event=>{
  const data=event.data,clientId=event.source?.id;
  if(!clientId||event.origin&&event.origin!==self.location.origin)return;
  if(data?.type==="sakura-audio-revoke"){audioClientEpochs.set(clientId,(audioClientEpochs.get(clientId)||0)+1);revokedAudioClients.add(clientId);for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);await pruneAudioCapabilities(clientId);});event.waitUntil(audioCapabilityWork);return;}
+ if(data?.type==="sakura-audio-revoke-token"&&audioUuid.test(data.token)){audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{const active=audioCapabilities.get(data.token),saved=active||await audioEntry("audio-bridge:"+data.token).catch(()=>undefined);if(saved?.clientId!==clientId)return;if(active)revokeAudioCapability(data.token);else await deleteAudioCapability(data.token);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type!=="sakura-audio-register"||!audioUuid.test(data.token)||!validAudioBridge(data.bridge)){if(data?.type==="sakura-audio-register")event.ports[0]?.postMessage({status:"unavailable"});return;}
  const epoch=audioClientEpochs.get(clientId)||0;
  audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{
   try{
    if(epoch!==(audioClientEpochs.get(clientId)||0))throw new Error("Audio registration was revoked");
    for(const [token,capability]of audioCapabilities)if(capability.expiresAt<Date.now())revokeAudioCapability(token);
-   if(audioCapabilities.size>=100)revokeAudioCapability(audioCapabilities.keys().next().value);
+   if(audioCapabilities.size>=100)throw new Error("Audio capability limit reached");
    const capability={...data.bridge,sha256:data.bridge.sha256.toLowerCase(),clientId,issuedAt:Date.now(),expiresAt:Date.now()+6*60*60*1000,streams:new Set()};
    await saveAudioCapability(data.token,capability);if(epoch!==(audioClientEpochs.get(clientId)||0))throw new Error("Audio registration was revoked");await pruneAudioCapabilities();if(epoch!==(audioClientEpochs.get(clientId)||0))throw new Error("Audio registration was revoked");audioCapabilities.set(data.token,capability);revokedAudioClients.delete(clientId);
    event.ports[0]?.postMessage({status:"ready",version:1});
@@ -105,6 +106,7 @@ async function serveDeviceAudio(request,clientId,token){
  const range=parseAudioRange(request.headers.get("Range"),capability.sizeBytes),headers=new Headers({"Accept-Ranges":"bytes","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",ETag:'"'+capability.sha256+'"'});
  if(!range){headers.set("Content-Range",`bytes */${capability.sizeBytes}`);return new Response(null,{status:416,headers});}
  headers.set("Content-Length",String(range.end-range.start+1));if(range.partial)headers.set("Content-Range",`bytes ${range.start}-${range.end}/${capability.sizeBytes}`);
+ if(request.method==="HEAD"){headers.set("Content-Type",capability.mimeType||"audio/mpeg");return new Response(null,{status:range.partial?206:200,headers});}
  const controller=new AbortController(),abort=()=>controller.abort(request.signal.reason);request.signal.addEventListener("abort",abort,{once:true});if(request.signal.aborted)abort();
  capability.streams ||= new Set();capability.streams.add(controller);
  const cleanup=()=>{request.signal.removeEventListener("abort",abort);capability.streams.delete(controller);};
@@ -112,7 +114,6 @@ async function serveDeviceAudio(request,clientId,token){
   const offset=Math.floor(range.start/262144)*262144;
   let prepared=await loadAudioChunk(capability,token,offset,Math.min(262144,capability.sizeBytes-offset),controller.signal),position=range.start;
   headers.set("Content-Type",prepared.mimeType||capability.mimeType||"audio/mpeg");
-  if(request.method==="HEAD"){cleanup();return new Response(null,{status:range.partial?206:200,headers});}
   const body=new ReadableStream({
    async pull(stream){try{controller.signal.throwIfAborted();if(position>range.end){cleanup();stream.close();return;}const aligned=Math.floor(position/262144)*262144,stop=Math.min(range.end+1,aligned+262144);if(!prepared)prepared=await loadAudioChunk(capability,token,aligned,Math.min(262144,capability.sizeBytes-aligned),controller.signal);stream.enqueue(prepared.bytes.slice(position-aligned,stop-aligned));prepared=undefined;position=stop;}catch(error){cleanup();controller.abort(error);stream.error(error);}},
    cancel(reason){cleanup();controller.abort(reason);}

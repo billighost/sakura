@@ -32,8 +32,8 @@ export interface QueueEntry {entryId:string;track:MusicTrack;priority?:"manual"|
 export interface DownloadEntry {
  recordingId:string;track:MusicTrack;status:"queued"|"resolving"|"downloading"|"paused"|"prepared"|"ready"|"failed";
  downloadedBytes:number;totalBytes:number|null;error?:string;operationId:string;sha256?:string;
- /** Prefix preparation stays out of the explicit download list. */
- requested?:boolean;cachedSeconds?:number;activeChunks?:number;updatedAt?:number;
+ /** Automatic playback caches remain partial until every verified chunk exists. */
+ requested?:boolean;mode?:"full"|"prefix"|"playback";cachedSeconds?:number;activeChunks?:number;updatedAt?:number;
 }
 export type PlayerModal = "queue"|"share"|"lyrics"|"player"|null;
 export interface UserSettings {theme:"system"|"light"|"dark";audioQuality:"high"|"balanced"|"data-saver";audioTechnology?:AudioTechnology;privateSession:boolean;discovery:number;artistVariety?:number;repeatTolerance?:number;newReleaseBias?:number;deepCutBias?:number;timeAware?:boolean;learnFromListening?:boolean;reducedMotion:boolean;openingAnimation:number;bloomPerformance?:"auto"|"1"|"2"|"3"|"4"|"5";seedArtists:string[];seedGenres:string[];seedArtistSelections?:{name:string;reference:ProviderReference;selectionKey:string}[];timeZone?:string;explicitContent?:boolean;onboarded:boolean;volume?:number;shuffle?:boolean;repeat?:"off"|"one"|"all";previewVolume?:number;previewLoop?:boolean;sleepTimerMinutes?:number; }

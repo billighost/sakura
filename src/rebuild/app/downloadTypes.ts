@@ -2,12 +2,13 @@ import type {DownloadEntry, MusicTrack} from "./types";
 import type {OfflineAudio} from "./offline";
 
 export interface DownloadSource {
- track:MusicTrack;url:string;fallbackUrl?:string;assetId:string;sizeBytes:number;sha256?:string;
+ track:MusicTrack;url:string;fallbackUrl?:string;assetId:string;sizeBytes:number;sha256?:string;mimeType?:string;
 }
 export interface DownloadFingerprint {assetId:string;sizeBytes:number;sha256:string}
 export interface PartialDownloadRecord {
  version:1;recordingId:string;track:MusicTrack;status:DownloadEntry["status"];
- mode:"full"|"prefix";requested:boolean;priority:number;chunkBytes:number;createdAt:number;updatedAt:number;
+ mode:"full"|"prefix"|"playback";requested:boolean;priority:number;chunkBytes:number;createdAt:number;updatedAt:number;
+ playbackOffset?:number;
  fingerprint?:DownloadFingerprint;mimeType?:string;error?:string;refreshSource?:boolean;
 }
 export interface DownloadChunk {offset:number;blob:Blob;sha256:string}

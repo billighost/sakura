@@ -40,6 +40,12 @@ describe("Bloom calendar and truthful discovery rules",()=>{
     assert.match(css,/min-width:44px;min-height:44px/);assert.match(css,/@media\(max-width:750px\)\{\.story \.headerControls \.controlLabel\{display:none\}/);
     assert.doesNotMatch(page,/BloomSurpriseCover/);assert.doesNotMatch(shelf,/BloomSurpriseCover/);
   });
+  it("keeps back navigation in the current play state and shows content while paused",()=>{
+    const director=readFileSync("src/rebuild/bloom/useBloomDirector.ts","utf8"),css=readFileSync("src/rebuild/bloom/cinema.module.css","utf8");
+    const start=director.indexOf("const previous="),end=director.indexOf("useEffect",start);assert.ok(start>=0&&end>start);
+    const navigation=director.slice(start,end);assert.match(navigation,/const previous=/);assert.match(navigation,/const jump=/);assert.doesNotMatch(navigation,/setPaused\(true\)/);
+    assert.match(css,/\.story\[data-paused="true"\] \.chapterContent\{animation:none!important;opacity:1;transform:none\}/);
+  });
   it("unlocks Monday locally and expires before Sunday starts",()=>{
     const id="weekly-2026-10-26";
     assert.equal(bloomWindow(id,new Date("2026-11-01T22:59:59Z")).status,"locked");

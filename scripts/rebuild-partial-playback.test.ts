@@ -28,7 +28,7 @@ async function fixture(options:{ready?:boolean;manager?:boolean;managerStatus?:s
  vm.runInContext("audioEntry=readFixtureEntry",context);
  const api=vm.runInContext("({parseAudioRange,validAudioBridge,audioFingerprintMatches,verifiedAudioChunk,serveDeviceAudio,revokeAudioCapability,audioCapabilities})",context);
  api.audioCapabilities.set(token,{...bridge,clientId:"owner-tab",expiresAt:Date.now()+60000});
- return {...api,context,handlers,bytes,entries,network,joined,bridge,prefix,save,async serve(range?:string,clientId="owner-tab",signal?:AbortSignal){return api.serveDeviceAudio(new Request(`https://sakura.example/_sakura/audio/${token}`,{headers:range?{Range:range}:{},signal}),clientId,token) as Promise<Response>;}};
+ return {...api,context,handlers,bytes,entries,network,joined,bridge,prefix,save,async serve(range?:string,clientId="owner-tab",signal?:AbortSignal,method="GET"){return api.serveDeviceAudio(new Request(`https://sakura.example/_sakura/audio/${token}`,{method,headers:range?{Range:range}:{},signal}),clientId,token) as Promise<Response>;}};
 }
 
 test("progressive audio serves persisted prefix and fetches only missing aligned intervals",async()=>{
@@ -41,6 +41,10 @@ test("progressive audio serves persisted prefix and fetches only missing aligned
 test("progressive playback joins manager chunk flights rather than creating duplicate fetches",async()=>{
  const f=await fixture({manager:true}),response=await f.serve();
  assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes);assert.deepEqual(f.joined,[262144,524288]);assert.deepEqual(f.network,[]);
+});
+
+test("audio HEAD reports range metadata without loading or downloading a chunk",async()=>{
+ const f=await fixture({manager:true}),response=await f.serve("bytes=262144-262999","owner-tab",undefined,"HEAD");assert.equal(response.status,206);assert.equal(response.headers.get("Content-Range"),`bytes 262144-262999/${f.bytes.length}`);assert.equal(response.headers.get("Content-Type"),"audio/mpeg");assert.deepEqual(f.joined,[]);assert.deepEqual(f.network,[]);
 });
 
 test("a transient page chunk failure falls back to the exact gateway without ending playback",async()=>{
@@ -117,6 +121,42 @@ test("a late helper registration acknowledgement cannot recreate a revoked accou
  const input={track:{id:recordingId},assetId,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`};
  const old=partial(accountId,input);assert.equal(pending.length,1);revoke();pending[0].port.postMessage({status:"ready",version:1});pending[0].port.close();assert.equal(await old,undefined);
  const fresh=partial(accountId,input);assert.equal(pending.length,2,"A fresh request must register again rather than reuse the revoked lease");pending[1].port.postMessage({status:"ready",version:1});pending[1].port.close();assert.match((await fresh)!,/^\/_sakura\/audio\//);revoke();
+});
+
+test("one progressive lease can be revoked without interrupting another active source",async()=>{
+ const pending:Array<{data:{type:string;token:string};port:MessagePort}>=[],revoked:string[]=[],exports:Record<string,unknown>={};
+ const controller={postMessage(data:{type:string;token:string},ports?:MessagePort[]){if(data.type==="sakura-audio-register")pending.push({data,port:ports![0]});else if(data.type==="sakura-audio-revoke-token")revoked.push(data.token);}};
+ const context=vm.createContext({exports,module:{exports},navigator:{serviceWorker:{controller,addEventListener(){}}},location:{origin:"https://sakura.example"},crypto:webcrypto,MessageChannel,setTimeout,clearTimeout,URL,AbortController});
+ const js=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/partialPlayback.ts",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInContext(js,context);
+ const partial=exports.partialPlaybackUrl as (id:string,source:unknown)=>Promise<string|undefined>,revokeUrl=exports.revokePartialPlaybackUrl as (url:string)=>void,revokeAll=exports.revokePartialPlayback as ()=>void;
+ const secondRecording="80000000-0000-4000-8000-000000000002",secondAsset="81000000-0000-4000-8000-000000000002",make=(recording:string,asset:string)=>({track:{id:recording},assetId:asset,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recording}/audio?assetId=${asset}`});
+ const first=partial(accountId,make(recordingId,assetId)),second=partial(accountId,make(secondRecording,secondAsset));for(const registration of pending){registration.port.postMessage({status:"ready",version:1});registration.port.close();}const firstUrl=(await first)!,secondUrl=(await second)!;revokeUrl(firstUrl);assert.deepEqual(revoked,[firstUrl.split("/").at(-1)]);assert.notEqual(secondUrl,firstUrl);revokeUrl(secondUrl);assert.deepEqual(revoked,[firstUrl.split("/").at(-1),secondUrl.split("/").at(-1)]);revokeAll();
+});
+
+test("same-song media consumers receive independently releasable capabilities",async()=>{
+ const pending:Array<{data:{type:string;token:string};port:MessagePort}>=[],revoked:string[]=[],exports:Record<string,unknown>={};
+ const controller={postMessage(data:{type:string;token:string},ports?:MessagePort[]){if(data.type==="sakura-audio-register")pending.push({data,port:ports![0]});else if(data.type==="sakura-audio-revoke-token")revoked.push(data.token);}};
+ const context=vm.createContext({exports,module:{exports},navigator:{serviceWorker:{controller,addEventListener(){}}},location:{origin:"https://sakura.example"},crypto:webcrypto,MessageChannel,setTimeout,clearTimeout,URL,AbortController});
+ const js=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/partialPlayback.ts",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInContext(js,context);
+ const partial=exports.partialPlaybackUrl as (id:string,source:unknown)=>Promise<string|undefined>,release=exports.revokePartialPlaybackUrl as (url:string)=>void,revokeAll=exports.revokePartialPlayback as ()=>void;
+ const input={track:{id:recordingId},assetId,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`};
+ const first=partial(accountId,input),second=partial(accountId,input);assert.equal(pending.length,2);for(const registration of pending){registration.port.postMessage({status:"ready",version:1});registration.port.close();}
+ const firstUrl=(await first)!,secondUrl=(await second)!;assert.notEqual(firstUrl,secondUrl);
+ release(firstUrl);assert.deepEqual(revoked,[firstUrl.split("/").at(-1)]);release(secondUrl);assert.deepEqual(revoked,[firstUrl.split("/").at(-1),secondUrl.split("/").at(-1)]);revokeAll();
+});
+
+test("expired capabilities are revoked and live capacity is never silently evicted",async()=>{
+ let now=1000;const pending:Array<{data:{type:string;token:string};port:MessagePort}>=[],revoked:string[]=[],exports:Record<string,unknown>={};
+ const controller={postMessage(data:{type:string;token:string},ports?:MessagePort[]){if(data.type==="sakura-audio-register")pending.push({data,port:ports![0]});else if(data.type==="sakura-audio-revoke-token")revoked.push(data.token);}};
+ const context=vm.createContext({exports,module:{exports},navigator:{serviceWorker:{controller,addEventListener(){}}},location:{origin:"https://sakura.example"},crypto:webcrypto,MessageChannel,setTimeout,clearTimeout,URL,AbortController,Date:{now:()=>now}});
+ const js=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/partialPlayback.ts",import.meta.url),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInContext(js,context);
+ const partial=exports.partialPlaybackUrl as (id:string,source:unknown)=>Promise<string|undefined>,release=exports.revokePartialPlaybackUrl as (url:string)=>void,revokeAll=exports.revokePartialPlayback as ()=>void;
+ const make=(index:number)=>{const recording=`80000000-0000-4000-8000-${String(index).padStart(12,"0")}`,asset=`81000000-0000-4000-8000-${String(index).padStart(12,"0")}`;return {track:{id:recording},assetId:asset,sizeBytes:10,sha256:"a".repeat(64),url:"/source",fallbackUrl:`/api/v2/recordings/${recording}/audio?assetId=${asset}`};};
+ const first=partial(accountId,make(1));pending[0].port.postMessage({status:"ready",version:1});pending[0].port.close();const firstUrl=(await first)!;now+=5*60*60*1000+1;
+ const replacement=partial(accountId,make(2));assert.deepEqual(revoked,[firstUrl.split("/").at(-1)]);pending[1].port.postMessage({status:"ready",version:1});pending[1].port.close();const urls=[(await replacement)!];
+ for(let index=3;index<=65;index++){const request=partial(accountId,make(index)),registration=pending.at(-1)!;registration.port.postMessage({status:"ready",version:1});registration.port.close();urls.push((await request)!);}
+ assert.equal(urls.length,64);assert.equal(await partial(accountId,make(66)),undefined);assert.equal(pending.length,65);assert.equal(revoked.length,1);
+ release(urls[0]);const admitted=partial(accountId,make(66));assert.equal(pending.length,66);pending.at(-1)!.port.postMessage({status:"ready",version:1});pending.at(-1)!.port.close();assert.match((await admitted)!,/^\/_sakura\/audio\//);revokeAll();
 });
 
 test("the page bridge distinguishes transient manager failures from recording-integrity failures",async()=>{

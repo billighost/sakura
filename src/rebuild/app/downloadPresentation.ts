@@ -1,6 +1,9 @@
 import type { DownloadEntry } from "./types";
 
-export function visibleDownloads(entries:DownloadEntry[]):DownloadEntry[]{return entries.filter(entry=>entry.requested!==false);}
+/** Downloads owns both explicit offline saves and the durable parts prepared by playback. */
+export function visibleDownloads(entries:DownloadEntry[]):DownloadEntry[]{return entries.slice();}
+/** A ready automatic cache is still not an offline save until the listener keeps it. */
+export function isSavedDownload(entry:DownloadEntry):boolean{return entry.status==="ready"&&entry.requested!==false;}
 /** Playback may begin from cached parts while a requested offline save is unfinished. */
 export function currentOfflineSave(recordingId:string,entries:DownloadEntry[]):{kind:"ready"|"saving"|"failed"|"paused"|"unsaved";entry?:DownloadEntry;label:string}{
  const entry=entries.find(item=>item.recordingId===recordingId);
@@ -16,6 +19,18 @@ export function downloadPercent(entry:Pick<DownloadEntry,"downloadedBytes"|"tota
 }
 export function downloadBytes(value:number){if(!Number.isFinite(value)||value<=0)return "0 MB";return value<1024*1024?Math.ceil(value/1024)+" KB":(value/1024/1024).toFixed(value>=10*1024*1024?0:1)+" MB";}
 export function downloadActivityLabel(entry:DownloadEntry):string{
+ const automatic=entry.requested===false,mode=entry.mode;
+ if(automatic){
+  const cached=entry.downloadedBytes>0?downloadBytes(entry.downloadedBytes)+" cached":"";
+  if(entry.status==="ready")return "Full song cached · Save it for offline listening";
+  if(entry.status==="failed")return "Playback cache incomplete · Save the full song to retry";
+  if(entry.status==="paused")return "Playback cache paused"+(cached?" · "+cached:"");
+  if(entry.status==="prepared")return (mode==="prefix"?"Ready for quicker playback":"Part of this song is on this device")+(cached?" · "+cached:"");
+  if(entry.status==="queued")return cached?"Playback cache waiting · "+cached:"Playback cache waiting";
+  if(entry.status==="resolving")return "Preparing playback cache";
+  const percent=downloadPercent(entry),progress=percent===null?"Caching for playback":percent+"% cached";
+  return progress+(entry.totalBytes?" · "+downloadBytes(entry.downloadedBytes)+" of "+downloadBytes(entry.totalBytes):"");
+ }
  const saved=entry.downloadedBytes>0?downloadBytes(entry.downloadedBytes)+" saved":"";
  if(entry.status==="failed")return "Save incomplete · Retry to finish";
  if(entry.status==="paused")return "Paused"+(saved?" · "+saved:"");
