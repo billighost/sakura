@@ -64,6 +64,7 @@ The interaction checks use a running development server (`npm run dev -- --port 
 ```powershell
 $env:SAKURA_TEST_URL="http://127.0.0.1:3027"
 npm run test:interactions:browser
+node scripts/rebuild-japanese-reading-browser.mjs --viewport
 node --import tsx scripts/rebuild-lyrics-live.ts
 ```
 

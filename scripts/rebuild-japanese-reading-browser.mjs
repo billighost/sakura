@@ -22,12 +22,14 @@ const tracks=['君の声','未来の光','花の記憶'].map((title,index)=>{
 });
 const sourceLines=tracks.map(track=>[{text:track.title,start:0,end:30},{text:'風に乗せて',start:30,end:40}]);
 const readings={'君の声':'kimi no koe','未来の光':'mirai no hikari','花の記憶':'hana no kioku','風に乗せて':'kaze ni nosete'};
-const output='.local/japanese-reading';
+const desktopHeaderOnly=process.argv.includes('--desktop-header');
+const viewportOnly=process.argv.includes('--viewport')||desktopHeaderOnly;
+const output=desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
 const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[]};
 let browser,latestPage;
 
-async function room(theme,width,sharedSettings){
- const context=await browser.newContext({viewport:{width,height:900},isMobile:width<700,hasTouch:width<700,colorScheme:theme,serviceWorkers:'block'});
+async function room(theme,width,sharedSettings,height=900){
+ const context=await browser.newContext({viewport:{width,height},isMobile:width<700,hasTouch:width<700,colorScheme:theme,serviceWorkers:'block'});
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.readingFixtureAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;});
  const settings=sharedSettings||{theme,audioTechnology:'none',japaneseReading:false,audioQuality:'balanced',privateSession:true,reducedMotion:false,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.4,shuffle:false,repeat:'off',revision:1,fieldRevisions:{}};
@@ -182,10 +184,74 @@ async function testRoom(theme,width,full){
  }catch(error){report.pageState={url:page.url(),text:(await page.locator('body').innerText()).slice(0,5000)};await page.screenshot({path:output+'/failure.png'}).catch(()=>{});throw error;}finally{await context.close();}
 }
 
+async function testViewport(theme,width,height,longTitle=false){
+ const originalTitle=tracks[0].title;
+ if(longTitle)tracks[0].title='君の声 — A song for the long way home, with a very long handwritten title';
+ const {context,page}=await room(theme,width,undefined,height);
+ const visibleInViewport=async(locator,label)=>{
+  const bounds=await locator.boundingBox();assert.ok(bounds,`${label} has bounds`);
+  assert.ok(bounds.y>=0&&bounds.y+bounds.height<=height+1,`${label} stays in the first ${height}px viewport: ${JSON.stringify(bounds)}`);
+ };
+ try{
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded',timeout:90000});
+  await page.addStyleTag({content:'nextjs-portal{display:none!important}'});
+  await page.getByRole('button',{name:`Play ${tracks[0].title}`,exact:true}).click();
+  const dialog=await openPlayer(page);await pausePlayer(dialog);
+  const header=dialog.locator('[data-dialog-swipe-handle]');
+  if(width<=760){
+   await expect(header.getByRole('button',{name:'Close',exact:true})).toBeHidden();
+   const title=await header.getByRole('heading').boundingBox();assert.ok(Math.abs(title.x+title.width/2-width/2)<1,'Mobile heading is centered');
+   assert.ok((await header.boundingBox()).height<=70,'Player header stays minimal');
+  }
+  const artwork=dialog.getByRole('group',{name:/Artwork for/});await visibleInViewport(artwork,'Cover artwork');
+  const coverBounds=await artwork.boundingBox();assert.ok(coverBounds.width>=100&&coverBounds.height>=100,'Cover stays visible at a useful size');
+  for(const label of ['Previous song','Next song','Share this song'])await visibleInViewport(dialog.getByRole('button',{name:label,exact:true}),label);
+  await visibleInViewport(dialog.getByRole('button',{name:/^Repeat:/}),'Repeat');
+  await visibleInViewport(dialog.getByRole('button',{name:'Play',exact:true}),'Play');
+  await visibleInViewport(dialog.getByRole('slider',{name:'Playback position',exact:true}),'Seek');
+  assert.equal(await dialog.locator('[data-player-scroll]').evaluate(element=>element.scrollTop),0,'Essential controls need no scrolling');
+  assert.equal(await dialog.evaluate(element=>element.scrollWidth>element.clientWidth+1),false,'No horizontal overflow');
+  await page.screenshot({path:`${output}/player-${theme}-${width}-${height}${longTitle?'-long':''}.png`,animations:'disabled'});
+  await dialog.getByRole('button',{name:'Lyrics',exact:true}).click();
+  const words=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(words).toHaveAttribute('data-dialog-phase','open');
+  await expect(words.locator('[data-player-header-song]')).toHaveText(tracks[0].title);
+  await visibleInViewport(words.locator('[data-player-header-song]'),'Lyrics song identity');
+  if(width<=760){
+   await expect(words.locator('[data-dialog-swipe-handle]').getByRole('button',{name:'Close',exact:true})).toBeHidden();
+   assert.ok((await words.locator('[data-dialog-swipe-handle]').boundingBox()).height<=85,'Lyrics header stays minimal with song title');
+  }else{
+   // Exercise the actual desktop header's layout with exceptionally long
+   // metadata; its text must shrink without pushing Close out of view.
+   await words.locator('[data-player-header-song]').evaluate(element=>{element.textContent=element.textContent.repeat(60);});
+   const bounds=await words.locator('[data-dialog-swipe-handle]').evaluate(element=>({client:element.clientWidth,scroll:element.scrollWidth}));
+   assert.ok(bounds.scroll<=bounds.client+1,'A long desktop song name cannot overflow the header');
+   await visibleInViewport(words.getByRole('button',{name:'Close',exact:true}),'Desktop Close');
+   const closeBounds=await words.getByRole('button',{name:'Close',exact:true}).boundingBox();assert.ok(closeBounds.x+closeBounds.width<=width,'Desktop Close stays onscreen');
+  }
+  await visibleInViewport(words.locator('[data-lyrics-controls]'),'Lyrics transport');
+  await words.getByRole('button',{name:'Next song',exact:true}).click();
+  await expect(words.locator('[data-player-header-song]')).toHaveText(tracks[1].title);
+  await page.screenshot({path:`${output}/lyrics-${theme}-${width}-${height}${longTitle?'-long':''}.png`,animations:'disabled'});
+  if(width<=760){
+   const bounds=await words.locator('[data-dialog-swipe-handle]').boundingBox(),cdp=await context.newCDPSession(page),x=bounds.x+bounds.width/2,y=bounds.y+12;
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+   for(let step=1;step<=10;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+step*18}]});await page.waitForTimeout(20);}
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
+   await expect(words).toHaveCount(0);await expect(dialog).toHaveAttribute('data-dialog-phase','open');
+  }else{await expect(words.getByRole('button',{name:'Close',exact:true})).toBeVisible();await words.getByRole('button',{name:'Close',exact:true}).click();}
+  report.checks.push(`${theme}/${width}×${height}${longTitle?' long title':''}: cover, seek, playback and sharing fit first screen; compact headers, live lyrics title, transport and dismissal work`);
+ }catch(error){await page.screenshot({path:output+'/failure.png'}).catch(()=>{});throw error;}
+ finally{tracks[0].title=originalTitle;await context.close();}
+}
+
 try{
  await fs.mkdir(output,{recursive:true});
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- for(const theme of ['light','dark'])for(const width of [1440,390])await testRoom(theme,width,theme==='light'&&width===1440);
+ if(desktopHeaderOnly)await testViewport('dark',1440,900);
+ else if(viewportOnly){
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,568],[375,667],[390,844],[430,932],[667,375]])await testViewport(theme,width,height);
+  await testViewport('light',320,568,true);await testViewport('dark',1440,900);
+ }else for(const theme of ['light','dark'])for(const width of [1440,390])await testRoom(theme,width,theme==='light'&&width===1440);
  assert.deepEqual(report.errors,[]);
  await fs.writeFile(output+'/report.json',JSON.stringify(report,null,2));
  console.log(JSON.stringify(report,null,2));
