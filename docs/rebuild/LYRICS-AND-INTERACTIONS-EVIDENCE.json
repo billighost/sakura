@@ -800,7 +800,17 @@
         "accepted": false
       }
     ],
-    "limitation": "No positive real full-song accuracy or live hosted speed evidence. All uncertain results retain unchanged plain source lyrics. Free hosting requires an eligible account that was not supplied."
+    "limitation": "No positive real full-song accuracy or live hosted speed evidence. All uncertain results retain unchanged plain source lyrics. Actual free GPU and CPU Gradio creation both returned HTTP402 after successful account login; no paid resources were selected.",
+    "hostingBlocker": {
+      "accountAuthenticated": true,
+      "emailVerified": true,
+      "userConfirmedAgeOverOneMonth": true,
+      "zeroGpuCreationHttpStatus": 402,
+      "cpuGradioCreationHttpStatus": 402,
+      "spaceCreated": false,
+      "paidPlanActivated": false,
+      "providerSuggestedNextStep": "community grant"
+    }
   },
   "validation": {
     "npmTest": 632,
@@ -812,5 +822,10 @@
     "eslintErrors": 0,
     "optionalDatabaseBranch": "not executed without isolated PostgreSQL"
   },
-  "downloadArchitecture": "Existing Cloudflare authorization owner, immutable CDN preparation and account/offline audio paths preserved; no acquisition or authorization owner started."
+  "downloadArchitecture": "Existing Cloudflare authorization owner, immutable CDN preparation and account/offline audio paths preserved; no acquisition or authorization owner started.",
+  "applicationDeployment": {
+    "commit": "32e6f14db92172444044d94a2c6bf289086c43a7",
+    "status": "success",
+    "url": "https://sakuraplayer.vercel.app"
+  }
 }

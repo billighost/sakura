@@ -28,6 +28,20 @@ Current hosting rules checked 2026-11-11:
 - Render's free 0.1 CPU/512 MB tier is unsuitable for a reliable fast Whisper
   service; the implementation does not recommend or silently activate it.
 
+Actual account checks supersede the eligibility summary above. On 2026-11-11,
+the user's authenticated account had a verified email and the user confirmed it
+was over one month old. Creating `zero-a10g` returned HTTP **402**:
+"Your account is not eligible to host ZeroGPU Spaces for free"; the service
+suggested a community grant. Explicit `cpu-basic` Gradio creation also returned
+**402**, requiring PRO. Neither request selected paid hardware, and neither
+created a worker. Static Spaces are free but cannot run this Python analysis.
+Local Hugging Face login now works; authorization is not the remaining blocker.
+Do not tell the user that account age alone guarantees free deployment.
+
+See [the prepared community grant request](../../docs/rebuild/LYRICS-SYNC-GRANT-DRAFT.md).
+It has not been submitted. A grant would unblock hosting, but would not establish
+accurate singing synchronization; the negative experiments below still apply.
+
 Copy this folder to a Gradio Space and select **ZeroGPU** hardware. Configure
 `SAKURA_SYNC_SECRET` as a Space secret and the same value in Sakura's server
 environment. Configure `SAKURA_LYRICS_SYNC_URL` in Sakura. Never put either

@@ -122,8 +122,12 @@ Current [free ZeroGPU rules](https://huggingface.co/docs/hub/spaces-zerogpu) req
 a personal account in good standing, a verified email and an account older than
 30 days. Eligible accounts can host two Spaces without a paid plan; daily GPU
 quotas, queues and cold starts apply. The user confirmed an account older than
-one month; email verification and local authenticated access still need to be
-established, so deployment remains pending. No paid compute or
+one month, authenticated locally, and the API confirmed its email is verified.
+Nevertheless, actual free ZeroGPU creation returned **402 Payment Required**:
+this account is not eligible and the API suggested a community grant. Explicit
+free CPU Gradio creation also returned 402, requiring PRO. Static hosting cannot
+run this worker. No Space was created. Deployment is blocked by the provider's
+account eligibility decision, not missing credentials. No paid compute or
 credit extension was enabled. This is not unlimited free production compute.
 
 Actual existing Downloads audio was compared with lyrics fetched through the
@@ -161,7 +165,11 @@ screenshots remain in ignored `.local/`. Public evidence contains selected
 metadata/results only. Preserve the deployed Cloudflare repair documented in
 `CLOUDFLARE-DOWNLOAD-ROLLOUT.md`; no authorization owner was started here.
 
-Remaining work: connect an eligible free hosting account and validate real hosted
+The application fixes were pushed in `32e6f14` and Vercel reported successful
+deployment. The production app remains `https://sakuraplayer.vercel.app`.
+
+Remaining work: obtain approved free compute and validate real hosted
 singing accuracy/runtime before describing auto sync as reliable. Provider gaps
 and uncertain readings remain honest, retryable limitations. Do not lower timing
 or recording-identity gates to turn these negative experiments into successes.
+The [community grant draft](LYRICS-SYNC-GRANT-DRAFT.md) is prepared but unsent.
