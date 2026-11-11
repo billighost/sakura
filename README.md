@@ -59,6 +59,16 @@ npm run test:personalization:browser
 node scripts/rebuild-export-smoke.mjs
 ```
 
+The interaction checks use a running development server (`npm run dev -- --port 3027`) and synthetic browser fixtures. Run the checks in another terminal:
+
+```powershell
+$env:SAKURA_TEST_URL="http://127.0.0.1:3027"
+npm run test:interactions:browser
+node --import tsx scripts/rebuild-lyrics-live.ts
+```
+
+The live lyric check invokes the actual backend route over local HTTP, simulates primary-provider misses, and calls `lyrics.ovh` for real. See [interaction verification](docs/rebuild/INTERACTION-CONTINUATION.md) for the full scope.
+
 The real Ink smoke (`npm run test:ink`) uses a private temporary account created by `node scripts/rebuild-test-session.mjs`. Its screenshots and reports stay under ignored `.local/`. Tests that access providers can fail when those external services are unavailable; fixture regressions are separate from live-provider evidence.
 
 See `docs/rebuild/PRODUCTION-DATA.md`, `AUDIO-AUDIT.md`, `LYRICS-AUDIT.md`, `UI-VERIFICATION.md`, and `PRODUCT-AUDIT.md` for contracts, reset evidence, and operational limits. Live checks verify Finesse original, its Cardi B remix, INERTIA and Ye by exact catalog evidence, returned file tags, complete checksums, decoder duration and browser playback. They are not acoustic-fingerprint certification. The 30-song Japanese lyric corpus preserves source text/timing; rare poetic readings remain flagged for review.

@@ -13,10 +13,11 @@ function storedDraft(value:unknown):SessionDraft|undefined{
  const pending=draft.pending===true,intent=pending&&draft.intent===true;
  return {...draft,pending,intent,intentAt:intent?(Number.isFinite(draft.intentAt)?draft.intentAt:draft.savedAt):undefined,state:{...state,sleepUntil:state.sleepUntil&&state.sleepUntil>Date.now()?state.sleepUntil:null}};
 }
-export function deviceIdentity(){
- try{const saved=localStorage.getItem("sakura-v2-device");if(saved&&/^[a-f0-9-]{36}$/i.test(saved))return saved;}catch{}
- const id=localId();try{localStorage.setItem("sakura-v2-device",id);}catch{}return id;
-}
+let playbackWriterId:string|undefined;
+/** Tabs need independent writers: a shared device ID cannot distinguish a
+ * delayed save from another tab's deliberate song or seek choice. Keep this
+ * identity stable through provider remounts, but never clone it from storage. */
+export function deviceIdentity(){return playbackWriterId??=localId();}
 export class ListeningSync {
  private draft:SessionDraft|null=null;
  private stopped=false;
@@ -63,6 +64,18 @@ export class ListeningSync {
   }this.draft.clockOffset=offset;this.save();}
  }
  private adopt(record:SessionRecord){this.draft={...record,pending:false,savedAt:Date.now(),clockOffset:this.clockKnown?this.clockOffset:undefined};this.explicit=false;this.intentStartedAt=null;this.save();this.restore(record.state);}
+ /** A delayed checkpoint from this page is an acknowledgement, never a
+  * command to rewind its live media. A pending restored draft can also finish
+  * its previous page's save before switching to this page's writer identity. */
+ private rebaseOwnCheckpoint(record:SessionRecord):boolean {
+  if(!this.draft)return false;
+  const ownLiveWriter=record.deviceId===this.deviceId&&this.sequence>0;
+  const ownRestoredWriter=this.sequence===0&&this.draft.pending&&record.deviceId===this.draft.deviceId;
+  if(!ownLiveWriter&&!ownRestoredWriter)return false;
+  this.draft.revision=Math.max(this.draft.revision,record.revision);
+  this.draft.updatedAt=Math.max(this.draft.updatedAt,record.updatedAt);
+  this.draft.pending=true;this.save();return true;
+ }
  async refresh(){
   if(this.stopped||this.request)return;
   const before=this.sequence;
@@ -71,7 +84,7 @@ export class ListeningSync {
    if(this.stopped)return;this.calibrate(data.serverTime);if(before!==this.sequence)return;
    const remote=data.session;if(!remote||!remote.state)return;
    if(this.draft?.pending&&this.explicit&&(this.draft.intentAt||this.draft.savedAt)>remote.updatedAt){this.draft.revision=remote.revision;this.save();return;}
-   if(!this.draft||remote.revision>this.draft.revision)this.adopt(remote);
+   if(!this.draft||remote.revision>this.draft.revision){if(!this.rebaseOwnCheckpoint(remote))this.adopt(remote);}
   })();
   this.request=request;try{await request;}finally{if(this.request===request)this.request=null;}
   await this.flush();
@@ -85,7 +98,8 @@ export class ListeningSync {
    const data=await requestJson<{accepted:boolean;session:SessionRecord|null;serverTime?:number}>("/api/v2/listening-session",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({state:sent.state,revision:sent.revision,deviceId:this.deviceId}),signal:this.controller.signal,keepalive},{context:"save",accountId:this.accountId});
    if(this.stopped||!data.session?.state)return;
    this.calibrate(data.serverTime);
-   if(data.accepted){if(this.draft){this.draft.revision=data.session.revision;this.draft.updatedAt=data.session.updatedAt;if(before===this.sequence){this.draft.pending=false;this.explicit=false;this.intentStartedAt=null;}this.save();}}
+   if(data.accepted){if(this.draft){this.draft.revision=data.session.revision;this.draft.updatedAt=data.session.updatedAt;this.draft.deviceId=this.deviceId;if(before===this.sequence){this.draft.pending=false;this.explicit=false;this.intentStartedAt=null;}this.save();}}
+   else if(this.rebaseOwnCheckpoint(data.session)){/* Retry the latest local position against its acknowledged revision. */}
    else if(this.explicit&&(this.draft?.intentAt??this.draft?.savedAt??0)>data.session.updatedAt){if(this.draft){this.draft.revision=data.session.revision;this.save();}}
    else this.adopt(data.session);
   })();

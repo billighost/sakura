@@ -22,3 +22,14 @@
 @keyframes menuInk{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
 .songPopover[data-motion=still],.songPopover[data-motion=still]>*{animation:none}
 @media(prefers-reduced-motion:reduce){.songPopover,.songPopover>*{animation:none}}
+.contextSurface{touch-action:manipulation;transition:box-shadow 360ms cubic-bezier(.16,.76,.22,1)}
+.contextSurface a,.contextSurface img{-webkit-touch-callout:none}
+.contextSurface[data-press-phase=pending]{box-shadow:inset 3px 0 color-mix(in srgb,var(--ink-petal,#c68c95) 70%,transparent)}
+.sheetHeader{position:relative;touch-action:pan-x pinch-zoom;cursor:grab;user-select:none}
+.sheetGrip{position:absolute;top:calc(3px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:grid;place-items:center;width:70px;height:14px;color:var(--p-muted,#69786d);opacity:.65;pointer-events:none;transition:color 360ms,opacity 360ms}
+.sheetGrip svg{width:58px;height:9px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+.sheetHeader:hover .sheetGrip,[data-dialog-dragging] .sheetGrip{color:var(--p-accent,#446b57);opacity:1}
+[data-dialog-dragging] .sheetHeader{cursor:grabbing}
+.songPopover [role=menuitem]{transition:background 260ms cubic-bezier(.16,.76,.22,1),color 260ms}
+@media(pointer:coarse){.contextSurface,.contextSurface a{-webkit-user-select:none;user-select:none}.songPopover button,.songPopover a{min-height:48px}.songPopover{border-radius:5px 22px 7px 22px}}
+@media(prefers-reduced-motion:reduce){.contextSurface,.sheetGrip,.songPopover [role=menuitem]{transition:none}}

@@ -18,7 +18,17 @@ Official sources fetched successfully over HTTPS on 2026-11-07. These are docume
 - Lyrics follow the active line within their own scrolling surface. User scroll pauses following; a visible action resumes it. Choosing lines for sharing is separate from pausing the scroll guide. Tapping a synced line outside selection mode seeks to its timestamp.
 - Fullscreen listening uses both viewport dimensions on desktop and mobile, safe-area padding, readable line widths and reduced-motion support.
 
-Swipe-to-delete and automatic navigation on a horizontal swipe were omitted because they would conflict with scrolling and make accidental actions likely. All listening actions have visible controls; touch gestures add shortcuts.
+Horizontal swipes on the full-player artwork and mini-player change songs after direction and distance checks. Vertical scrolling and pinch zoom retain browser ownership; visible previous/next buttons provide the same actions. A pull from a dialog's header dismisses that dialog, while scrolling its body preserves it. Holds and drags cancel when a second pointer arrives. Swipe-to-delete remains unavailable.
+
+## 10 November refinement
+
+Reviewed the official [pointer cancellation guidance](https://www.w3.org/WAI/WCAG22/Understanding/pointer-cancellation.html), [44px enhanced target guidance](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html), [listbox keyboard pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/), and [MDN touch-action reference](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action). Reversible options on holds, release-based song changes, preserved browser scrolling/zoom, visible alternatives, and keyboard focus ownership informed the implementation.
+
+Dropdowns use a custom combobox with native top-layer popovers, arrows, Home/End, typeahead, disabled options and Escape. Touch scrolling does not move the highlighted option or fight the list's scroll position. Seek, volume and garden sliders retain native range semantics and 44px hit areas.
+
+Search alone docks beneath the navbar. Following the listener's correction, the docked field is 44px tall, shares the page background, and has no surrounding panel or extra artwork. Sort/layout/category controls remain in page flow. Liked-song rows grow with their content and use the main page's scroll surface in every layout.
+
+Browser acceptance covers actual artwork and mini-player swipes, dialog pulls, secondary-pointer cancellation, custom choices and sliders, mobile/desktop collection search, short/tall viewports, and reading persistence. See `INTERACTION-CONTINUATION.md` for results and scope.
 
 ## Verification
 

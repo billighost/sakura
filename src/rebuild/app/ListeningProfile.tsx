@@ -6,6 +6,7 @@ import { useResource } from "./resources";
 import { Artwork, Button, Empty, LoadingRows, LoadError, TrackList } from "./Elements";
 import { RecoveryNotice } from "./RecoveryNotice";
 import { GardenSlider } from "./ListeningControls";
+import { SelectPopover } from "./SelectPopover";
 import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
 import { musicTrack, type MusicTrack } from "./types";
@@ -85,7 +86,7 @@ function ListeningHours({ hours, timeZone }: { hours: Hour[]; timeZone: string }
       setSelected(next); bars.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
     }}>{complete.map(item => <button key={item.hour} type="button" tabIndex={selectedHour.hour === item.hour ? 0 : -1} aria-pressed={selectedHour.hour === item.hour} aria-label={`${hourLabel(item.hour)}, ${listeningTime(item.audibleMs)} listened`} title={`${hourLabel(item.hour)} · ${listeningTime(item.audibleMs)}`} onClick={() => setSelected(item.hour)}><span style={{ "--bar-height": `${Math.max(3, item.audibleMs / maximum * 100)}%` } as CSSProperties}/></button>)}</div>
     <div className={s.chartDates}><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div>
-    <div className={s.hourDetail}><label className={s.hourPicker}><span className={s.srOnly}>Choose a listening hour</span><select value={selectedHour.hour} onChange={event => setSelected(Number(event.target.value))}>{complete.map(item => <option key={item.hour} value={item.hour}>{hourLabel(item.hour)}</option>)}</select></label><span aria-live="polite">{listeningTime(selectedHour.audibleMs)} of listening</span>{selectedHour.genres.length ? <div className={s.hourGenres}>{selectedHour.genres.slice(0, 3).map(genre => <span key={genre.name}><b dir="auto">{genre.name}</b><small>{listeningTime(genre.audibleMs)}</small></span>)}</div> : <small>No genre information for this listening hour.</small>}</div>
+    <div className={s.hourDetail}><SelectPopover className={s.hourPicker} label="Choose a listening hour" value={selectedHour.hour} onChange={setSelected} options={complete.map(item => ({value:item.hour,label:hourLabel(item.hour)}))}/><span aria-live="polite">{listeningTime(selectedHour.audibleMs)} of listening</span>{selectedHour.genres.length ? <div className={s.hourGenres}>{selectedHour.genres.slice(0, 3).map(genre => <span key={genre.name}><b dir="auto">{genre.name}</b><small>{listeningTime(genre.audibleMs)}</small></span>)}</div> : <small>No genre information for this listening hour.</small>}</div>
     <p className={s.smallNote}>Saved listening history, shown in {timeZone}. Choose an hour above or use the arrow keys in the chart.</p>
   </section>;
 }

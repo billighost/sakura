@@ -112,3 +112,20 @@
 .repeatControl{position:relative;display:inline-flex;align-items:center;justify-content:center}
 .repeatControl>b{position:absolute;right:-1px;top:-3px;z-index:2;display:grid;place-items:center;width:14px;height:14px;border-radius:65% 35% 65% 35%;background:var(--ink-accent);color:var(--ink-on);box-shadow:0 0 0 2px var(--ink-bg);font:700 8px/1 var(--font-inter),Arial,sans-serif;pointer-events:none}
 @media(prefers-reduced-motion:reduce){.iconButton{transition:none}.iconButton.active{transform:none}}
+
+.iconButton{position:relative}
+.shortcutHint{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translate(-50%,5px);padding:5px 8px;border:1px solid var(--ink-line);border-radius:9px 3px 9px 3px;background:var(--ink-card);color:var(--ink-muted);font:10px ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap;opacity:0;pointer-events:none;z-index:80;transition:opacity .32s,transform .45s cubic-bezier(.18,.72,.24,1)}
+.iconButton:hover .shortcutHint,.iconButton:focus-visible .shortcutHint{opacity:1;transform:translate(-50%,0)}
+.appHeader .shortcutHint{bottom:auto;top:calc(100% + 5px)}
+.playerIdentityGroup{position:relative;touch-action:pan-y pinch-zoom;user-select:none}
+.playerIdentityGroup[data-swiping] .playerIdentity{cursor:grabbing}
+.playerIdentity{cursor:grab}
+.miniSleeve{animation:miniSleeveArrival .85s cubic-bezier(.16,.72,.22,1) both;transform-origin:30% 70%}
+.miniCaption{animation:miniCaptionArrival .72s cubic-bezier(.16,.72,.22,1) both}
+.playerIdentityGroup[data-swipe-direction=previous] .miniSleeve{animation-name:miniSleeveReturn}
+.miniReading{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:9px;line-height:1.5;color:var(--ink-accent);font-style:normal;opacity:.85}
+@keyframes miniSleeveArrival{from{opacity:0;transform:translateX(18px) rotate(7deg);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+@keyframes miniSleeveReturn{from{opacity:0;transform:translateX(-18px) rotate(-7deg);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+@keyframes miniCaptionArrival{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(pointer:coarse){.shortcutHint{display:none}}
+@media(prefers-reduced-motion:reduce){.miniSleeve,.miniCaption{animation:none}.shortcutHint{transition:none}}

@@ -13,6 +13,7 @@ import {musicTrack} from "../src/rebuild/app/types";
 import {validOfflineAudio} from "../src/rebuild/app/offline";
 import {boundedSeekPosition} from "../src/rebuild/app/seekPosition";
 import {userIssue,UserFacingError,responseIssue,type FailureKind} from "../src/rebuild/app/errors";
+import {audioTechnology} from "../src/rebuild/audio/presets";
 import {FEED_DEFAULTS} from "../src/rebuild/app/feedPreferences";
 import * as listeningEvidence from "../src/rebuild/app/listeningEvidence";
 import * as smartQueueHelpers from "../src/rebuild/app/smartQueue";
@@ -43,13 +44,15 @@ async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce
  const hooks:Array<{deps:unknown[]|undefined;cleanup?:()=>void}>=[],pendingEffects:Array<{slot:number;effect:()=>void|(()=>void)}>=[];
  const windowEvents=new Map<string,Set<()=>void>>(),documentEvents=new Map<string,Set<()=>void>>(),timers=new Set<ReturnType<typeof setTimeout>>(),timerCallbacks=new Map<ReturnType<typeof setTimeout>,{callback:()=>void;delay:number}>();
  const registrations:Array<{accountId:string;track:MusicTrack;ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>;resolve?:(url:string|undefined)=>void}>=[],resolvers:Array<{track:MusicTrack;resolve:(result:unknown)=>void;reject:(error:unknown)=>void;signal:AbortSignal}>=[],ensured:Array<{id:string;offset:number;signal?:AbortSignal}>=[];
+ const soundModes:string[]=[];
  const prepares:string[]=[],enqueues:Array<{id:string;requested:boolean}>=[],disposed:string[]=[],objectUrls:string[]=[],revokedUrls:string[]=[],partials=new Map<string,{fingerprint:{assetId:string;sizeBytes:number;sha256:string};blob:Blob;cachedSeconds:number}>();
  const downloadResolvers:Array<(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<{url:string}>>=[];
  const chunkWaiters:Array<{resolve:()=>void;signal?:AbortSignal}>=[];
  const entries:Record<string,{recordingId:string;requested:boolean;status:string;track:MusicTrack}>={};
  const accountEntries=new Map([[accountId,entries]]),accountStorage=new Map([[accountId,saved]]);
  let media:FixtureAudio|undefined,revocations=0,closed=false,renderQueued=false,stateSlot=0,refSlot=0,effectSlot=0,profileId=accountId,loggedOut=false,value:MusicState;
- const navigator={onLine:!options.offline};
+ const mediaActions=new Map<string,()=>void>();
+ const navigator={onLine:!options.offline,mediaSession:{metadata:null,playbackState:"none",setActionHandler(name:string,action:()=>void){mediaActions.set(name,action);}}};
  const location={origin:"https://sakura.example",href:"https://sakura.example/library",pathname:"/library"};
  const noop=()=>{},asyncNoop=async()=>{},exports:Record<string,unknown>={};
  const events=(handlers:Map<string,Set<()=>void>>)=>({addEventListener(name:string,listener:()=>void){const group=handlers.get(name)||new Set();group.add(listener);handlers.set(name,group);},removeEventListener(name:string,listener:()=>void){handlers.get(name)?.delete(listener);}});
@@ -57,7 +60,7 @@ async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce
  const react={createContext:()=>({Provider:noop}),useState(initial:unknown){const slot=stateSlot++;if(slot>=states.length)states[slot]=initial;return [states[slot],(next:unknown)=>{states[slot]=typeof next==="function"?(next as (previous:unknown)=>unknown)(states[slot]):next;scheduleRender();}];},useRef(current:unknown){const slot=refSlot++;return refs[slot]||(refs[slot]={current});},useEffect(effect:()=>void|(()=>void),deps?:unknown[]){const slot=effectSlot++,previous=hooks[slot];if(!previous||!deps||deps.length!==previous.deps?.length||deps.some((dep,index)=>!Object.is(dep,previous.deps?.[index])))pendingEffects.push({slot,effect});hooks[slot]={deps,cleanup:previous?.cleanup};}};
  function captureMedia(audio:FixtureAudio){media=audio;}
  class FixtureAudio {
-  private address="";preload="";volume=.8;muted=false;seeking=false;paused=true;currentTime=0;duration=Number.NaN;rejectNextPlay=false;error:{code:number}|null=null;
+  private address="";preload="";volume=.8;muted=false;seeking=false;paused=true;currentTime=0;duration=Number.NaN;playbackRate=1;defaultPlaybackRate=1;preservesPitch=true;rejectNextPlay=false;error:{code:number}|null=null;
   fallbackRejected=false;loads:string[]=[];listeners=new Map<string,Set<{listener:()=>void;once:boolean}>>();
   constructor(){captureMedia(this);}
   get src(){return this.address;}set src(address:string){this.address=address?new URL(address,location.href).href:"";}
@@ -93,16 +96,16 @@ async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce
   "./downloadEngine":{DurableDownloadManager:Manager},"./sharedFlight":{SharedFlight},
   "./partialPlayback":{partialPlaybackUrl:async(accountId:string,source:{track:MusicTrack},ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>{if(options.bridge===false)return;const registration={accountId,track:source.track,ensure};registrations.push(registration);return options.deferRegistration?new Promise<string|undefined>(resolve=>Object.assign(registration,{resolve})):"https://sakura.example/_sakura/audio/fixture";},revokePartialPlayback:()=>{revocations++;}},
   "./listeningSync":{ListeningSync:class{start=asyncNoop;stop=noop;refresh=asyncNoop;flush=asyncNoop;change=noop;},deviceIdentity:()=>"fixture"},"./sessionState":{sessionState:()=>({})},
-  "../audio/engine":{MediaAudioEngine:class{initialized=false;requiresVolumeGraph=false;setVolume(){}setMode(){return Promise.resolve();}dispose(){}}},"../audio/presets":{audioTechnology:()=>"none"},
+  "../audio/engine":{MediaAudioEngine:class{initialized=false;requiresVolumeGraph=false;setVolume(){}resume(){return Promise.resolve();}setMode(mode:string){soundModes.push(mode);this.initialized ||= mode!=="none";return Promise.resolve();}dispose(){}}},"../audio/presets":{audioTechnology},
   "./playbackSource":{readyPlaybackFor},"./seekPosition":{boundedSeekPosition},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:(accountId:string,prefix="/api/v2/",dropData=false)=>invalidations.push({accountId,prefix,dropData})},"./listeningQueue":queue,
   "./offline":{localRead:async(owner:string,key:string)=>accountStorage.get(owner)?.get(key),localWrite:async(owner:string,key:string,entry:unknown)=>{let storage=accountStorage.get(owner);if(!storage){storage=new Map();accountStorage.set(owner,storage);}storage.set(key,entry);},rememberAccount:asyncNoop,lastAccount:async()=>({id:profileId}),forgetActiveAccount:asyncNoop,drainListen:asyncNoop,clearListeningOutbox:async(accountId:string,period:string,cutoff:number)=>{historyClears.push({accountId,period,cutoff});if(options.deferHistoryClear)await new Promise<void>(resolve=>historyClearResolvers.push(resolve));},deliverListen:async(_owner:string,chunk:Record<string,unknown>)=>{delivered.push(chunk);return true;},savedAudio:async(owner:string)=>[...(accountStorage.get(owner)||new Map())].filter(([key,value])=>String(key)==="audio:"+(value as {track?:MusicTrack})?.track?.id&&validOfflineAudio(value)).map(([,value])=>value),validOfflineAudio},
  };
  class FixtureUrl extends URL {static createObjectURL(blob:Blob){const url=URL.createObjectURL(blob);objectUrls.push(url);return url;}static revokeObjectURL(url:string){revokedUrls.push(url);URL.revokeObjectURL(url);}}
- const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:{...events(windowEvents),dispatchEvent(event:Event){for(const listener of windowEvents.get(event.type)||[])(listener as (event:Event)=>void)(event);return true;}},CustomEvent,URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance:options.clock?{now:()=>elapsed}:performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
+ const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,MediaMetadata:class{constructor(value:unknown){Object.assign(this,value);}},navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:{...events(windowEvents),dispatchEvent(event:Event){for(const listener of windowEvents.get(event.type)||[])(listener as (event:Event)=>void)(event);return true;}},CustomEvent,URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance:options.clock?{now:()=>elapsed}:performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {chunkWaiters,holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {mediaActions,soundModes,chunkWaiters,holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
 
 test("startup error event and original Play rejection share one surviving fallback transport",async()=>{
@@ -684,5 +687,69 @@ test("listening and feedback recorded during local history reconciliation surviv
   p.setTaste({feedback:[],tasteEvidence:[{recordingId:song().id,audibleMs:9000,playCount:1,completedCount:0,skippedCount:0}],historyClearedAt:cutoff,historyDeletion:{periodStart:"2026-11-01T00:00:00.000003Z",clearedAt:cutoff}});await p.pollTaste();
   const feedback={target:"recording",targetId:song(2).id,kind:"block",expiresAt:null,updatedAt:"2026-11-08T00:00:00.000005Z"};p.dispatch("sakura-taste-updated",{accountId,feedback});p.advance(1000);p.value.pause();await tick();p.resolveHistoryClear();await tick();await tick();
   const retained=p.saved.get("personalization-evidence") as {history:Array<{audibleMs:number}>;feedback:Array<typeof feedback>};assert.equal(retained.history[0].audibleMs,10000);assert.equal(retained.feedback[0].targetId,feedback.targetId);
+ }finally{p.close();}
+});
+
+
+test("duplicate metadata and duration notifications cannot rewind an already restored transport",async()=>{
+ const p=await player({bridge:false});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.value.seek(31500);p.media.currentTime=38.25;
+  for(const event of ["loadedmetadata","durationchange","loadedmetadata"]){p.media.emit(event);await tick();}
+  assert.equal(p.media.currentTime,38.25);p.media.emit("timeupdate");await tick();assert.equal(p.value.positionMs,38250);
+ }finally{p.close();}
+});
+
+for(const duration of [Number.POSITIVE_INFINITY,Number.NaN])test(`initial playback with ${String(duration)} duration keeps advancing when metadata finally arrives`,async()=>{
+ const p=await player({bridge:false,deferMetadata:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.duration=duration;p.media.currentTime=7.25;
+  p.media.emit("timeupdate");await tick();assert.equal(p.value.positionMs,7250);
+  p.media.metadata();await tick();assert.equal(p.media.currentTime,7.25);
+  p.media.currentTime=9.5;p.media.emit("durationchange");p.media.emit("timeupdate");await tick();assert.equal(p.value.positionMs,9500);
+ }finally{p.close();}
+});
+
+test("a replacement stream restores a saved position once even with an infinite duration",async()=>{
+ const p=await player({bridge:false,deferMetadata:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.metadata();p.value.seek(31500);await tick();
+  p.media.networkFailure();await tick();p.media.duration=Number.POSITIVE_INFINITY;p.media.emit("loadedmetadata");await tick();assert.equal(p.media.currentTime,31.5);
+  p.media.currentTime=38.25;p.media.metadata();p.media.emit("timeupdate");await tick();assert.equal(p.value.positionMs,38250);
+ }finally{p.close();}
+});
+
+for(const duration of [Number.POSITIVE_INFINITY,Number.NaN])test(`an advancing source with ${String(duration)} duration preserves its live position through recovery`,async()=>{
+ const p=await player({bridge:false});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.duration=duration;p.media.currentTime=56.75;
+  p.media.emit("timeupdate");await tick();assert.equal(p.value.positionMs,56750);p.media.networkFailure();await tick();
+  assert.equal(p.media.currentTime,56.75);assert.equal(p.value.positionMs,56750);
+ }finally{p.close();}
+});
+
+test("the original playback speed and pitch survive source replacement and unexpected browser rate changes",async()=>{
+ const p=await player({bridge:false});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");
+  p.media.playbackRate=1.2;p.media.defaultPlaybackRate=.8;p.media.preservesPitch=false;p.media.emit("ratechange");
+  assert.equal(p.media.playbackRate,1);assert.equal(p.media.defaultPlaybackRate,1);assert.equal(p.media.preservesPitch,true);
+  p.media.currentTime=32.5;p.media.networkFailure();await tick();assert.equal(p.media.playbackRate,1);assert.equal(p.media.currentTime,32.5);
+ }finally{p.close();}
+});
+
+test("choosing None while an older audio technology save is pending keeps dry playback after acknowledgement and reconnect",async()=>{
+ const p=await player({bridge:false,deferSettingsPatch:true});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=29;
+  const enhanced=p.value.updateSettings({audioTechnology:"warmth"});await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);
+  const original=p.value.updateSettings({audioTechnology:"none"});await tick();assert.equal(p.value.settings.audioTechnology,"none");assert.equal(p.soundModes.at(-1),"none");
+  p.resolveSettings(0);await enhanced;assert.equal(p.value.settings.audioTechnology,"none");
+  await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===2);p.resolveSettings(1);await original;
+  await p.connection(false);await p.connection(true);await tick();
+  assert.equal(p.value.settings.audioTechnology,"none");assert.equal(p.preferenceDraft?.settings.audioTechnology,"none");assert.equal(p.soundModes.at(-1),"none");assert.equal(p.media.currentTime,29);assert.equal(p.value.status,"playing");
+ }finally{p.close();}
+});
+
+
+test("repeated headset or OS Play commands keep an already playing recording and resume a paused one",async()=>{
+ const p=await player({bridge:false});try{
+  p.value.play(song());await until(()=>p.value.status==="playing");p.media.currentTime=42.5;
+  p.mediaActions.get("play")!();p.mediaActions.get("play")!();await tick();assert.equal(p.value.status,"playing");assert.equal(p.media.currentTime,42.5);
+  p.mediaActions.get("pause")!();await tick();assert.equal(p.value.status,"paused");p.mediaActions.get("play")!();await until(()=>p.value.status==="playing");assert.equal(p.media.currentTime,42.5);
  }finally{p.close();}
 });

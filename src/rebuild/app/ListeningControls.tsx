@@ -1,15 +1,16 @@
 "use client";
-import { useRef, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
 import s from "./listening-controls.module.css";
 function clock(ms:number){const seconds=Math.floor(Math.max(0,ms)/1000);return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;}
 export function PlaybackRibbon({positionMs,durationMs,onSeek,disabled=false,compact=false,label="Playback position"}:{positionMs:number;durationMs:number;onSeek:(ms:number)=>void;disabled?:boolean;compact?:boolean;label?:string}){
- const max=Math.max(1,durationMs);const value=Math.max(0,Math.min(positionMs,max));const percent=value/max*100;
+ const dragging=useRef(false);const [preview,setPreview]=useState<number|null>(null);
+ const max=Math.max(1,durationMs);const value=Math.max(0,Math.min(preview??positionMs,max));const percent=value/max*100;
  return <div className={`${s.ribbon} ${compact?s.compact:""}`}><div className={s.ribbonTrack} style={{"--progress":`${percent}%`} as CSSProperties}>
   <svg viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true"><path className={s.ghostStroke} d="M0 23C30 18 55 27 80 23S130 16 160 22S210 28 240 22S270 8 294 21S330 31 360 23S410 17 440 22S480 28 510 22S555 19 600 23"/><path className={s.stem} d="M0 23C55 21 90 24 150 23S220 22 275 23S340 24 405 23S515 21 600 23"/></svg>
   <div className={s.played}><svg viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 23C30 18 55 27 80 23S130 16 160 22S210 28 240 22S270 8 294 21S330 31 360 23S410 17 440 22S480 28 510 22S555 19 600 23"/></svg></div><span className={s.ribbonBloom}><Blossom/></span>
-  <input type="range" min={0} max={max} step={100} value={value} disabled={disabled||!durationMs} aria-label={label} aria-valuetext={`${clock(value)} of ${clock(durationMs)}`} onChange={e=>onSeek(Number(e.target.value))}/>
+  <input type="range" min={0} max={max} step={100} value={value} disabled={disabled||!durationMs} aria-label={label} aria-valuetext={`${clock(value)} of ${clock(durationMs)}`} title="Drag to seek · ← / → 5 seconds · Shift + ← / → 1 second" onPointerDown={e=>{dragging.current=true;setPreview(Number(e.currentTarget.value));e.currentTarget.setPointerCapture(e.pointerId);}} onChange={e=>{const next=Number(e.target.value);if(dragging.current)setPreview(next);else onSeek(next);}} onPointerUp={e=>{if(!dragging.current)return;dragging.current=false;onSeek(Number(e.currentTarget.value));setPreview(null);}} onPointerCancel={()=>{dragging.current=false;setPreview(null);}} onKeyDown={e=>{let next:number|undefined;if(e.key==="ArrowLeft"||e.key==="ArrowDown")next=value-(e.shiftKey?1000:5000);else if(e.key==="ArrowRight"||e.key==="ArrowUp")next=value+(e.shiftKey?1000:5000);else if(e.key==="Home")next=0;else if(e.key==="End")next=durationMs;else if(e.key==="PageUp")next=value+10000;else if(e.key==="PageDown")next=value-10000;if(next!==undefined){e.preventDefault();e.stopPropagation();onSeek(Math.max(0,Math.min(durationMs,next)));}}}/>
  </div><div className={s.times}><span>{clock(positionMs)}</span>{!compact&&<em>follow the little thread</em>}<span>{clock(durationMs)}</span></div></div>;
 }
 export function VolumeControl({value,onChange,compact=false,label="Volume"}:{value:number;onChange:(value:number)=>void;compact?:boolean;label?:string}){

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import {PlaybackRibbon,VolumeControl} from "../app/ListeningControls";
 import { useMusic } from "../app/MusicContext";
+import { SelectPopover } from "../app/SelectPopover";
 import { PlayerDialog, PlayerIcon } from "../player/Primitives";
 import { AUDIO_TECHNOLOGIES, audioTechnology, type AudioTechnology } from "./presets";
 import { prepareComparison, type AudioComparison } from "./preview";
@@ -374,7 +375,7 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
       <button type="button" onClick={() => input.current?.click()} disabled={!context}><PlayerIcon name="up" size={14}/>Choose audio file</button>
       <input ref={input} className={s.srOnly} type="file" accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg,.opus" aria-label="Choose a comparison audio file" onChange={event => void chooseFile(event)} disabled={!context}/>
     </div></div>
-    <div className={s.compareHeading}><span className={s.eyebrow}>SAME SONG. SAME MOMENT.</span><label htmlFor={id + "-mode"}>Compare with<select id={id + "-mode"} aria-label="Compare with" value={mode} onChange={event => void selectMode(audioTechnology(event.target.value))}>{AUDIO_TECHNOLOGIES.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label></div>
+    <div className={s.compareHeading}><span className={s.eyebrow}>SAME SONG. SAME MOMENT.</span><label htmlFor={id + "-mode"}>Compare with<SelectPopover id={id + "-mode"} label="Compare with" value={mode} onChange={value => void selectMode(audioTechnology(value))} options={AUDIO_TECHNOLOGIES.map(value => ({value:value.id,label:value.name}))}/></label></div>
     <div className={s.lanes} aria-busy={busy}>
       <WaveformLane side="original" name="Original" description="None · the source sound" waveform={comparison?.originalWaveform || []} progress={duration ? position / duration : 0} playing={playing === "original"} disabled={!comparison || busy || !context} onPlay={() => void play("original")} onSeek={progress => seek(progress * duration)}/>
       <WaveformLane side="enhanced" name={preset.name} description={preset.description} waveform={comparison?.enhancedWaveform || []} progress={duration ? position / duration : 0} playing={playing === "enhanced"} disabled={!comparison || busy || !context} onPlay={() => void play("enhanced")} onSeek={progress => seek(progress * duration)}/>

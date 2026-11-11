@@ -6,7 +6,7 @@ import {FEED_NUMERIC_FIELDS,FEED_BOOLEAN_FIELDS} from "./feedPreferences";
 import {initialTasteSignature,normalizeInitialTasteProfile} from "../recommendations/initialTaste";
 export interface PreferenceSyncMetadata {serverRevision?:number;serverSettings?:Partial<UserSettings>;baseSettings?:Partial<UserSettings>;serverFieldRevisions?:Record<string,number>;baseFieldRevisions?:Record<string,number>}
 export interface PreferenceDraft extends PreferenceSyncMetadata {settings:UserSettings;pending:boolean;pendingPatch?:Partial<UserSettings>;savedAt:number}
-const supported=["theme","audioQuality","audioTechnology","privateSession",...FEED_NUMERIC_FIELDS,...FEED_BOOLEAN_FIELDS,"reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
+const supported=["theme","audioQuality","audioTechnology","japaneseReading","privateSession",...FEED_NUMERIC_FIELDS,...FEED_BOOLEAN_FIELDS,"reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
 export function cachedPreferences(accountId?:string):Partial<UserSettings>{try{const id=accountId||localStorage.getItem("sakura-v2-active-account");if(!id)return {};const raw=localStorage.getItem("sakura-v2-preferences:"+id);return raw?fullSettings(JSON.parse(raw).settings):{};}catch{return {};}}
 /** Read-only account metadata may be cached, but can never enter a PATCH. */
 export function fullSettings(value:unknown):Partial<UserSettings>{
@@ -17,7 +17,7 @@ export function fullSettings(value:unknown):Partial<UserSettings>{
 export function settingsFields(value:unknown):Partial<UserSettings>{
  const object=value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
  const choices:Record<string,readonly string[]>={theme:["system","light","dark"],audioQuality:["high","balanced","data-saver"],audioTechnology:AUDIO_TECHNOLOGIES.map(mode=>mode.id),bloomPerformance:["auto","1","2","3","4","5"],repeat:["off","one","all"]};
- const booleans=["privateSession","reducedMotion","explicitContent","onboarded","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
+ const booleans=["japaneseReading","privateSession","reducedMotion","explicitContent","onboarded","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
  const result:Record<string,unknown>={};
  for(const key of supported){const field=object[key];if(field===undefined)continue;
   if(choices[key]){if(typeof field==="string"&&choices[key].includes(field))result[key]=field;}

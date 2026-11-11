@@ -31,14 +31,14 @@ export function ids(value: unknown, limit = 200): string[] {
   return parsed;
 }
 export const DEFAULT_SETTINGS = {
-  theme: "system", audioQuality: "high", audioTechnology: "none", privateSession: false, ...FEED_DEFAULTS,
+  theme: "system", audioQuality: "high", audioTechnology: "none", japaneseReading: false, privateSession: false, ...FEED_DEFAULTS,
   reducedMotion: false, openingAnimation: 1, bloomPerformance: "auto", explicitContent: true,
   timeZone: "Africa/Lagos", seedArtistSelections: [],volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15,
 } as const;
 export function preferencesPatch(value: unknown): Record<string,unknown> {
   const raw = object(value), result: Record<string,unknown> = {};
   const choices: Record<string,readonly string[]> = { theme:["system","dark","light"], bloomPerformance:["auto","1","2","3","4","5"], audioQuality:["high","balanced","data-saver"], audioTechnology:AUDIO_TECHNOLOGIES.map(mode=>mode.id),repeat:["off","one","all"] };
-  const booleans = ["privateSession","reducedMotion","explicitContent","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
+  const booleans = ["japaneseReading","privateSession","reducedMotion","explicitContent","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
   const allowed = new Set([...Object.keys(choices),...booleans,...FEED_NUMERIC_FIELDS,"openingAnimation","seedArtists","seedArtistSelections","seedGenres","onboarded","timeZone","volume","previewVolume","sleepTimerMinutes"]);
   if (Object.keys(raw).some(key=>!allowed.has(key))) throw new ProductError(400,"Unsupported setting");
   for (const [key,values] of Object.entries(choices)) if (raw[key] !== undefined) {

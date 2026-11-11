@@ -6,6 +6,11 @@ import { fetchLrcLibLyrics, lyricCacheKey, lyricIdentityVariants, selectLyricsCa
 import { lyricInputKey } from "../src/rebuild/player/useLyrics";
 import { createLyricsResolver } from "../src/rebuild/lyrics/service";
 import { LyricRequestError, parseLyricIdentity, parseReadingRequest } from "../src/rebuild/lyrics/request";
+import { fetchLyricaLyrics, fetchNetEaseLyrics, fetchVerifiedLyrics, fetchLyricsOvh } from "../src/rebuild/lyrics/fallbacks";
+import { lyricRetryAfter } from "../src/rebuild/lyrics/transport";
+import { lyricRetryDelay, preserveLyricReadings } from "../src/rebuild/player/lyricRecovery";
+import { JAPANESE_READING_VERSION } from "../src/rebuild/lyrics/versions";
+import type { PlayerLyrics } from "../src/rebuild/player/useLyrics";
 
 const compact = (text: string) => text.replace(/\s/g, "");
 const READING_CASES: Array<[string, string]> = [
@@ -222,4 +227,214 @@ test("Missing lyrics retry after a short TTL while provider outages are never ca
   await unavailable(identity);
   await unavailable(identity);
   assert.equal(outages, 2);
+});
+
+test("one empty exact lookup cannot mask a failed search as missing lyrics", async () => {
+  const result = await fetchLrcLibLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {
+    fetch: async url => String(url).includes("/api/get?") ? new Response(null, {status: 404}) : new Response(null, {status: 503}),
+    wait: async () => undefined,
+  });
+  assert.equal(result.status, "unavailable");
+});
+
+test("a thrown exact-lookup network error still permits verified search recovery", async () => {
+  const result = await fetchLrcLibLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {
+    fetch: async url => {if (String(url).includes("/api/get?")) throw new TypeError("failed to fetch"); return Response.json([original]);},
+    wait: async () => undefined,
+  });
+  assert.equal(result.status, "matched");
+});
+
+test("title-only search can recover artist spelling differences through verified aliases", async () => {
+  const result = await fetchLrcLibLyrics({title: "Lemon", artist: "Kenshi Yonezu", durationSeconds: 191}, {
+    fetch: async url => {
+      const query = new URL(String(url));
+      return query.pathname.endsWith("/search") && !query.searchParams.has("artist_name") && !query.searchParams.has("q")
+        ? Response.json([{...original, trackName: "Lemon", artistName: "米津玄師"}]) : new Response(null, {status: 404});
+    },
+  });
+  assert.equal(result.status, "matched");
+});
+
+test("all completed empty LRCLib variants produce a genuine missing result", async () => {
+  const requests: string[] = [];
+  const result = await fetchLrcLibLyrics({title: "Idol", artist: "YOASOBI"}, {fetch: async url => {requests.push(String(url));return new Response(null, {status: 404});}});
+  assert.equal(result.status, "missing");
+  assert.ok(requests.some(url => url.includes("%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB")));
+  assert.ok(requests.some(url => url.includes("/api/search?track_name=")));
+});
+
+test("provider long rate limits propagate a retry delay without hammering every alias", async () => {
+  let requests = 0;
+  const result = await fetchLrcLibLyrics({title: "Idol", artist: "YOASOBI"}, {
+    now: () => 1000,
+    fetch: async () => {requests++; return new Response(null, {status: 429, headers: {"Retry-After": "90"}});},
+  });
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.retryAfterMs, 90_000);
+  assert.equal(requests, 1);
+});
+
+test("a short Retry-After is awaited before retrying the provider", async () => {
+  let requests = 0, clock = 0;
+  const waits: number[] = [];
+  const result = await fetchLrcLibLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {
+    now: () => clock, wait: async delay => {waits.push(delay); clock += delay;},
+    fetch: async () => ++requests === 1 ? new Response(null, {status: 429, headers: {"Retry-After": "1"}}) : Response.json(original),
+  });
+  assert.equal(result.status, "matched");
+  assert.deepEqual(waits, [1000]);
+  assert.equal(requests, 2);
+});
+
+test("HTTP-date Retry-After and malformed values are handled correctly", () => {
+  assert.equal(lyricRetryAfter("Mon, 09 Nov 2026 12:00:10 GMT", Date.parse("2026-11-09T12:00:00Z")), 10_000);
+  assert.equal(lyricRetryAfter("invalid"), undefined);
+  assert.equal(lyricRetryAfter("-2"), undefined);
+});
+
+test("verified lyrics cascade waits for every provider before announcing absence", async () => {
+  let complete!: () => void;
+  let settled = false;
+  const result = fetchVerifiedLyrics({title: "Finesse", artist: "Bruno Mars"}, {providers: [
+    async () => ({status: "missing", reason: "empty"}),
+    async () => {await new Promise<void>(resolve => {complete = resolve;}); return {status: "missing", reason: "empty"};},
+  ]}).then(value => {settled = true; return value;});
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  complete();
+  assert.equal((await result).status, "missing");
+});
+
+test("verified fallback lyrics win immediately and cancel stalled sources", async () => {
+  let stalledSignal!: AbortSignal;
+  const result = await fetchVerifiedLyrics({title: "Finesse", artist: "Bruno Mars"}, {providers: [
+    async (_, options) => {stalledSignal = options.signal!; return new Promise(() => undefined);},
+    async () => ({status: "matched", track: original, provider: "netease"}),
+  ]});
+  assert.equal(result.status, "matched");
+  assert.equal(stalledSignal.aborted, true);
+});
+
+test("a missing source and a rate-limited source produce retryable unavailable lyrics", async () => {
+  const result = await fetchVerifiedLyrics({title: "Finesse", artist: "Bruno Mars"}, {providers: [
+    async () => ({status: "missing", reason: "empty"}),
+    async () => ({status: "unavailable", reason: "rate limit", retryAfterMs: 60_000}),
+  ]});
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.retryAfterMs, 60_000);
+});
+
+test("NetEase verifies recording metadata and retains only its original lyrics", async () => {
+  const result = await fetchNetEaseLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {fetch: async url => {
+    if (String(url).includes("/search/get")) return Response.json({code: 200, result: {songs: [{id: 52, name: "Finesse", duration: 191000, artists: [{name: "Bruno Mars"}], album: {name: "24K Magic"}}]}});
+    return Response.json({code: 200, lrc: {lyric: "[00:01]original words"}, tlyric: {lyric: "[00:01]translated words"}});
+  }});
+  assert.equal(result.status, "matched");
+  if (result.status === "matched") {assert.equal(result.provider, "netease"); assert.equal(result.track.syncedLyrics, "[00:01]original words");}
+});
+
+test("NetEase does not fetch lyrics for a different recording edition", async () => {
+  let lyricCalls = 0;
+  const result = await fetchNetEaseLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {fetch: async url => {
+    if (String(url).includes("/song/lyric")) lyricCalls++;
+    return Response.json({code: 200, result: {songs: [{id: 53, name: "Finesse (Remix)", duration: 217000, artists: [{name: "Bruno Mars"}], album: {name: "24K Magic"}}]}});
+  }});
+  assert.equal(result.status, "missing");
+  assert.equal(lyricCalls, 0);
+});
+
+test("Lyrica original source text and returned metadata are verified before acceptance", async () => {
+  let request = "";
+  const result = await fetchLyricaLyrics({title: "Finesse", artist: "Bruno Mars", durationSeconds: 191}, {fetch: async url => {
+    request = String(url);
+    return Response.json({status: "success", data: {title: "Finesse", artist: "Bruno Mars", album: "24K Magic", duration: 191, lyrics: "original words", timed_lyrics: [{start_time: 1.5, text: "original words"}]}});
+  }});
+  assert.equal(result.status, "matched");
+  assert.ok(request.includes("romanize=false"));
+  assert.ok(!request.includes("language=en"));
+  if (result.status === "matched") {assert.equal(result.provider, "lyrica");assert.equal(result.track.syncedLyrics, "[00:01.500]original words");}
+});
+
+test("Lyrica cannot match a metadata-free or translated Japanese response", async () => {
+  const result = await fetchLyricaLyrics({title: "Idol", artist: "YOASOBI", durationSeconds: 213, language: "ja"}, {fetch: async () => Response.json({status: "success", data: {title: "Idol", artist: "YOASOBI", duration: 213, lyrics: "translated English words"}})});
+  assert.equal(result.status, "missing");
+});
+
+test("verified stale lyrics survive provider outages and later empty indexes", async () => {
+  let clock = 0, calls = 0;
+  const resolver = createLyricsResolver({now: () => clock, load: async () => ++calls === 1 ? {status: "matched", track: original, provider: "lrclib"} : {status: "missing", reason: "index unavailable"}});
+  const identity = {title: "Finesse", artist: "Bruno Mars", durationSeconds: 191};
+  const verified = await resolver(identity);
+  clock = 31 * 24 * 60 * 60 * 1000;
+  assert.deepEqual(await resolver(identity), verified);
+  assert.equal(calls, 2);
+});
+
+test("cached readings survive a refresh of identical original lyrics", () => {
+  const originalLyrics: PlayerLyrics = {lines: [{text: "君の声", start: 1, end: 3, romanized: "kimi no koe", readingEngine: JAPANESE_READING_VERSION}], timing: "synced", provider: "lrclib", providerTrackId: 1, schemaVersion: "verified-lyrics-v2", hasJapanese: true};
+  const fresh = {...originalLyrics, lines: [{text: "君の声", start: 1, end: 3}], provider: "netease"};
+  assert.equal(preserveLyricReadings(originalLyrics, fresh).lines[0].romanized, "kimi no koe");
+  assert.equal(preserveLyricReadings(originalLyrics, {...fresh, lines: [{text: "君の声", start: 2, end: 3}]}).lines[0].romanized, undefined);
+  assert.equal(preserveLyricReadings(originalLyrics, {...fresh, lines: [{text: "違う声", start: 1, end: 3}]}).lines[0].romanized, undefined);
+});
+
+test("lyric retry policy waits for reset and does not retry invalid or expired sessions", () => {
+  assert.equal(lyricRetryDelay(0, 429, 90_000), 90_000);
+  assert.equal(lyricRetryDelay(0, 503), 5000);
+  assert.equal(lyricRetryDelay(8, 503), 60_000);
+  assert.equal(lyricRetryDelay(0, 404), 45_000);
+  assert.equal(lyricRetryDelay(0, 401), undefined);
+  assert.equal(lyricRetryDelay(0, 409), undefined);
+});
+
+
+test("lyrics.ovh encodes exact title and artist and returns only untimed original text", async () => {
+  let requested = "";
+  const result = await fetchLyricsOvh({title: "Song / One", artist: "Artist & Voice", durationSeconds: 180}, {fetch: async url => {
+    requested = String(url); return Response.json({lyrics: "First line\r\nSecond line"});
+  }});
+  assert.equal(requested, "https://api.lyrics.ovh/v1/Artist%20%26%20Voice/Song%20%2F%20One");
+  assert.equal(result.status, "matched");
+  if (result.status === "matched") {
+    assert.equal(result.provider, "lyrics.ovh");
+    assert.equal(result.track.plainLyrics, "First line\nSecond line");
+    assert.equal(result.track.syncedLyrics, null);
+    assert.equal(result.track.duration, undefined);
+  }
+});
+
+test("plain fallback runs after every primary source completes and cannot displace a match", async () => {
+  const completed: string[] = [];
+  const identity = {title: "Finesse", artist: "Bruno Mars"};
+  const result = await fetchVerifiedLyrics(identity, {providers: [
+    async () => {completed.push("first");return {status:"missing",reason:"empty"};},
+    async () => {await Promise.resolve();completed.push("second");return {status:"unavailable",reason:"offline"};},
+  ],plainFallback: async () => {
+    assert.deepEqual(new Set(completed), new Set(["first","second"]));
+    return {status:"matched",provider:"lyrics.ovh",track:{...original,syncedLyrics:null}};
+  }});
+  assert.equal(result.status,"matched");
+  let fallbackCalls = 0;
+  const primary = await fetchVerifiedLyrics(identity, {providers:[async () => ({status:"matched",provider:"lrclib",track:original})],plainFallback:async()=>{
+    fallbackCalls++;return {status:"missing",reason:"empty"};
+  }});
+  assert.equal(primary.status,"matched");
+  assert.equal(fallbackCalls,0);
+});
+
+test("OVH misses do not conceal a primary rate limit and OVH failures remain retryable", async () => {
+  const identity = {title:"Finesse",artist:"Bruno Mars"};
+  const rateLimited = await fetchVerifiedLyrics(identity,{providers:[async()=>({status:"unavailable",reason:"rate limited",retryAfterMs:60000})],plainFallback:async()=>({status:"missing",reason:"empty"})});
+  assert.equal(rateLimited.status,"unavailable");
+  assert.equal(rateLimited.retryAfterMs,60000);
+  const thrown = await fetchVerifiedLyrics(identity,{providers:[async()=>({status:"missing",reason:"empty"})],plainFallback:async()=>{throw new TypeError("network");}});
+  assert.equal(thrown.status,"unavailable");
+  const missing = await fetchVerifiedLyrics(identity,{providers:[async()=>({status:"missing",reason:"empty"})],plainFallback:async()=>({status:"missing",reason:"empty"})});
+  assert.equal(missing.status,"missing");
+});
+
+test("OVH never substitutes translated words for requested Japanese lyrics",async()=>{
+  const result = await fetchLyricsOvh({title:"Idol",artist:"YOASOBI",language:"ja"},{fetch:async()=>Response.json({lyrics:"English translation"})});
+  assert.equal(result.status,"missing");
 });

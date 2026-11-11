@@ -7,6 +7,7 @@ import { useMusic } from "../app/MusicContext";
 import { RecoveryNotice } from "../app/RecoveryNotice";
 import { UserFacingError } from "../app/errors";
 import { useDialogLifecycle } from "../app/dialogLifecycle";
+import touch from "../app/touch.module.css";
 
 export type PlayerIconName = "play" | "pause" | "next" | "previous" | "close" | "up" | "down" | "heart" | "queue" | "lyrics" | "share" | "download" | "shuffle" | "repeat" | "volume" | "check" | "link" | "image" | "video" | "back";
 const paths: Record<PlayerIconName, ReactNode> = {
@@ -29,8 +30,8 @@ const paths: Record<PlayerIconName, ReactNode> = {
 export function PlayerIcon({ name, size = 20 }: { name: PlayerIconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
-export function IconButton({ icon, label, active, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: PlayerIconName; label: string; active?: boolean }) {
-  return <button type="button" {...props} aria-label={label} title={label} aria-pressed={active} className={`${s.iconButton} ${active ? s.active : ""} ${className}`}><PlayerIcon name={icon}/></button>;
+export function IconButton({ icon, label, active, shortcut, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: PlayerIconName; label: string; active?: boolean; shortcut?: string }) {
+  return <button type="button" {...props} aria-label={label} title={`${label}${shortcut ? ` (${shortcut})` : ""}`} data-shortcut={shortcut||undefined} aria-pressed={active} className={`${s.iconButton} ${active ? s.active : ""} ${className}`}><PlayerIcon name={icon}/></button>;
 }
 export function PlayerButton({ icon, children, secondary, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: PlayerIconName; secondary?: boolean }) {
   return <button type="button" {...props} data-dialog-autofocus={props.autoFocus||undefined} className={`${s.button} ${secondary ? s.secondary : ""} ${props.className || ""}`}>{icon && <PlayerIcon name={icon} size={18}/>}<span>{children}</span></button>;
@@ -53,7 +54,7 @@ export function PlayerDialog({ title, subtitle, children, footer, onClose, wide 
   const titleId = useId();
   const animateClose = useDialogLifecycle(ref, onClose, music.settings.reducedMotion);
   const requestClose = () => { if (!closeDisabled) animateClose(); };
-  return <dialog ref={ref} className={`${s.dialog} ${wide ? s.wide : ""} ${fullscreen ? s.fullscreen : ""} ${className}`} data-dialog-appearance={appearance} data-reduced-motion={music.settings.reducedMotion || undefined} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); requestClose(); }} onPointerDown={(event) => {
+  return <dialog ref={ref} className={`${s.dialog} ${wide ? s.wide : ""} ${fullscreen ? s.fullscreen : ""} ${className}`} data-dialog-appearance={appearance} data-dialog-close-disabled={closeDisabled||undefined} data-reduced-motion={music.settings.reducedMotion || undefined} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); requestClose(); }} onPointerDown={(event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     backdropPress.current = event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom);
   }} onClick={(event) => {
@@ -62,7 +63,7 @@ export function PlayerDialog({ title, subtitle, children, footer, onClose, wide 
     if (event.target !== event.currentTarget || !beganOnBackdrop) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose();
-  }}><section className={s.dialogInner}><header className={s.dialogHeader}><div>{subtitle && <p className={s.eyebrow}>{subtitle}</p>}<h2 id={titleId}>{title}</h2></div><IconButton icon="close" label="Close" onClick={requestClose} disabled={closeDisabled}/></header><div className={s.dialogBody} data-player-scroll>{music.notice&&<div className={s.dialogNotice}><RecoveryNotice error={new UserFacingError(music.notice.issue)} retry={music.notice.retry} compact/><IconButton icon="close" label="Dismiss message" onClick={music.dismissNotice}/></div>}{children}</div>{footer && <footer className={s.dialogFooter}>{footer}</footer>}</section></dialog>;
+  }}><section className={s.dialogInner}><header className={`${s.dialogHeader} ${touch.sheetHeader}`} data-dialog-swipe-handle title="Drag down to close"><span className={touch.sheetGrip} aria-hidden="true"><svg viewBox="0 0 70 10"><path d="M8 6Q22 1 35 5T62 4"/><path d="m30 4 5 3 5-3"/></svg></span><div>{subtitle && <p className={s.eyebrow}>{subtitle}</p>}<h2 id={titleId}>{title}</h2></div><IconButton icon="close" label="Close" shortcut="Esc" onClick={requestClose} disabled={closeDisabled}/></header><div className={s.dialogBody} data-player-scroll>{music.notice&&<div className={s.dialogNotice}><RecoveryNotice error={new UserFacingError(music.notice.issue)} retry={music.notice.retry} compact/><IconButton icon="close" label="Dismiss message" onClick={music.dismissNotice}/></div>}{children}</div>{footer && <footer className={s.dialogFooter}>{footer}</footer>}</section></dialog>;
 }
 export function formatPlaybackTime(milliseconds: number) {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));

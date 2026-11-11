@@ -29,6 +29,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   const close=useRef(onClose);
   const owner=useRef(music.account?.id);const requestVersion=useRef(0);const requestController=useRef<AbortController|null>(null);
   const creation=useRef<{name:string;description:string;id:string}|null>(null);
+  const typed=useRef({text:"",at:0});
   useLayoutEffect(()=>{close.current=onClose;},[onClose]);
   useLayoutEffect(()=>{const version=requestVersion.current+1;requestVersion.current=version;if(owner.current!==music.account?.id){owner.current=music.account?.id;close.current();}return()=>{requestVersion.current=version+1;requestController.current?.abort();};},[music.account?.id,track.id]);
   useLayoutEffect(()=>{
@@ -36,25 +37,35 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
     const previous=document.activeElement;
     const origin=anchor||(previous instanceof HTMLElement?previous.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0});
     function place(){
-      if(!element)return;const gap=8;const width=element.offsetWidth;const height=element.offsetHeight;
-      element.style.left=`${Math.max(gap,Math.min(innerWidth-width-gap,origin.left+origin.width-width))}px`;
-      element.style.top=`${Math.max(gap,Math.min(innerHeight-height-gap,origin.top+origin.height+gap))}px`;
+      if(!element)return;const gap=8,viewport=window.visualViewport,left=viewport?.offsetLeft||0,top=viewport?.offsetTop||0,viewWidth=viewport?.width||innerWidth,viewHeight=viewport?.height||innerHeight;
+      element.style.maxHeight=`${Math.max(120,viewHeight-gap*2)}px`;
+      const width=element.offsetWidth,height=element.offsetHeight;
+      element.style.left=`${Math.max(left+gap,Math.min(left+viewWidth-width-gap,origin.left+origin.width-width))}px`;
+      element.style.top=`${Math.max(top+gap,Math.min(top+viewHeight-height-gap,origin.top+origin.height+gap))}px`;
       const rect=element.getBoundingClientRect();
       element.style.transformOrigin=`${Math.max(0,Math.min(width,origin.left+origin.width/2-rect.left))}px ${origin.top>rect.top+height/2?"bottom":"top"}`;
     }
     if(typeof element.showPopover==="function")element.showPopover();else element.style.display="block";
-    place();element.querySelector<HTMLElement>('[role="menuitem"]')?.focus({preventScroll:true});
+    place();element.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach(item=>{item.tabIndex=-1;});element.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus({preventScroll:true});
     const observer=new ResizeObserver(place);observer.observe(element);
     function scrolled(event:Event){if(event.target instanceof Node&&element?.contains(event.target))return;close.current();}
     function outside(event:Event){if(event.target instanceof Node&&!element?.contains(event.target))close.current();}
-    window.addEventListener("resize",place);document.addEventListener("wheel",scrolled,{capture:true,passive:true});document.addEventListener("touchmove",scrolled,{capture:true,passive:true});document.addEventListener("pointerdown",outside);
-    return()=>{observer.disconnect();window.removeEventListener("resize",place);document.removeEventListener("wheel",scrolled,true);document.removeEventListener("touchmove",scrolled,true);document.removeEventListener("pointerdown",outside);const restore=element.contains(document.activeElement)||document.activeElement===document.body;if(typeof element.hidePopover==="function")element.hidePopover();if(restore&&previous instanceof HTMLElement&&previous.isConnected)previous.focus({preventScroll:true});};
+    window.addEventListener("resize",place);window.visualViewport?.addEventListener("resize",place);window.visualViewport?.addEventListener("scroll",place);document.addEventListener("wheel",scrolled,{capture:true,passive:true});document.addEventListener("touchmove",scrolled,{capture:true,passive:true});document.addEventListener("pointerdown",outside);
+    return()=>{observer.disconnect();window.removeEventListener("resize",place);window.visualViewport?.removeEventListener("resize",place);window.visualViewport?.removeEventListener("scroll",place);document.removeEventListener("wheel",scrolled,true);document.removeEventListener("touchmove",scrolled,true);document.removeEventListener("pointerdown",outside);const restore=element.contains(document.activeElement)||document.activeElement===document.body;if(typeof element.hidePopover==="function")element.hidePopover();if(restore&&previous instanceof HTMLElement&&previous.isConnected)previous.focus({preventScroll:true});};
   },[anchor]);
-  useEffect(()=>{if(creatingPlaylist)menu.current?.querySelector<HTMLInputElement>("input")?.focus({preventScroll:true});else menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({preventScroll:true});},[playlists,tasteMenu,creatingPlaylist]);
+  useEffect(()=>{typed.current={text:"",at:0};if(creatingPlaylist)menu.current?.querySelector<HTMLInputElement>("input")?.focus({preventScroll:true});else{menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach(item=>{item.tabIndex=-1;});menu.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus({preventScroll:true});}},[playlists,tasteMenu,creatingPlaylist]);
   function keyboard(event:KeyboardEvent){
-    if(event.key==="Escape"){event.preventDefault();event.stopPropagation();if(creatingPlaylist){setCreatingPlaylist(false);setFailure(null);}else onClose();return;}
+    if(event.key==="Escape"){event.preventDefault();event.stopPropagation();if(creatingPlaylist){setCreatingPlaylist(false);setFailure(null);}else if(tasteMenu){setTasteMenu(false);}else if(playlists){setPlaylists(null);}else onClose();return;}
     if(event.key==="Tab"){if(creatingPlaylist)return;event.stopPropagation();onClose();return;}
     if(creatingPlaylist&&(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement))return;
+    if(event.key.length===1&&/\S/u.test(event.key)&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
+      const now=Date.now(),letter=event.key.toLocaleLowerCase(),previous=now-typed.current.at<650?typed.current.text:"",query=previous===letter?letter:previous+letter;
+      typed.current={text:query,at:now};
+      const items=Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')||[]),index=items.indexOf(document.activeElement as HTMLElement);
+      const ordered=[...items.slice(index+1),...items.slice(0,index+1)];
+      const match=ordered.find(item=>item.textContent?.trim().toLocaleLowerCase().startsWith(query));
+      event.preventDefault();event.stopPropagation();match?.focus({preventScroll:true});return;
+    }
     if(!["ArrowDown","ArrowUp","Home","End"].includes(event.key))return;
     event.preventDefault();event.stopPropagation();const items=Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')||[]);if(!items.length)return;
     const index=items.indexOf(document.activeElement as HTMLElement);const target=event.key==="Home"?0:event.key==="End"?items.length-1:(index+(event.key==="ArrowDown"?1:-1)+items.length)%items.length;items[target].focus();

@@ -130,3 +130,52 @@
 .active::after{content:"";position:absolute;right:1px;bottom:1px;width:8px;height:11px;border-radius:70% 25% 70% 25%;background:var(--p-petal);box-shadow:0 0 0 2px var(--p-bg);transform:rotate(30deg);pointer-events:none}
 .active svg{fill:color-mix(in srgb,var(--p-accent) 28%,transparent);filter:drop-shadow(0 1px 0 color-mix(in srgb,var(--p-bg) 70%,transparent))}
 @media(prefers-reduced-motion:reduce){.iconButton{transition:none}.active{transform:none}}
+
+/* The sleeve keeps the previous cover beneath the new paper as the record turns. */
+.sleeveGesture{position:relative;cursor:grab;user-select:none;-webkit-user-select:none;outline-offset:7px;border-radius:5px;overflow:clip}
+.sleeveGesture:active{cursor:grabbing}.sleeveGesture:focus-visible{outline:2px solid var(--p-accent)}
+.recordSleeve{position:relative;isolation:isolate;aspect-ratio:1}
+.recordSleeve .artwork{width:100%;box-shadow:0 12px 40px #0001;border-radius:4px}
+.incomingRecord{position:relative;z-index:2;animation:recordTurnIn 850ms cubic-bezier(.16,.76,.22,1) both;transform-origin:50% 80%}
+.outgoingRecord{position:absolute;inset:0;z-index:1;pointer-events:none;animation:recordTurnOut 740ms cubic-bezier(.22,.6,.24,1) both;transform-origin:50% 80%}
+.recordSleeve[data-swipe-direction=previous] .incomingRecord{animation-name:recordTurnBackIn}
+.recordSleeve[data-swipe-direction=previous] .outgoingRecord{animation-name:recordTurnBackOut}
+@keyframes recordTurnIn{from{opacity:0;transform:translateX(38px) rotate(3deg);filter:sepia(.28)}to{opacity:1;transform:none;filter:none}}
+@keyframes recordTurnOut{to{opacity:0;transform:translateX(-32px) rotate(-3deg);filter:sepia(.35)}}
+@keyframes recordTurnBackIn{from{opacity:0;transform:translateX(-38px) rotate(-3deg);filter:sepia(.28)}to{opacity:1;transform:none;filter:none}}
+@keyframes recordTurnBackOut{to{opacity:0;transform:translateX(32px) rotate(3deg);filter:sepia(.35)}}
+.recordGestureHint{display:block;text-align:center;color:var(--p-muted);font-size:10px;letter-spacing:.025em;min-height:22px}
+.mouseRecordHint{opacity:0;transition:opacity 450ms ease}.playerArt:hover .mouseRecordHint,.playerArt:focus-within .mouseRecordHint{opacity:.85}
+.touchRecordHint{display:none}.recordGestureHint kbd,.lyricFootnote kbd{font:9px var(--font-inter),Arial,sans-serif;border:1px solid var(--p-line);border-radius:5px 2px 5px 2px;padding:2px 5px;margin-left:4px;color:var(--p-muted)}
+
+/* A pencilled invitation sits beneath the live words, rather than a utility link. */
+.lyricPreview{margin-top:16px;border-top:1px solid color-mix(in srgb,var(--p-petal) 50%,var(--p-line));position:relative}
+.lyricPreview:before{content:"";position:absolute;width:12px;height:17px;right:14px;top:-8px;background:var(--p-petal);border:3px solid var(--p-bg);border-radius:75% 15% 75% 15%;transform:rotate(32deg);pointer-events:none}
+.lyricPreview .lyricPeek{border:0;border-radius:0;background:radial-gradient(ellipse at 95% 90%,color-mix(in srgb,var(--p-petal) 9%,transparent),transparent 70%);padding:23px 9px 13px;gap:12px;position:relative;transition:background 500ms ease}
+.peekWords{font:italic 24px/1.55 var(--font-fraunces),Georgia,serif;overflow-wrap:anywhere;animation:peekInk 520ms ease both}
+.lyricPeek .peekReading{display:block;font:12px/1.9 var(--font-inter),Arial,sans-serif;color:var(--p-muted);margin-top:9px;letter-spacing:.015em}
+.lyricsLettering{display:block;width:min(100%,400px);height:auto;overflow:visible;margin:0 0 -9px;color:var(--p-accent)}
+.letteringText{fill:currentColor;font:italic 46px var(--font-fraunces),Georgia,serif;letter-spacing:-.045em}
+.letteringStem,.letteringArrow,.letteringPetal{fill:none;stroke:currentColor;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
+.letteringStem{opacity:.65;stroke-dasharray:520;stroke-dashoffset:24;transition:stroke-dashoffset 850ms cubic-bezier(.16,.76,.22,1)}
+.letteringArrow{transform-origin:380px 32px;transition:transform 700ms cubic-bezier(.16,.76,.22,1)}
+.letteringPetal{stroke:var(--p-petal);stroke-width:1.5}
+.lyricPeek:hover .letteringStem,.lyricPeek:focus-visible .letteringStem{stroke-dashoffset:0}
+.lyricPeek:hover .letteringArrow,.lyricPeek:focus-visible .letteringArrow{transform:translateX(4px) rotate(-3deg)}
+.lyricFootnote{display:flex;align-items:center;justify-content:space-between;width:100%;color:var(--p-muted);font-size:9px;letter-spacing:.025em}
+.lyricFootnote kbd{opacity:0;transition:opacity 450ms ease}.lyricPeek:hover .lyricFootnote kbd,.lyricPeek:focus-visible .lyricFootnote kbd{opacity:1}
+.peekReadingControl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 3px 8px;flex-wrap:wrap}
+.peekReadingControl>button{display:flex;align-items:center;gap:9px;min-height:44px;border:0;background:transparent;color:var(--p-muted);padding:8px 6px;font-size:10px}
+.peekReadingControl>button>span{font:18px var(--font-fraunces),Georgia,serif;color:var(--p-accent)}
+.peekReadingControl>button>i{display:block;width:10px;height:15px;transform:rotate(25deg);border:1px solid var(--p-line);border-radius:75% 15% 75% 15%;margin:0 4px;transition:background 450ms ease,border-color 450ms ease}
+.peekReadingControl>button[aria-pressed=true]{color:var(--p-accent)}.peekReadingControl>button[aria-pressed=true]>i{background:var(--p-accent);border-color:var(--p-accent)}
+.peekReadingControl>.peekReadingRetry{color:var(--p-accent);text-decoration:underline;text-underline-offset:4px}
+.readingRecovery{text-align:center;font-size:11px;line-height:1.8;color:var(--p-muted);margin:10px 0}.readingRecovery button{display:inline-block;min-height:44px;background:transparent;border:0;color:var(--p-accent);padding:7px 10px;text-decoration:underline;text-underline-offset:4px}
+@keyframes peekInk{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(pointer:coarse){.mouseRecordHint{display:none}.touchRecordHint{display:inline}.lyricFootnote kbd{display:none}}
+@media(max-width:760px){.lyricPreview .lyricPeek{padding-top:20px}.lyricPreview .peekWords{font-size:23px}.recordGestureHint{font-size:9px}}
+.dialog[data-reduced-motion=true] .outgoingRecord{display:none}
+@media(prefers-reduced-motion:reduce){.outgoingRecord{display:none}.incomingRecord,.peekWords{animation:none}.mouseRecordHint,.letteringStem,.letteringArrow,.peekReadingControl>button>i{transition:none}}
+
+/* Keep the lyric transport on the same paper as the surrounding words. */
+.lyricsControls{background:var(--ink-bg);box-shadow:none}

@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMusic } from "../app/MusicContext";
 import { ArtistLinks } from "../app/ArtistLinks";
 import { PlaybackRibbon } from "../app/ListeningControls";
@@ -10,6 +10,7 @@ import { lyricInputKey, useLyrics, type PlayerLyricLine } from "./useLyrics";
 import { lyricMoment } from "./lyricFollow";
 import { useLyricFollow } from "./useLyricFollow";
 import { setShareSelection } from "./shareSelection";
+import { useJapaneseReading } from "./useJapaneseReading";
 import s from "./player.module.css";
 
 type LyricsViewProps = { onClose?: () => void; onOpenShare?: (lines: PlayerLyricLine[]) => void };
@@ -27,10 +28,8 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
   const lyrics = useLyrics(music.track);
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<{ source: string; indices: number[] }>({ source: "", indices: [] });
-  const [reading, setReading] = useState(false);
-  const [readingBusy, setReadingBusy] = useState(false);
-  const readingLock = useRef(false);
-  const disposed = useRef(false);
+  const readingGuide = useJapaneseReading(lyrics);
+  const reading = readingGuide.enabled;
   const [message, setMessage] = useState<string | null>(null);
   const lineRefs = useRef<Array<HTMLElement | null>>([]);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -44,8 +43,6 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
   const duration = music.durationMs || music.track?.durationMs || 0;
   const hasWords = Boolean(data && !data.instrumental && data.lines.some(line => line.text.trim()));
 
-  useEffect(() => { disposed.current = false; return () => { disposed.current = true; }; }, []);
-
   function followWords() { setSelecting(false); resume(); }
   function toggleSelection() {
     setSelecting(!selecting);
@@ -53,27 +50,6 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
     if (selecting) resume(); else pause();
   }
   function closeView() { if (onClose) requestDialogClose(onClose, viewRef.current?.closest<HTMLDialogElement>("dialog")); }
-
-  async function toggleReading() {
-    if (disposed.current || readingLock.current) return;
-    if (reading) { setReading(false); return; }
-    readingLock.current = true;
-    setReadingBusy(true);
-    setMessage(null);
-    try {
-      await lyrics.getJapaneseReadings();
-      if (disposed.current) return;
-      setReading(true);
-      music.dismissNotice();
-    } catch (error) {
-      if (disposed.current) return;
-      music.reportError(error, "lyrics", () => void toggleReading());
-      setMessage("The reading guide is unavailable. Try again.");
-    } finally {
-      readingLock.current = false;
-      if (!disposed.current) setReadingBusy(false);
-    }
-  }
 
   function chooseLine(index: number) {
     if (!music.track || !data) return;
@@ -102,10 +78,11 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
     {hasWords && <div className={s.chips}>
       {data?.timing === "synced" && <button type="button" aria-pressed={follow && !selecting} onClick={followWords}>{follow && !selecting ? "Following along" : "Follow the words"}</button>}
       <button type="button" aria-pressed={selecting} onClick={toggleSelection}>{selecting ? "Done selecting" : "Select lines"}</button>
-      {data?.hasJapanese && <button type="button" aria-pressed={reading} disabled={readingBusy} onClick={() => void toggleReading()}>{readingBusy ? "Preparing readings…" : "Japanese reading guide"}</button>}
+      {data?.hasJapanese && <button type="button" aria-label="Japanese reading guide" aria-pressed={reading} aria-busy={readingGuide.busy} title={reading ? "Reading guide stays on for Japanese songs. Choose to turn it off." : "Keep a reading guide for Japanese songs."} onClick={readingGuide.toggle}>{readingGuide.busy ? "Preparing readings…" : "Japanese reading guide"}</button>}
       <button type="button" onClick={share}>Share {selected.length ? `${selected.length} lines` : "lyrics"}</button>
     </div>}
     {message && <p className={s.hint} role="status">{message}</p>}
+    {readingGuide.error && <p className={s.readingRecovery} role="status">Your reading choice is saved. {readingGuide.error} <button type="button" onClick={readingGuide.retry}>Try the reading again</button></p>}
     {lyrics.loading && <div className={s.empty}><span className={s.spinner}/><p>Finding the words for this recording…</p></div>}
     {lyrics.error && <RecoveryNotice error={lyrics.error} context="lyrics" retry={lyrics.retry}/>}
     {!music.track && <div className={s.empty}><p>Choose a song to discover its lyrics.</p></div>}
@@ -122,7 +99,7 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
           </div>
           : <button type="button" key={`${line.start}-${index}`} ref={element => { lineRefs.current[index] = element; }} data-lyric-index={index} className={`${s.lyricLine} ${index === active ? s.currentLyric : ""} ${selected.includes(index) ? s.selectedLyric : ""}`} aria-pressed={selecting ? selected.includes(index) : undefined} aria-current={index === active ? "true" : undefined} title={!selecting && data.timing === "synced" ? `Listen from ${formatPlaybackTime(line.start * 1000)}` : undefined} onPointerDown={pause} onClick={() => chooseLine(index)}>
             <span>{line.words?.length && index === active ? line.words.map((word, wordIndex) => <span key={wordIndex} className={music.positionMs / 1000 >= word.start && (word.end === undefined || music.positionMs / 1000 < word.end) ? s.currentWord : ""}>{word.text}</span>) : line.text}</span>
-            {reading && line.romanized && <small>{line.romanized}{line.readingReviewNeeded && <span className={s.reviewMark} title="This line contains a reading that needs review"> · reading needs review</span>}</small>}
+            {reading && line.romanized && line.romanized.trim() !== line.text.trim() && <small>{line.romanized}{line.readingReviewNeeded && <span className={s.reviewMark} title="This line contains a reading that needs review"> · reading needs review</span>}</small>}
           </button>)}
       </div>
       <p className={s.hint}>Lyrics: {data.provider}. {reading ? "Japanese readings use a word dictionary. Names and poetic pronunciations can vary." : ""}</p>

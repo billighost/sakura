@@ -1,0 +1,11 @@
+.marker{display:block;height:1px;margin-bottom:-1px;pointer-events:none}
+.dock{position:sticky;top:0;z-index:12;min-width:0;margin:19px 0;background:transparent}
+.dock>[data-search-field]{margin:0;transition:padding .35s ease,border-radius .35s ease,background .35s ease}
+.dock[data-docked]>[data-search-field]{height:44px;min-height:44px;padding:0 10px;border-radius:0;background:var(--ink-bg);border-bottom:1px solid var(--ink-line);box-shadow:none;gap:9px}
+.dock[data-docked] [data-search-field]>input{padding:0;font-size:12px}
+.dock[data-docked] [data-search-mark]{width:20px;height:20px}
+.dock[data-docked] [data-search-mark]>svg:last-child,.dock[data-docked] [data-search-stem]{display:none}
+.dock[data-docked] [data-search-field]>button{width:44px;height:44px;background:transparent}
+.dock[data-docked]:focus-within [data-search-field]{border-bottom-color:var(--ink-accent)}
+:global([data-reduced-motion=true]) .dock>[data-search-field]{transition:none}
+@media(prefers-reduced-motion:reduce){.dock>[data-search-field]{transition:none}}

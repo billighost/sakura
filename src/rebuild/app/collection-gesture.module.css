@@ -1,0 +1,8 @@
+.card{position:relative;min-width:0}
+.options{position:absolute;right:9px;top:9px;display:grid;place-items:center;width:44px;height:44px;border:1px solid color-mix(in srgb,var(--ink-line) 75%,transparent);border-radius:55% 40% 55% 40%;color:var(--ink-text);background:color-mix(in srgb,var(--ink-bg) 93%,transparent);backdrop-filter:blur(10px);box-shadow:0 3px 12px color-mix(in srgb,var(--ink-text) 8%,transparent);opacity:0;transform:translateY(-3px);transition:opacity .35s ease,transform .5s cubic-bezier(.2,.65,.25,1),border-radius .5s ease;z-index:2}
+.card:hover>.options,.card:focus-within>.options,.options[aria-expanded=true]{opacity:1;transform:translateY(0)}
+.options:hover{border-radius:40% 55% 40% 55%;color:var(--ink-accent)}
+.options:focus-visible{outline:2px solid var(--ink-accent);outline-offset:3px}
+@media(hover:none),(pointer:coarse){.options{opacity:1;transform:none}}
+[data-reduced-motion] .options{transition:none}
+@media(prefers-reduced-motion:reduce){.options{transition:none}}

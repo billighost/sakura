@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SelectPopover } from "./SelectPopover";
 import { useMusic } from "./MusicContext";
 import { useResource, invalidateResources } from "./resources";
 import { invalidateRecommendationResources } from "./recommendationResources";
@@ -99,7 +100,7 @@ function DataControls() {
         {feedback.length > 5 && <button type="button" className={s.textButton} aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer adjustments" : `See all ${feedback.length} adjustments`}</button>}
       </>}
     </details>
-    <div className={s.dataSelects}><label>What to clear<select value={scope} onChange={event => setScope(event.target.value as Scope)}>{Object.entries(scopes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Time period<select value={period} onChange={event => setPeriod(event.target.value as Period)}>{Object.entries(periods).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+    <div className={s.dataSelects}><label>What to clear<SelectPopover label="What to clear" value={scope} onChange={setScope} options={Object.entries(scopes).map(([value,label])=>({value:value as Scope,label}))}/></label><label>Time period<SelectPopover label="Time period" value={period} onChange={setPeriod} options={Object.entries(periods).map(([value,label])=>({value:value as Period,label}))}/></label></div>
     <div className={s.dataActions}><Button secondary icon="download" disabled={exporting || busy || !accountId} onClick={() => void exportData()}>{exporting ? "Preparing your data…" : "Export my data"}</Button><button className={s.clearButton} type="button" disabled={busy || !accountId} onClick={() => { setError(null); setConfirmation(true); }}><Icon name="trash" size={17}/>Clear selected data</button></div>
     {error && !confirmation && <p className={s.error} role="alert">{error}</p>}
     <p className={s.smallNote}>Your listening record includes audible time, song positions, finishes, skips, and listening hours. Published genre tags help describe the music. You can pause learning in your feed settings.</p>
