@@ -13,7 +13,7 @@ import {BloomCover} from "./BloomCover";
 import {useBoundary} from "./useBoundary";
 import {useBloomPalette} from "./useBloomPalette";
 import {useBloomAudio} from "./useBloomAudio";
-import {bloomDate,type BloomItem,type BloomRecap,type BloomPeriod} from "./uiTypes";
+import {bloomDate,type BloomItem,type BloomRecap,type BloomPeriod,type BloomPreparedStory} from "./uiTypes";
 import {bloomDesignForItem} from "./design";
 import {BLOOM_WORLDS,bloomWorld,isBloomWorld} from "./worlds/registry";
 import s from "./bloom.module.css";
@@ -34,8 +34,9 @@ function BloomDetail({id}:{id:string}){
  },[p.account?.id,router,audio]);
  function close(){audio.close();router.replace("/bloom");if(p.account)invalidateResources(p.account.id,"/api/v2/bloom");}
  async function reveal(chapterId:string){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/reveal`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chapterId})},{context:"page",accountId:p.account?.id});}
+ async function prepare(){if(archival&&recap)return {story:recap,chapters:recap.chapters,listening:recap.listening};return requestJson<BloomPreparedStory>(`/api/v2/bloom/${encodeURIComponent(id!)}/prepare`,{method:"POST"},{context:"page",accountId:p.account?.id});}
  async function complete(){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/complete`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"},{context:"page",accountId:p.account?.id});}
- const active=archival?archive:detail,preview=process.env.NODE_ENV!=="production"?query.get("world"):null;return erased?<LoadingRows/>:expired?<RecoveryNotice error={new UserFacingError(responseIssue(410,null))} retry={active.retry}/>:active.error?<RecoveryNotice error={active.error} retry={active.retry}/>:recap?<BloomStory key={recap.id} initial={recap} design={isBloomWorld(preview)?preview:bloomDesignForItem(recap)} theme={theme} reducedMotion={p.settings.reducedMotion} performance={p.settings.bloomPerformance} accountId={p.account?.id} onClose={close} onReveal={reveal} onComplete={complete} onPlay={audio.play} onStopSound={audio.stop} onPauseSound={audio.pause} onResumeSound={audio.resume} audioMessage={audio.message}/>:archival&&archive.data?<RecoveryNotice error={new UserFacingError(responseIssue(404,null))} retry={archive.retry}/>:<LoadingRows/>;
+ const active=archival?archive:detail,preview=process.env.NODE_ENV!=="production"?query.get("world"):null;return erased?<LoadingRows/>:expired?<RecoveryNotice error={new UserFacingError(responseIssue(410,null))} retry={active.retry}/>:active.error?<RecoveryNotice error={active.error} retry={active.retry}/>:recap?<BloomStory key={recap.id} initial={recap} design={isBloomWorld(preview)?preview:bloomDesignForItem(recap)} theme={theme} reducedMotion={p.settings.reducedMotion} performance={p.settings.bloomPerformance} accountId={p.account?.id} onClose={close} onPrepare={prepare} onReveal={reveal} onComplete={complete} onPlay={audio.play} onStopSound={audio.stop} onPauseSound={audio.pause} onResumeSound={audio.resume} audioMessage={audio.message}/>:archival&&archive.data?<RecoveryNotice error={new UserFacingError(responseIssue(404,null))} retry={archive.retry}/>:<LoadingRows/>;
 }
 function BloomGallery(){
 const p=useMusic(),theme=usePalette(),query=useSearchParams(),requested=query.get("period"),[period,setPeriod]=useState<BloomPeriod>(requested==="monthly"||requested==="yearly"?requested:"weekly");

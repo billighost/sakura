@@ -26,7 +26,7 @@
 .heading a,.link{display:inline-flex;align-items:center;gap:9px;min-height:44px;color:var(--ink-accent);font-size:12px}
 .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
 .card{min-width:0;border:1px solid var(--ink-line);border-radius:15px;overflow:hidden;background:var(--ink-card)}
-.card>div:first-child{aspect-ratio:16/9}
+.card>div:first-child{aspect-ratio:4/3}
 .body{padding:23px 25px 24px}
 .status{font-size:10px;letter-spacing:.09em;line-height:1.6;color:var(--ink-muted)}
 .body h3{font:clamp(26px,3vw,33px)/1.1 var(--font-fraunces),Georgia,serif;letter-spacing:-.035em;margin:10px 0 9px;overflow-wrap:anywhere}
@@ -40,7 +40,7 @@
 .cards[data-count="1"]{grid-template-columns:minmax(0,1fr)}
 .cards[data-count="1"] .card{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .cards[data-count="1"] .card>div:first-child{height:100%;aspect-ratio:auto;min-height:220px}
-@media(max-width:750px){.heading{align-items:start;flex-direction:column;gap:4px}.cards{grid-template-columns:minmax(0,1fr)}.body{padding:21px}.cards[data-count="1"] .card{display:block}.cards[data-count="1"] .card>div:first-child{aspect-ratio:16/9;min-height:0}.shelf{margin:26px 0 34px}}
+@media(max-width:750px){.heading{align-items:start;flex-direction:column;gap:4px}.cards{grid-template-columns:minmax(0,1fr)}.body{padding:21px}.cards[data-count="1"] .card{display:block}.cards[data-count="1"] .card>div:first-child{height:auto;aspect-ratio:4/3;min-height:0}.shelf{margin:26px 0 34px}}
 @media(max-width:750px){.promotion{grid-template-columns:minmax(0,1fr) 135px;gap:8px;padding:27px 23px 25px}.promotion h2{font-size:30px;max-width:20ch}.promotionCopy>p{font-size:12px}.promotionArt{width:150px;margin-right:-26px}.promotionSeal{width:58px;height:58px;font-size:10px;left:-8px;bottom:-5px}.promotionPetal{width:40px;right:0}.promotionEyebrow{font-size:9px;gap:7px}.promotionTiming{margin-left:0}.promotionNote{max-width:26ch}}
 @media(max-width:480px){.promotion{display:block;padding:27px 21px 23px}.promotionCopy{padding-top:1px}.promotion h2{padding-right:60px;min-height:65px;margin-top:18px}.promotionArt{position:absolute;width:84px;right:18px;top:60px;opacity:.55;z-index:-1;margin:0}.promotionArt>div{border-width:3px}.promotionOrbit{inset:15px 0 6px}.promotionSeal,.promotionPetal{display:none}.promotionCopy>p{max-width:38ch}.promotionEyebrow{padding-right:18px}.promotionAction{padding-inline:17px}.promotionNote{max-width:none}}
 @media(prefers-reduced-motion:reduce){.promotionPetal{animation:none}.promotionAction{transition:none}}

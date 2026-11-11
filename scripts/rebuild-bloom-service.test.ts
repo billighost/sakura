@@ -3,7 +3,7 @@ import {describe,it} from "node:test";
 import type {Pool} from "pg";
 import {bloomWindow} from "../src/rebuild/bloom/calendar";
 import {createBloomExperience} from "../src/rebuild/bloom/experience";
-import {getBloom,listBloom,listBloomShelf,revealBloom,completeBloom,archivedBloom} from "../src/rebuild/bloom/service";
+import {getBloom,listBloom,listBloomShelf,prepareBloom,revealBloom,completeBloom,archivedBloom} from "../src/rebuild/bloom/service";
 import {ProductError} from "../src/rebuild/data/validation";
 import type {BloomSnapshot} from "../src/rebuild/bloom/snapshot";
 
@@ -55,6 +55,24 @@ function fixture(account:string,recapId=id,version=4){
 }
 
 describe("Bloom service persistence and reveal contracts without network",()=>{
+ it("stages immutable story facts without revealing, completing, or exposing them in the normal view",async()=>{
+  const saved=fixture("prepare");const before=await getBloom("prepare",id,now);
+  const prepared=await prepareBloom("prepare",id,now);
+  assert.deepEqual(prepared.story,before);
+  assert.equal(prepared.chapters[1].stat.value,1);
+  assert.deepEqual(saved.revealed_chapters,[]);assert.equal(saved.completed_at,null);
+  const after=await getBloom("prepare",id,now);
+  assert.deepEqual(after,before);assert.ok(after.chapters.every(chapter=>chapter.stat===null&&!chapter.revealed));
+  await assert.rejects(completeBloom("prepare",id,now),error=>error instanceof ProductError&&error.status===409);
+  await assert.rejects(revealBloom("prepare",id,"song-count",now),error=>error instanceof ProductError&&error.status===409);
+ });
+ it("keeps preparation within account and availability boundaries and does not freeze empty stories",async()=>{
+  fixture("prepare-owner");
+  await assert.rejects(prepareBloom("prepare-other",id,now),error=>error instanceof ProductError&&error.status===409);
+  assert.equal(stored.has(key("prepare-other",id)),false);
+  await assert.rejects(prepareBloom("prepare-owner","monthly-2026-11",now),error=>error instanceof ProductError&&error.status===423);
+  await assert.rejects(prepareBloom("prepare-owner",id,new Date(bloomWindow(id,now).expiresAt)),error=>error instanceof ProductError&&error.status===410);
+ });
  it("saves measured playback sources, keeps unknown origins out of rankings, and reveals them only with their chapter",async()=>{
   let recap=await getBloom("source",id,now);
   const index=recap.chapters.findIndex(chapter=>chapter.id==="listening-source");

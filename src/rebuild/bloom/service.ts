@@ -154,6 +154,20 @@ export async function getBloom(accountId:string,id:string,now=new Date()){
     return view(item,row);
   });
 }
+/** Explicit story entry may stage its immutable facts ahead of navigation.
+ * Keep the ordinary view concealed and never advance the saved reveal frontier
+ * or completion date merely because the browser prepared the next scenes. */
+export async function prepareBloom(accountId:string,id:string,now=new Date()){
+  const existing=await getBloom(accountId,id,now);
+  if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
+  return inTransaction(async client=>{
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+    const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR SHARE`,[accountId,id])).rows[0];
+    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
+    const item=window(id,now,row.time_zone);requireAvailable(item);
+    return {story:view(item,row),chapters:row.snapshot.chapters as SavedBloomChapter[],listening:row.snapshot.listening};
+  });
+}
 export async function revealBloom(accountId:string,id:string,rawChapterId:unknown,now=new Date()){
   const chapterId=text(rawChapterId,"Bloom chapter",80);const existing=await getBloom(accountId,id,now);
   if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");

@@ -10,7 +10,8 @@ import {createBloomExperience} from '../src/rebuild/bloom/experience.ts';
 
 const expect=baseExpect.configure({timeout:20000});
 const base=process.env.SAKURA_TEST_URL||'http://127.0.0.1:3016';
-const output='.local/bloom-promotion-review';await fs.mkdir(output,{recursive:true});
+const coversOnly=process.argv.includes('--covers');
+const output=coversOnly?'.local/bloom-cover-fill':'.local/bloom-promotion-review';await fs.mkdir(output,{recursive:true});
 const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;assert.ok(secret,'Synthetic auth signing configuration is required');
 const account={id:'90000000-0000-4000-8000-000000000096',username:'Bloom reminder fixture',email:'bloom-reminder@example.invalid'};
 const token=await encode({token:{id:account.id,name:account.username},secret,salt:'authjs.session-token'});
@@ -66,6 +67,28 @@ async function view(name,now,getItems,{width=320,dark=false,reduced=true}={}){
  return {page,banner,context,load,verify,screenshot,setDate:async value=>{currentNow=value;await page.clock.setFixedTime(new Date(value));}};
 }
 try{
+ if(coversOnly){
+  for(const width of [320,390,1280])for(const dark of [false,true])for(const single of [false,true]){
+   const name=`covers-${width}-${dark?'dark':'light'}-${single?'single':'multiple'}`,test=await view(name,'2027-01-01T12:00:00Z',single?stamp=>[item('yearly-2026',stamp,{worldId:'cosmos'})]:annual,{width,dark});
+   await test.load();const covers=test.page.locator('[data-bloom-shelf] [data-bloom-cover]');await expect(covers.first()).toBeVisible();
+   let firstWorld;
+   for(const cover of await covers.all()){
+    await cover.scrollIntoViewIfNeeded();await cover.locator('img').evaluate(image=>image.decode());
+    const layout=await cover.evaluate(element=>{const image=element.querySelector('img'),box=element.getBoundingClientRect(),art=image.getBoundingClientRect();return {world:element.dataset.bloomCover,width:box.width,height:box.height,imageWidth:art.width,imageHeight:art.height,fit:getComputedStyle(image).objectFit,naturalWidth:image.naturalWidth,srcset:image.getAttribute('srcset')};});
+    assert.ok(layout.naturalWidth>0,'Authored cover loads');assert.equal(layout.fit,'cover','Artwork fills its surface instead of exposing side gutters');
+    assert.ok(Math.abs(layout.width-layout.imageWidth)<1&&Math.abs(layout.height-layout.imageHeight)<1,'Image occupies the full Home cover surface');
+    if(width<=750||!single)assert.ok(Math.abs(layout.width/layout.height-4/3)<.01,'Home uses the same authored 4:3 cover proportions as Bloom');
+    firstWorld??=layout;report.layouts.push({name,...layout});
+   }
+   const homeScreenshot=`${output}/${name}-home.png`;await covers.first().screenshot({path:homeScreenshot,animations:'disabled'});report.screenshots.push(homeScreenshot);
+   await test.page.goto(base+'/bloom?period=yearly',{waitUntil:'domcontentloaded',timeout:90000});
+   const bloomCover=test.page.locator(`[data-bloom-cover="${firstWorld.world}"]`).first();await expect(bloomCover).toBeVisible();await bloomCover.scrollIntoViewIfNeeded();await bloomCover.locator('img').evaluate(image=>image.decode());
+   assert.equal(await bloomCover.locator('img').getAttribute('srcset'),firstWorld.srcset,'Home and Bloom use the same illustrated cover source');
+   assert.equal(await bloomCover.locator('img').evaluate(image=>getComputedStyle(image).objectFit),'cover');
+   const bloomScreenshot=`${output}/${name}-bloom.png`;await bloomCover.screenshot({path:bloomScreenshot,animations:'disabled'});report.screenshots.push(bloomScreenshot);
+   report.checks.push(`${name}: Home cover fills its surface and matches Bloom artwork`);await test.context.close();
+  }
+ }else{
  const weeklyCases=[['weekly-before','2026-11-08T12:00:00Z','anticipation','Opens tomorrow','/bloom?period=weekly'],['weekly-launch','2026-11-09T12:00:00Z','launch','Just opened today','/bloom/weekly-2026-11-02'],['weekly-after','2026-11-10T12:00:00Z','reminder','Opened yesterday','/bloom/weekly-2026-11-02']];
  for(const [name,now,phase,timing,href] of weeklyCases){const test=await view(name,now,weekly);await test.load();await test.verify({period:'weekly',phase,timing,href});await test.screenshot();report.checks.push(`${name}: correct calendar phase, wording and destination`);await test.context.close();}
  {
@@ -87,6 +110,7 @@ try{
  }
  {
   const now='2026-11-09T12:00:00Z',test=await view('suppressed-states',now,stamp=>[item('weekly-2026-11-02',stamp,{completed:true}),item('monthly-2026-10',stamp,{status:'empty'}),item('yearly-2025',stamp,{status:'expired'}),item('yearly-2024',stamp,{status:'archived',completed:true})]);await test.load();await test.verify(null);report.checks.push('Completed, empty, expired and archived blooms have no campaign');await test.context.close();
+ }
  }
  assert.deepEqual(report.errors,[],'No browser runtime or hydration errors');
 }catch(error){report.errors.push(error.stack||String(error));if(debug&&!debug.isClosed())await debug.screenshot({path:`${output}/failure.png`}).catch(()=>{});process.exitCode=1;}

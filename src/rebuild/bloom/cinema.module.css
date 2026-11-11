@@ -25,7 +25,7 @@
 .poster [data-bloom-world="cosmos"] .posterPeriod{padding-top:65px}.poster [data-bloom-world="cosmos"] .posterHeading{font-size:32px}.poster [data-bloom-world="cosmos"] .posterSignature{margin-top:15px}
 
 /* Gallery cards preserve the complete authored composition with stable geometry. */
-.cardArt>img{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}
+.cardArt>img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .coverCard{min-width:0}
 
 .story[open][data-dialog-phase="opening"]{animation:storyAperture .62s cubic-bezier(.18,.74,.22,1) both}

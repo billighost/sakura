@@ -49,8 +49,9 @@ try{
     await illustration.screenshot({path:path.join(source,`${world}-${theme}.png`),animations:'disabled'});break;
    }catch(error){if(attempt>=2||!/context was destroyed|navigation|interrupted/i.test(String(error)))throw error;}
   }
-  const artwork=await fs.readFile(`src/rebuild/bloom/worlds/${world}/World.tsx`),stylesheet=await fs.readFile(`src/rebuild/bloom/worlds/${world}/world.module.css`),geometry=await fs.readFile('src/rebuild/bloom/worlds/stableTrig.ts');
-  const sourceHash=createHash('sha256').update(artwork).update(stylesheet).update(geometry).digest('hex');
+  const artwork=await fs.readFile(`src/rebuild/bloom/worlds/${world}/World.tsx`,'utf8'),stylesheet=await fs.readFile(`src/rebuild/bloom/worlds/${world}/world.module.css`,'utf8'),geometry=await fs.readFile('src/rebuild/bloom/worlds/stableTrig.ts','utf8');
+  // Source identity stays stable across Git's Windows line-ending conversion.
+  const sourceHash=createHash('sha256').update(artwork.replace(/\r\n/g,'\n')).update(stylesheet.replace(/\r\n/g,'\n')).update(geometry.replace(/\r\n/g,'\n')).digest('hex');
   manifest.assets.push({world,theme,sourceHash});
   console.log(`Captured ${world} ${theme}`);
  }

@@ -48,6 +48,7 @@ try{
     const palettes=[['#243851','#e2b993','#889b8b'],['#c79f85','#72525e','#d6ca9c'],['#315357','#cd976d','#d8d5b4'],['#3f3d59','#eac788','#91acaa'],['#899c81','#e5bd91','#426268']];const colours=palettes[i];
     return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="${colours[0]}"/><circle cx="280" cy="125" r="110" fill="${colours[1]}"/><path d="M0 300Q140 105 400 320V400H0" fill="${colours[2]}"/><path d="M20 35H240M20 50H140" stroke="${colours[1]}" stroke-width="4"/></svg>`});
    }
+   if(path.endsWith('/prepare'))return route.fulfill({json:{story:recap(),chapters:snapshot.chapters,listening:snapshot.listening}});
    if(path.endsWith('/reveal')){
     const chapterId=request.postDataJSON().chapterId,index=snapshot.chapters.findIndex(c=>c.id===chapterId);
     assert.ok(index>=0);assert.ok(snapshot.chapters.slice(0,index).every(c=>revealed.has(c.id)),'sequential reveal');
@@ -99,7 +100,7 @@ try{
    if(index===0){await dialog.evaluate(node=>{for(let press=0;press<3;press++)node.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));});}
    else await dialog.locator('[data-bloom-action="next"]').click();
   }
-  await dialog.locator('[data-bloom-action="save"]').waitFor();assert.ok(complete);assert.equal(new Set(mutations).size,mutations.length,'no repeated reveals');
+  await dialog.locator('[data-bloom-action="save"]').waitFor();await expect.poll(()=>complete).toBe(true);assert.equal(new Set(mutations).size,mutations.length,'no repeated reveals');
   await page.screenshot({path:`${output}/${world}-finale-${width}.png`});
   await dialog.getByRole('button',{name:'Read my Bloom',exact:true}).click();await expect(dialog).toHaveAttribute('data-view','reading');assert.equal(await dialog.locator('section[data-kind]').count(),snapshot.chapters.length+1,'reading mode retains every fact and the finale');
   await dialog.getByRole('button',{name:'Return to cinema',exact:true}).click();await expect(dialog).toHaveAttribute('data-view','cinema');

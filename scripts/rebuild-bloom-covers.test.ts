@@ -13,8 +13,8 @@ test("every authored world has current, bounded light and dark WebP card assets"
  for(const asset of manifest.assets){
   assert.ok(BLOOM_WORLDS.some(world=>world.id===asset.world));assert.ok(["light","dark"].includes(asset.theme));
   const key=asset.world+":"+asset.theme;assert.equal(seen.has(key),false);seen.add(key);assert.equal(asset.files.length,2);
-  const art=await readFile(new URL(`../src/rebuild/bloom/worlds/${asset.world}/World.tsx`,import.meta.url)),css=await readFile(new URL(`../src/rebuild/bloom/worlds/${asset.world}/world.module.css`,import.meta.url)),geometry=await readFile(new URL("../src/rebuild/bloom/worlds/stableTrig.ts",import.meta.url));
-  assert.equal(asset.sourceHash,createHash("sha256").update(art).update(css).update(geometry).digest("hex"),`${key} needs regeneration after artwork changes`);
+  const art=await readFile(new URL(`../src/rebuild/bloom/worlds/${asset.world}/World.tsx`,import.meta.url),"utf8"),css=await readFile(new URL(`../src/rebuild/bloom/worlds/${asset.world}/world.module.css`,import.meta.url),"utf8"),geometry=await readFile(new URL("../src/rebuild/bloom/worlds/stableTrig.ts",import.meta.url),"utf8");
+  assert.equal(asset.sourceHash,createHash("sha256").update(art.replace(/\r\n/g,"\n")).update(css.replace(/\r\n/g,"\n")).update(geometry.replace(/\r\n/g,"\n")).digest("hex"),`${key} needs regeneration after artwork changes`);
   for(const file of asset.files){
    const bytes=await readFile(new URL("../public"+file.path,import.meta.url)),digest=createHash("sha256").update(bytes).digest("hex");
    assert.equal(bytes.length,file.bytes);assert.equal(digest,file.sha256);assert.ok(bytes.length<180000);

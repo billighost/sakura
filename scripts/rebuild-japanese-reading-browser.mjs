@@ -24,7 +24,8 @@ const sourceLines=tracks.map(track=>[{text:track.title,start:0,end:30},{text:'�
 const readings={'君の声':'kimi no koe','未来の光':'mirai no hikari','花の記憶':'hana no kioku','風に乗せて':'kaze ni nosete'};
 const desktopHeaderOnly=process.argv.includes('--desktop-header');
 const viewportOnly=process.argv.includes('--viewport')||desktopHeaderOnly;
-const output=desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
+const miniArtworkOnly=process.argv.includes('--mini-artwork');
+const output=miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
 const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[]};
 let browser,latestPage;
 
@@ -184,6 +185,30 @@ async function testRoom(theme,width,full){
  }catch(error){report.pageState={url:page.url(),text:(await page.locator('body').innerText()).slice(0,5000)};await page.screenshot({path:output+'/failure.png'}).catch(()=>{});throw error;}finally{await context.close();}
 }
 
+async function testMiniArtwork(theme,width){
+ const {context,page}=await room(theme,width);
+ const keyWarnings=[];
+ page.on('console',message=>{if(/same key|unique.*key/i.test(message.text()))keyWarnings.push(message.text());});
+ try{
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded',timeout:90000});
+  await page.addStyleTag({content:'nextjs-portal{display:none!important}'});
+  const mini=page.locator('[data-song-swipe="mini"]');
+  for(const index of [0,1,2,0,2,1,0,1,2]){
+   const track=tracks[index];
+   await page.getByRole('button',{name:`Play ${track.title}`,exact:true}).click();
+   await expect(mini.locator('b')).toHaveCount(1);
+   await expect(mini.locator('b')).toHaveText(track.title);
+   const cover=mini.getByRole('button',{name:'Open now playing',exact:true}).locator('img');
+   await expect(cover).toHaveCount(1);
+   await expect(cover).toHaveAttribute('src',track.coverUrl);
+   await expect.poll(()=>cover.evaluate(element=>element.complete&&element.naturalWidth>0)).toBe(true);
+  }
+  assert.deepEqual(keyWarnings,[],'Current artwork and caption never share duplicate React keys');
+  await page.screenshot({path:`${output}/${theme}-${width}.png`,animations:'disabled'});
+  report.checks.push(`${theme}/${width}: nine song changes retain exactly one current mini-player cover and caption, with no duplicate-key warnings`);
+ }finally{await context.close();}
+}
+
 async function testViewport(theme,width,height,longTitle=false){
  const originalTitle=tracks[0].title;
  if(longTitle)tracks[0].title='君の声 — A song for the long way home, with a very long handwritten title';
@@ -247,7 +272,8 @@ async function testViewport(theme,width,height,longTitle=false){
 try{
  await fs.mkdir(output,{recursive:true});
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- if(desktopHeaderOnly)await testViewport('dark',1440,900);
+ if(miniArtworkOnly)for(const theme of ['light','dark'])for(const width of [1440,390])await testMiniArtwork(theme,width);
+ else if(desktopHeaderOnly)await testViewport('dark',1440,900);
  else if(viewportOnly){
   for(const theme of ['light','dark'])for(const [width,height] of [[320,568],[375,667],[390,844],[430,932],[667,375]])await testViewport(theme,width,height);
   await testViewport('light',320,568,true);await testViewport('dark',1440,900);

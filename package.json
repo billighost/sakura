@@ -31,6 +31,8 @@
     "test:personalization:browser": "node scripts/rebuild-personalized-feed-browser.mjs",
     "test:bloom:listening": "node --import tsx --test scripts/rebuild-bloom.test.ts scripts/rebuild-bloom-listening.test.ts scripts/rebuild-bloom-refresh.test.ts scripts/rebuild-bloom-shelf.test.ts scripts/rebuild-bloom-audio.test.ts scripts/rebuild-bloom-sources.test.ts scripts/rebuild-listening-origin.test.ts scripts/rebuild-bloom-appearance.test.ts scripts/rebuild-bloom-service.test.ts scripts/rebuild-bloom-experience.test.ts scripts/rebuild-bloom-insights.test.ts scripts/rebuild-bloom-promotions.test.ts scripts/rebuild-bloom-world-variation.test.ts",
     "test:bloom:browser": "node --import tsx scripts/rebuild-bloom-listening-browser.mjs",
+    "test:bloom:staging:browser": "node --import tsx scripts/rebuild-bloom-staging-browser.mjs",
+    "test:bloom:covers:browser": "node --import tsx scripts/rebuild-bloom-promotions-browser.mjs --covers",
     "test:bloom:exports:browser": "node --import tsx scripts/rebuild-bloom-export-browser.mjs",
     "test:initial-taste": "node --import tsx --test scripts/rebuild-initial-taste.test.ts",
     "test:initial-taste:db": "node --import tsx --test --test-concurrency=1 scripts/rebuild-initial-taste-db.test.ts",

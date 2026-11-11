@@ -36,6 +36,7 @@ try{
    if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});
    if(path==='/api/v2/bloom'){bloomLoads++;return route.fulfill({json:{items,schedule:{timeZone:'Africa/Lagos'}}});}
    if(path==='/api/v2/bloom/archive')return route.fulfill({json:{items:[]}});
+   if(path==='/api/v2/bloom/monthly-2026-10/prepare')return route.fulfill({json:{story:recap(),chapters:[{...recap().chapters[0],stat:{label:'Listening time',value:1234,unit:'minutes'}}]}});
    if(path==='/api/v2/bloom/monthly-2026-10/reveal'){assert.equal(request.postDataJSON().chapterId,'cover-scroll-chapter');revealed=true;return route.fulfill({json:recap()});}
    if(path==='/api/v2/bloom/monthly-2026-10')return route.fulfill({json:recap()});
    if(path==='/api/v2/home')return route.fulfill({json:{featured:[track],mixes:[],recent:[]}});
