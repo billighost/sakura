@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { openingSession } from "./openingSession";
 import { sakuraPetalPath, sakuraPetalVeins } from "./Brand";
 import { openingBranches, openingDepartures, openingDurationMs, openingFlowers } from "./openingArt";
@@ -8,6 +8,7 @@ import s from "./opening.module.css";
 const motionSubscribe=(listener:()=>void)=>{const media=matchMedia("(prefers-reduced-motion: reduce)");media.addEventListener("change",listener);return()=>media.removeEventListener("change",listener);};
 const motionSnapshot=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
 const departureByFlower=new Map<number,number>(openingDepartures);
+const flightByFlower=new Map<number,number>(openingDepartures.map(([flower],index)=>[flower,index]));
 const airPaths=[
  "M-250 680C80 580 180 120 580 260S1050 370 1280 60",
  "M-220 530C190 500 215 180 550 180S920 380 1280 145",
@@ -18,13 +19,13 @@ const airPaths=[
  "M-160 820C160 670 390 790 680 625S1010 560 1280 710",
 ];
 
-function OpeningArtwork({id}:{id:string}) {
+const OpeningArtwork=memo(function OpeningArtwork({id}:{id:string}) {
  return <>
   <svg viewBox="0 0 1000 760" className={s.drawing} aria-hidden="true" focusable="false" data-opening-tree>
    <defs>
     <radialGradient id={`${id}-wash`}><stop stopColor="var(--ink-petal,#d5ada8)" stopOpacity=".19"/><stop offset="1" stopColor="var(--ink-petal,#d5ada8)" stopOpacity="0"/></radialGradient>
     <linearGradient id={`${id}-wood`} x1="473" x2="504" gradientUnits="userSpaceOnUse"><stop stopColor="var(--ink-accent,#446b57)"/><stop offset="1" stopColor="color-mix(in srgb,var(--ink-accent,#446b57) 78%,var(--ink-text,#273b34))"/></linearGradient>
-    <mask id={`${id}-trunk-reveal`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="760"><path d={openingBranches[0][0]} pathLength="100" fill="none" stroke="white" strokeWidth="32" strokeLinecap="round" className={s.trunkReveal}/></mask>
+    <mask id={`${id}-trunk-reveal`} maskUnits="userSpaceOnUse" x="438" y="278" width="75" height="400"><path d={openingBranches[0][0]} pathLength="100" fill="none" stroke="white" strokeWidth="32" strokeLinecap="round" className={s.trunkReveal}/></mask>
     <linearGradient id={`${id}-petal-wash`} x1="-16" y1="-42" x2="13" y2="5" gradientUnits="userSpaceOnUse"><stop stopColor="color-mix(in srgb,var(--ink-petal,#d5ada8) 65%,var(--ink-bg,#f5f5ee))"/><stop offset=".5" stopColor="var(--ink-petal,#d5ada8)"/><stop offset="1" stopColor="color-mix(in srgb,var(--ink-petal,#d5ada8) 75%,var(--ink-accent,#446b57))"/></linearGradient>
     <g id={`${id}-petal`}>
      <path d={sakuraPetalPath} fill={`url(#${id}-petal-wash)`} stroke="color-mix(in srgb,var(--ink-petal,#d5ada8) 80%,var(--ink-text,#273b34))" strokeWidth=".55"/>
@@ -48,17 +49,20 @@ function OpeningArtwork({id}:{id:string}) {
     <g className={s.buds} fill="var(--ink-petal,#d5ada8)" stroke="var(--ink-accent,#446b57)" strokeWidth=".5">
      {[[144,315,-30],[199,275,-12],[312,278,18],[362,250,-20],[451,239,12],[577,266,35],[686,288,-15],[805,336,15],[257,440,-20]].map(([x,y,angle],i)=><g key={i} transform={`translate(${x} ${y}) rotate(${angle})`}><g className={s.bud} style={{"--bloom-delay":`${1.25+i*.07}s`} as CSSProperties}><path d="M0 0C-8-8-8-21-1-25C7-20 9-8 0 0Z"/><path d="M0 0Q-2-10-1-20" fill="none" opacity=".4"/></g></g>)}
     </g>
-    {openingFlowers.map(([x,y,scale,angle],i)=>{
-     const departure=departureByFlower.get(i),flight=openingDepartures.findIndex(([flower])=>flower===i);
-     return <g key={i} transform={`translate(${x} ${y}) rotate(${angle}) scale(${scale})`} data-opening-flower>
-      <g className={s.flower} style={{"--bloom-delay":`${1.02+(1-y/700)*.82+(i%5)*.06}s`} as CSSProperties}>
-       {departure===undefined?<use href={`#${id}-flower`}/>:<>{[0,72,144,216,288].map((rotation,petal)=><g key={petal} transform={`rotate(${rotation})`}><use href={`#${id}-petal`} className={petal===departure?s.departing:undefined} style={petal===departure?{"--flight-delay":`${2.92+flight*.035}s`} as CSSProperties:undefined}/></g>)}<use href={`#${id}-center`}/></>}
-      </g>
-     </g>;
-    })}
    </g>
    <g className={s.ground} fill="none" stroke="var(--ink-accent,#446b57)" strokeLinecap="round"><path pathLength="100" d="M410 675Q489 663 570 675M465 682Q500 678 532 683"/><path pathLength="100" d="M496 657Q476 669 467 674M501 658Q514 667 522 673"/></g>
   </svg>
+  {/* Each small sleeve caches its SVG while its HTML layer grows and turns. */}
+  <div className={s.blossomField} aria-hidden="true"><div className={s.tree}>
+   {openingFlowers.map(([x,y,scale,angle],i)=>{
+    const departure=departureByFlower.get(i),flight=flightByFlower.get(i)||0;
+    return <span key={i} className={s.flowerAnchor} style={{left:`${x/10}%`,top:`${y/7.6}%`,width:`${scale*10}%`,transform:`translate(-50%,-50%) rotate(${angle}deg)`}} data-opening-flower>
+     <svg viewBox="-50 -50 100 100" className={s.flower} focusable="false" style={{"--bloom-delay":`${1.02+(1-y/700)*.82+(i%5)*.06}s`} as CSSProperties}>
+      {departure===undefined?<use href={`#${id}-flower`}/>:<>{[0,72,144,216,288].map((rotation,petal)=><g key={petal} transform={`rotate(${rotation})`}><use href={`#${id}-petal`} className={petal===departure?s.departing:undefined} style={petal===departure?{"--flight-delay":`${2.92+flight*.035}s`} as CSSProperties:undefined}/></g>)}<use href={`#${id}-center`}/></>}
+     </svg>
+    </span>;
+   })}
+  </div></div>
   <svg className={s.wind} viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-opening-wind><g fill="none" stroke="var(--ink-accent,#446b57)" strokeLinecap="round">{airPaths.map((path,i)=><path key={i} d={path} pathLength="100" className={s.airLine} style={{"--air-order":i} as CSSProperties}/>)}</g></svg>
   <div className={s.flightField} aria-hidden="true" data-opening-flight-field>
    {openingDepartures.map(([flower,petal],i)=>{
@@ -70,7 +74,7 @@ function OpeningArtwork({id}:{id:string}) {
    {Array.from({length:18},(_,i)=><i key={i} className={s.pollen} style={{"--pollen-x":`${8+(i*17)%85}%`,"--pollen-y":`${12+(i*23)%70}%`,"--pollen-order":i} as CSSProperties}/>)}
   </div>
  </>;
-}
+});
 
 export function SakuraOpening({reduced=false,autoPlay=true,preview=false}:{reduced?:boolean;autoPlay?:boolean;preview?:boolean}) {
  const id=useId().replace(/[^a-zA-Z0-9_-]/g,"")+"-opening";

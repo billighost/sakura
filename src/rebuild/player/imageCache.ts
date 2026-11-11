@@ -1,4 +1,6 @@
-const MAX_RETAINED_ARTWORK = 72;
+// Only recent full-player sleeves need to remain decoded. Keeping dozens of
+// full-size covers alive can consume hundreds of megabytes on a phone.
+const MAX_RETAINED_ARTWORK = 12;
 
 type RetainedArtwork = {
   image: HTMLImageElement;

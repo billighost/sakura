@@ -1,0 +1,43 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useMusic } from "./MusicContext";
+import { invalidateResources } from "./resources";
+import { musicTrack, type MusicTrack } from "./types";
+import { Artwork, Button, SearchField, Empty, IconButton, SectionTitle, TrackList, TrackMenu, time } from "./Elements";
+import { requestJson } from "./errors";
+import { useScreenActions } from "./screenActions";
+import { ArtistLinks } from "./ArtistLinks";
+import { Icon } from "./Icon";
+import { AlbumLink } from "./AlbumLink";
+import { collectionTrackMatches } from "./collectionSearch";
+import { CollectionToolbar, PlaylistArtwork, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
+import { StickySearch } from "./StickySearch";
+import { CollectionGesture } from "./CollectionGesture";
+import { SmartQueueButton } from "./SmartQueueButton";
+import { MixPlaylistDialog } from "./MixPlaylistDialog";
+import room from "./collection-room.module.css";
+import s from "./ink.module.css";
+import { type Data, list, normalizedSearchText, useApi, ResourceBody } from "./MusicScreenResources";
+
+export function Collection({kind,id}:{kind:"playlist"|"mix"|"album"|"artist";id:string}){
+ const p=useMusic(),actions=useScreenActions(p.account?.id,kind+":"+id),base=kind==="mix"?"mixes":kind==="playlist"?"playlists":kind==="album"?"albums":"artists";
+ const resource=useApi("/api/v2/"+base+"/"+encodeURIComponent(id)),data=resource.data,tracks=list(data?.recordings||data?.tracks);
+ const [editing,setEditing]=useState(false),[renaming,setRenaming]=useState(false),[name,setName]=useState(""),[query,setQuery]=useState(""),[playlistMaker,setPlaylistMaker]=useState(false);
+ const [presentation,setPresentation]=useRoomPresentation(p.account?.id,kind+":"+id),{layout,sort,direction}=presentation;
+ const title=String(data?.name||data?.title||"A little music world"),url=data?.imageUrl||data?.coverUrl||(Array.isArray(data?.coverUrls)?data.coverUrls[0]:null);
+ const match=normalizedSearchText(query),shown=sortRoomTracks(tracks.filter(track=>collectionTrackMatches(track,query)),sort,direction);
+ const playable=shown.length?shown:tracks;
+ async function rename(){
+  if(!p.account||!name.trim())return;const controller=actions.begin("rename");if(!controller)return;setRenaming(true);
+  try{await requestJson("/api/v2/playlists/"+encodeURIComponent(id),{method:"PATCH",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.trim()})},{context:"save",accountId:p.account.id});
+   if(!actions.current("rename",controller))return;setEditing(false);invalidateResources(p.account.id);resource.retry();
+  }catch(error){if(actions.current("rename",controller))p.reportError(error,"save",()=>void rename());}finally{if(actions.finish("rename",controller))setRenaming(false);}
+ }
+ return <ResourceBody resource={resource}>{data&&<><div className={s.collectionHero}>{(kind==="playlist"||kind==="mix")?<PlaylistArtwork dedicatedCover={data.hasCustomCover===true} coverUrl={data.coverUrl} coverUrls={[...(Array.isArray(data.coverUrls)?data.coverUrls:[]),...tracks.map(track=>track.coverUrl)]} title={title} className={room.collectionPlaylistArtwork}/>:<Artwork url={url as string} title={title} className={kind==="artist"?s.artistArtwork:""}/>}<div><span className={s.eyebrow}>{kind==="mix"?"SAKURA SELECTS / MADE FOR YOU":kind.toUpperCase()}</span><h1>{title}</h1><p>{String(data.description||data.bio||"A little closer to the music.")}</p><small>{tracks.length} songs · {Math.ceil(tracks.reduce((sum,t)=>sum+t.durationMs,0)/60000)} min</small><div className={s.buttonRow}><Button icon="play" disabled={!tracks.length||data.playability==="unavailable"} onClick={()=>p.play(playable[0],playable)}>Play {kind}</Button><SmartQueueButton scope="collection" tracks={tracks} label="Find my soundtrack here"/><IconButton icon="shuffle" disabled={!tracks.length} label={"Shuffle "+title} onClick={()=>{p.setShuffle(true);if(playable.length)p.play(playable[Math.floor(Math.random()*playable.length)],playable);}}/><IconButton icon="download" disabled={!tracks.length} label={"Download "+title} onClick={()=>tracks.forEach(p.requestDownload)}/>{kind==="mix"&&<IconButton icon="plus" disabled={!tracks.length} label={"Make a playlist from "+title} onClick={()=>setPlaylistMaker(true)}/>} {kind==="playlist"&&<IconButton icon="edit" disabled={renaming} label="Rename playlist" onClick={()=>{setName(title);setEditing(true);}}/>}</div></div></div>
+ {editing&&<form className={s.createPlaylist} onSubmit={event=>{event.preventDefault();void rename();}}><input value={name} disabled={renaming} onChange={e=>setName(e.target.value)} maxLength={80} required aria-label="Playlist name"/><button type="submit" className={s.primaryButton} disabled={renaming||!name.trim()}>{renaming?"Saving name...":"Save name"}</button><Button secondary disabled={renaming} onClick={()=>setEditing(false)}>Cancel</Button></form>}
+ <StickySearch label={title+" search"}><SearchField value={query} onChange={setQuery} label={"Find a song in this "+kind} placeholder="Find a title, artist or album"/></StickySearch><CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={shown.length} firstSortLabel={kind==="album"?"Track number":kind==="playlist"?"Playlist order":kind==="artist"?"Popular order":"Mix order"} dateSortLabel={kind==="playlist"?"Date added":undefined}/>{match&&!shown.length?<Empty title="No songs match your search." description="Try another name or clear your search to see the collection again."/>:<TrackList tracks={shown} layout={layout} dateLabel={kind==="playlist"?"Added":undefined}/>}
+ {kind==="mix"&&<div className={s.note}><Icon name="queue"/><p>{String(data.reason||"A different mood from your other mixes, with familiar voices and a little discovery.")}</p><Link href="/settings">Shape my discovery</Link></div>}{kind==="artist"&&Array.isArray(data.albums)&&<><SectionTitle title="Their records"/><div className={s.entityGrid}>{(data.albums as Data[]).map(album=><CollectionGesture key={String(album.id)} kind="album" id={String(album.id)} title={String(album.title)}><Link href={"/album/"+album.id}><Artwork url={album.coverUrl as string} title={String(album.title)}/><h3>{String(album.title)}</h3></Link></CollectionGesture>)}</div></>}{playlistMaker&&kind==="mix"&&<MixPlaylistDialog key={id} mixId={id} mixName={title} tracks={tracks} onClose={()=>setPlaylistMaker(false)}/>}</>}</ResourceBody>;
+}
+
+export function TrackDetails({id}:{id:string}){const p=useMusic();const resource=useApi("/api/v2/recordings/"+encodeURIComponent(id));const data=resource.data;const [menu,setMenu]=useState(false);let t:MusicTrack|null=null;try{if(data)t=musicTrack((data.recording||data) as Data);}catch{/* A malformed card has a clear unavailable view below. */}return <ResourceBody resource={resource}>{t?<><div className={s.collectionHero}><Artwork url={t.coverUrl} title={t.albumTitle||t.title}/><div><span className={s.eyebrow}>A LITTLE CLOSER TO THE SONG</span><h1>{t.title}</h1><ArtistLinks track={t}/><p><AlbumLink track={t}/> · {time(t.durationMs)}</p><span className={s.recordingBadge}>{t.versionLabel}</span><div className={s.buttonRow}><Button icon="play" onClick={()=>t&&p.play(t)}>Play song</Button><IconButton icon="heart" label="Keep this song" active={p.liked.has(t.id)} onClick={()=>t&&void p.toggleLike(t)}/><IconButton icon="download" label="Save on this device" onClick={()=>t&&p.requestDownload(t)}/><IconButton icon="more" label="Song options" onClick={()=>setMenu(true)}/></div></div></div><div className={s.detailGrid}><section><span className={s.eyebrow}>FOLLOW EVERY WORD</span><h2>There’s more<br/>between the lines.</h2><p>Synced lyrics and clear reading guides, with room to sing along.</p><Button secondary icon="lyrics" onClick={()=>{if(t){p.play(t);p.openModal("lyrics");}}}>Listen with lyrics</Button></section><section><span className={s.eyebrow}>THE RIGHT RECORDING</span><h2>Your song.<br/>Your version.</h2><p>{t.versionLabel}. Other recordings are separate, with their own audio and download entries.</p><Link href={"/search?q="+encodeURIComponent(t.title+" "+t.artists[0])}>Explore other recordings <Icon name="arrow" size={16}/></Link></section></div>{menu&&<TrackMenu track={t} onClose={()=>setMenu(false)}/>}</>:<Empty title="This song is unavailable." description="Look it up in the catalog and select the exact recording." href="/search" action="Find the song"/>}</ResourceBody>;}

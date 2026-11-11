@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { signOut } from "next-auth/react";
 import { musicTrack, type Account, type DownloadEntry, type MusicTrack, type PlaybackStatus, type PlayerModal, type QueueEntry, type UserSettings } from "./types";
 import { requestJson, userIssue, userMessage, UserFacingError, responseIssue, type ErrorContext, type UserIssue } from "./errors";
@@ -16,6 +16,7 @@ import {MediaAudioEngine} from "../audio/engine";
 import {audioTechnology,type AudioTechnology} from "../audio/presets";
 import {readyPlaybackFor} from "./playbackSource";
 import {boundedSeekPosition} from "./seekPosition";
+import {PlaybackProgressStore} from "./playbackProgress";
 import {waitForRecording} from "./recordingJob";
 import { clearResources, invalidateResources } from "./resources";
 import {FEED_DEFAULTS} from "./feedPreferences";
@@ -37,6 +38,8 @@ export interface MusicState {
  track:MusicTrack|null;status:PlaybackStatus;error:string|null;positionMs:number;durationMs:number;queue:QueueEntry[];currentEntryId:string|null;
  getPlaybackChoiceVersion?:()=>number;
  getPlaybackPosition?:()=>number;
+ // Subscribe with usePlaybackProgress when rendering a timeline or lyrics.
+ playbackProgress?:PlaybackProgressStore;
  play:(track:MusicTrack,list?:MusicTrack[],source?:{context:string;contextId?:string})=>void;playQueueEntry:(entryId:string)=>void;togglePlay:()=>void;pause:()=>void;next:()=>void;previous:()=>void;seek:(ms:number)=>void;
  addQueue:(track:MusicTrack)=>void;removeQueue:(entryId:string)=>void;moveQueue:(entryId:string,delta:number)=>void;reorderQueue:(entryId:string,beforeId:string|null)=>void;clearQueue:()=>void;
  smartQueue:(options?:SmartQueueOptions)=>Promise<void>;smartQueueBusy:boolean;
@@ -49,6 +52,7 @@ export interface MusicState {
 const DEFAULT_SETTINGS:UserSettings={theme:"system",audioQuality:"high",audioTechnology:"none",japaneseReading:false,privateSession:false,...FEED_DEFAULTS,reducedMotion:false,openingAnimation:1,bloomPerformance:"auto",seedArtists:[],seedGenres:[],onboarded:false,timeZone:"Africa/Lagos",explicitContent:true,volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15};
 const Context=createContext<MusicState|null>(null);
 export function useMusic(){const value=useContext(Context);if(!value)throw new Error("MusicProvider is required.");return value;}
+export function usePlaybackProgress(){const music=useMusic(),store=music.playbackProgress;if(!store)throw new Error("MusicProvider playback progress is required.");return useSyncExternalStore(store.subscribe,store.getSnapshot,store.getServerSnapshot);}
 interface Resolved {track:MusicTrack;url:string;assetId:string;sizeBytes:number;resolvedAt:number;fallbackUrl?:string;sha256?:string;mimeType?:string}
 interface PlaybackRecovery {token:number;entryId:string;accountId:string;attempt:number;timer?:ReturnType<typeof setTimeout>;resume:()=>void}
 interface ActivePlaybackSource {token:number;fallbackUrl:string|undefined;used:boolean;recoveryAttempt:number;recoveryPositionMs:number;progressive:boolean;transport:number}
@@ -59,7 +63,8 @@ const isUuid=(id:string)=>/^[a-f0-9-]{36}$/i.test(id);
 
 export function MusicProvider({children}:{children:ReactNode}){
  const [account,setAccount]=useState<Account|null>(null);const [booting,setBooting]=useState(true);const [offline,setOffline]=useState(false);const [settings,setSettings]=useState<UserSettings>(DEFAULT_SETTINGS);
- const [track,setTrack]=useState<MusicTrack|null>(null);const [status,setStatus]=useState<PlaybackStatus>("idle");const [error,setError]=useState<string|null>(null);const [positionMs,setPosition]=useState(0);const [durationMs,setDuration]=useState(0);
+ const [track,setTrack]=useState<MusicTrack|null>(null);const [status,setStatus]=useState<PlaybackStatus>("idle");const [error,setError]=useState<string|null>(null);
+ const progress=useRef<PlaybackProgressStore|null>(null);if(progress.current===null)progress.current=new PlaybackProgressStore();const progressStore=progress.current,setPosition=progressStore.setPosition,setDuration=progressStore.setDuration;
  const [queue,setQueue]=useState<QueueEntry[]>([]);const [currentEntryId,setCurrentEntryId]=useState<string|null>(null);const [shuffle,setShuffleState]=useState(false);const [repeat,setRepeatState]=useState<"off"|"one"|"all">("off");const [volume,setVolumeState]=useState(.8);
  const [liked,setLiked]=useState<Set<string>>(new Set());const [downloads,setDownloads]=useState<Record<string,DownloadEntry>>({});const [modal,setModal]=useState<PlayerModal>(null);const [shareTrack,setShareTrack]=useState<MusicTrack|null>(null);const [toast,setToast]=useState("");const [sleepMinutes,setSleepMinutes]=useState<number|null>(null);
  const [notice,setNotice]=useState<{issue:UserIssue;retry?:()=>void}|null>(null);const [connectionVersion,setConnectionVersion]=useState(0);
@@ -388,7 +393,7 @@ export function MusicProvider({children}:{children:ReactNode}){
    },12000);
   };
   playbackWatchdog.current={arm:armWatchdog,clear:clearWatchdog};playbackFallback.current=switchToFallback;
-  const time=()=>{if(!a.src||expireSleep())return;restorePlaybackPosition(a);collectAudible();const source=activeSource.current;if(source&&a.currentTime*1000-source.recoveryPositionMs>=5000){source.recoveryAttempt=0;automaticFailures.current=0;}if(runtime.current.status==="playing"&&Date.now()-lastSnapshot.current>5000)saveListening(false);setPosition(playbackPosition());if(Number.isFinite(a.duration))setDuration(a.duration*1000);armWatchdog();};
+  const time=()=>{if(!a.src||expireSleep())return;restorePlaybackPosition(a);collectAudible();const source=activeSource.current;if(source&&a.currentTime*1000-source.recoveryPositionMs>=5000){source.recoveryAttempt=0;automaticFailures.current=0;}if(runtime.current.status==="playing"&&Date.now()-lastSnapshot.current>5000)saveListening(false);progressStore.update({positionMs:playbackPosition(),...(Number.isFinite(a.duration)?{durationMs:a.duration*1000}:{})});armWatchdog();};
   const playing=()=>{if(!a.src||a.paused||expireSleep())return;restorePlaybackPosition(a);void audioEngine.current?.resume().catch(()=>{});runtime.current.status="playing";setStatus("playing");audible.current.last=performance.now();audible.current.media=a.currentTime;armWatchdog();};
   const paused=()=>{if(!a.paused||playbackRecovery.current||runtime.current.status==="buffering"&&pendingMediaRestore.current?.token===generation.current)return;clearWatchdog();collectAudible({paused:false});flushListen();if(!["resolving","error","idle"].includes(runtime.current.status)){runtime.current.status="paused";setStatus("paused");}};
   const waiting=()=>{if(!a.src||!["resolving","buffering","playing"].includes(runtime.current.status))return;collectAudible();runtime.current.status="buffering";setStatus("buffering");armWatchdog();};
@@ -397,7 +402,7 @@ export function MusicProvider({children}:{children:ReactNode}){
   // belongs to the attached source and must not stop its replacement.
   const failure=()=>{if(!a.src||!a.error||!["buffering","playing"].includes(runtime.current.status))return;clearWatchdog();if(!switchToFallback())failPlayback();};
   const ended=()=>{if(!a.src||expireSleep())return;clearWatchdog();if(lyricTimingOwner.current&&runtime.current.track&&lyricTimingOwner.current.recordingId===effectiveId(runtime.current.track)&&lyricTimingOwner.current.entryId===runtime.current.currentEntryId){flushListen(true,true,false);runtime.current.status="paused";setStatus("paused");saveListening();window.dispatchEvent(new CustomEvent("sakura-lyric-timing-ended",{detail:lyricTimingOwner.current}));return;}collectAudible({paused:false});const outcome=listeningOutcome({naturalEnd:true,explicitSkip:false,audibleMs:audible.current.totalMs,durationMs:runtime.current.track?.durationMs||a.duration*1000});flushListen(outcome.completed,true,false);if(runtime.current.repeat==="one"){audible.current={eventId:cryptoId(),sequence:0,ms:0,totalMs:0,terminal:false,last:performance.now(),media:0,context:audible.current.context,contextId:audible.current.contextId};a.currentTime=0;const token=generation.current;void a.play().catch(()=>{if(token===generation.current)pause(false);});}else nextRef.current();};
-  const metadata=()=>restorePlaybackPosition(a);
+  const metadata=()=>{restorePlaybackPosition(a);if(Number.isFinite(a.duration))setDuration(a.duration*1000);};
   const naturalSpeed=()=>{if(a.defaultPlaybackRate!==1)a.defaultPlaybackRate=1;if(a.playbackRate!==1)a.playbackRate=1;a.preservesPitch=true;};
   const volumeChanged=()=>{collectAudible({muted:nativeSound.current.muted||nativeSound.current.volume===0});nativeSound.current={muted:a.muted,volume:a.volume};};
   a.addEventListener("loadedmetadata",metadata);a.addEventListener("durationchange",metadata);a.addEventListener("ratechange",naturalSpeed);a.addEventListener("volumechange",volumeChanged);a.addEventListener("loadstart",armWatchdog);a.addEventListener("stalled",armWatchdog);a.addEventListener("timeupdate",time);a.addEventListener("playing",playing);a.addEventListener("pause",paused);a.addEventListener("waiting",waiting);a.addEventListener("error",failure);a.addEventListener("ended",ended);
@@ -673,7 +678,7 @@ export function MusicProvider({children}:{children:ReactNode}){
  useEffect(()=>()=>{if(sleepTimer.current)clearTimeout(sleepTimer.current);if(toastTimer.current)clearTimeout(toastTimer.current);},[]);
 
  useEffect(()=>{if(!("mediaSession" in navigator))return;if(track)navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:track.artists.join(", "),album:track.albumTitle||"",artwork:track.coverUrl?[{src:track.coverUrl,sizes:"512x512",type:"image/jpeg"}]:[]});navigator.mediaSession.playbackState=["playing","buffering","resolving"].includes(status)?"playing":status==="paused"?"paused":"none";if(!track)navigator.mediaSession.metadata=null;try{navigator.mediaSession.setActionHandler("play",()=>{if(!["playing","buffering","resolving"].includes(runtime.current.status))togglePlay();});navigator.mediaSession.setActionHandler("pause",()=>pause());navigator.mediaSession.setActionHandler("nexttrack",next);navigator.mediaSession.setActionHandler("previoustrack",previous);navigator.mediaSession.setActionHandler("seekto",details=>seek((details.seekTime||0)*1000));}catch{/* Older browsers expose only some Media Session actions. */}},[track,status]);
- const value:MusicState={account,booting,offline,settings,artistChoiceVersion,updateSettings,track,status,error,positionMs,durationMs,queue,currentEntryId,getPlaybackChoiceVersion:()=>playbackChoiceVersion.current,getPlaybackPosition:playbackPosition,play,playQueueEntry,togglePlay,pause:()=>pause(),next,previous,seek,addQueue,removeQueue,moveQueue,reorderQueue,clearQueue,smartQueue,smartQueueBusy,parkedPicks,restoreParkedPicks,shuffle,setShuffle,repeat,setRepeat,volume,setVolume,liked,toggleLike,downloads,requestDownload,cancelDownload,pauseDownload,resumeDownload,removeDownload,effectiveId,ensureRecording,preparePlaybackAudio,modal,shareTrack,openModal:(modal,subject)=>{setShareTrack(subject||null);setModal(modal);},closeModal:()=>setModal(null),notify,toast,notice,reportError,dismissNotice:()=>setNotice(null),retryConnection:()=>setConnectionVersion(v=>v+1),logout,sleepMinutes,setSleepTimer};
+ const value:MusicState={account,booting,offline,settings,artistChoiceVersion,updateSettings,track,status,error,get positionMs(){return progressStore.getSnapshot().positionMs;},get durationMs(){return progressStore.getSnapshot().durationMs;},playbackProgress:progressStore,queue,currentEntryId,getPlaybackChoiceVersion:()=>playbackChoiceVersion.current,getPlaybackPosition:playbackPosition,play,playQueueEntry,togglePlay,pause:()=>pause(),next,previous,seek,addQueue,removeQueue,moveQueue,reorderQueue,clearQueue,smartQueue,smartQueueBusy,parkedPicks,restoreParkedPicks,shuffle,setShuffle,repeat,setRepeat,volume,setVolume,liked,toggleLike,downloads,requestDownload,cancelDownload,pauseDownload,resumeDownload,removeDownload,effectiveId,ensureRecording,preparePlaybackAudio,modal,shareTrack,openModal:(modal,subject)=>{setShareTrack(subject||null);setModal(modal);},closeModal:()=>setModal(null),notify,toast,notice,reportError,dismissNotice:()=>setNotice(null),retryConnection:()=>setConnectionVersion(v=>v+1),logout,sleepMinutes,setSleepTimer};
  return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 function cryptoId(){return typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():"00000000-0000-4000-8000-"+Math.random().toString(16).slice(2).padEnd(12,"0").slice(0,12);}

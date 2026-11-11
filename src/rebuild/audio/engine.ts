@@ -1,12 +1,18 @@
 import { audioPreset, audioTechnology, dbToGain, type AudioTechnology } from "./presets";
 
 export interface AudioGraph { output: AudioNode; dispose: () => void }
-const protectionCurve = new Float32Array(65537);
-for (let i = 0; i < protectionCurve.length; i++) {
-  const value = i * 2 / (protectionCurve.length - 1) - 1;
-  const magnitude = Math.abs(value);
-  // Linear at normal levels; an emergency soft ceiling, not a true-peak limiter.
-  protectionCurve[i] = magnitude <= 0.8 ? value : Math.sign(value) * (0.8 + 0.14 * Math.tanh((magnitude - 0.8) / 0.14));
+let protectionCurve: Float32Array<ArrayBuffer> | undefined;
+function getProtectionCurve() {
+  if (protectionCurve) return protectionCurve;
+  const curve = new Float32Array(65537);
+  for (let i = 0; i < curve.length; i++) {
+    const value = i * 2 / (curve.length - 1) - 1;
+    const magnitude = Math.abs(value);
+    // Linear at normal levels; an emergency soft ceiling, not a true-peak limiter.
+    curve[i] = magnitude <= 0.8 ? value : Math.sign(value) * (0.8 + 0.14 * Math.tanh((magnitude - 0.8) / 0.14));
+  }
+  protectionCurve = curve;
+  return curve;
 }
 
 /** Shared by real-time playback and the comparison renderer. Never connects the destination. */
@@ -45,7 +51,7 @@ export function createAudioGraph(context: BaseAudioContext, source: AudioNode, m
       compressor.attack.value = settings.attack; compressor.release.value = settings.release; append(compressor);
       const makeup = context.createGain(); makeup.gain.value = dbToGain(settings.makeupDb); append(makeup);
     }
-    const protection = context.createWaveShaper(); protection.curve = protectionCurve; protection.oversample = "none"; append(protection);
+    const protection = context.createWaveShaper(); protection.curve = getProtectionCurve(); protection.oversample = "none"; append(protection);
   }
   let disposed = false;
   return { output, dispose() { if (disposed) return; disposed = true; try { source.disconnect(input); } catch {} for (const node of nodes) { try { node.disconnect(); } catch {} } } };

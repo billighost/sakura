@@ -2,6 +2,10 @@
 .opening[data-active=true],:global(html[data-sakura-opening=pending]) .opening{display:flex}
 .opening::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 50% 38%,color-mix(in srgb,var(--ink-petal,#d5ada8) 6%,transparent),transparent 62%)}
 .drawing{position:absolute;left:50%;top:45%;width:var(--art-width);height:auto;overflow:visible;transform:translate(-50%,-50%)}
+.blossomField{position:absolute;left:50%;top:45%;width:var(--art-width);max-width:100%;aspect-ratio:1000/760;transform:translate(-50%,-50%);pointer-events:none}
+.blossomField>.tree{position:absolute;inset:0}
+.flowerAnchor{position:absolute;aspect-ratio:1}
+.flowerAnchor>.flower{display:block;width:100%;height:100%;overflow:visible;transform-box:border-box;transform-origin:center;will-change:transform,opacity}
 .wash{animation:washAppear 2.8s ease both}
 .tree{transform-box:view-box;transform-origin:50% 88%;animation:treeSway 1.55s ease-in-out 2.8s both}
 .branches>path,.bark>path,.ground>path{stroke-dasharray:100;stroke-dashoffset:100;animation:branchGrow var(--grow-duration,.8s) cubic-bezier(.23,.64,.36,1) var(--grow-delay,0s) both}
@@ -41,7 +45,8 @@
 .opening[data-opening-gentle]{animation:none}
 .opening[data-opening-gentle] *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}
 .opening[data-opening-gentle] .departing{opacity:1}
+.opening[data-opening-gentle] .flower{will-change:auto}
 .opening[data-opening-gentle] .wind,.opening[data-opening-gentle] .flightField{display:none}
-@media(max-width:550px){.opening{--art-width:min(116vw,95dvh)}.drawing{top:44%}.flightAnchor{top:calc(44% + var(--source-y)*var(--art-width))}.wordmark{top:calc(44% + var(--art-width)*.34)}.caption{font-size:7px;margin-bottom:10px}.tagline{font-size:9px}}
-@media(max-height:570px) and (min-width:551px){.opening{--art-width:85dvh}.drawing{top:40%}.flightAnchor{top:calc(40% + var(--source-y)*var(--art-width))}.wordmark{top:calc(40% + var(--art-width)*.32);font-size:37px}.caption{font-size:7px;margin-bottom:6px}.tagline{font-size:9px;margin-top:6px}}
-@media(prefers-reduced-motion:reduce){.opening,.opening *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}.departing{opacity:1}.wind,.flightField{display:none}}
+@media(max-width:550px){.opening{--art-width:min(116vw,95dvh)}.drawing,.blossomField{top:44%}.flightAnchor{top:calc(44% + var(--source-y)*var(--art-width))}.wordmark{top:calc(44% + var(--art-width)*.34)}.caption{font-size:7px;margin-bottom:10px}.tagline{font-size:9px}}
+@media(max-height:570px) and (min-width:551px){.opening{--art-width:85dvh}.drawing,.blossomField{top:40%}.flightAnchor{top:calc(40% + var(--source-y)*var(--art-width))}.wordmark{top:calc(40% + var(--art-width)*.32);font-size:37px}.caption{font-size:7px;margin-bottom:6px}.tagline{font-size:9px;margin-top:6px}}
+@media(prefers-reduced-motion:reduce){.opening,.opening *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}.departing{opacity:1}.flower{will-change:auto}.wind,.flightField{display:none}}

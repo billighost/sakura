@@ -11,7 +11,7 @@ import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
 import { musicTrack, type MusicTrack } from "./types";
 import { PersonalizationDataControls } from "./PersonalizationDataControls";
-import { BloomShelf } from "../bloom/BloomPage";
+import { BloomShelf } from "../bloom/BloomShelf";
 import s from "./listening-profile.module.css";
 import starting from "./initial-taste-profile.module.css";
 

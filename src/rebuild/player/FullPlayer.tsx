@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useMusic } from "../app/MusicContext";
+import { useMusic, usePlaybackProgress } from "../app/MusicContext";
 import type { MusicTrack } from "../app/types";
 import { Artwork, IconButton, PlayerButton, PlayerDialog } from "./Primitives";
 import { ReadingLanguageChoice } from "./ReadingLanguageChoice";
@@ -36,19 +36,19 @@ function LyricsLettering() {
 }
 
 export function FullPlayer({ onClose, onOpenLyrics, onOpenQueue, onOpenShare }: { onClose: () => void; onOpenLyrics?: () => void; onOpenQueue?: () => void; onOpenShare?: () => void }) {
-  const music = useMusic();
+  const music = useMusic(), progress = usePlaybackProgress();
   const [tasteTrack,setTasteTrack] = useState<MusicTrack|null>(null);
   const lyrics = useLyrics(music.track);
   const readingGuide = useJapaneseReading(lyrics);
   const swipe = useSongSwipe({ onNext: music.next, onPrevious: music.previous, disabled: !music.track, reducedMotion: music.settings.reducedMotion });
   const close = () => requestDialogClose(onClose);
   const track = music.track;
-  const cue = lyrics.data?.timing === "synced" && music.status !== "resolving" && music.status !== "error" ? miniLyricCue(lyrics.data.lines, music.positionMs) : null;
+  const cue = lyrics.data?.timing === "synced" && music.status !== "resolving" && music.status !== "error" ? miniLyricCue(lyrics.data.lines, progress.positionMs) : null;
   const previewLine = lyrics.data?.timing === "plain" ? lyrics.data.lines.find(line => line.text.trim()) : null;
   const previewText = cue?.text || previewLine?.text || "A little music between the words.";
   const previewReading = cue?.romanized || (previewLine?.romanized?.trim() !== previewLine?.text.trim() ? previewLine?.romanized : undefined);
   const previewKey = `${track ? lyricInputKey(track) : ""}:${cue?.start ?? "plain"}`;
-  const duration = music.durationMs || track?.durationMs || 0;
+  const duration = progress.durationMs || track?.durationMs || 0;
   const busy = music.status === "resolving" || music.status === "buffering";
   const trackId = track ? music.effectiveId(track) : undefined;
   const liked = trackId ? music.liked.has(trackId) : false;
@@ -59,7 +59,7 @@ export function FullPlayer({ onClose, onOpenLyrics, onOpenQueue, onOpenShare }: 
     {!track ? <div className={s.empty}><h3>Ready when you are.</h3><p>Choose a song to start listening.</p><PlayerButton onClick={close}>Find your music</PlayerButton></div> : <div className={s.fullPlayer}>
       <div className={s.playerArt}><div className={s.sleeveGesture} {...swipe.bind} style={swipe.style} tabIndex={0} role="group" aria-label={`Artwork for ${track.title}. Swipe or drag left for the next song, right for the previous song.`} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); event.stopPropagation(); if (event.key === "ArrowLeft") music.previous(); else music.next(); } }}><RecordSleeve track={track} identity={music.currentEntryId || lyricInputKey(track)} direction={swipe.direction}/></div><span className={s.artNote}>put the world on pause.</span><small className={s.recordGestureHint}><span className={s.touchRecordHint}>swipe to turn the record</span><span className={s.mouseRecordHint}>drag to turn the record <kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd></span></small></div>
       <div className={s.playerDetails}><div className={s.playerTitle}><div><h1>{track.title}</h1><p onClick={close}><ArtistLinks track={track}/></p></div><IconButton icon="heart" label={liked ? "Remove from liked songs" : "Like this song"} active={liked} onClick={() => music.toggleLike(track)}/></div><p className={s.version}>{track.versionLabel}{track.albumTitle && <> · <AlbumLink track={track} onNavigate={close}/></>}</p>
-        <PlaybackRibbon positionMs={music.positionMs} durationMs={duration} onSeek={music.seek} disabled={music.status === "resolving"}/>
+        <PlaybackRibbon positionMs={progress.positionMs} durationMs={duration} onSeek={music.seek} disabled={music.status === "resolving"}/>
         <div className={s.transport}><IconButton icon="shuffle" label={music.shuffle ? "Turn shuffle off" : "Turn shuffle on"} shortcut="S" active={music.shuffle} onClick={() => music.setShuffle(!music.shuffle)}/><IconButton icon="previous" label="Previous song" shortcut="Shift+←" onClick={music.previous}/><button type="button" className={s.largePlay} aria-label={music.status === "playing" ? "Pause" : busy ? "Pause loading" : "Play"} title={`${music.status === "playing" ? "Pause" : "Play"} (Space)`} data-shortcut="Space" data-playback-shortcuts="listening" onClick={music.togglePlay}>{busy ? <span className={s.spinner}/> : <span><svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">{music.status === "playing" ? <path d="M6 4h4v16H6zm8 0h4v16h-4z"/> : <path d="m7 4 14 8-14 8z"/>}</svg></span>}</button><IconButton icon="next" label="Next song" shortcut="Shift+→" onClick={music.next}/><IconButton icon="repeat" label={`Repeat: ${music.repeat}. Change repeat mode`} shortcut="R" active={music.repeat !== "off"} onClick={() => music.setRepeat(music.repeat === "off" ? "all" : music.repeat === "all" ? "one" : "off")}/>{music.repeat === "one" && <span className={s.repeatOne}>1</span>}</div>
         <p className={s.playbackStatus} role="status">{music.status === "resolving" ? "Finding your exact recording…" : music.status === "buffering" ? "Buffering audio…" : music.status === "error" ? "This recording could not play. Choose Play to try again." : ""}</p>
         {music.status === "error" && music.error && <RecoveryNotice error={music.error} context="playback" retry={music.togglePlay} compact/>}

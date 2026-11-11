@@ -31,8 +31,8 @@ export function PlaybackKeyboard() {
         case "play":p.togglePlay();break;
         case "previous":p.previous();break;
         case "next":p.next();break;
-        case "seekBack":p.seek(p.positionMs-5000);break;
-        case "seekForward":p.seek(p.positionMs+5000);break;
+        case "seekBack":p.seek((p.getPlaybackPosition?.()??p.positionMs)-5000);break;
+        case "seekForward":p.seek((p.getPlaybackPosition?.()??p.positionMs)+5000);break;
         case "volumeUp":p.setVolume(Math.min(1,p.volume+.05));break;
         case "volumeDown":p.setVolume(Math.max(0,p.volume-.05));break;
         case "mute":p.setVolume(p.volume>0?0:lastVolume.current);break;

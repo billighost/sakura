@@ -20,7 +20,7 @@ export function BloomPoster({recap,design,theme,demo,quality}:{recap:BloomRecap;
    <section className={`bloom-content ${s.posterContent}`}>
     <p className={s.posterPeriod}>{recap.period.toUpperCase()} · {bloomDate(recap.periodStart,recap.timeZone)} — {bloomDate(new Date(new Date(recap.periodEnd).getTime()-1).toISOString(),recap.timeZone)}</p>
     <h1 className={`bloom-heading ${s.posterHeading}`}>{bloomChapterTitle(design,"finale",undefined,recap.experience)}</h1>
-    {recording&&<article className={s.posterWinner}><BloomArtwork url={recording.coverUrl||metadata.coverUrl} title={title}/><h2>{title}</h2><p>{credits.map(String).join(" · ")}</p><small>Your most-listened song</small></article>}
+    {recording&&<article className={s.posterWinner}><BloomArtwork original url={recording.coverUrl||metadata.coverUrl} title={title}/><h2>{title}</h2><p>{credits.map(String).join(" · ")}</p><small>Your most-listened song</small></article>}
     <div className={s.posterStats}><div><strong>{listeningDuration(recap.summary.audibleMs)}</strong><span>of actual listening</span></div><div><strong>{recap.summary.recordingCount}</strong><span>{recap.summary.recordingCount===1?"different song":"different songs"}</span></div></div>
     {artist?.stat&&<p className={s.posterArtist}><span>Your most-listened artist</span><strong>{artist.artists?.[0]?.name||artist.stat.label}</strong></p>}
     <p className={s.posterSignature}>sakura bloom · {bloomWorld(design).name}<br/>{bloomWorldVoice(design,recap.experience).closing}</p>

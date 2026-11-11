@@ -8,9 +8,15 @@ import {chapterScene} from "./story";
 import {listeningDuration} from "./comparisons";
 import type {BloomArtistInsight,BloomChapter,BloomRankedRecording} from "./uiTypes";
 import s from "./cinema.module.css";
-import {sameOriginArtworkUrl} from "../player/imageUrl";
+import {responsiveArtworkSources,sameOriginArtworkUrl} from "../player/imageUrl";
 
-export function BloomArtwork({url,title,className}:{url:unknown;title:string;className?:string}){const [failedUrl,setFailedUrl]=useState<string|null>(null),src=typeof url==="string"?sameOriginArtworkUrl(url):null;return src&&failedUrl!==src?<img className={className} src={src} width="400" height="400" decoding="async" alt={`${title} artwork`} onError={()=>setFailedUrl(src)}/>:<div className={`${s.artFallback} ${className||""}`} role="img" aria-label={`Artwork unavailable for ${title}`}><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="57"/><circle cx="80" cy="80" r="35"/><path d="M80 22Q29 46 80 80Q131 46 80 22ZM22 80Q46 131 80 80Q46 29 22 80ZM80 138Q131 114 80 80Q29 114 80 138ZM138 80Q114 29 80 80Q114 131 138 80Z"/><circle cx="80" cy="80" r="8"/></svg></div>;}
+export function BloomArtwork({url,title,className,original=false}:{url:unknown;title:string;className?:string;original?:boolean}){
+ const [failedUrl,setFailedUrl]=useState<string|null>(null),raw=typeof url==="string"?url:null;
+ // Exported posters scale their composition to 1080px. Keep the original
+ // pixels there while scrolling chapter artwork chooses a native thumbnail.
+ const sources=original?{src:sameOriginArtworkUrl(raw),srcSet:undefined}:responsiveArtworkSources(raw,true),src=sources.src;
+ return src&&failedUrl!==src?<img className={className} src={src} srcSet={sources.srcSet} sizes={sources.srcSet?"auto, (max-width: 750px) 70vw, 340px":undefined} loading={original?"eager":"lazy"} width="400" height="400" decoding="async" alt={`${title} artwork`} onError={()=>setFailedUrl(src)}/>:<div className={`${s.artFallback} ${className||""}`} role="img" aria-label={`Artwork unavailable for ${title}`}><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="57"/><circle cx="80" cy="80" r="35"/><path d="M80 22Q29 46 80 80Q131 46 80 22ZM22 80Q46 131 80 80Q46 29 22 80ZM80 138Q131 114 80 80Q29 114 80 138ZM138 80Q114 29 80 80Q114 131 138 80Z"/><circle cx="80" cy="80" r="8"/></svg></div>;
+}
 
 function Recording({entry,onPlay,measured=true}:{entry:BloomRankedRecording;onPlay?:(recording:Record<string,unknown>)=>void;measured?:boolean}){
  const metadata=(entry.recording.metadata||entry.recording) as Record<string,unknown>;const title=String(entry.recording.title||metadata.title||"Song");let track=null;try{track=musicTrack(entry.recording);}catch{}

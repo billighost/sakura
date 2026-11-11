@@ -1,10 +1,10 @@
-import { useId, type CSSProperties } from "react";
+import { memo, useId, type CSSProperties } from "react";
 import s from "./hero-garden.module.css";
 
 const petal = "M0 0C-12-6-18-22-8-29L0-23L8-29C18-22 12-6 0 0Z";
 
 /** Original ink drawings: a sheltered flowering branch and an open blossom sky. */
-export function HeroGarden({ surface }: { surface: "home" | "discover" }) {
+export const HeroGarden = memo(function HeroGarden({ surface }: { surface: "home" | "discover" }) {
   const id = useId().replace(/:/g, "");
   const home = surface === "home";
   const flowers = home
@@ -30,4 +30,4 @@ export function HeroGarden({ surface }: { surface: "home" | "discover" }) {
       </g></g>)}
     {[[160, 94, -22], [223, 248, 25], [398, 20, 42], [294, 378, -35]].map(([x, y, angle], index) => <g key={index} transform={`translate(${x} ${y}) rotate(${angle})`}><path className={s.driftingPetal} style={{ "--order": index } as CSSProperties} d="M0 0C-9-9-6-20 2-23C10-15 8-5 0 0Z"/></g>)}
   </svg>;
-}
+});

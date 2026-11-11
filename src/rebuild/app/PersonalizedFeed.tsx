@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMusic } from "./MusicContext";
 import { musicTrack, type MusicTrack } from "./types";
@@ -18,6 +18,7 @@ import type { SongMenuAnchor } from "./TrackActions";
 import { appendUniqueFeedItems } from "./feedItems";
 import { HeroGarden } from "./HeroGarden";
 import {useHeroRecommendation} from "./useHeroRecommendation";
+import {useVisibleMotion} from "./useVisibleMotion";
 import s from "./personalized-feed.module.css";
 
 type Surface = "home" | "discover";
@@ -227,16 +228,21 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
 
   const pick = hero.ready ? hero.item : feed.items[0];
   useEffect(()=>{heroPickRef.current=pick||null;},[pick]);
-  const allTracks = [...new Map([...(pick?[pick.track]:[]),...feed.items.map(item => item.track)].map(track=>[track.id,track])).values()];
+  const pickTrack = pick?.track;
+  const allTracks = useMemo(() => [...new Map([...(pickTrack ? [pickTrack] : []), ...feed.items.map(item => item.track)].map(track => [track.id, track])).values()], [pickTrack, feed.items]);
   // The hero changes independently; cards below it keep their place while scrolling.
-  const feedItems = feed.items;
-  const chapters: FeedItem[][] = [];
-  for (let i = 0; i < feedItems.length; i += CHAPTER_SIZE) chapters.push(feedItems.slice(i, i + CHAPTER_SIZE));
+  const chapters = useMemo(() => {
+    const groups: FeedItem[][] = [];
+    for (let i = 0; i < feed.items.length; i += CHAPTER_SIZE) groups.push(feed.items.slice(i, i + CHAPTER_SIZE));
+    return groups;
+  }, [feed.items]);
+  const motionRegions = useMemo(() => [chapters, feed.sections], [chapters, feed.sections]);
+  useVisibleMotion(root, motionRegions);
   const discovery = mode === "familiar" ? 0 : mode === "explore" ? 1 : music.settings.discovery;
   const discoveryLabel = discovery <= .25 ? "More familiar music" : discovery >= .7 ? "More new music" : "Familiar songs and new discoveries";
-  const openMenu = (track: MusicTrack, anchor: SongMenuAnchor) => setMenu({ track, anchor });
+  const openMenu = useCallback((track: MusicTrack, anchor: SongMenuAnchor) => setMenu({ track, anchor }), []);
   const privateListening = music.settings.privateSession || music.settings.learnFromListening === false;
-  const source: FeedSource = { context: home ? "home-feed" : "discover-feed" };
+  const source = useMemo<FeedSource>(() => ({ context: home ? "home-feed" : "discover-feed" }), [home]);
 
   return <div ref={root} className={s.feedRoom} data-surface={surface} data-personalized-feed={surface}>
     <div className={s.welcome}><span><Blossom/>{home ? `Music for ${music.account?.username || "you"}` : "ROOM FOR NEW MUSIC"}</span>
@@ -253,7 +259,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
         <div className={s.tasteNote}><span className={s.tasteDot}/>{discoveryLabel}
           <button type="button" onClick={() => setShowWhy(value => !value)} aria-expanded={showWhy} aria-controls={explanationId}>About recommendations</button></div>
       </div>
-      <div className={s.heroMusic} data-hero-music><HeroGarden surface={surface}/>
+      <div className={s.heroMusic} data-hero-music data-motion-region><HeroGarden surface={surface}/>
         {pick ? <HeroPick item={pick} tracks={allTracks} source={source} onOptions={openMenu}/> : <div className={s.waitingSleeve} aria-hidden="true"><Blossom/><span>your next<br/><em>good song</em></span><i/></div>}
         <span className={s.cornerNote}>{home ? "music, with room to breathe" : "another side of music"}</span>
       </div>
@@ -278,7 +284,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
 
     {children}
 
-    {feed.sections.slice(0, 3).map((section, index) => <section key={section.id} className={s.spotlight} aria-label={section.title}>
+    {feed.sections.slice(0, 3).map((section, index) => <section key={section.id} className={s.spotlight} aria-label={section.title} data-motion-region>
       <div className={s.sectionHeading}><div><span className={s.eyebrow}>{index === 0 ? "FROM YOUR LISTENING" : "MORE TO EXPLORE"}</span><h2>{section.title}</h2><p>{section.description}</p></div>
         <SmartQueueButton scope="collection" tracks={section.tracks} label="Play a mix"/></div>
       <div className={s.shelf} tabIndex={0} aria-label={section.title + " songs; scroll for more"}>{section.tracks.slice(0, 8).map((track, position) => <ShelfSong key={track.id} track={track}
@@ -300,7 +306,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
       {feed.ready && !feed.items.length && <div className={s.emptyGarden}><Blossom/><h3>No recommendations yet.</h3><p>Choose favorite artists or explore the catalog to start your recommendations.</p>
         <div><Link href="/onboarding">Choose favorite artists<Icon name="arrow" size={15}/></Link><Link href="/search">Search music<Icon name="search" size={15}/></Link></div></div>}
 
-      <div className={s.songChapters}>{chapters.map((chapter, chapterIndex) => <div key={chapter[0].track.id} className={s.chapter}>
+      <div className={s.songChapters}>{chapters.map((chapter, chapterIndex) => <div key={chapter[0].track.id} className={s.chapter} data-motion-region>
         {chapterIndex > 0 && <div className={s.chapterDivider} aria-hidden="true"><span/><Blossom/><span/><i>more music to explore</i></div>}
         <div className={s.songGrid}>{chapter.map((item, index) => <FeedSong key={item.track.id} item={item} tracks={allTracks}
           number={chapterIndex * CHAPTER_SIZE + index + 2} featured={index === 0} source={source} onOptions={openMenu}/>)}</div>

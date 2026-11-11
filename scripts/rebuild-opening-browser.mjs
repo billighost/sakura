@@ -2,7 +2,7 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import {chromium} from "@playwright/test";
+import {chromium,webkit} from "@playwright/test";
 import {encode} from "next-auth/jwt";
 
 const base=process.env.SAKURA_TEST_URL||"http://localhost:3012";
@@ -16,7 +16,8 @@ await fs.mkdir(routeDirectory,{recursive:true});
 await fs.writeFile(routePath,'export default function Page(){return <section><h1>Opening art review</h1><p>Your music loads while the tree unfolds.</p></section>;}\n');
 const output=".local/opening-art-review";
 await fs.mkdir(output,{recursive:true});
-const browser=await chromium.launch({channel:"chrome",headless:true});
+const engine=process.env.SAKURA_OPENING_BROWSER||"chromium";
+const browser=engine==="webkit"?await webkit.launch({headless:true}):await chromium.launch({channel:"chrome",headless:true});
 const checks=[],errors=[];
 const selected=process.env.SAKURA_OPENING_VIEWPORTS?.split(",");
 try{
@@ -64,9 +65,13 @@ try{
   const art=await opening.evaluate(el=>{
    const tree=el.querySelector("[data-opening-tree]"),wind=el.querySelector("[data-opening-wind]"),field=el.querySelector("[data-opening-flight-field]"),ids=Array.from(el.querySelectorAll("[id]")).map(node=>node.id);
    const box=node=>{const b=node.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};};
-   return {tree:box(tree),wind:box(wind),field:box(field),uniqueIds:new Set(ids).size===ids.length,nodeCount:el.querySelectorAll("*").length,branches:Array.from(el.querySelectorAll("[data-opening-branch]")).every(node=>Number.parseFloat(getComputedStyle(node).strokeDashoffset)===0)};
+   const blossoms=el.querySelector('[class*="blossomField"]'),flowers=Array.from(el.querySelectorAll('[data-opening-flower]'));
+   return {tree:box(tree),blossoms:box(blossoms),wind:box(wind),field:box(field),uniqueIds:new Set(ids).size===ids.length,nodeCount:el.querySelectorAll("*").length,branches:Array.from(el.querySelectorAll("[data-opening-branch]")).every(node=>Number.parseFloat(getComputedStyle(node).strokeDashoffset)===0),boundedFlowers:flowers.every(node=>node.tagName==='SPAN'&&node.querySelector('svg')?.getBBox().width>0&&getComputedStyle(node.querySelector('svg')).willChange.includes('transform')),maskArea:Number(el.querySelector('mask').getAttribute('width'))*Number(el.querySelector('mask').getAttribute('height'))};
   });
   assert.equal(art.uniqueIds,true,"SVG paint and shape definitions are distinct");assert.equal(art.branches,true);
+  assert.equal(art.boundedFlowers,true,"Detailed blossoms grow in bounded compositor layers with valid shared SVG shapes");
+  assert.ok(art.maskArea<40000,"The trunk reveal rasterizes only the painted trunk bounds");
+  assert.ok(Math.abs(art.tree.x-art.blossoms.x)<.5&&Math.abs(art.tree.y-art.blossoms.y)<.5&&Math.abs(art.tree.width-art.blossoms.width)<.5&&Math.abs(art.tree.height-art.blossoms.height)<.5,`Blossoms stay aligned with the original branch coordinate space: ${JSON.stringify({tree:art.tree,blossoms:art.blossoms})}`);
   assert.ok(art.nodeCount<700,`Symbol reuse keeps animated SVG nodes bounded (${art.nodeCount})`);
   assert.equal(art.wind.width,width);assert.equal(art.wind.height,height);assert.equal(art.field.width,width);assert.equal(art.field.height,height);
   assert.ok(art.tree.width>width*.25,"Tree remains large enough on the screen");
