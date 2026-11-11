@@ -50,7 +50,7 @@
     "test:lyrics:cache:browser": "node scripts/rebuild-lyric-cache-policy-browser.mjs",
     "test:modal:browser": "node scripts/rebuild-modal-backdrop-browser.mjs",
     "test:lyrics:cache:review": "node scripts/rebuild-cache-review-browser.mjs",
-    "test:performance:browser": "node scripts/rebuild-loading-performance-browser.mjs && node scripts/rebuild-scroll-performance-browser.mjs && node scripts/rebuild-bloom-performance-browser.mjs"
+    "test:performance:browser": "node scripts/rebuild-loading-performance-browser.mjs && node scripts/rebuild-scroll-performance-browser.mjs && node scripts/rebuild-bloom-performance-browser.mjs && node --import tsx scripts/rebuild-loading-offline-browser.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

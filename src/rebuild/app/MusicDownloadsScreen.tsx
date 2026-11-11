@@ -14,7 +14,3 @@ function OfflineShelves({tracks}:{tracks:MusicTrack[]}){
 }
 
 export function Downloads(){return <DownloadsRoom offlineShelves={tracks=><OfflineShelves tracks={tracks}/>}/>;}
-
-/** A direct client reference lets the neutral document warm this route's code
- * without putting Downloads into every music page's initial bundle. */
-export function OfflineDownloads(){const {account}=useMusic();return <Downloads key={account?.id||"guest"}/>;}
