@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import {useRouter,useSearchParams} from "next/navigation";
 import {useMusic} from "../app/MusicContext";
+import {replaceMusicUrl} from "../app/offlineNavigation";
 import {useResource,invalidateResources} from "../app/resources";
 import {requestJson,UserFacingError,responseIssue} from "../app/errors";
 import {RecoveryNotice} from "../app/RecoveryNotice";
@@ -28,11 +29,11 @@ function BloomDetail({id}:{id:string}){
  const detail=useResource<BloomRecap>(p.account?.id||null,!archival?`/api/v2/bloom/${encodeURIComponent(id)}`:null),archive=useResource<{items:BloomRecap[]}>(p.account?.id||null,archival?`/api/v2/bloom/archive?year=${encodeURIComponent(id.slice(7))}`:null);
  const audio=useBloomAudio(),recap=archival?archive.data?.items.find(item=>item.id===id):detail.data,expired=useBoundary(!archival?recap?.expiresAt:undefined,()=>audio.close());
  useEffect(()=>{
-  const revoke=(event:Event)=>{const data=(event as CustomEvent<{accountId?:string;scope?:string}>).detail;if(data?.accountId!==p.account?.id||data.scope==="feedback")return;setErased(true);audio.close();router.replace("/bloom");};
+  const revoke=(event:Event)=>{const data=(event as CustomEvent<{accountId?:string;scope?:string}>).detail;if(data?.accountId!==p.account?.id||data.scope==="feedback")return;setErased(true);audio.close();replaceMusicUrl(router,"/bloom");};
   window.addEventListener("sakura-personalization-cleared",revoke);window.addEventListener("sakura-listening-erased",revoke);
   return()=>{window.removeEventListener("sakura-personalization-cleared",revoke);window.removeEventListener("sakura-listening-erased",revoke);};
  },[p.account?.id,router,audio]);
- function close(){audio.close();router.replace("/bloom");if(p.account)invalidateResources(p.account.id,"/api/v2/bloom");}
+ function close(){audio.close();replaceMusicUrl(router,"/bloom");if(p.account)invalidateResources(p.account.id,"/api/v2/bloom");}
  async function reveal(chapterId:string){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/reveal`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chapterId})},{context:"page",accountId:p.account?.id});}
  async function prepare(){if(archival&&recap)return {story:recap,chapters:recap.chapters,listening:recap.listening};return requestJson<BloomPreparedStory>(`/api/v2/bloom/${encodeURIComponent(id!)}/prepare`,{method:"POST"},{context:"page",accountId:p.account?.id});}
  async function complete(){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/complete`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"},{context:"page",accountId:p.account?.id});}

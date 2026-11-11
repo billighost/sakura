@@ -64,6 +64,65 @@ CREATE TABLE IF NOT EXISTS sakura_v2."FavoriteOperationReceipt" (
   liked boolean NOT NULL, received_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY(account_id,operation_id)
 );
+-- Old setters mutate Favorite before writing their receipt. Keep that lock order
+-- throughout the additive upgrade so a live old writer can finish safely.
+LOCK TABLE sakura_v2."Favorite" IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE sakura_v2."FavoriteOperationReceipt" IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE sakura_v2."FavoriteOperationReceipt" ADD COLUMN IF NOT EXISTS base_revision bigint CHECK(base_revision>=0);
+ALTER TABLE sakura_v2."FavoriteOperationReceipt" ADD COLUMN IF NOT EXISTS conflict boolean NOT NULL DEFAULT false;
+-- Unlike choices retain a revision even when the Favorite row is absent.
+-- A first delivery of an old offline choice can then compare its own baseline.
+CREATE TABLE IF NOT EXISTS sakura_v2."FavoriteChoice" (
+  account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+  recording_id uuid NOT NULL REFERENCES sakura_v2."Recording"(id) ON DELETE RESTRICT,
+  revision bigint NOT NULL CHECK(revision>=1), liked boolean NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(account_id,recording_id)
+);
+INSERT INTO sakura_v2."FavoriteChoice"(account_id,recording_id,revision,liked)
+ SELECT known.account_id,known.recording_id,1,
+   EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=known.account_id AND f.recording_id=known.recording_id)
+ FROM (SELECT account_id,recording_id FROM sakura_v2."Favorite"
+       UNION SELECT account_id,recording_id FROM sakura_v2."FavoriteOperationReceipt") known
+ ON CONFLICT(account_id,recording_id) DO NOTHING;
+-- Repair a partial earlier rollout before installing compatibility triggers.
+UPDATE sakura_v2."FavoriteChoice" choice SET revision=choice.revision+1,
+ liked=EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=choice.account_id AND f.recording_id=choice.recording_id),updated_at=now()
+ WHERE choice.liked IS DISTINCT FROM EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=choice.account_id AND f.recording_id=choice.recording_id);
+CREATE OR REPLACE FUNCTION sakura_v2.favorite_membership_choice() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE target_account uuid; target_recording uuid; target_liked boolean;
+BEGIN
+ IF TG_OP='INSERT' THEN target_account:=NEW.account_id;target_recording:=NEW.recording_id;target_liked:=true;
+ ELSE target_account:=OLD.account_id;target_recording:=OLD.recording_id;target_liked:=false; END IF;
+ -- Account deletion must not recreate a row that is being cascade-deleted.
+ IF NOT EXISTS(SELECT 1 FROM public."User" WHERE id=target_account)
+    OR NOT EXISTS(SELECT 1 FROM sakura_v2."Recording" WHERE id=target_recording) THEN RETURN NULL; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('sakura-v2-history:'||target_account::text));
+ INSERT INTO sakura_v2."FavoriteChoice" AS choice(account_id,recording_id,revision,liked,updated_at)
+ VALUES(target_account,target_recording,1,target_liked,now())
+ ON CONFLICT(account_id,recording_id) DO UPDATE SET revision=choice.revision+1,liked=EXCLUDED.liked,updated_at=now();
+ RETURN NULL;
+END;
+$$;
+CREATE OR REPLACE TRIGGER favorite_membership_choice AFTER INSERT OR DELETE ON sakura_v2."Favorite"
+ FOR EACH ROW EXECUTE FUNCTION sakura_v2.favorite_membership_choice();
+CREATE OR REPLACE FUNCTION sakura_v2.favorite_legacy_receipt_choice() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.base_revision IS NOT NULL OR NEW.conflict THEN RETURN NULL; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public."User" WHERE id=NEW.account_id)
+    OR NOT EXISTS(SELECT 1 FROM sakura_v2."Recording" WHERE id=NEW.recording_id) THEN RETURN NULL; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('sakura-v2-history:'||NEW.account_id::text));
+ -- A membership trigger or the new setter already advances choices in this
+ -- transaction. Only a legacy no-op needs its receipt to advance the revision.
+ INSERT INTO sakura_v2."FavoriteChoice" AS choice(account_id,recording_id,revision,liked,updated_at)
+ VALUES(NEW.account_id,NEW.recording_id,1,
+   EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=NEW.account_id AND f.recording_id=NEW.recording_id),now())
+ ON CONFLICT(account_id,recording_id) DO UPDATE SET revision=choice.revision+1,liked=EXCLUDED.liked,updated_at=now()
+ WHERE choice.updated_at IS DISTINCT FROM now();
+ RETURN NULL;
+END;
+$$;
+CREATE OR REPLACE TRIGGER favorite_legacy_receipt_choice AFTER INSERT ON sakura_v2."FavoriteOperationReceipt"
+ FOR EACH ROW EXECUTE FUNCTION sakura_v2.favorite_legacy_receipt_choice();
 CREATE TABLE IF NOT EXISTS sakura_v2."Playlist" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,

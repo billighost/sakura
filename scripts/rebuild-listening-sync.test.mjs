@@ -1,30 +1,9 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
-import vm from 'node:vm';
-import ts from 'typescript';
 
-// Execute the real coordinator with deterministic storage and transport, so
-// request ordering and browser-close recovery can be tested without a server.
-const compiled=ts.transpileModule(await readFile('src/rebuild/app/listeningSync.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+import {setup} from './fixtures/listening-sync-test.mjs';
 const state=(positionMs=0)=>({queue:[],currentEntryId:null,positionMs,sleepUntil:null});
-function setup(options={}){
- const mirror=new Map(),disk=new Map(),restored=[],requests=[],timers=new Map(),storageErrors=[];let remote=null,stamp=1000,elapsed=0,serverTime=undefined,offline=false,holdGet=null,holdPut=null,nextTimer=0,blockedMirror=options.blockedMirror,blockedDisk=options.blockedDisk;
- const exports={};const localStorage={getItem:key=>mirror.get(key)||null,setItem:(key,value)=>{if(blockedMirror)throw new Error('Storage unavailable');mirror.set(key,value);}};
- const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
- const transport=async(path,init={},options={})=>{
-  requests.push({path,init,options});if(offline)throw new Error('offline');if(init.signal?.aborted)throw new DOMException('aborted','AbortError');
-  if(!init.method){if(holdGet){const hold=holdGet;holdGet=null;return hold;}return {session:clone(remote),serverTime};}
-  if(holdPut){const hold=holdPut;holdPut=null;return hold;}
-  const sent=JSON.parse(init.body);if(sent.revision!==(remote?.revision||0))return {accepted:false,session:clone(remote),serverTime};
-  const updatedAt=serverTime??++stamp,choiceAt=sent.explicit===false?(remote?.choiceAt??remote?.updatedAt??updatedAt):Math.max(remote?.choiceAt??0,Math.min(sent.intentAt??updatedAt,updatedAt));
-  remote={state:sent.state,revision:sent.revision+1,deviceId:sent.deviceId,updatedAt,choiceAt};return {accepted:true,session:clone(remote),serverTime};
- };
- vm.runInNewContext(compiled,{exports,require:path=>path==='./offline'?{localRead:async(account)=>clone(disk.get(account)),localWrite:async(account,name,draft)=>{if(blockedDisk)throw new Error('Storage unavailable');disk.set(account,clone(draft));}}:path==='./sessionState'?{localId:randomUUID}:{requestJson:transport},localStorage,crypto:{randomUUID},AbortController,DOMException,Date:{now:()=>++stamp},performance:options.monotonic?{now:()=>elapsed}:undefined,setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
- const deviceId=randomUUID(),sync=new exports.ListeningSync('account-a',deviceId,value=>restored.push(clone(value)),error=>storageErrors.push(error));
- return {sync,deviceId,mirror,disk,restored,requests,storageErrors,storageAvailable(){blockedMirror=false;blockedDisk=false;},writerIdentity:exports.deviceIdentity,get remote(){return remote;},set remote(value){remote=value;},offline(value){offline=value;},now(value){stamp=value;},elapsed(value){elapsed=value;},serverTime(value){serverTime=value;},hold(value){holdGet=value;},holdPut(value){holdPut=value;},newSync(writerId=deviceId){return new exports.ListeningSync('account-a',writerId,value=>restored.push(clone(value)));}};
-}
 
 test('total storage failure is reported once and cannot start an undurable session upload',async()=>{
  const f=setup({blockedMirror:true,blockedDisk:true});await f.sync.start();f.sync.change(state(23000));await assert.rejects(()=>f.sync.flush(),/Storage unavailable/);assert.equal(f.storageErrors.length,1);assert.equal(f.requests.filter(row=>row.init.method==='PUT').length,0);

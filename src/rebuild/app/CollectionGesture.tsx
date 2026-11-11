@@ -7,7 +7,7 @@ import { useMusic } from "./MusicContext";
 import { SongGesture } from "./SongGesture";
 import { Icon } from "./Icon";
 import { useScreenActions } from "./screenActions";
-import { requestJson } from "./errors";
+import { loadResource, resourceSnapshot } from "./resources";
 import { musicTrack, type MusicTrack } from "./types";
 import { MixPlaylistDialog } from "./MixPlaylistDialog";
 import type { SongMenuAnchor } from "./TrackActions";
@@ -54,12 +54,16 @@ function CollectionOptions({ title, kind, href, anchor, trigger, onClose, onActi
    if (openedAt && current && Math.abs(current.top - openedAt.top) < .5 && Math.abs(current.left - openedAt.left) < .5) return;
    close.current();
   };
+  // Touch release can restore focus to the held card after opening the menu.
+  // Escape must still dismiss this manual popover from that focused card.
+  const escape = (event: globalThis.KeyboardEvent) => {if(event.key === "Escape" && !event.defaultPrevented){event.preventDefault();event.stopPropagation();close.current();}};
   document.addEventListener("pointerdown", outside);
+  document.addEventListener("keydown", escape);
   document.addEventListener("scroll", scroll, true);
   window.addEventListener("resize", place);
   window.visualViewport?.addEventListener("resize", place);
   return () => {
-   resize.disconnect(); document.removeEventListener("pointerdown", outside); document.removeEventListener("scroll", scroll, true);
+   resize.disconnect(); document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); document.removeEventListener("scroll", scroll, true);
    window.removeEventListener("resize", place); window.visualViewport?.removeEventListener("resize", place);
    const restore = element.contains(document.activeElement) || document.activeElement === document.body;
    if (element.matches(":popover-open")) element.hidePopover();
@@ -108,7 +112,16 @@ export function CollectionGesture({ children, className = "", kind, id, title, t
    let queue = tracks;
    if (!queue) {
     const endpoint = kind === "mix" ? "mixes" : kind === "playlist" ? "playlists" : kind === "album" ? "albums" : "artists";
-    const data = await requestJson<Record<string, unknown>>(`/api/v2/${endpoint}/${encodeURIComponent(id)}`, { signal: controller.signal }, { context: "playback", accountId: music.account?.id });
+    const accountId=music.account?.id;if(!accountId)return;
+    const path=`/api/v2/${endpoint}/${encodeURIComponent(id)}`;
+    // Share the page's durable cache and flight. Cancelling this menu action
+    // must not cancel another screen's use of the same collection.
+    await loadResource(accountId,path);
+    if(!actions.current("collection",controller))return;
+    const snapshot=resourceSnapshot<Record<string,unknown>>(accountId,path);
+    if(snapshot.error&&snapshot.data===undefined)throw snapshot.error;
+    const data=snapshot.data;
+    if(!data)throw new Error("This collection has not been saved on this device yet.");
     const rows = data.recordings ?? data.tracks;
     queue = Array.isArray(rows) ? rows.map(row => musicTrack(row as Record<string, unknown>)) : [];
    }

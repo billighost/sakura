@@ -19,7 +19,8 @@ wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt "
 for (let i = 0; i < samples; i++) wav.writeInt16LE(Math.round(Math.sin(i * 2 * Math.PI * 440 / 24000) * 500), 44 + i * 2);
 const id = "95170000-0000-4000-8000-000000000481", assetId = "95180000-0000-4000-8000-000000000481", sha256 = createHash("sha256").update(wav).digest("hex");
 const browser = await chromium.launch({ channel: "chrome", headless: true }), errors = [], checks = [], publications = [], network = [];
-let session = null, revision = 0;
+let session = null, revision = 0, settingsRevision = 0;
+const settings = { theme: "light", openingAnimation: 0, reducedMotion: false, audioTechnology: "none", privateSession: true, onboarded: true, seedArtists: [], seedGenres: [], volume: .8 }, fieldRevisions = Object.fromEntries(Object.keys(settings).map(key => [key, 0]));
 try {
  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
  await context.addCookies([{ name: "authjs.session-token", value: token, url: base }]);
@@ -28,7 +29,10 @@ try {
   const request = route.request(), path = new URL(request.url()).pathname, data = request.method() === "POST" || request.method() === "PUT" || request.method() === "PATCH" ? request.postDataJSON() : {};network.push({path,method:request.method(),range:request.headers().range});
   if (path === "/api/v2/profile") return route.fulfill({ json: { profile: account } });
   if (path === "/api/auth/session") return route.fulfill({ json: { user: account } });
-  if (path === "/api/v2/settings") return route.fulfill({ json: { theme: "light", openingAnimation: 0, reducedMotion: false, audioTechnology: "none", privateSession: true, onboarded: true, seedArtists: [], seedGenres: [], volume: .8 } });
+  if (path === "/api/v2/settings") {
+   if (request.method() === "PATCH") { const { expectedRevision, ...patch } = data; assert.equal(expectedRevision, settingsRevision); ++settingsRevision; Object.assign(settings, patch); for (const key of Object.keys(patch)) fieldRevisions[key] = settingsRevision; }
+   return route.fulfill({ json: { ...settings, revision: settingsRevision, fieldRevisions } });
+  }
   if (path === "/api/v2/listening-session") { if (request.method() === "PUT") session = { state: data.state, revision: ++revision, deviceId: data.deviceId, updatedAt: Date.now() }; return route.fulfill({ json: { accepted: true, session, serverTime: Date.now() } }); }
   if (path === "/api/v2/recordings/resolve") return route.fulfill({ json: { status: "resolved", recording: { id, reference: {provider: "deezer", id: "481"}, references: [{provider: "deezer", id: "481"}], metadata: { title: "Words in the garden", artists: ["Studio fixture"], albumTitle: "A little manuscript", durationMs: 12000 } }, playback: { assetId, url: base + "/api/v2/recordings/" + id + "/audio", fallbackUrl: "/api/v2/recordings/" + id + "/audio", sizeBytes: wav.length, sha256, mimeType: "audio/wav" } } });
   if (path.endsWith("/audio")) { const range = request.headers().range?.match(/bytes=(\d+)-(\d*)/); if (!range) return route.fulfill({ body: wav, contentType: "audio/wav", headers: { "Accept-Ranges": "bytes" } }); const start = Number(range[1]), end = range[2] ? Math.min(wav.length - 1, Number(range[2])) : wav.length - 1; return route.fulfill({ status: 206, body: wav.subarray(start, end + 1), contentType: "audio/wav", headers: { "Accept-Ranges": "bytes", "Content-Range": `bytes ${start}-${end}/${wav.length}` } }); }

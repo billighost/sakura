@@ -38,6 +38,19 @@ test("plain publication preserves contributor text and stanza spacing exactly",(
   const text="\nFirst line\n\nSecond line\r\nLast line\n";
   assert.equal(parseLyricSubmission({text,format:"plain"},identity).plainLyrics,text);
 });
+
+test("enhanced LRC publication rejects malformed, backwards and out-of-song word timestamps",()=>{
+  for(const text of [
+    "[00:01]<00:99>words",
+    "[00:01]<00:02>first <00:01>second",
+    "[00:01]<00:00>early words",
+    "[00:01]<03:05>late words",
+    "[00:01]<00:10>overlap\n[00:05]next line",
+    "[00:01]<00:01.1234>invalid fraction"
+  ])assert.throws(()=>parseLyricSubmission({text,format:"lrc"},identity),text);
+  const text="[00:01]<00:01.00>first <00:02.25>second\n[00:05]next line";
+  assert.equal(parseLyricSubmission({text,format:"lrc"},identity).plainLyrics,"first second\nnext line");
+});
 test("prepared browser token avoids expensive server proof and returns verified indexed lyrics",async()=>{
   const calls:string[]=[],payloads:unknown[]=[],headers:Headers[]=[];
   const result=await publishLyrics(identity,{format:"lrc",text:"[00:01.00]words",publishToken:"prefix:123"},{fetch:async(url,options)=>{
@@ -98,4 +111,13 @@ test("browser challenge cancellation terminates the worker and never submits lyr
 test("missing browser workers and expired challenges preserve drafts without publication",async()=>{
   const original=globalThis.Worker;Object.defineProperty(globalThis,"Worker",{value:undefined,configurable:true,writable:true});
   try{await assert.rejects(()=>solveLyricPublishChallenge({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+10000},new AbortController().signal),/draft is kept/);await assert.rejects(()=>solveLyricPublishChallenge({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()-1},new AbortController().signal));}finally{Object.defineProperty(globalThis,"Worker",{value:original,configurable:true,writable:true});}
+});
+
+test("a malformed successful publish response produces a recoverable draft error",async()=>{
+  const original=globalThis.Worker,oldFetch=globalThis.fetch;
+  class StubWorker {onmessage:((event:MessageEvent)=>void)|null=null;onerror:((event:ErrorEvent)=>void)|null=null;terminate(){}postMessage(){queueMicrotask(()=>this.onmessage?.({data:{type:"complete",token:"prefix:0"}} as MessageEvent));}}
+  Object.defineProperty(globalThis,"Worker",{value:StubWorker,configurable:true,writable:true});
+  globalThis.fetch=async url=>String(url).endsWith("/challenge")?Response.json({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+10000}):Response.json(null);
+  try{await assert.rejects(()=>publishLyricSubmission("recording","words","plain",{accountId:"owner",signal:new AbortController().signal}),/publishing response.*draft is kept/);}
+  finally{globalThis.fetch=oldFetch;Object.defineProperty(globalThis,"Worker",{value:original,configurable:true,writable:true});}
 });

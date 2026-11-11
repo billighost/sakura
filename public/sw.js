@@ -31,7 +31,7 @@ function revokeAudioCapability(token){const capability=audioCapabilities.get(tok
 self.addEventListener("message",event=>{
  const data=event.data,clientId=event.source?.id;
  if(!clientId||event.origin&&event.origin!==self.location.origin)return;
- if(data?.type==="sakura-cache-route"&&typeof data.path==="string"&&data.path.length<2048&&musicPath(data.path)){event.waitUntil(cacheDocument(data.path).catch(()=>{}));return;}
+ if(data?.type==="sakura-cache-route"&&typeof data.path==="string"&&data.path.length<2048&&documentPath(data.path)){event.waitUntil(cacheDocument(data.path).catch(()=>{}));return;}
  if(data?.type==="sakura-warm-shell"){event.waitUntil(cacheDocument(OFFLINE,true).catch(()=>{}));return;}
  if(data?.type==="sakura-audio-revoke"){audioClientEpochs.set(clientId,(audioClientEpochs.get(clientId)||0)+1);revokedAudioClients.add(clientId);for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);await pruneAudioCapabilities(clientId);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type==="sakura-audio-revoke-token"&&audioUuid.test(data.token)){audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{const active=audioCapabilities.get(data.token),saved=active||await audioEntry("audio-bridge:"+data.token).catch(()=>undefined);if(saved?.clientId!==clientId)return;if(active)revokeAudioCapability(data.token);else await deleteAudioCapability(data.token);});event.waitUntil(audioCapabilityWork);return;}
@@ -128,29 +128,69 @@ async function serveDeviceAudio(request,clientId,token){
  }catch(error){cleanup();controller.abort(error);return new Response(null,{status:request.signal.aborted?499:503,headers:{"Cache-Control":"private, no-store"}});}
 }
 function musicPath(path){return /^\/(?:home|discover|search|library(?:\/downloaded)?|liked|downloads|offline|profile|settings|onboarding|import|(?:artist|album|playlist|mix|track)\/[^/]+|bloom(?:\/[^/]+)?)\/?$/.test(path);}
+function publicPath(path){return /^\/(?:about|privacy|terms)\/?$/.test(path);}
+function documentPath(path){return musicPath(path)||publicPath(path);}
+async function openCache(name){try{return await caches.open(name);}catch{return undefined;}}
+async function matchCache(cache,request,options){try{return await cache?.match(request,options);}catch{return undefined;}}
+async function timedFetch(input,options={},buffer=false){
+ const controller=new AbortController(),source=options.signal||(input instanceof Request?input.signal:null),abort=()=>controller.abort(source.reason);
+ if(source?.aborted)abort();else source?.addEventListener("abort",abort,{once:true});
+ const timer=setTimeout(()=>controller.abort(new Error("The connection did not respond in time.")),15000);
+ try{const response=await fetch(input,{...options,signal:controller.signal});if(buffer)await response.clone().arrayBuffer();return response;}finally{clearTimeout(timer);source?.removeEventListener("abort",abort);}
+}
+function cacheableResource(request,response,name){
+ if(!response.ok||response.status!==200||response.redirected)return false;
+ const mime=(response.headers.get("Content-Type")||"").toLowerCase(),path=new URL(request.url).pathname;
+ if(name===ARTWORK)return mime.startsWith("image/");
+ if(name===ASSETS&&path.endsWith(".js"))return /(?:javascript|ecmascript)/.test(mime);
+ if(name===ASSETS&&path.endsWith(".css"))return mime.startsWith("text/css");
+ return !mime.includes("text/html")||name===CACHE;
+}
 async function cacheFirst(request,name){
- const cache=await caches.open(name),saved=await cache.match(request,{ignoreSearch:name===ASSETS});if(saved)return saved;
+ // Browser storage can be unavailable or full while the network still works.
+ const cache=await openCache(name),saved=await matchCache(cache,request,{ignoreSearch:name===ASSETS});if(saved&&cacheableResource(request,saved,name))return saved;
  const identity=new URL(request.url);if(name===ASSETS)identity.search="";
  const key=name+":"+identity.href;let flight=resourceFlights.get(key);
  if(!flight){
   // One consumer cancelling its image does not cancel another consumer's copy.
-  flight=(async()=>{const response=await fetch(new Request(request,{signal:null}));if(response.ok&&response.status===200&&(name!==ARTWORK||response.headers.get("Content-Type")?.startsWith("image/"))){try{await cache.put(request,response.clone());}catch{}}return response;})();
+  flight=(async()=>{const response=await timedFetch(new Request(request,{signal:null}),{},true);if(cacheableResource(request,response,name)){try{await cache?.put(request,response.clone());}catch{}}return response;})();
   resourceFlights.set(key,flight);void flight.finally(()=>{if(resourceFlights.get(key)===flight)resourceFlights.delete(key);}).catch(()=>{});
  }
  return (await flight).clone();
 }
+function documentAssets(html){return [...new Set(html.match(/\/_next\/static\/[^"\s<>\\]+\.(?:js|css|woff2?)/g)||[])];}
+async function usableDocument(cache,path){
+ const response=await matchCache(cache,path);if(!response)return;
+ try{
+  const assets=await openCache(ASSETS),critical=documentAssets(await response.clone().text()).filter(path=>/\.(?:js|css)$/.test(path));
+  for(const path of critical){const request=new Request(new URL(path,self.location.origin)),saved=await matchCache(assets,request,{ignoreSearch:true});if(!saved||!cacheableResource(request,saved,ASSETS))return;}
+  return response;
+ }catch{return undefined;}
+}
+async function commitDocument(cache,path,response){
+ // A deployment is usable offline only after its critical modules and styles
+ // are in durable storage. Failed warming must retain the previous document.
+ if(!cache||!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return false;
+ const copy=response.clone();let timer;
+ const html=await Promise.race([copy.text(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("The page ended before it could be saved.")),15000);})]).finally(()=>clearTimeout(timer));
+ const assets=documentAssets(html),assetCache=await openCache(ASSETS);
+ const results=await Promise.allSettled(assets.map(async path=>{
+  const request=new Request(new URL(path,self.location.origin)),critical=/\.(?:js|css)$/.test(path);
+  const fetched=await cacheFirst(request,ASSETS),saved=await matchCache(assetCache,request,{ignoreSearch:true});
+  if(critical&&(!cacheableResource(request,fetched,ASSETS)||!saved||!cacheableResource(request,saved,ASSETS)))throw new Error("A required page dependency could not be saved.");
+ }));
+ if(results.some((result,index)=>result.status==="rejected"&&/\.(?:js|css)$/.test(assets[index])))return false;
+ try{await cache.put(path,response);return true;}catch{return false;}
+}
 async function cacheDocument(path,refresh=false){
- if(!musicPath(path))return;const cache=await caches.open(CACHE);
- if(!refresh&&await cache.match(path))return;
+ if(!documentPath(path))return;const cache=await openCache(CACHE);if(!cache)return;
+ if(!refresh&&await usableDocument(cache,path))return;
  let flight=documentFlights.get(path);if(flight)return flight;
  flight=(async()=>{
-  const response=await fetch(path,{cache:"reload",credentials:"same-origin",headers:{Accept:"text/html"}});
+  const response=await timedFetch(path,{cache:"reload",credentials:"same-origin",headers:{Accept:"text/html"}},true);
   // Never persist an authentication redirect as an offline music page.
   if(!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return;
-  const savedResponse=response.clone(),html=await response.text();
-  const assets=[...new Set(html.match(/\/_next\/static\/[^"\s<>]+\.(?:js|css|woff2?)/g)||[])];
-  await Promise.allSettled(assets.map(url=>cacheFirst(new Request(new URL(url,self.location.origin)),ASSETS)));
-  try{await cache.put(path,savedResponse);}catch{}
+  return commitDocument(cache,path,response);
  })();documentFlights.set(path,flight);
  try{return await flight;}finally{if(documentFlights.get(path)===flight)documentFlights.delete(path);}
 }
@@ -173,18 +213,24 @@ self.addEventListener("fetch",event=>{
  // responses vary by router state and must never share a URL-only cache.
  if(url.pathname.startsWith("/api/")||request.headers.has("RSC")||url.searchParams.has("_rsc"))return;
  if(request.mode==="navigate"){event.respondWith((async()=>{
-  const cache=await caches.open(CACHE);
+  const cache=await openCache(CACHE);
   try{
-   const response=await fetch(request);
-   if(response.ok&&!response.redirected&&musicPath(url.pathname)&&response.headers.get("Content-Type")?.includes("text/html")){
-    try{await cache.put(url.pathname,response.clone());}catch{}
+   const response=await timedFetch(request);
+   if(response.status>=500&&response.status<=599&&documentPath(url.pathname)){
+    const saved=await usableDocument(cache,url.pathname)||musicPath(url.pathname)&&await usableDocument(cache,OFFLINE);if(saved)return saved;
+   }
+   if(response.ok&&!response.redirected&&documentPath(url.pathname)&&response.headers.get("Content-Type")?.includes("text/html")){
+    const warming=commitDocument(cache,url.pathname,response.clone()).catch(()=>false);
+    // Deliver online HTML immediately; the worker finishes the atomic cache
+    // commit in the background without delaying the live page's first paint.
+    event.waitUntil(warming);
    }
    return response;
   }catch{
-   const saved=await cache.match(url.pathname);if(saved)return saved;
+   const saved=documentPath(url.pathname)&&await usableDocument(cache,url.pathname);if(saved)return saved;
    // Deliver the neutral client shell under the requested URL. Its offline
    // renderer opens that page using account-scoped data, preserving deep links.
-   const offline=musicPath(url.pathname)&&await cache.match(OFFLINE);if(offline)return offline;
+   const offline=musicPath(url.pathname)&&await usableDocument(cache,OFFLINE);if(offline)return offline;
    return new Response("Open Sakura once while connected to prepare this device for offline listening.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}});
   }
  })());return;}

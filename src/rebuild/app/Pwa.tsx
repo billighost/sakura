@@ -1,5 +1,14 @@
 "use client";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useOffline } from "next/offline";
+import { installPublicOfflineNavigation, rememberMusicRoute } from "./offlineNavigation";
+function PublicOfflineNavigation(){
+ const pathname=usePathname(),offline=useOffline();
+ useEffect(()=>installPublicOfflineNavigation(()=>offline),[offline]);
+ useEffect(()=>{rememberMusicRoute(pathname);const controlled=()=>rememberMusicRoute(location.pathname);navigator.serviceWorker?.addEventListener("controllerchange",controlled);return()=>navigator.serviceWorker?.removeEventListener("controllerchange",controlled);},[pathname]);
+ return null;
+}
 export function Pwa() {
  useEffect(()=>{
   const theme=()=>{const color=document.documentElement.dataset.inkTheme==="dark"?"#18241f":"#f5f5ee";for(const element of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))element.content=color;};
@@ -21,5 +30,5 @@ export function Pwa() {
   }).catch(()=>{if(live)window.dispatchEvent(new CustomEvent("sakura-pwa-status",{detail:{ready:false}}));});
   return()=>{live=false;navigator.serviceWorker.removeEventListener("controllerchange",warm);window.removeEventListener("online",refresh);document.removeEventListener("visibilitychange",refresh);};
  }, []);
- return null;
+ return <Suspense fallback={null}><PublicOfflineNavigation/></Suspense>;
 }

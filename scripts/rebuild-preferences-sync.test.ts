@@ -50,7 +50,7 @@ test("preference conflicts retain HTTP status for safe refresh without being ret
 
 test("mirrored preference drafts preserve their bases and order writes even within one millisecond",async t=>{
  const original=Object.getOwnPropertyDescriptor(globalThis,"localStorage"),values=new Map<string,string>();
- Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{getItem:(key:string)=>values.get(key)||null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)}});
+ Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{get length(){return values.size;},key:(index:number)=>[...values.keys()][index]||null,getItem:(key:string)=>values.get(key)||null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)}});
  t.after(()=>{if(original)Object.defineProperty(globalThis,"localStorage",original);else Reflect.deleteProperty(globalThis,"localStorage");});
  t.mock.method(Date,"now",()=>2000);
  const account=randomUUID(),settings={...DEFAULT_SETTINGS,seedArtists:[],seedGenres:[],seedArtistSelections:[],onboarded:true} as UserSettings;
@@ -59,5 +59,5 @@ test("mirrored preference drafts preserve their bases and order writes even with
  await writePreferenceDraft(account,{...settings,volume:.3},true,{volume:.3});
  const second=await readPreferenceDraft(account);assert.ok(second!.savedAt>first!.savedAt);assert.equal(second?.serverRevision,9);assert.deepEqual(second?.pendingPatch,{volume:.3});
  values.set("sakura-v2-preferences:"+account,JSON.stringify({...second,serverRevision:-3,baseSettings:{volume:4,privateSession:"false"},serverSettings:{volume:.8,token:"not a setting"}}));
- const clean=await readPreferenceDraft(account);assert.equal(clean?.serverRevision,undefined);assert.deepEqual(clean?.baseSettings,{});assert.deepEqual(clean?.serverSettings,{volume:.8});
+ const clean=await readPreferenceDraft(account);assert.equal(clean?.serverRevision,9,"The immutable server journal survives a corrupt whole snapshot");assert.deepEqual(clean?.baseSettings,{volume:.8},"The valid operation journal retains its baseline when the whole snapshot is corrupt");assert.deepEqual(clean?.serverSettings,{volume:.8,privateSession:false});
 });

@@ -60,5 +60,6 @@ test("repeated listening uploads coalesce and remove the exact outbox only after
 test("failed history drain stops at one request and preserves the backlog for each account",async()=>withListenStorage(async values=>{
  for(const [account,sequence]of [["account-a",0],["account-a",1],["account-b",0]] as const)values.set(`sakura-v2-outbox:${account}:listen-event:${sequence}`,JSON.stringify({...listenChunk,sequence}));
  let requests=0;globalThis.fetch=async()=>{requests++;return new Response("{}",{status:503});};
- await drainListen("account-a");assert.equal(requests,1);assert.equal(values.size,3);
+ await drainListen("account-a");assert.equal(requests,1);assert.equal([...values.keys()].filter(key=>key.startsWith("sakura-v2-outbox:")).length,3);
+ for(const [account,sequence]of [["account-a",0],["account-a",1],["account-b",0]]as const)assert.deepEqual(JSON.parse(values.get(`sakura-v2-outbox:${account}:listen-event:${sequence}`)!),{...listenChunk,sequence});
 }));

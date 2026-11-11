@@ -1,13 +1,14 @@
-import {localRead,localWrite} from "./offline";
+import {localRead,localWrite,localDelete,localEntries,offlineDatabase} from "./offline";
 import type {UserSettings} from "./types";
 import {AUDIO_TECHNOLOGIES} from "../audio/presets";
 import {validTimeZone} from "../bloom/calendar";
 import {FEED_NUMERIC_FIELDS,FEED_BOOLEAN_FIELDS} from "./feedPreferences";
 import {initialTasteSignature,normalizeInitialTasteProfile} from "../recommendations/initialTaste";
-export interface PreferenceSyncMetadata {serverRevision?:number;serverSettings?:Partial<UserSettings>;baseSettings?:Partial<UserSettings>;serverFieldRevisions?:Record<string,number>;baseFieldRevisions?:Record<string,number>}
+export interface PreferenceIntent {operationId:string;field:keyof UserSettings;value:unknown;createdAt:number;baseValue?:unknown;baseRevision?:number}
+export interface PreferenceSyncMetadata {serverRevision?:number;serverSettings?:Partial<UserSettings>;baseSettings?:Partial<UserSettings>;serverFieldRevisions?:Record<string,number>;baseFieldRevisions?:Record<string,number>;pendingOperations?:Record<string,PreferenceIntent>}
 export interface PreferenceDraft extends PreferenceSyncMetadata {settings:UserSettings;pending:boolean;pendingPatch?:Partial<UserSettings>;savedAt:number}
 const supported=["theme","audioQuality","audioTechnology","japaneseReading","lyricReading","privateSession",...FEED_NUMERIC_FIELDS,...FEED_BOOLEAN_FIELDS,"reducedMotion","openingAnimation","bloomPerformance","seedArtists","seedGenres","seedArtistSelections","timeZone","explicitContent","onboarded","volume","shuffle","repeat","previewVolume","previewLoop","sleepTimerMinutes"] as const;
-export function cachedPreferences(accountId?:string):Partial<UserSettings>{try{const id=accountId||localStorage.getItem("sakura-v2-active-account");if(!id)return {};const raw=localStorage.getItem("sakura-v2-preferences:"+id);return raw?fullSettings(JSON.parse(raw).settings):{};}catch{return {};}}
+export function cachedPreferences(accountId?:string):Partial<UserSettings>{try{const id=accountId||localStorage.getItem("sakura-v2-active-account");if(!id)return {};const raw=localStorage.getItem("sakura-v2-preferences:"+id),draft=raw?preferenceDraft(JSON.parse(raw)):undefined;const records=new Map<string,PreferenceIntent>(),acks:PreferenceIntent[]=[],servers:PreferenceServerRecord[]=[];for(const intent of Object.values(draft?.pendingOperations||{}))records.set(intent.operationId,intent);collectMirror(id,records,acks,servers);const server=latestServer(servers,draft);return fullSettings({...draft?.settings,...server?.serverSettings,...intentPatch(activeIntents(records,acks))});}catch{return {};}}
 /** Read-only account metadata may be cached, but can never enter a PATCH. */
 export function fullSettings(value:unknown):Partial<UserSettings>{
  const fields=settingsFields(value),raw=value&&typeof value==="object"?value as Record<string,unknown>:{},profile=normalizeInitialTasteProfile(raw.initialTasteProfile);
@@ -71,25 +72,110 @@ export function rebasePreferences(pending:Partial<UserSettings>,base:Partial<Use
 function preferenceMetadata(value:unknown):PreferenceSyncMetadata {
  const object=value&&typeof value==="object"?value as PreferenceSyncMetadata:{};
  const serverRevision=preferenceRevision({revision:object.serverRevision});
- return {...(serverRevision!==undefined?{serverRevision}:{}),...(object.serverSettings?{serverSettings:settingsFields(object.serverSettings)}:{}),...(object.baseSettings?{baseSettings:settingsFields(object.baseSettings)}:{}),...(object.serverFieldRevisions?{serverFieldRevisions:preferenceFieldRevisions({fieldRevisions:object.serverFieldRevisions})}:{}),...(object.baseFieldRevisions?{baseFieldRevisions:preferenceFieldRevisions({fieldRevisions:object.baseFieldRevisions})}:{})};
+ return {...(serverRevision!==undefined?{serverRevision}:{}),...(object.serverSettings?{serverSettings:settingsFields(object.serverSettings)}:{}),...(object.baseSettings?{baseSettings:settingsFields(object.baseSettings)}:{}),...(object.serverFieldRevisions?{serverFieldRevisions:preferenceFieldRevisions({fieldRevisions:object.serverFieldRevisions})}:{}),...(object.baseFieldRevisions?{baseFieldRevisions:preferenceFieldRevisions({fieldRevisions:object.baseFieldRevisions})}:{}),...(object.pendingOperations?{pendingOperations:cleanIntents(object.pendingOperations)}:{})};
 }
 function preferenceDraft(value:unknown):PreferenceDraft|undefined{
  if(!value||typeof value!=="object")return;const draft=value as PreferenceDraft;
  if(!draft.settings||typeof draft.settings!=="object"||!Number.isFinite(draft.savedAt)||draft.savedAt<0)return;
- return {settings:fullSettings(draft.settings) as UserSettings,pending:draft.pending===true,pendingPatch:draft.pending?settingsFields(draft.pendingPatch||draft.settings):{},savedAt:draft.savedAt,...preferenceMetadata(draft)};
+ const metadata=preferenceMetadata(draft),pendingPatch=draft.pending?settingsFields(draft.pendingPatch||draft.settings):{};
+ const pendingOperations=metadata.pendingOperations||Object.fromEntries(Object.entries(pendingPatch).map(([field,value])=>[field,legacyIntent(field as keyof UserSettings,value,draft.savedAt,metadata)]));
+ return {settings:fullSettings(draft.settings) as UserSettings,pending:draft.pending===true,pendingPatch,savedAt:draft.savedAt,...metadata,pendingOperations};
 }
 const writes=new Map<string,Promise<void>>();
 const writeStamps=new Map<string,number>();
+const ownIntents=new Map<string,Record<string,PreferenceIntent>>();
+const clocks=new Map<string,number>();
+const intentPrefix=(accountId:string)=>"sakura-v2-preference-intent:"+accountId+":";
+const ackPrefix=(accountId:string)=>"sakura-v2-preference-ack:"+accountId+":";
+const serverPrefix=(accountId:string)=>"sakura-v2-preference-server:"+accountId+":";
+const intentVersion=(intent:PreferenceIntent)=>intent.operationId+":"+(intent.baseRevision??"initial");
+const copy=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
+interface PreferenceServerRecord {serverRevision:number;serverSettings:Partial<UserSettings>;serverFieldRevisions?:Record<string,number>;savedAt:number}
+function serverRecord(value:unknown):PreferenceServerRecord|undefined{
+ if(!value||typeof value!=="object")return;const raw=value as PreferenceServerRecord,metadata=preferenceMetadata(raw);if(metadata.serverRevision===undefined||!metadata.serverSettings||!Object.keys(metadata.serverSettings).length||!Number.isFinite(raw.savedAt))return;
+ return {serverRevision:metadata.serverRevision,serverSettings:copy(metadata.serverSettings),serverFieldRevisions:metadata.serverFieldRevisions,savedAt:raw.savedAt};
+}
+function latestServer(records:PreferenceServerRecord[],draft?:PreferenceDraft){const source=serverRecord(draft);return [...records,...(source?[source]:[])].sort((a,b)=>b.serverRevision-a.serverRevision||b.savedAt-a.savedAt)[0];}
+function validIntent(value:unknown):PreferenceIntent|undefined{
+ if(!value||typeof value!=="object")return;const intent=value as PreferenceIntent;
+ if(typeof intent.operationId!=="string"||!intent.operationId||intent.operationId.length>180||!supported.includes(intent.field as typeof supported[number])||!Number.isSafeInteger(intent.createdAt)||intent.createdAt<0)return;
+ const field=intent.field,clean=settingsFields({[field]:intent.value});if(!(field in clean))return;
+ const base=settingsFields({[field]:intent.baseValue}),baseRevision=preferenceRevision({revision:intent.baseRevision});
+ return {operationId:intent.operationId,field,value:copy(clean[field]),createdAt:intent.createdAt,...(field in base?{baseValue:copy(base[field])}:{}),...(baseRevision!==undefined?{baseRevision}:{})};
+}
+function cleanIntents(value:unknown):Record<string,PreferenceIntent>{
+ if(!value||typeof value!=="object"||Array.isArray(value))return {};const result:Record<string,PreferenceIntent>={};
+ for(const [field,raw]of Object.entries(value)){const intent=validIntent(raw);if(intent?.field===field)result[field]=intent;}return result;
+}
+function compareIntents(a:PreferenceIntent,b:PreferenceIntent){return a.createdAt===b.createdAt?a.operationId.localeCompare(b.operationId):a.createdAt-b.createdAt;}
+export function mergePreferenceIntents(...sources:Array<Record<string,PreferenceIntent>|undefined>):Record<string,PreferenceIntent>{
+ const result:Record<string,PreferenceIntent>={};for(const source of sources)for(const [field,intent]of Object.entries(cleanIntents(source))){const old=result[field];if(!old||compareIntents(intent,old)>0||intent.operationId===old.operationId&&(intent.baseRevision??-1)>(old.baseRevision??-1))result[field]=intent;}return result;
+}
+function intentPatch(intents:Record<string,PreferenceIntent>):Partial<UserSettings>{return settingsFields(Object.fromEntries(Object.values(intents).map(intent=>[intent.field,intent.value])));}
+function legacyIntent(field:keyof UserSettings,value:unknown,savedAt:number,metadata:PreferenceSyncMetadata):PreferenceIntent{
+ let hash=2166136261;for(const char of JSON.stringify(value)){hash=Math.imul(hash^char.charCodeAt(0),16777619);}
+ const base=settingsFields(metadata.baseSettings),revision=metadata.baseFieldRevisions?.[field];
+ return {field,value:copy(value),createdAt:Math.floor(savedAt),operationId:`legacy:${field}:${savedAt}:${hash>>>0}`,...(field in base?{baseValue:copy(base[field])}:{}),...(revision!==undefined?{baseRevision:revision}:{})};
+}
+/** Create IDs only for deliberate edits. The shared logical clock keeps later
+ * edits later even when wall time repeats or moves backwards. */
+export function createPreferenceIntents(accountId:string,patch:Partial<UserSettings>,metadata:PreferenceSyncMetadata={}):Record<string,PreferenceIntent>{
+ let shared=0;try{shared=Number(localStorage.getItem("sakura-v2-preference-clock:"+accountId))||0;}catch{}
+ const createdAt=Math.max(Date.now(),(clocks.get(accountId)||0)+1,Number.isSafeInteger(shared)&&shared>=0?shared+1:0,...Object.values(cleanIntents(metadata.pendingOperations)).map(intent=>intent.createdAt+1));clocks.set(accountId,createdAt);
+ try{localStorage.setItem("sakura-v2-preference-clock:"+accountId,String(createdAt));}catch{}
+ const base=settingsFields(metadata.baseSettings),server=settingsFields(metadata.serverSettings),result:Record<string,PreferenceIntent>={};
+ for(const [key,value]of Object.entries(settingsFields(patch))){const field=key as keyof UserSettings,baseValue=field in base?base[field]:server[field],baseRevision=metadata.baseFieldRevisions?.[field]??metadata.serverFieldRevisions?.[field];result[key]={field,value:copy(value),createdAt,operationId:globalThis.crypto?.randomUUID?.()||`${createdAt}:${Math.random().toString(36).slice(2)}:${field}`,...(baseValue!==undefined?{baseValue:copy(baseValue)}:{}),...(baseRevision!==undefined?{baseRevision}:{})};}return result;
+}
+function collectIntent(records:Map<string,PreferenceIntent>,value:unknown){const intent=validIntent(value);if(!intent)return;const old=records.get(intent.operationId);if(!old||JSON.stringify(old.value)===JSON.stringify(intent.value)&&(intent.baseRevision??-1)>(old.baseRevision??-1))records.set(intent.operationId,intent);}
+function preserveBaseline(intent:PreferenceIntent,stored:unknown){const previous=validIntent(stored);return previous?.operationId===intent.operationId&&previous.field===intent.field&&JSON.stringify(previous.value)===JSON.stringify(intent.value)&&(previous.baseRevision??-1)>(intent.baseRevision??-1)?previous:intent;}
+function collectMirror(accountId:string,records:Map<string,PreferenceIntent>,acks:PreferenceIntent[],servers:PreferenceServerRecord[]=[]){
+ try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith(intentPrefix(accountId))&&!key.startsWith(ackPrefix(accountId))&&!key.startsWith(serverPrefix(accountId)))continue;let value:unknown;try{value=JSON.parse(localStorage.getItem(key)||"null");}catch{continue;}if(key.startsWith(ackPrefix(accountId))){const ack=validIntent(value);if(ack)acks.push(ack);}else if(key.startsWith(serverPrefix(accountId))){const server=serverRecord(value);if(server)servers.push(server);}else collectIntent(records,value);}}catch{}
+}
+function activeIntents(records:Map<string,PreferenceIntent>,acks:PreferenceIntent[]){return mergePreferenceIntents(...[...records.values()].filter(intent=>!acks.some(ack=>ack.field===intent.field&&compareIntents(intent,ack)<=0)).map(intent=>({[intent.field]:intent})));}
+async function reserveIntentOrder(accountId:string,intents:Record<string,PreferenceIntent>){
+ if(!Object.keys(intents).length)return;const database=await offlineDatabase(),tx=database.transaction("entries","readwrite"),done=tx.done,prefix="account:"+accountId+":",clockKey=prefix+"preference-clock";
+ // A rejected request also rejects transaction completion. Observe both
+ // promises immediately so the mirror fallback does not leave an unhandled
+ // transaction error when a request fails before the final await.
+ void done.catch(()=>{});
+ let clock=Number(await tx.store.get(clockKey))||0;
+ for(const intent of Object.values(intents)){
+  const orderKey=prefix+"preference-order:"+intent.operationId,stored=await tx.store.get(orderKey) as {createdAt?:number}|undefined;
+  const createdAt=Number.isSafeInteger(stored?.createdAt)&&stored!.createdAt!>=0?stored!.createdAt!:Math.max(clock+1,intent.createdAt);clock=Math.max(clock,createdAt);intent.createdAt=createdAt;
+  await tx.store.put({operationId:intent.operationId,createdAt},orderKey);await tx.store.put(intent,prefix+"preference-intent:"+intentVersion(intent));
+ }
+ await tx.store.put(clock,clockKey);await done;clocks.set(accountId,Math.max(clocks.get(accountId)||0,clock));
+}
 export async function readPreferenceDraft(accountId:string):Promise<PreferenceDraft|undefined>{
  let mirror:PreferenceDraft|undefined;try{const value=localStorage.getItem("sakura-v2-preferences:"+accountId);if(value)mirror=preferenceDraft(JSON.parse(value));}catch{}
  const saved=preferenceDraft(await localRead<PreferenceDraft>(accountId,"preference-draft").catch(()=>undefined));
- return saved&&(!mirror||saved.savedAt>=mirror.savedAt)?saved:mirror;
+ const draft=saved&&(!mirror||saved.savedAt>=mirror.savedAt)?saved:mirror,records=new Map<string,PreferenceIntent>(),acks:PreferenceIntent[]=[],servers:PreferenceServerRecord[]=[];
+ for(const source of [mirror,saved])for(const intent of Object.values(source?.pendingOperations||{}))collectIntent(records,intent);
+ const orders=new Map<string,number>(),entries=await localEntries<unknown>(accountId,"preference-").catch(()=>[]);for(const entry of entries){if(entry.name.startsWith("preference-ack:")){const ack=validIntent(entry.value);if(ack)acks.push(ack);}else if(entry.name.startsWith("preference-intent:"))collectIntent(records,entry.value);else if(entry.name.startsWith("preference-server:")){const server=serverRecord(entry.value);if(server)servers.push(server);}else if(entry.name.startsWith("preference-order:")){const order=entry.value as {operationId?:unknown;createdAt?:unknown};if(typeof order?.operationId==="string"&&typeof order.createdAt==="number"&&Number.isSafeInteger(order.createdAt)&&order.createdAt>=0)orders.set(order.operationId,order.createdAt);}}collectMirror(accountId,records,acks,servers);for(const intent of [...records.values(),...acks]){const order=orders.get(intent.operationId);if(order!==undefined)intent.createdAt=order;}const server=latestServer(servers,draft);
+ const pendingOperations=activeIntents(records,acks),pendingPatch=intentPatch(pendingOperations);if(!draft&&!Object.keys(pendingPatch).length)return;
+ const savedAt=Math.max(draft?.savedAt||0,...[...records.values()].map(intent=>intent.createdAt));clocks.set(accountId,Math.max(clocks.get(accountId)||0,savedAt));
+ return {...draft,...server,settings:fullSettings({...draft?.settings,...server?.serverSettings,...pendingPatch}) as UserSettings,savedAt,pending:Object.keys(pendingPatch).length>0,pendingPatch,pendingOperations,baseSettings:settingsFields(Object.fromEntries(Object.values(pendingOperations).filter(intent=>intent.baseValue!==undefined).map(intent=>[intent.field,intent.baseValue]))),baseFieldRevisions:Object.fromEntries(Object.values(pendingOperations).filter(intent=>intent.baseRevision!==undefined).map(intent=>[intent.field,intent.baseRevision!]))};
 }
 export async function writePreferenceDraft(accountId:string,settings:UserSettings,pending:boolean,pendingPatch?:Partial<UserSettings>,metadata?:PreferenceSyncMetadata){
  let existing:PreferenceDraft|undefined;try{const value=localStorage.getItem("sakura-v2-preferences:"+accountId);if(value)existing=preferenceDraft(JSON.parse(value));}catch{}
  const savedAt=Math.max(Date.now(),(writeStamps.get(accountId)||0)+1,(existing?.savedAt||0)+1);writeStamps.set(accountId,savedAt);
- const draft={settings:fullSettings(settings),pending,pendingPatch:pending?settingsFields(pendingPatch||settings):{},savedAt,...preferenceMetadata(metadata||existing)};let mirrored=false;
+ const clean=pending?settingsFields(pendingPatch||settings):{},meta=preferenceMetadata(metadata||existing),supplied=cleanIntents(metadata?.pendingOperations),own=ownIntents.get(accountId)||{},pendingOperations:Record<string,PreferenceIntent>={};
+ for(const [field,value]of Object.entries(clean)){const match=[supplied[field],own[field]].find(intent=>intent&&JSON.stringify(intent.value)===JSON.stringify(value));let intent=match||createPreferenceIntents(accountId,{[field]:value},meta)[field];intent=preserveBaseline(intent,existing?.pendingOperations?.[field]);pendingOperations[field]=intent;}ownIntents.set(accountId,{...own,...pendingOperations});
+ const newerServer=existing&&(existing.serverRevision??-1)>(meta.serverRevision??-1)?existing:undefined;
+ const draft={...(newerServer?preferenceMetadata(newerServer):meta),settings:copy(fullSettings({...newerServer?.settings,...settings,...(newerServer?.serverSettings||{}),...intentPatch(pendingOperations)})),pending,pendingPatch:clean,pendingOperations,savedAt};let mirrored=false;
+ const server=serverRecord({...meta,savedAt});
  try{localStorage.setItem("sakura-v2-preferences:"+accountId,JSON.stringify(draft));mirrored=true;}catch{}
- const write=(writes.get(accountId)||Promise.resolve()).catch(()=>{}).then(async()=>{await localWrite(accountId,"preference-draft",draft);await localWrite(accountId,"settings",draft.settings);});writes.set(accountId,write);
+ // Baseline rebases get separate immutable keys: a sleeping tab can persist
+ // its older version afterward without replacing a higher acknowledged base.
+ let journalMirrored=true;for(const intent of Object.values(pendingOperations))try{localStorage.setItem(intentPrefix(accountId)+intentVersion(intent),JSON.stringify(intent));}catch{journalMirrored=false;}
+ if(server)try{localStorage.setItem(serverPrefix(accountId)+server.serverRevision,JSON.stringify(server));}catch{journalMirrored=false;}
+ const write=(writes.get(accountId)||Promise.resolve()).catch(()=>{}).then(async()=>{await reserveIntentOrder(accountId,pendingOperations);for(const [field,intent]of Object.entries(pendingOperations)){if(metadata?.pendingOperations?.[field]?.operationId===intent.operationId)metadata.pendingOperations[field].createdAt=intent.createdAt;try{localStorage.setItem(intentPrefix(accountId)+intentVersion(intent),JSON.stringify(intent));}catch{}await localWrite(accountId,"preference-intent:"+intentVersion(intent),intent);}if(server)await localWrite(accountId,"preference-server:"+server.serverRevision,server);await localWrite(accountId,"preference-draft",draft);await localWrite(accountId,"settings",draft.settings);});writes.set(accountId,write);
+ try{await write;}catch(error){if(!mirrored||!journalMirrored)throw error;}finally{if(writes.get(accountId)===write)writes.delete(accountId);}
+}
+/** A valid response retires only the sent field generations, never a newer
+ * edit captured while that request was in flight or a different tab's field. */
+export async function acknowledgePreferenceIntents(accountId:string,sent:Record<string,PreferenceIntent>){
+ const intents=Object.values(cleanIntents(sent));let mirrored=true;for(const intent of intents)try{localStorage.setItem(ackPrefix(accountId)+intent.operationId,JSON.stringify(intent));localStorage.removeItem(intentPrefix(accountId)+intentVersion(intent));}catch{mirrored=false;}
+ const write=(writes.get(accountId)||Promise.resolve()).catch(()=>{}).then(async()=>{for(const intent of intents){await localWrite(accountId,"preference-ack:"+intent.operationId,intent);await localDelete(accountId,"preference-intent:"+intentVersion(intent));}});writes.set(accountId,write);
  try{await write;}catch(error){if(!mirrored)throw error;}finally{if(writes.get(accountId)===write)writes.delete(accountId);}
 }

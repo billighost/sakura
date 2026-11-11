@@ -21,7 +21,9 @@ import * as autoplayHelpers from "../src/rebuild/app/autoplay";
 import * as tasteOrdering from "../src/rebuild/app/tasteOrdering";
 import * as personalization from "../src/rebuild/recommendations/personalization";
 import {settingsFields,fullSettings,rebasePreferences,preferenceRevision,preferenceFieldRevisions,unacknowledgedPreferences,type PreferenceDraft,type PreferenceSyncMetadata} from "../src/rebuild/app/preferences";
-import {favoriteOverlay,mergeFavoriteIntents,acknowledgeFavorite,type FavoriteIntent} from "../src/rebuild/app/favorites";
+import {favoriteOverlay,mergeFavoriteIntents,mergeFavoriteRevisions,acknowledgeFavorite,type FavoriteIntent,type FavoriteConfirmation} from "../src/rebuild/app/favorites";
+import {mergePreferenceIntents,type PreferenceIntent} from "../src/rebuild/app/preferences";
+import {validPreferenceReceipt} from "../src/rebuild/app/preferenceReceipt";
 import type {UserSettings} from "../src/rebuild/app/types";
 
 const accountId="90000000-0000-4000-8000-000000000001";
@@ -95,9 +97,10 @@ async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce
  const modules:Record<string,unknown>={
   "./feedPreferences":{FEED_DEFAULTS},"./listeningEvidence":listeningEvidence,"./smartQueue":smartQueueHelpers,"./autoplay":{...autoplayHelpers,needsAutoplay:(entries:Parameters<typeof autoplayHelpers.needsAutoplay>[0],currentId:string|null)=>options.autoplay===true&&autoplayHelpers.needsAutoplay(entries,currentId)},"./tasteOrdering":tasteOrdering,"../recommendations/personalization":personalization,
   react,"react/jsx-runtime":{jsx:(_type:unknown,props:unknown)=>props},"next-auth/react":{signOut:async()=>{loggedOut=true;}},"./types":{musicTrack},
-  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/taste"){if(holdTaste){holdTaste=false;return new Promise(resolve=>tasteRequests.push(resolve));}return remoteTaste;}if(path==="/api/v2/library?kind=liked")return {recordings:[...remoteFavorites].map(recordingId=>({recordingId}))};if(path==="/api/v2/library"){const change=JSON.parse(String(init.body));favoriteRequests.push(change);const receipt=(options.favoriteResponse?options.favoriteResponse(change):{...change,accepted:true,...options.favoriteReceipt}) as {liked?:boolean;accepted?:boolean};if(receipt?.accepted===true&&typeof receipt.liked==="boolean"){if(receipt.liked)remoteFavorites.add(change.recordingId);else remoteFavorites.delete(change.recordingId);}return receipt;}if(path==="/api/v2/settings"){if(!init.body)return {settings:remoteSettings};const body=JSON.parse(String(init.body));if(options.deferSettingsPatch)return new Promise((resolve,reject)=>settingsRequests.push({body,resolve,reject}));const {expectedRevision,...patch}=body;if(expectedRevision!==undefined&&expectedRevision!==remoteSettings.revision)throw Object.assign(new UserFacingError(responseIssue(409,null)),{status:409});remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};return {settings:remoteSettings};}if(path==="/api/v2/smart-queue"){const body=JSON.parse(String(init.body));const tracks=(options.smartTracks||[song(4),song(5)]).map(track=>resolved(track).recording);return options.deferSmartQueue?new Promise(resolve=>smartRequests.push({body,resolve})):{tracks,reason:"Chosen from your fixture listening"};}if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise((resolve,reject)=>resolvers.push({track,resolve,reject,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue,userMessage:(error:Error)=>error.message,UserFacingError,responseIssue},
-  "./preferences":{cachedPreferences:()=>preferenceDraft?.settings||{privateSession:!options.recordListening},settingsFields,fullSettings,rebasePreferences,preferenceRevision,preferenceFieldRevisions,readPreferenceDraft:async()=>preferenceDraft,writePreferenceDraft:async(_owner:string,settings:UserSettings,pending:boolean,pendingPatch:Partial<UserSettings>,metadata?:PreferenceSyncMetadata)=>{preferenceDraft={settings,pending,pendingPatch,savedAt:Date.now(),...metadata};},unacknowledgedPreferences},
-  "./favorites":{readFavoriteDraft:asyncNoop,writeFavoriteDraft:async(_owner:string,_liked:Iterable<string>,pending:Record<string,FavoriteIntent>)=>{if(!Object.keys(pending).length)return;favoriteWrites.push({...pending});if(options.failFavoriteStorage)throw new UserFacingError({kind:"storage",title:"Favorites could not be saved",message:"Storage unavailable",action:"Check storage"});if(holdFavorites)await new Promise<void>(resolve=>favoriteStorageWaiters.push(resolve));},favoriteOverlay,mergeFavoriteIntents,acknowledgeFavorite,acknowledgeFavoriteDraft:async(_owner:string,operationId:string)=>{favoriteAcks.push(operationId);}},
+  "./errors":{requestJson:async(path:string,init:RequestInit={},scope?:{accountId?:string})=>{requests.push(path);requestOwners.push(scope?.accountId);if(path==="/api/v2/profile"){if(!navigator.onLine)throw new Error("Offline profile request");return {profile:{id:profileId}};}if(path==="/api/v2/taste"){if(holdTaste){holdTaste=false;return new Promise(resolve=>tasteRequests.push(resolve));}return remoteTaste;}if(path==="/api/v2/library?kind=liked")return {recordings:[...remoteFavorites].map(recordingId=>({recordingId}))};if(path==="/api/v2/library"){const change=JSON.parse(String(init.body));favoriteRequests.push(change);const receipt=(options.favoriteResponse?options.favoriteResponse(change):{...change,accepted:true,revision:Number(change.baseRevision??0)+1,...options.favoriteReceipt}) as {liked?:boolean;accepted?:boolean};if(receipt?.accepted===true&&typeof receipt.liked==="boolean"){if(receipt.liked)remoteFavorites.add(change.recordingId);else remoteFavorites.delete(change.recordingId);}return receipt;}if(path==="/api/v2/settings"){if(!init.body)return {settings:remoteSettings};const body=JSON.parse(String(init.body));if(options.deferSettingsPatch)return new Promise((resolve,reject)=>settingsRequests.push({body,resolve,reject}));const {expectedRevision,...patch}=body;if(expectedRevision!==undefined&&expectedRevision!==remoteSettings.revision)throw Object.assign(new UserFacingError(responseIssue(409,null)),{status:409});remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};return {settings:remoteSettings};}if(path==="/api/v2/smart-queue"){const body=JSON.parse(String(init.body));const tracks=(options.smartTracks||[song(4),song(5)]).map(track=>resolved(track).recording);return options.deferSmartQueue?new Promise(resolve=>smartRequests.push({body,resolve})):{tracks,reason:"Chosen from your fixture listening"};}if(path==="/api/auth/session")return loggedOut?{}:{user:{id:profileId}};if(path==="/api/v2/recordings/resolve"){const track=song(Number(JSON.parse(String(init.body)).reference.id));return options.deferResolve?new Promise((resolve,reject)=>resolvers.push({track,resolve,reject,signal:init.signal!})):resolved(track);}throw new Error("Unexpected request "+path);},userIssue,userMessage:(error:Error)=>error.message,UserFacingError,responseIssue},
+  "./preferenceReceipt":{validPreferenceReceipt},
+  "./preferences":{mergePreferenceIntents,acknowledgePreferenceIntents:async(_owner:string,operations:Record<string,PreferenceIntent>)=>{for(const intent of Object.values(operations))saved.set("preference-ack:"+intent.operationId,{...intent});},createPreferenceIntents:(_owner:string,patch:Partial<UserSettings>,metadata?:PreferenceSyncMetadata)=>Object.fromEntries(Object.entries(patch).map(([field,value])=>[field,{operationId:webcrypto.randomUUID(),field,value,createdAt:Date.now(),baseValue:metadata?.baseSettings?.[field as keyof UserSettings]??metadata?.serverSettings?.[field as keyof UserSettings],baseRevision:metadata?.baseFieldRevisions?.[field]??metadata?.serverFieldRevisions?.[field]??0}])) as Record<string,PreferenceIntent>,cachedPreferences:()=>preferenceDraft?.settings||{privateSession:!options.recordListening},settingsFields,fullSettings,rebasePreferences,preferenceRevision,preferenceFieldRevisions,readPreferenceDraft:async()=>preferenceDraft,writePreferenceDraft:async(_owner:string,settings:UserSettings,pending:boolean,pendingPatch:Partial<UserSettings>,metadata?:PreferenceSyncMetadata)=>{preferenceDraft={settings,pending,pendingPatch,savedAt:Date.now(),...metadata};},unacknowledgedPreferences},
+  "./favorites":{mergeFavoriteRevisions,createFavoriteIntent:(_owner:string,track:MusicTrack,liked:boolean,baseRevision:number)=>({track,liked,baseRevision,operationId:webcrypto.randomUUID(),createdAt:Date.now()}),readFavoriteDraft:asyncNoop,writeFavoriteDraft:async(_owner:string,liked:Iterable<string>,pending:Record<string,FavoriteIntent>,revisions?:Record<string,number>)=>{saved.set("favorite-draft",{likedIds:[...liked],pending:{...pending},revisions:{...revisions}});if(!Object.keys(pending).length)return;favoriteWrites.push({...pending});if(options.failFavoriteStorage)throw new UserFacingError({kind:"storage",title:"Favorites could not be saved",message:"Storage unavailable",action:"Check storage"});if(holdFavorites)await new Promise<void>(resolve=>favoriteStorageWaiters.push(resolve));},favoriteOverlay,mergeFavoriteIntents,acknowledgeFavorite,acknowledgeFavoriteDraft:async(_owner:string,operationId:string,confirmation?:FavoriteConfirmation)=>{favoriteAcks.push(operationId);saved.set("favorite-confirmation:"+operationId,confirmation);}},
   "./downloadEngine":{DurableDownloadManager:Manager},"./sharedFlight":{SharedFlight},
   "./partialPlayback":{partialPlaybackUrl:async(accountId:string,source:{track:MusicTrack},ensure:(offset:number,signal:AbortSignal)=>Promise<unknown>)=>{if(options.bridge===false)return;const registration={accountId,track:source.track,ensure};registrations.push(registration);return options.deferRegistration?new Promise<string|undefined>(resolve=>Object.assign(registration,{resolve})):"https://sakura.example/_sakura/audio/fixture";},revokePartialPlayback:()=>{revocations++;}},
   "./listeningSync":{ListeningSync:class{start=asyncNoop;stop=noop;refresh=asyncNoop;flush=asyncNoop;change=noop;},deviceIdentity:()=>"fixture"},"./sessionState":{sessionState:()=>({})},
@@ -105,12 +108,14 @@ async function player(options:{startupPromiseFailure?:boolean;rejectFallbackOnce
   "./playbackSource":{readyPlaybackFor},"./seekPosition":{boundedSeekPosition},"./recordingJob":{waitForRecording:async(result:unknown)=>result},"./resources":{clearResources:noop,invalidateResources:(accountId:string,prefix="/api/v2/",dropData=false)=>invalidations.push({accountId,prefix,dropData})},"./listeningQueue":queue,
   "./offline":{localRead:async(owner:string,key:string)=>accountStorage.get(owner)?.get(key),localWrite:async(owner:string,key:string,entry:unknown)=>{let storage=accountStorage.get(owner);if(!storage){storage=new Map();accountStorage.set(owner,storage);}storage.set(key,entry);},rememberAccount:asyncNoop,lastAccount:async()=>({id:profileId}),forgetActiveAccount:asyncNoop,drainListen:asyncNoop,clearListeningOutbox:async(accountId:string,period:string,cutoff:number)=>{historyClears.push({accountId,period,cutoff});if(options.deferHistoryClear)await new Promise<void>(resolve=>historyClearResolvers.push(resolve));},deliverListen:async(_owner:string,chunk:Record<string,unknown>)=>{delivered.push(chunk);return true;},savedAudio:async(owner:string)=>[...(accountStorage.get(owner)||new Map())].filter(([key,value])=>String(key)==="audio:"+(value as {track?:MusicTrack})?.track?.id&&validOfflineAudio(value)).map(([,value])=>value),validOfflineAudio},
  };
+ const requestAdapter=modules["./errors"] as {requestJson:(path:string,init?:RequestInit,scope?:{accountId?:string})=>Promise<unknown>},ordinaryRequest=requestAdapter.requestJson;
+ requestAdapter.requestJson=async(path,init,scope)=>{const pages=saved.get("library-pages") as unknown[]|undefined;if(path.startsWith("/api/v2/library?kind=liked")&&pages?.length){requests.push(path);requestOwners.push(scope?.accountId);return pages.shift();}return ordinaryRequest(path,init,scope);};
  class FixtureUrl extends URL {static createObjectURL(blob:Blob){const url=URL.createObjectURL(blob);objectUrls.push(url);return url;}static revokeObjectURL(url:string){revokedUrls.push(url);URL.revokeObjectURL(url);}}
  const context=vm.createContext({exports,module:{exports},require:(name:string)=>{assert.ok(name in modules,"Unexpected player dependency "+name);return modules[name];},Audio:FixtureAudio,MediaMetadata:class{constructor(value:unknown){Object.assign(this,value);}},navigator,location,document:{visibilityState:"visible",...events(documentEvents)},window:{...events(windowEvents),dispatchEvent(event:Event){for(const listener of windowEvents.get(event.type)||[])(listener as (event:Event)=>void)(event);return true;}},CustomEvent,URL:FixtureUrl,Blob,AbortController,DOMException,crypto:webcrypto,performance:options.clock?{now:()=>elapsed}:performance,queueMicrotask,Map,Set,setInterval:()=>0,clearInterval:noop,setTimeout:(callback:()=>void,delay:number)=>{const timer=setTimeout(()=>{timerCallbacks.delete(timer);timers.delete(timer);callback();},delay);timers.add(timer);timerCallbacks.set(timer,{callback,delay});return timer;},clearTimeout:(timer:ReturnType<typeof setTimeout>)=>{clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);}});
  vm.runInContext(code,context);
  function render(){stateSlot=0;refSlot=0;effectSlot=0;pendingEffects.length=0;value=(exports.MusicProvider as (props:unknown)=>{value:MusicState})({children:null}).value;for(const {slot,effect}of [...pendingEffects]){hooks[slot].cleanup?.();hooks[slot].cleanup=effect()||undefined;}}
  render();await until(()=>states[1]===false);await tick();
- return {favoriteWrites,favoriteRequests,favoriteAcks,releaseFavoriteStorage(){holdFavorites=false;for(const release of favoriteStorageWaiters)release();},mediaActions,soundModes,chunkWaiters,holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
+ return {favoriteWrites,favoriteRequests,favoriteAcks,releaseFavoriteStorage(){holdFavorites=false;for(const release of favoriteStorageWaiters)release();},mediaActions,soundModes,chunkWaiters,holdTaste(){holdTaste=true;},resolveTaste(data:Record<string,unknown>){tasteRequests.at(-1)!(data);},resolveHistoryClear(index=historyClearResolvers.length-1){historyClearResolvers[index]();},invalidations,async pollTaste(){const before=requests.filter(path=>path==="/api/v2/taste").length;for(const listener of windowEvents.get("focus")||[])listener();await until(()=>requests.filter(path=>path==="/api/v2/taste").length>before);await tick();await tick();},remoteChoice(patch:Record<string,unknown>){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};},get preferenceDraft(){return preferenceDraft;},settingsRequests,resolveSettings(index=settingsRequests.length-1){const {expectedRevision,...patch}=settingsRequests[index].body;void expectedRevision;remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].resolve({settings:remoteSettings});},conflictSettings(patch:Record<string,unknown>,index=settingsRequests.length-1){remoteSettings={...remoteSettings,...patch,revision:Number(remoteSettings.revision)+1,fieldRevisions:{...preferenceFieldRevisions(remoteSettings),...Object.fromEntries(Object.keys(patch).map(key=>[key,Number(remoteSettings.revision)+1]))}};settingsRequests[index].reject(Object.assign(new UserFacingError(responseIssue(409,null)),{status:409}));},delivered,advance(ms:number){elapsed+=ms;media!.currentTime+=ms/1000;},dispatch(name:string,detail:Record<string,unknown>){for(const listener of windowEvents.get(name)||[])(listener as (event:Event)=>void)(new CustomEvent(name,{detail}));},timerFor(delay:number){return [...timerCallbacks].find(([,entry])=>entry.delay===delay)?.[0];},async fireTimer(delay:number){const scheduled=[...timerCallbacks].find(([,entry])=>entry.delay===delay);if(!scheduled)return false;const [timer,{callback}]=scheduled;clearTimeout(timer);timers.delete(timer);timerCallbacks.delete(timer);callback();await tick();return true;},setWallClock(now:number){vm.runInContext("Date.now = () => " + now,context);},get value(){return value;},states,requests,requestOwners,smartRequests,historyClears,setTaste(data:Record<string,unknown>){remoteTaste=data;},resolveSmart(tracks:MusicTrack[],index=smartRequests.length-1){smartRequests[index].resolve({tracks:tracks.map(track=>resolved(track).recording),reason:"Chosen fixture songs"});},media:media!,prepares,enqueues,entries,saved,disposed,objectUrls,revokedUrls,registrations,resolvers,downloadResolvers,ensured,partials,navigator,location,get revocations(){return revocations;},get registrationPending(){return !!registrations.at(-1)?.resolve;},register(url:string|undefined,index=registrations.length-1){registrations[index]?.resolve?.(url);},resolve(index=resolvers.length-1,track=resolvers[index].track){resolvers[index].resolve(resolved(track));},rejectResolve(index=resolvers.length-1,error:unknown=new Error("Temporary network failure")){resolvers[index].reject(error);},async profile(id:string){profileId=id;value.retryConnection();await until(()=>value.account?.id===id);await tick();},async connection(online:boolean){navigator.onLine=online;for(const handler of windowEvents.get(online?"online":"offline")||[])handler();await tick();},close(){closed=true;for(const hook of hooks.toReversed())hook.cleanup?.();for(const timer of timers)clearTimeout(timer);for(const url of objectUrls)URL.revokeObjectURL(url);}};
 }
 
 test("startup error event and original Play rejection share one surviving fallback transport",async()=>{
@@ -786,20 +791,62 @@ test("an unrelated favorite receipt cannot acknowledge a pending local choice",a
 
 for(const [label,response] of [
  ["empty",()=>({})],
+ ["null",()=>null],
  ["liked only",(change:{liked:boolean})=>({liked:change.liked})],
  ["missing operation ID",(change:{liked:boolean})=>({liked:change.liked,accepted:true})],
  ["missing acceptance",(change:{liked:boolean;operationId:string})=>({liked:change.liked,operationId:change.operationId})],
  ["missing confirmed choice",(change:{operationId:string})=>({operationId:change.operationId,accepted:true})],
  ["nonboolean confirmed choice",(change:{operationId:string})=>({liked:"yes",operationId:change.operationId,accepted:true})],
  ["explicit refusal",(change:{liked:boolean;operationId:string})=>({...change,accepted:false})],
+ ["missing revision",(change:{liked:boolean;operationId:string})=>({...change,accepted:true})],
+ ["invalid revision",(change:{liked:boolean;operationId:string})=>({...change,accepted:true,revision:"1"})],
+ ["mismatched recording",(change:{liked:boolean;operationId:string})=>({...change,recordingId:"another-recording",accepted:true,revision:1})],
 ] as const)test(`a ${label} 2xx favorite receipt retains its durable operation until a valid retry`,async()=>{
  let healthy=false;
- const p=await player({favoriteResponse:change=>healthy?{...change,accepted:true}:response(change)});
+ const p=await player({favoriteResponse:change=>healthy?{...change,accepted:true,revision:1}:response(change)});
  try{
   await p.value.toggleLike(song());assert.equal(p.favoriteRequests.length,1);assert.equal(p.favoriteAcks.length,0);assert.equal(p.value.liked.has(song().id),true);assert.ok(p.value.notice);
   const original=p.favoriteRequests[0],durable=p.favoriteWrites.at(-1)?.[song().id];assert.equal(durable?.operationId,original.operationId);assert.equal(durable?.liked,true);
   healthy=true;await p.connection(true);await until(()=>p.favoriteAcks.length===1);
   assert.equal(p.favoriteRequests.length,2);assert.deepEqual(p.favoriteRequests[1],original);assert.deepEqual(p.favoriteAcks,[original.operationId]);assert.equal(p.value.liked.has(song().id),true);
+ }finally{p.close();}
+});
+
+for(const [label,response]of [
+ ["empty",{}],
+ ["missing revision",{settings:{discovery:.66,fieldRevisions:{discovery:1}}}],
+ ["invalid revision",{settings:{discovery:.66,revision:"1",fieldRevisions:{discovery:1}}}],
+ ["missing field revision",{settings:{discovery:.66,revision:1}}],
+ ["future field revision",{settings:{discovery:.66,revision:1,fieldRevisions:{discovery:2}}}],
+ ["mismatched choice",{settings:{discovery:.2,revision:1,fieldRevisions:{discovery:1}}}],
+]as const)test(`a ${label} 200 settings response retains the exact durable operation until a valid retry`,async()=>{
+ const p=await player({deferSettingsPatch:true});try{
+  const change=p.value.updateSettings({discovery:.66}),rejected=assert.rejects(change,(error:unknown)=>error instanceof UserFacingError&&error.issue.kind==="connection");
+  await new Promise(resolve=>setTimeout(resolve,210));await until(()=>p.settingsRequests.length===1);
+  const operation=p.preferenceDraft?.pendingOperations?.discovery;assert.ok(operation);
+  p.settingsRequests[0].resolve(response);await rejected;
+  assert.equal(p.preferenceDraft?.pending,true);assert.equal(p.preferenceDraft?.pendingPatch?.discovery,.66);assert.equal(p.preferenceDraft?.pendingOperations?.discovery.operationId,operation.operationId);assert.equal(p.saved.has("preference-ack:"+operation.operationId),false);assert.equal(p.value.settings.discovery,.66);
+  await p.connection(true);await until(()=>p.settingsRequests.length===2);assert.equal(p.settingsRequests[1].body.discovery,.66);assert.equal(p.preferenceDraft?.pendingOperations?.discovery.operationId,operation.operationId);
+  p.resolveSettings(1);await until(()=>p.preferenceDraft?.pending===false);assert.equal(p.saved.has("preference-ack:"+operation.operationId),true);assert.equal(p.value.settings.discovery,.66);
+ }finally{p.close();}
+});
+
+test("a first-delivery favorite conflict adopts and durably confirms the newer remote unlike",async()=>{
+ let conflict=true;const p=await player({favoriteResponse:change=>conflict?{...change,liked:false,revision:4,accepted:true,conflict:true}:{...change,revision:5,accepted:true,conflict:false}});try{
+  await p.value.toggleLike(song());assert.equal(p.favoriteRequests.length,1);const first=p.favoriteRequests[0] as {baseRevision?:number;operationId:string};assert.equal(first.baseRevision,0);assert.deepEqual(p.favoriteAcks,[first.operationId]);assert.equal(p.value.liked.has(song().id),false);assert.match(p.value.toast,/another device/);
+  assert.deepEqual(JSON.parse(JSON.stringify(p.saved.get("favorite-confirmation:"+first.operationId))),{recordingId:song().id,liked:false,revision:4});const draft=p.saved.get("favorite-draft") as {likedIds:string[];pending:Record<string,FavoriteIntent>;revisions:Record<string,number>};assert.equal(draft.likedIds.includes(song().id),false);assert.equal(Object.keys(draft.pending).length,0);assert.equal(draft.revisions[song().id],4);
+  conflict=false;await p.value.toggleLike(song());const next=p.favoriteRequests[1] as {baseRevision?:number;operationId:string};assert.equal(next.baseRevision,4);assert.notEqual(next.operationId,first.operationId);assert.equal(p.value.liked.has(song().id),true);
+ }finally{p.close();}
+});
+
+test("a later library page repairs a first-page like using the exact newer unlike revision",async()=>{
+ const p=await player();try{
+  const id=song().id;p.saved.set("library-pages",[
+   {recordings:[{recordingId:id}],favoriteRevisions:{[id]:1},favoriteStates:{[id]:{liked:true,revision:1}},nextCursor:"page-two"},
+   {recordings:[],favoriteRevisions:{[id]:2},favoriteStates:{[id]:{liked:false,revision:2}},nextCursor:null},
+  ]);
+  await p.connection(true);await until(()=>p.requests.some(path=>path.includes("cursor=page-two")));await tick();await tick();assert.equal(p.value.liked.has(id),false);
+  const draft=p.saved.get("favorite-draft") as {likedIds:string[];revisions:Record<string,number>};assert.equal(draft.likedIds.includes(id),false);assert.equal(draft.revisions[id],2);
  }finally{p.close();}
 });
 
@@ -834,5 +881,73 @@ test("an automatic request yields to an explicit soundtrack action while it is p
 test("canceling a download in its staging tick prevents an acquisition from starting",async()=>{
  const p=await player();try{
   p.value.requestDownload(song());p.value.cancelDownload(song().id);await tick();await tick();assert.deepEqual(p.enqueues,[]);assert.equal(Object.keys(p.entries).length,0);
+ }finally{p.close();}
+});
+
+
+test("review: offline auto-next bypasses unavailable contextual songs in favor of downloaded audio",async()=>{
+ const p=await player({autoplay:true,offline:true,bridge:false});try{
+  const blob=new Blob(["offline review audio"],{type:"audio/mpeg"});for(const index of [1,3]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}
+  p.value.play(song(1),[song(1),song(2)]);await until(()=>p.value.status==="playing"&&p.value.queue.some(entry=>entry.track.id===song(3).id));
+  p.media.paused=true;p.media.emit("ended");await tick();await tick();await tick();
+  assert.equal(p.value.track?.id,song(3).id);assert.equal(p.value.status,"playing");assert.ok(p.value.parkedPicks.some(entry=>entry.track.id===song(2).id));
+ }finally{p.close();}
+});
+
+for(const repeat of ["off","one","all"] as const)test(`review: delayed background sleep expiry stops the ${repeat} repeat mode before native ended`,async()=>{
+ const p=await player({bridge:false,remoteSettings:{repeat}});try{
+  p.value.play(song(1),[song(1),song(2)]);await until(()=>p.value.status==="playing");p.value.setSleepTimer(1);
+  p.setWallClock(Date.now()+120000);p.media.paused=true;p.media.emit("ended");await tick();await tick();
+  assert.equal(p.value.track?.id,song(1).id);assert.equal(p.value.status,"paused");assert.equal(p.media.paused,true);
+ }finally{p.close();}
+});
+
+test("review: a broken generated recording yields to another prepared queue song",async()=>{
+ const p=await player({autoplay:true,bridge:false,smartTracks:[song(2),song(3),song(4)]});try{
+  p.value.play(song(1));await until(()=>p.value.status==="playing"&&p.value.queue.some(entry=>entry.track.id===song(3).id));
+  p.media.paused=true;p.media.emit("ended");await until(()=>p.value.status==="playing"&&p.value.track?.id===song(2).id);
+  p.media.networkFailure(3);await tick();p.media.networkFailure(3);await tick();await tick();await tick();
+  assert.equal(p.value.track?.id,song(3).id);assert.equal(p.value.status,"playing");
+ }finally{p.close();}
+});
+
+
+test("review: sleep expiry cannot be undone by a delayed automatic queue response",async()=>{
+ const p=await player({autoplay:true,deferSmartQueue:true,bridge:false});try{
+  p.value.play(song(1));await until(()=>p.value.status==="playing"&&p.smartRequests.length===1);
+  p.media.paused=true;p.media.emit("ended");await until(()=>p.value.status==="buffering");
+  p.setWallClock(1000000000000);p.value.setSleepTimer(1);p.setWallClock(1000000060000);assert.equal(await p.fireTimer(60000),true);assert.equal(p.value.status,"paused");
+  p.resolveSmart([song(2)],0);await tick();await tick();await tick();assert.equal(p.smartRequests.length,1);
+  assert.equal(p.value.status,"paused");assert.equal(p.media.paused,true);assert.equal(p.value.track?.id,song(1).id);
+ }finally{p.close();}
+});
+
+test("review: an unsupported prepared offline blob yields to another saved automatic song",async()=>{
+ const p=await player({autoplay:true,offline:true,bridge:false});try{
+  const blob=new Blob(["verified prepared review audio"],{type:"audio/mpeg"});for(const index of [1,2,3]){const track=song(index);p.saved.set("audio:"+track.id,{track,blob,sha256:"a".repeat(64),sizeBytes:blob.size,savedAt:Date.now(),requested:true});}
+  p.value.play(song(1));await until(()=>p.value.status==="playing"&&p.value.queue.length>=3&&p.objectUrls.length>=3);
+  const current=p.value.queue.findIndex(entry=>entry.entryId===p.value.currentEntryId),following=p.value.queue.slice(current+1),expected=following[1].track.id;
+  const nativePlay=p.media.play.bind(p.media);let failed=false;p.media.play=async()=>{if(!failed){failed=true;throw new DOMException("The prepared codec is unsupported","NotSupportedError");}return nativePlay();};
+  p.media.paused=true;p.media.emit("ended");await tick();await tick();await tick();await tick();
+  assert.equal(p.value.track?.id,expected);assert.equal(p.value.status,"playing");assert.equal(p.requests.some(path=>path.includes("recordings/resolve")),false);
+ }finally{p.close();}
+});
+
+test("review: a failed manual recording remains visible and retains the listener's queue choice",async()=>{
+ const p=await player({autoplay:true,bridge:false,smartTracks:[song(3),song(4)]});try{
+  p.value.play(song(1));p.value.addQueue(song(2));await until(()=>p.value.status==="playing"&&p.value.queue.some(entry=>entry.track.id===song(3).id));
+  const chosen=p.value.queue.find(entry=>entry.track.id===song(2).id&&entry.priority==="manual")!;
+  p.media.paused=true;p.media.emit("ended");await until(()=>p.value.status==="playing"&&p.value.currentEntryId===chosen.entryId);
+  p.media.networkFailure(3);await tick();p.media.networkFailure(3);await until(()=>p.value.status==="error");
+  assert.equal(p.value.currentEntryId,chosen.entryId);assert.equal(p.value.queue.find(entry=>entry.entryId===chosen.entryId)?.priority,"manual");assert.ok(p.value.queue.some(entry=>entry.track.id===song(3).id));
+ }finally{p.close();}
+});
+
+test("review: data-saver prepared audio uses a same-origin source after audio technology is enabled",async()=>{
+ const p=await player({bridge:false,remoteSettings:{audioQuality:"data-saver"}});try{
+  p.value.play(song(1),[song(1),song(2)]);await until(()=>p.value.status==="playing");await tick();await tick();
+  await p.value.updateSettings({audioTechnology:"warmth"});await until(()=>p.value.status==="playing");
+  p.media.paused=true;p.media.emit("ended");await until(()=>p.value.track?.id===song(2).id&&p.value.status==="playing");
+  assert.equal(p.media.src,"https://sakura.example"+song(2).readyPlayback!.fallbackUrl);assert.ok(p.soundModes.includes("warmth"));assert.equal(p.enqueues.length,0);
  }finally{p.close();}
 });

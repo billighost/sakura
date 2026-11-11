@@ -27,6 +27,7 @@ async function post<T>(url:string,body:unknown,accountId:string,signal:AbortSign
       const message=descriptions[String(data.reason)]||(response.status===400||response.status===413?"Check the lyrics and make sure every synced line has a valid timestamp within the song. Your draft is kept.":descriptions["lyrics-publish-unavailable"]);
       throw publishIssue(message,response.status===429?"busy":response.status===400||response.status===413?"validation":"connection");
     }
+    if(!data||typeof data!=="object"||Array.isArray(data))throw publishIssue("Sakura could not read the publishing response. Your draft is kept.");
     return data as T;
   }catch(error){if(signal.aborted)throw signal.reason;if(error instanceof UserFacingError)throw error;throw publishIssue("The connection ended while publishing. Your draft is kept; reconnect and check the song's lyrics before trying again.");}
 }

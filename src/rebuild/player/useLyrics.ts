@@ -2,16 +2,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
-import { lyricReadingLanguage, readingEngine, READING_VERSION, type ReadingLanguage } from "../lyrics/language";
+import { lyricReadingLanguage, readingEngine, type ReadingLanguage } from "../lyrics/language";
 import { VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
-import { readJsonResponse, requestJson, userMessage, UserFacingError,type UserIssue } from "../app/errors";
+import { readJsonResponse, requestJson,responseIssue, userMessage, UserFacingError,type UserIssue } from "../app/errors";
 import { LyricFlights } from "./lyricFlight";
 import { LYRIC_REQUEST_TIMEOUT_MS, lyricRetryAfter, waitForLyrics } from "../lyrics/transport";
-import { lyricRetryDelay, preserveLyricReadings } from "./lyricRecovery";
+import { lyricRetryDelay,preserveLyricReadingLanguage, preserveLyricReadings } from "./lyricRecovery";
 import type { AutoSyncEvidence } from "../lyrics/autoSync";
 import {chooseReadingLanguage,rememberReadingGuides,type ReadingGuides} from "./readingCache";
 import {browserOffline} from "../app/resourcePolicy";
 import {LYRIC_WEEK_MS,lyricCacheFresh,lyricProviderCheckedAt} from "./lyricCachePolicy";
+import {stableLyricCacheIdentity} from "./lyricCacheIdentity";
 
 export interface PlayerLyricLine extends TimedLyric { romanized?: string; readingReviewNeeded?: boolean; readingEngine?: string }
 export interface PlayerLyrics {
@@ -27,9 +28,12 @@ export interface PlayerLyrics {
 }
 type CacheValue = { key: string; savedAt: number; checkedAt?:number; data: PlayerLyrics; guides?:ReadingGuides };
 type MissingCacheValue={key:string;savedAt:number;checkedAt:number;missing:true;issue:UserIssue};
+type StoredCacheValue=CacheValue&Partial<MissingCacheValue>;
 type LyricInput = Pick<MusicTrack, "id" | "title" | "artists" | "albumTitle" | "durationMs"> & Partial<Pick<MusicTrack,"artistCredits">> & Partial<Pick<MusicTrack,"versionLabel" | "alternateTitles" | "language">>;
 const memory = new Map<string, CacheValue>();
 const missingMemory=new Map<string,MissingCacheValue>();
+const cacheVersions=new Map<string,number>();
+let legacyKeys:Promise<Map<string,string[]>>|undefined;
 const flights = new LyricFlights<PlayerLyrics>();
 const readingFlights = new LyricFlights<PlayerLyrics>();
 const subscribers = new Map<string, Set<(data: PlayerLyrics) => void>>();
@@ -58,40 +62,75 @@ async function readCache(key: string) {
   const hit = memory.get(key);
   if (hit) return hit;
   if(missingMemory.has(key))return;
+  const version=cacheVersions.get(key)||0;
   try {
     const db = await openDatabase();
-    return await new Promise<CacheValue | undefined>((resolve) => {
-      const request = db.transaction("lyrics", "readonly").objectStore("lyrics").get(key);
-      request.onsuccess = () => {
-        const value = request.result as CacheValue&Partial<MissingCacheValue> | undefined;
-        if(value?.key===key&&value.missing===true&&Number.isFinite(value.checkedAt)&&value.issue?.kind==="missing"&&typeof value.issue.message==="string"){missingMemory.set(key,value as MissingCacheValue);resolve(undefined);}
-        else if (value?.key === key && Number.isFinite(value.savedAt) && value.data?.schemaVersion === VERIFIED_LYRICS_VERSION && validLines(value.data.lines) && (value.data.instrumental || value.data.lines.some(line => line.text.trim()))) { memory.set(key, value); resolve(value); }
-        else resolve(undefined);
-      };
-      request.onerror = () => resolve(undefined);
-    });
+    let value=await storedCache(db,key);
+    if(!value){
+     const legacy=(await legacyCacheKeys(db)).get(key)||[];
+     const candidates=(await Promise.all(legacy.map(oldKey=>storedCache(db,oldKey)))).filter((candidate):candidate is StoredCacheValue=>cacheRank(candidate,key)>=0);
+     // A reading-engine upgrade may have left several identities behind.
+     // Permanent synced lyrics must survive a later plain or missing fallback.
+     value=candidates.sort((left,right)=>cacheRank(right,key)-cacheRank(left,key)||right.savedAt-left.savedAt)[0];
+     if(value&&cacheRank(value,key)>0){
+      let guides=rememberReadingGuides(value.guides,value.data);
+      for(const candidate of candidates)if(cacheRank(candidate,key)>0){
+       guides=rememberReadingGuides({...rememberReadingGuides(candidate.guides,candidate.data),...guides},value.data);
+      }
+      value={...value,guides};
+     }
+    }
+    // An older database read must not replace a publication or reading choice
+    // that was applied while its storage transaction was pending.
+    if((cacheVersions.get(key)||0)!==version)return memory.get(key);
+    if(!value||stableLyricCacheIdentity(value.key)!==key)return;
+    if(value.missing===true&&Number.isFinite(value.checkedAt)&&value.issue?.kind==="missing"&&typeof value.issue.message==="string"){
+     const missing={...value,key} as MissingCacheValue;
+     if(value.key!==key)await writeMissingCache(key,missing.issue,missing.checkedAt);else missingMemory.set(key,missing);
+     return;
+    }
+    if(cacheRank(value,key)>0){
+     const cached={...value,key} as CacheValue;
+     if(value.key!==key)await writeCache(cached);else memory.set(key,cached);
+     return memory.get(key);
+    }
   } catch { return undefined; }
 }
+function cacheRank(value:StoredCacheValue|undefined,key:string){
+ if(!value||stableLyricCacheIdentity(value.key)!==key)return -1;
+ if(value.missing===true)return Number.isFinite(value.checkedAt)&&value.issue?.kind==="missing"&&typeof value.issue.message==="string"?0:-1;
+ if(!Number.isFinite(value.savedAt)||value.data?.schemaVersion!==VERIFIED_LYRICS_VERSION||!validLines(value.data.lines)||!value.data.instrumental&&!value.data.lines.some(line=>line.text.trim()))return -1;
+ return value.data.timing==="synced"?2:value.data.timing==="plain"?1:-1;
+}
+function storedCache(db:IDBDatabase,key:string){return new Promise<StoredCacheValue|undefined>(resolve=>{
+ const request=db.transaction("lyrics","readonly").objectStore("lyrics").get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>resolve(undefined);
+});}
+function legacyCacheKeys(db:IDBDatabase){return legacyKeys||(legacyKeys=new Promise<Map<string,string[]>>(resolve=>{
+ const request=db.transaction("lyrics","readonly").objectStore("lyrics").getAllKeys();request.onsuccess=()=>{const keys=new Map<string,string[]>();for(const raw of request.result)if(typeof raw==="string"){const stable=stableLyricCacheIdentity(raw);if(stable!==raw)keys.set(stable,[...(keys.get(stable)||[]),raw]);}resolve(keys);};request.onerror=()=>{legacyKeys=undefined;resolve(new Map());};
+}));}
 async function writeCache(value: CacheValue) {
   const previous=memory.get(value.key);
   value={...value,checkedAt:lyricProviderCheckedAt(value,previous)};
   value = {...value, data: preserveLyricReadings(previous?.data, value.data)};
   value.guides=rememberReadingGuides({...previous?.guides,...value.guides},value.data);
   memory.set(value.key, value);
+  const version=(cacheVersions.get(value.key)||0)+1;cacheVersions.set(value.key,version);
   missingMemory.delete(value.key);
   subscribers.get(value.key)?.forEach(listener => listener(value.data));
   while (memory.size > 128) memory.delete(memory.keys().next().value!);
-  await persistCache(value);
+  await persistCache(value,version);
 }
-async function writeMissingCache(key:string,issue:UserIssue){
- const checkedAt=Date.now(),value:MissingCacheValue={key,savedAt:checkedAt,checkedAt,missing:true,issue};
+async function writeMissingCache(key:string,issue:UserIssue,checkedAt=Date.now()){
+ const value:MissingCacheValue={key,savedAt:checkedAt,checkedAt,missing:true,issue};
  missingMemory.set(key,value);
+ const version=(cacheVersions.get(key)||0)+1;cacheVersions.set(key,version);
  while(missingMemory.size>128)missingMemory.delete(missingMemory.keys().next().value!);
- await persistCache(value);
+ await persistCache(value,version);
 }
-async function persistCache(value:CacheValue|MissingCacheValue){
+async function persistCache(value:CacheValue|MissingCacheValue,version:number){
   try {
     const db = await openDatabase();
+    if(cacheVersions.get(value.key)!==version)return;
     await new Promise<void>((resolve) => {
       const tx = db.transaction("lyrics", "readwrite");
       tx.objectStore("lyrics").put(value);
@@ -105,7 +144,7 @@ async function persistCache(value:CacheValue|MissingCacheValue){
 }
 export function lyricInputKey(track: LyricInput) {
   const normalize = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
-  return JSON.stringify([VERIFIED_LYRICS_VERSION, READING_VERSION, normalize(track.title), [...new Set([...track.artists,...(track.artistCredits||[]).map(credit=>credit.name)].map(normalize))].sort(), normalize(track.albumTitle || ""), Math.round(track.durationMs / 1000), track.versionLabel,track.language,track.alternateTitles]);
+  return JSON.stringify([VERIFIED_LYRICS_VERSION, normalize(track.title), [...new Set([...track.artists,...(track.artistCredits||[]).map(credit=>credit.name)].map(normalize))].sort(), normalize(track.albumTitle || ""), Math.round(track.durationMs / 1000), track.versionLabel,track.language,track.alternateTitles]);
 }
 export function useLyrics(track: MusicTrack | null) {
   const [retryVersion,setRetryVersion]=useState(0);
@@ -170,10 +209,12 @@ export function useLyrics(track: MusicTrack | null) {
           for(const title of input.alternateTitles||[])query.append("alternateTitle",title);
           if(explicitRefresh||cached||missing)query.set("refresh","1");
           const response = await fetch(`/api/v2/lyrics?${query}`, {credentials: "same-origin",cache:"no-store", signal: AbortSignal.any([signal, AbortSignal.timeout(LYRIC_REQUEST_TIMEOUT_MS)])});
+          const confirmedMissing=response.status===404&&await response.clone().json().then(raw=>raw?.status==="missing").catch(()=>false);
           let payload: PlayerLyrics;
           try {payload = await readJsonResponse<PlayerLyrics>(response, {context: "lyrics"});}
           catch (error) {
-            if(error instanceof UserFacingError&&error.status===404){signal.throwIfAborted();const previous=memory.get(thisKey);
+            if(response.status===404&&!confirmedMissing)throw new LyricLoadError(new UserFacingError(responseIssue(503,null,"lyrics"),503),lyricRetryAfter(response.headers.get("Retry-After")));
+            if(error instanceof UserFacingError&&error.status===404&&confirmedMissing){signal.throwIfAborted();const previous=memory.get(thisKey)||cached;
               if(previous)await writeCache({...previous,savedAt:Date.now(),checkedAt:Date.now()});
               else if((publicationVersions.get(thisKey)||0)===publicationBefore)await writeMissingCache(thisKey,error.issue);
             }
@@ -188,7 +229,7 @@ export function useLyrics(track: MusicTrack | null) {
           // A pre-publication provider request can finish after the upload. It
           // must never overwrite the freshly read LRCLIB result on this device.
           if((publicationVersions.get(thisKey)||0)!==publicationBefore&&memory.get(thisKey))return memory.get(thisKey)!.data;
-          await writeCache({ key: thisKey, savedAt: Date.now(),checkedAt:Date.now(), data });
+          await writeCache({ key: thisKey, savedAt: Date.now(),checkedAt:Date.now(), data:preserveLyricReadingLanguage(memory.get(thisKey)?.data,data) });
           return memory.get(thisKey)!.data;
         });
         release = request.release;
@@ -219,7 +260,7 @@ export function useLyrics(track: MusicTrack | null) {
     if(!validLines(payload.lines)||payload.schemaVersion!==VERIFIED_LYRICS_VERSION||!payload.lines.some(line=>line.text.trim()))throw new Error("Published lyrics did not match a valid provider response.");
     const data={...payload,hasJapanese:payload.lines.some(line=>/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)),readingLanguage:lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language)};
     publicationVersions.set(key,(publicationVersions.get(key)||0)+1);
-    await writeCache({key,savedAt:Date.now(),checkedAt:Date.now(),data});
+    await writeCache({key,savedAt:Date.now(),checkedAt:Date.now(),data:preserveLyricReadingLanguage(memory.get(key)?.data,data)});
   },[input,key]);
   const setReadingLanguage=useCallback(async(language:ReadingLanguage)=>{
     if(!key)return;
@@ -231,13 +272,16 @@ export function useLyrics(track: MusicTrack | null) {
     if(!key)return;
     const source=(await readCache(key))?.data;
     if(!source||source.timing!=="plain"||!validLines(lines)||lines.length!==source.lines.length||lines.some((line,index)=>line.text!==source.lines[index].text))throw new Error("The sync result no longer matches these plain lyrics.");
+    const publicationBefore=publicationVersions.get(key)||0;
     const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(source.lines.map(line=>line.text))));
     const sourceContentKey=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,"0")).join("");
     if(evidence.sourceContentKey!==sourceContentKey||evidence.engine!=="whisper-small-en-v1"||!Number.isFinite(evidence.confidence)||evidence.confidence<0||evidence.confidence>1||!/^[a-f0-9]{64}$/.test(evidence.audioSha256))throw new Error("The sync evidence does not match this recording's lyrics.");
+    const latest=memory.get(key)?.data||source;
+    if((publicationVersions.get(key)||0)!==publicationBefore||latest.timing!=="plain"||latest.lines.length!==source.lines.length||latest.lines.some((line,index)=>line.text!==source.lines[index].text))throw new Error("The lyrics changed while syncing. Your latest words have been kept.");
     // Preserve readings by source line while replacing only verified timing.
-    const updated=lines.map((line,index)=>({...source.lines[index],...line}));
+    const updated=lines.map((line,index)=>({...latest.lines[index],...line}));
     publicationVersions.set(key,(publicationVersions.get(key)||0)+1);
-    await writeCache({key,savedAt:Date.now(),data:{...source,lines:updated,timing:"synced",autoSyncEvidence:evidence}});
+    await writeCache({key,savedAt:Date.now(),data:{...latest,lines:updated,timing:"synced",autoSyncEvidence:evidence}});
   },[key]);
   const getJapaneseReadings = useCallback(async (requestedLanguage?:ReadingLanguage) => {
     if (!input || !key) return;

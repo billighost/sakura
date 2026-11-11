@@ -9,6 +9,13 @@ export const offlineDatabase=db;
 const key=(accountId:string,name:string)=>"account:"+accountId+":"+name;
 export async function localRead<T>(accountId:string,name:string):Promise<T|undefined>{return (await db()).get("entries",key(accountId,name));}
 export async function localWrite(accountId:string,name:string,value:unknown){await (await db()).put("entries",value,key(accountId,name));}
+/** Serialize version checks with writes so an older tab cannot commit last. */
+export async function localWriteOrdered(accountId:string,name:string,value:Record<string,unknown>,field="savedAt"){
+ const tx=(await db()).transaction("entries","readwrite"),nameKey=key(accountId,name),previous=await tx.store.get(nameKey) as Record<string,unknown>|undefined;
+ const version=Number(value[field])||0,oldVersion=Number(previous?.[field])||0;
+ if(!previous||version>oldVersion||version===oldVersion&&(Number(value.savedAt)||0)>=(Number(previous.savedAt)||0))await tx.store.put(value,nameKey);
+ await tx.done;
+}
 export async function localDelete(accountId:string,name:string){await (await db()).delete("entries",key(accountId,name));}
 /** Read a bounded account namespace without scanning other accounts or audio. */
 export async function localEntries<T>(accountId:string,prefix:string):Promise<Array<{name:string;value:T}>>{
@@ -45,6 +52,7 @@ const listenControllers=new Map<string,AbortController>();
 const listenClearRanges=new Map<string,{period:"week"|"month"|"all";cutoffMs:number}[]>();
 const listenFlightChunks=new Map<string,ListenChunk>();
 const listenRejections=new Set<string>();
+const listenDrainPositions=new Map<string,string>();
 function validListenChunk(value:unknown):value is ListenChunk {
  const chunk=value as Partial<ListenChunk>|null;
  return !!chunk&&typeof chunk.eventId==="string"&&!!chunk.eventId&&typeof chunk.recordingId==="string"&&!!chunk.recordingId&&Number.isSafeInteger(chunk.sequence)&&chunk.sequence!>=0&&chunk.sequence!<=100000&&Number.isSafeInteger(chunk.msPlayed)&&chunk.msPlayed!>=0&&chunk.msPlayed!<=120000&&Number.isSafeInteger(chunk.positionMs)&&chunk.positionMs!>=0&&chunk.positionMs!<=21600000&&typeof chunk.completed==="boolean"&&(chunk.skipped===undefined||typeof chunk.skipped==="boolean")&&(chunk.finished===undefined||typeof chunk.finished==="boolean")&&typeof chunk.context==="string"&&!!chunk.context.trim()&&chunk.context.length<=40&&(chunk.contextId==null||typeof chunk.contextId==="string"&&!!chunk.contextId.trim()&&chunk.contextId.length<=120)&&(chunk.occurredAt===undefined||typeof chunk.occurredAt==="string"&&Number.isFinite(Date.parse(chunk.occurredAt)));
@@ -100,9 +108,18 @@ export async function drainListen(accountId:string,options:{timeoutMs?:number;ma
  try{let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){const name=String(cursor.key);if(name.startsWith(key(accountId,"listen:"))){const chunk=cursor.value;if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidDisk.push(name.slice(key(accountId,"").length));}cursor=await cursor.continue();}}catch{}
  try{for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith("sakura-v2-outbox:"+accountId+":")){try{const chunk:unknown=JSON.parse(localStorage.getItem(name)||"null");if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidMirror.push(name);}catch{invalidMirror.push(name);}}}for(const name of invalidMirror)localStorage.removeItem(name);}catch{}
  await Promise.allSettled(invalidDisk.map(name=>localDelete(accountId,name)));
- for(const chunk of [...pending.values()].sort((a,b)=>a.eventId.localeCompare(b.eventId)||a.sequence-b.sequence).slice(0,options.maxChunks??100)){
+ let position=listenDrainPositions.get(accountId);try{position=localStorage.getItem("sakura-v2-listen-drain:"+accountId)||position;}catch{}
+ if(!position){const saved=await localRead<unknown>(accountId,"listen-drain-progress").catch(()=>undefined);if(typeof saved==="string")position=saved;}
+ const sorted=[...pending.values()].sort((a,b)=>a.eventId.localeCompare(b.eventId)||a.sequence-b.sequence);
+ const index=position?sorted.findIndex(chunk=>chunk.eventId+":"+String(chunk.sequence).padStart(6,"0")>position!):0,start=index<0?0:index;
+ const ordered=[...sorted.slice(start),...sorted.slice(0,start)];
+ for(const chunk of ordered.slice(0,options.maxChunks??100)){
   const remaining=deadline-performance.now();if(remaining<=0)break;
-  const delivered=await deliverListen(accountId,chunk,Math.min(options.timeoutMs??10000,remaining));
+  const next=chunk.eventId+":"+String(chunk.sequence).padStart(6,"0");listenDrainPositions.set(accountId,next);
+  try{localStorage.setItem("sakura-v2-listen-drain:"+accountId,next);}catch{}
+  await localWrite(accountId,"listen-drain-progress",next).catch(()=>{});
+  const available=deadline-performance.now();if(available<=0)break;
+  const delivered=await deliverListen(accountId,chunk,Math.min(options.timeoutMs??10000,available));
   if(!delivered&&!listenRejections.has("sakura-v2-outbox:"+accountId+":"+chunk.eventId+":"+chunk.sequence))break;
  }
 }

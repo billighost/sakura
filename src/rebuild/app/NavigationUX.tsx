@@ -9,14 +9,20 @@ import {enterOfflineShell,installOfflineNavigation,localRouteSnapshot,musicRoute
 import { Blossom } from "./Brand";
 import s from "./ink.module.css";
 
-export function RouteTransition({children}:{children:ReactNode}){
- const pathname=usePathname(),router=useRouter(),element=useRef<HTMLDivElement>(null);
+/** Keep navigation available while account restoration is still in progress. */
+export function OfflineNavigationController(){
+ const pathname=usePathname(),router=useRouter();
  const music=useMusic(),frameworkOffline=useOffline();
- const localPath=useSyncExternalStore(subscribeLocalRoute,localRouteSnapshot,()=>"");
  useEffect(()=>installOfflineNavigation(()=>music.offline||frameworkOffline),[music.offline,frameworkOffline]);
  useEffect(()=>{if(music.offline||frameworkOffline||!navigator.onLine)enterOfflineShell();},[music.offline,frameworkOffline]);
  useEffect(()=>{if(!navigator.onLine)return;for(const href of ["/home","/discover","/search","/library","/profile","/liked","/library/downloaded"])router.prefetch(href);},[router]);
  useEffect(()=>{rememberMusicRoute(pathname);const controlled=()=>rememberMusicRoute(location.pathname);navigator.serviceWorker?.addEventListener("controllerchange",controlled);return()=>navigator.serviceWorker?.removeEventListener("controllerchange",controlled);},[pathname]);
+ return null;
+}
+
+export function RouteTransition({children}:{children:ReactNode}){
+ const pathname=usePathname(),element=useRef<HTMLDivElement>(null);
+ const localPath=useSyncExternalStore(subscribeLocalRoute,localRouteSnapshot,()=>"");
  useLayoutEffect(()=>{
   const node=element.current;
   if(!node)return;

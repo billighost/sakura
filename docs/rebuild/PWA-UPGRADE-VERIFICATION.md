@@ -25,7 +25,7 @@ The installed Next.js 16.4.5 guides were read before implementation. Findings, s
 
 ## Verification
 
-The final current-source `npm test` run passed **714 tests** and `npm run test:sync` passed **78 tests**. TypeScript passed; ESLint reported **zero errors and 15 existing warnings**. The production Next build passed compilation, TypeScript and all **62 pages**; all **seven actual service-worker browser journeys** passed with zero page errors. The additional provider/sync run passed 174 tests, its coordinator run passed 29, and outbox/evidence passed 23. Seven malformed-success favorite receipt cases verify that the original operation remains durable, replays with the same identity, and is retired only by a matching accepted receipt. Isolated browser fixtures use synthetic account APIs and generated audio; they clean up their temporary app routes.
+The first upgrade verification passed **714 tests** in `npm test` and **78 tests** in `npm run test:sync`. TypeScript passed; ESLint reported **zero errors and 15 existing warnings**. The production Next build passed compilation, TypeScript and all **62 pages**; all **seven actual service-worker browser journeys** passed with zero page errors. The additional provider/sync run passed 174 tests, its coordinator run passed 29, and outbox/evidence passed 23. Seven malformed-success favorite receipt cases verify that the original operation remains durable, replays with the same identity, and is retired only by a matching accepted receipt. Isolated browser fixtures use synthetic account APIs and generated audio; they clean up their temporary app routes. The subsequent review expanded the coverage; current totals and findings are in [PWA second review](PWA-SECOND-REVIEW.md).
 
 Local evidence:
 
@@ -49,7 +49,7 @@ At the user's explicit request, Sakura's authenticated search/index/challenge/pu
 
 The one accepted upload is LRCLIB record **40279485**. Public search readback and Sakura's lyrics endpoint both returned the supplied text unchanged: **1,710 characters and 85 lines**, including the final newline. SHA-256: `8dec832b389cacc5fde0e783ccc6808a6ba0dfdd1c3fac4a6290356c13611bfa`. No timestamps were invented and the accepted upload was not resubmitted. Evidence is in `.local/never-be-friends-publication-report.json`; it contains no account secrets.
 
-The current hosted release at `https://sakuraplayer.vercel.app` was tested in a fresh authenticated API context. It returned HTTP 503 both ordinarily and with `refresh=1`; its new worker URL also returned 404. This rules out the browser's saved lyric copy as the sole cause and confirms the deployed application still predates these fixes. Evidence is `.local/never-be-friends-deployed-lyrics-report.json`. Local successful readback and the public LRCLIB publication are distinct from deploying the application changes.
+Before the first GitHub push, the hosted release at `https://sakuraplayer.vercel.app` returned HTTP 503 both ordinarily and with `refresh=1`; its new worker URL returned 404. This ruled out browser cache as the sole cause. After pushing `01851d4`, a fresh authenticated check returned HTTP 200 for the worker and both lyric lookups, with the correct synced LRCLIB record. All supplied lyric content matches except the final newline. The earlier failure evidence is `.local/never-be-friends-deployed-lyrics-report.json`; the successful rollout is `.local/live-rollout-lyrics-second-review.json`.
 
 ## Release and handoff
 
@@ -60,3 +60,5 @@ The public lyric submission was explicitly authorized. Application code is prepa
 The user also requested workspace cleanup. Owned verification servers were stopped, but automatic approval review rejected deletion of the generated `.next-pwa-dev` directory with `blocked by policy`, including a narrowly scoped attempt against its verified absolute path. Disk cleanup therefore remains outstanding. Generated Next builds, incremental files, screenshots and logs remain local and excluded from Git; source, reusable tests, submitted lyric text, configuration and database/download records were preserved.
 
 Handoff: the PWA, visuals, cache, offline sync, continuous playback, mobile layout and lyric studio changes are implemented and covered by the retained checks. The user authorized committing and pushing the complete source changes to GitHub. Preserve the operation receipt migration and the publication's exact verified recording identity when releasing.
+
+The subsequent requested bug review and its additional repairs are recorded in [PWA second review](PWA-SECOND-REVIEW.md).

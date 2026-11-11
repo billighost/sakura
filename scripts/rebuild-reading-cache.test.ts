@@ -4,6 +4,8 @@ import {chooseReadingLanguage,rememberReadingGuides} from "../src/rebuild/player
 import {readingEngine} from "../src/rebuild/lyrics/language";
 import type {PlayerLyrics} from "../src/rebuild/player/useLyrics";
 import {LYRIC_WEEK_MS,lyricCacheFresh,lyricProviderCheckedAt} from "../src/rebuild/player/lyricCachePolicy";
+import {stableLyricCacheIdentity} from "../src/rebuild/player/lyricCacheIdentity";
+import {preserveLyricReadingLanguage} from "../src/rebuild/player/lyricRecovery";
 
 test("synced lyrics remain permanent while plain and missing lookups check weekly without deleting content",()=>{
  const checkedAt=1700000000000;
@@ -23,6 +25,19 @@ test("reading saves preserve the provider check timestamp and successful provide
 });
 
 const source:PlayerLyrics={schemaVersion:"verified-lyrics-v3",lines:[{text:"君の声",start:0,end:10}],timing:"plain",provider:"fixture",providerTrackId:1,hasJapanese:true,readingLanguage:"ja"};
+
+test("reading engine upgrades keep the same saved lyric identity",()=>{
+ const identity=["verified-lyrics-v3","song",["artist"],"album",180,"Original recording",null,null],key=JSON.stringify(identity);
+ for(const readingVersion of ["multilingual-reading-v0","multilingual-reading-v1","multilingual-reading-v2"]){assert.equal(stableLyricCacheIdentity(JSON.stringify([identity[0],readingVersion,...identity.slice(1)])),key);}
+ assert.equal(stableLyricCacheIdentity(key),key);
+ assert.equal(stableLyricCacheIdentity("not-an-identity"),"not-an-identity");
+});
+
+test("provider refresh keeps a chosen reading language for unchanged words",()=>{
+ const selected={...source,readingLanguage:"zh" as const},refreshed={...source,lines:[{text:"君の声",start:3,end:9}]};
+ assert.equal(preserveLyricReadingLanguage(selected,refreshed).readingLanguage,"zh");
+ assert.equal(preserveLyricReadingLanguage(selected,{...refreshed,lines:[{text:"Updated lyric",start:0,end:9}],readingLanguage:null}).readingLanguage,null);
+});
 
 test("changing reading language and auto-sync timing reuses each completed guide",()=>{
  const japanese={...source,lines:source.lines.map(line=>({...line,romanized:"kimi no koe",readingEngine:readingEngine("ja")}))};

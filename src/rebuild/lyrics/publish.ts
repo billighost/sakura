@@ -48,9 +48,11 @@ export function parseLyricSubmission(value: unknown, identity: LyricIdentity) {
       const tags=line.match(/^\s*((?:\[\d{1,3}:[0-5]\d(?:[.:]\d{1,3})?\])+)/);
       if(!tags)throw new LyricRequestError("Each LRC lyric line needs a valid timestamp (seconds 00–59)");
       if(/^\s*\[\d/.test(line.slice(tags[0].length)))throw new LyricRequestError("Every LRC timestamp must be complete with seconds 00–59");
+      for(const mark of line.matchAll(/<\d[^>\n]*(?:>|$)/g))if(!/^<\d{1,3}:[0-5]\d(?:[.:]\d{1,3})?>$/.test(mark[0]))throw new LyricRequestError("Every word timestamp needs complete minutes and seconds 00–59");
     }
     const lines = parseTimedLyrics(text);
     if (!lines.some(line=>line.text.trim()) || lines.some(line=>line.start > identity.durationSeconds! + 2)) throw new LyricRequestError("LRC timestamps must fit this recording");
+    if(lines.some(line=>line.words?.some((word,index,words)=>word.start<line.start||word.start>identity.durationSeconds!+2||line.end!==undefined&&word.start>line.end||index>0&&word.start<words[index-1].start)))throw new LyricRequestError("Word timestamps must follow their lyric line in order and fit this recording");
     // Reject partial parsing instead of silently dropping unstamped lyric text.
     if (text.split("\n").some(line=>line.trim() && !/^\s*\[(?:\d+:\d|[a-z]+:)/i.test(line))) throw new LyricRequestError("Each LRC lyric line needs a timestamp");
     return {trackName:identity.title, artistName:identity.artist, albumName:identity.album, duration:Math.round(identity.durationSeconds), syncedLyrics:text, plainLyrics:lines.map(line=>line.text).join("\n")};
