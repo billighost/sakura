@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "playwright-report/**",
     "worker/rebuild/**",
+    "worker/**/.wrangler/**",
   ]),
   {
     files: ["worker/**/*.js"],

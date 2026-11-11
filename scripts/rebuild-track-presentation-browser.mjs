@@ -74,7 +74,12 @@ try{
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.locator('[data-mini-lyric]')).toHaveText('君の声が、ここにある');
   assert.equal(lyricRequests.get(tracks[0].id),1,'mini/fullscreen share one lyric request');
-  await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+  // The existing mobile sheet intentionally hides its header close button.
+  // Escape is its accessible keyboard dismissal; touch dismissal is covered
+  // by rebuild-japanese-reading-browser.mjs using the real pull gesture.
+  if(variant.isMobile)await page.keyboard.press('Escape');
+  else await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.evaluate(()=>{window.presentationAudio.currentTime=4;window.presentationAudio.dispatchEvent(new Event('timeupdate'));});
   await expect(page.locator('[data-mini-lyric]')).toHaveCount(0);
   assert.equal(lyricRequests.get(tracks[0].id),1,'position updates and equal metadata replacements retain one lyric request');

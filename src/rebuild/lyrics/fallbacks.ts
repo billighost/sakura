@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { fetchLrcLibLyrics, lyricIdentityVariants, selectLyricsCandidate, type LrcLibTrack, type LyricIdentity, type LyricMatch } from "./provider";
 import { createLyricTransport, type LyricProviderOptions, type LyricResponse } from "./transport";
+import { lyricEdition } from "./identity";
+import { parseTimedLyrics } from "./parse";
 
 type ObjectValue = Record<string, unknown>;
 const object = (value: unknown): ObjectValue => value && typeof value === "object" && !Array.isArray(value) ? value as ObjectValue : {};
@@ -14,7 +16,7 @@ const failure = (responses: LyricResponse[], emptyReason: string): LyricMatch =>
 export async function fetchNetEaseLyrics(identity: LyricIdentity, options: LyricProviderOptions = {}): Promise<LyricMatch> {
   const transport = createLyricTransport(options, "NetEase"), responses: LyricResponse[] = [];
   const variants = lyricIdentityVariants(identity);
-  const queries = [...new Set(variants.titles.slice(0, 3).flatMap(title => variants.artists.slice(0, 2).map(artist => `${title} ${artist}`)))];
+  const queries = [...new Set(variants.titles.slice(0, 3).flatMap(title => variants.artists.slice(0, 8).map(artist => `${title} ${artist}`)))].slice(0, 16);
   for (const query of queries) {
     const response = await transport.read(`https://music.163.com/api/search/get?${new URLSearchParams({s: query, type: "1", limit: "30"})}`);
     responses.push(response);
@@ -55,8 +57,9 @@ function lyricTime(value: unknown): number | undefined {
 export async function fetchLyricaLyrics(identity: LyricIdentity, options: LyricProviderOptions = {}): Promise<LyricMatch> {
   const transport = createLyricTransport(options, "Lyrica"), responses: LyricResponse[] = [];
   const variants = lyricIdentityVariants(identity);
-  for (const title of variants.titles.slice(0, 3)) {
-    const response = await transport.read(`https://wilooper-lyrica.hf.space/lyrics/?${new URLSearchParams({artist: identity.artist, song: title, timestamps: "true", romanize: "false"})}`);
+  const pairs=variants.titles.slice(0,3).flatMap(title=>variants.artists.slice(0,8).map(artist=>({title,artist}))).slice(0,12);
+  for (const {title,artist} of pairs) {
+    const response = await transport.read(`https://wilooper-lyrica.hf.space/lyrics/?${new URLSearchParams({artist, song: title, timestamps: "true", romanize: "false"})}`);
     responses.push(response);
     if (response.status !== "ok") continue;
     const payload = object(response.data), data = object(payload.data);
@@ -82,6 +85,9 @@ export async function fetchLyricaLyrics(identity: LyricIdentity, options: LyricP
 
 /** OVH identifies text by its exact artist/title URL and supplies no timing or edition metadata. */
 export async function fetchLyricsOvh(identity: LyricIdentity, options: LyricProviderOptions = {}): Promise<LyricMatch> {
+  // This source cannot verify editions or instrumental identity. Never invent
+  // duration metadata to pass the normal verification gates.
+  if (lyricEdition(identity.title,identity.versionLabel).length) return {status:"missing",reason:"Plain fallback cannot verify this recording edition"};
   const transport = createLyricTransport(options, "lyrics.ovh"), responses: LyricResponse[] = [];
   const variants = lyricIdentityVariants(identity);
   for (const title of variants.titles.slice(0, 3)) {
@@ -101,7 +107,8 @@ export async function fetchLyricsOvh(identity: LyricIdentity, options: LyricProv
 }
 
 type LyricLoader = (identity: LyricIdentity, options: LyricProviderOptions) => Promise<LyricMatch>;
-/** Return a verified match immediately, but a miss requires every source to finish successfully. */
+/** Synced matches win immediately. Keep a plain match while other bounded
+ * providers finish, so a fast plain response cannot cancel available timing. */
 export async function fetchVerifiedLyrics(identity: LyricIdentity, options: LyricProviderOptions & {providers?: readonly LyricLoader[]; plainFallback?: LyricLoader | null} = {}): Promise<LyricMatch> {
   const controller = new AbortController();
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
@@ -110,16 +117,22 @@ export async function fetchVerifiedLyrics(identity: LyricIdentity, options: Lyri
   const primary = await new Promise<LyricMatch>((resolve, reject) => {
     let remaining = providers.length, finished = false;
     const outcomes: LyricMatch[] = [];
-    const abort = () => { if (finished) return; finished = true; reject(signal.reason); };
+    let plain: Extract<LyricMatch,{status:"matched"}>|undefined;
+    let plainDeadline: ReturnType<typeof setTimeout>|undefined;
+    const abort = () => { if (finished) return; finished = true; clearTimeout(plainDeadline); reject(signal.reason); };
     signal.addEventListener("abort", abort, {once: true});
     if (signal.aborted) { abort(); return; }
-    const finish = (value: LyricMatch) => { if (finished) return; finished = true; signal.removeEventListener("abort", abort); resolve(value); controller.abort(); };
+    const finish = (value: LyricMatch) => { if (finished) return; finished = true; clearTimeout(plainDeadline); signal.removeEventListener("abort", abort); resolve(value); controller.abort(); };
     providers.forEach(provider => {
       Promise.resolve().then(() => provider(identity, {...options, signal})).catch((): LyricMatch => ({status: "unavailable", reason: "A lyrics provider could not be reached"})).then(value => {
         if (finished) return;
-        if (value.status === "matched") { finish(value); return; }
+        if (value.status === "matched") {
+          if(value.track.instrumental||value.track.syncedLyrics&&parseTimedLyrics(value.track.syncedLyrics).some(line=>line.text.trim())){finish(value);return;}
+          if(!plain){plain=value;plainDeadline=setTimeout(()=>finish(value),options.timeoutMs??12_000);}
+        }
         outcomes.push(value);
         if (--remaining) return;
+        if(plain){finish(plain);return;}
         const unavailable = outcomes.filter((result): result is Extract<LyricMatch, {status: "missing" | "ambiguous" | "unavailable"}> => result.status === "unavailable");
         if (unavailable.length) finish({status: "unavailable", reason: unavailable[0].reason, ...(unavailable.some(result => result.retryAfterMs) ? {retryAfterMs: Math.min(...unavailable.filter(result => result.retryAfterMs).map(result => result.retryAfterMs!))} : {})});
         else finish(outcomes.find(result => result.status === "ambiguous") || {status: "missing", reason: "All lyric providers completed without a verified recording match"});

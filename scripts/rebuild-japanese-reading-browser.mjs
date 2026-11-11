@@ -55,7 +55,7 @@ async function room(theme,width,sharedSettings,height=900){
    return route.fulfill({json:{session,serverTime:Date.now()}});
   }
   if(path==='/api/v2/recordings/resolve'){const track=tracks.find(item=>item.reference.id===request.postDataJSON().reference.id)||tracks[0];return route.fulfill({json:{status:'resolved',recording:{...track,recordingId:track.id,metadata:{title:track.title,artists:track.artists,artistsComplete:true,durationMs:track.durationMs,albumTitle:track.albumTitle}},playback:track.readyPlayback}});}
-  if(path==='/api/v2/lyrics'){counts.lyrics++;const index=Math.max(0,tracks.findIndex(track=>track.title===url.searchParams.get('title')));return route.fulfill({json:{status:'matched',lines:sourceLines[index],timing:'synced',provider:'synthetic Japanese fixture',providerTrackId:401+index,schemaVersion:'verified-lyrics-v2'}});}
+  if(path==='/api/v2/lyrics'){counts.lyrics++;const index=Math.max(0,tracks.findIndex(track=>track.title===url.searchParams.get('title')));return route.fulfill({json:{status:'matched',lines:sourceLines[index],timing:'synced',provider:'synthetic Japanese fixture',providerTrackId:401+index,schemaVersion:'verified-lyrics-v3'}});}
   if(path==='/api/v2/readings'){counts.readings++;const data=request.postDataJSON();return route.fulfill({json:{engine:'ja-ipadic-hepburn-v1',lines:data.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:false,readingEngine:'ja-ipadic-hepburn-v1'}))}});}
   if(/^\/api\/v2\/recordings\/[^/]+$/.test(path))return route.fulfill({json:{recording:tracks.find(track=>track.id===path.split('/').at(-1))||tracks[0]}});
   return route.fulfill({json:{items:[],recordings:[],schedule:{timeZone:'Africa/Lagos'}}});

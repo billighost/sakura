@@ -20,6 +20,7 @@ export const PLAYBACK_SHORTCUTS: readonly {action: PlaybackShortcut; keys: strin
 export function shortcutTargetIsInteractive(target: EventTarget | null): boolean {
   if (typeof Element === "undefined" || !(target instanceof Element)) return false;
   const element = target instanceof HTMLElement ? target : null;
+  if (target.closest('[data-playback-shortcuts="listening"]') && !target.closest('input,textarea,select,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"],[data-playback-shortcuts="off"]')) return false;
   return !!(element?.isContentEditable || target.closest('input,textarea,select,option,button,summary,a[href],audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[data-playback-shortcuts="off"],[role="button"],[role="link"],[role="textbox"],[role="searchbox"],[role="combobox"],[role="listbox"],[role="option"],[role="menu"],[role="menuitem"],[role="slider"],[role="spinbutton"],[role="switch"],[role="tab"],[role="checkbox"],[role="radio"],[role="tree"],[role="treeitem"],[role="grid"],[role="gridcell"]'));
 }
 

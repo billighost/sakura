@@ -1,5 +1,6 @@
 import type { TimedLyric, TimedWord } from "./parse";
 import type { LyricIdentity } from "./provider";
+import { READING_LANGUAGES, type ReadingLanguage } from "./language";
 
 export class LyricRequestError extends Error {
   constructor(message: string, public readonly status = 400) { super(message); }
@@ -15,7 +16,7 @@ const boundedString = (value: unknown, name: string, maximum = 200, optional = f
 };
 
 export function parseLyricIdentity(query: URLSearchParams): LyricIdentity {
-  const title = boundedString(query.get("title"), "title")!;
+  const title = boundedString(query.get("title"), "title", 600)!;
   const artists = query.getAll("artist").map((value) => boundedString(value, "artist")!);
   const artist = artists[0];
   if (!artist) throw new LyricRequestError("artist is required");
@@ -27,7 +28,10 @@ export function parseLyricIdentity(query: URLSearchParams): LyricIdentity {
   if (durationSeconds !== undefined && (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > 24 * 60 * 60)) {
     throw new LyricRequestError("duration must be a positive number of seconds");
   }
-  return { title, artist, artists: [...new Set(artists)], album, recordingId, durationSeconds, language };
+  if (artists.length > 16) throw new LyricRequestError("Too many artist credits");
+  const alternateTitles = query.getAll("alternateTitle").map(value => boundedString(value, "alternate title", 600)!);
+  if (alternateTitles.length > 8) throw new LyricRequestError("Too many alternate titles");
+  return { title, artist, artists: [...new Set(artists)], album, recordingId, durationSeconds, language, alternateTitles, versionLabel: boundedString(query.get("version"), "version", 200, true) };
 }
 
 const time = (value: unknown, name: string, fallback?: number) => {
@@ -36,10 +40,11 @@ const time = (value: unknown, name: string, fallback?: number) => {
   return value;
 };
 
-export function parseReadingRequest(body: unknown): { recordingId?: string; lines: TimedLyric[] } {
+export function parseReadingRequest(body: unknown): { recordingId?: string; language: ReadingLanguage; lines: TimedLyric[] } {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new LyricRequestError("A reading request object is required");
   const value = body as Record<string, unknown>;
-  if (value.language !== undefined && value.language !== "ja") throw new LyricRequestError("This reading endpoint supports Japanese (ja)");
+  const language = value.language === undefined ? "ja" : value.language;
+  if (!READING_LANGUAGES.includes(language as ReadingLanguage)) throw new LyricRequestError("Unsupported reading language");
   const recordingId = boundedString(value.recordingId, "recordingId", 100, true);
   if (!Array.isArray(value.lines) || !value.lines.length) throw new LyricRequestError("lines are required");
   if (value.lines.length > 400) throw new LyricRequestError("Lyrics exceed 400 lines", 413);
@@ -69,5 +74,5 @@ export function parseReadingRequest(body: unknown): { recordingId?: string; line
     return { text: line.text, start, ...(end === undefined ? {} : { end }), ...(words === undefined ? {} : { words }) };
   });
   if (characters > 20_000 || wordCount > 5000) throw new LyricRequestError("Lyrics exceed the reading request limit", 413);
-  return { recordingId, lines };
+  return { recordingId, language:language as ReadingLanguage, lines };
 }

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { JAPANESE_LYRIC_CORPUS } from "./corpus";
 import { parseTimedLyrics } from "./parse";
 import { createLyricTransport, type LyricProviderOptions, type LyricResponse } from "./transport";
+import { lyricArtistParts, lyricEdition, lyricText, lyricTitleVariants } from "./identity";
 
 export interface LyricIdentity {
   recordingId?: string;
@@ -11,6 +12,8 @@ export interface LyricIdentity {
   album?: string;
   durationSeconds?: number;
   language?: "ja" | "ko" | "zh" | "en" | string;
+  alternateTitles?: readonly string[];
+  versionLabel?: string;
 }
 
 export interface LrcLibTrack {
@@ -28,17 +31,17 @@ export type LyricMatch =
   | { status: "matched"; track: LrcLibTrack; provider: "lrclib" | "netease" | "lyrica" | "lyrics.ovh" }
   | { status: "missing" | "ambiguous" | "unavailable"; reason: string; retryAfterMs?: number };
 
-const normalize = (text: string) => text.normalize("NFKC").toLowerCase().replace(/[\p{P}\p{Z}\s]/gu, "");
+const normalize = lyricText;
 const hasJapanese = (text: string) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text);
 const unique = (values: readonly (string | undefined)[]) => [...new Map(values.filter((value): value is string => Boolean(value?.trim())).map(value => [normalize(value), value.trim()])).values()];
-const artistParts = (value: string) => unique(value.split(/\s+(?:feat(?:uring)?\.?|ft\.?|with|x)\s+|\s*[,&]\s*/i));
+
 
 export function lyricIdentityVariants(identity: LyricIdentity) {
-  const artists = unique([identity.artist, ...(identity.artists || [])]);
+  const artists = unique([identity.artist, ...lyricArtistParts(identity.artist), ...(identity.artists || []).flatMap(artist => [artist, ...lyricArtistParts(artist)])]);
   const corpus = JAPANESE_LYRIC_CORPUS.find(song =>
     song.titles.some(title => normalize(title) === normalize(identity.title)) &&
     song.artists.some(artist => artists.some(value => normalize(value) === normalize(artist))));
-  return { titles: unique([identity.title, ...(corpus?.titles || [])]), artists: unique([...artists, ...(corpus?.artists || [])]) };
+  return { titles: unique([...lyricTitleVariants(identity.title), ...(identity.alternateTitles || []), ...(corpus?.titles || [])]), artists: unique([...artists, ...(corpus?.artists || [])]) };
 }
 
 /** Fail closed rather than picking the highest-scoring unrelated lyric. */
@@ -50,8 +53,11 @@ export function selectLyricsCandidate(identity: LyricIdentity, candidates: reado
   const variants = lyricIdentityVariants(identity);
   const compatible = candidates.filter((candidate) => {
     if (!candidate || typeof candidate.trackName !== "string" || typeof candidate.artistName !== "string" || !Number.isFinite(candidate.id)) return false;
-    if (!variants.titles.some(title => normalize(candidate.trackName) === normalize(title))) return false;
-    const candidateArtists = unique([candidate.artistName, ...artistParts(candidate.artistName)]);
+    if (JSON.stringify(lyricEdition(identity.title,identity.versionLabel)) !== JSON.stringify(lyricEdition(candidate.trackName))) return false;
+    if (!lyricEdition(identity.title).includes("live") && /\blive\s+(?:\d{4}|at|in|from)\b/i.test(candidate.albumName || "")) return false;
+    if (lyricEdition(identity.title,identity.versionLabel).includes("instrumental") && (!candidate.instrumental || candidate.plainLyrics?.trim() || candidate.syncedLyrics?.trim())) return false;
+    if (!variants.titles.some(title => lyricTitleVariants(candidate.trackName).some(name => normalize(name) === normalize(title)))) return false;
+    const candidateArtists = unique([candidate.artistName, ...lyricArtistParts(candidate.artistName)]);
     if (!candidateArtists.some(candidateArtist => variants.artists.some(artist => normalize(candidateArtist) === normalize(artist)))) return false;
     if (!candidate.plainLyrics?.trim() && !candidate.syncedLyrics?.trim() && !candidate.instrumental) return false;
     if (candidate.syncedLyrics && !candidate.plainLyrics?.trim() && !candidate.instrumental && !parseTimedLyrics(candidate.syncedLyrics).some(line => line.text)) return false;
@@ -86,15 +92,16 @@ export function lyricCacheKey(identity: LyricIdentity) {
   const digest = createHash("sha256").update(JSON.stringify({
     title: normalize(identity.title), artist: normalize(identity.artist), album: normalize(identity.album || ""),
     artists: unique(identity.artists || []).map(normalize).sort(), duration: identity.durationSeconds ?? null, language: identity.language ?? null,
+    alternateTitles: identity.alternateTitles || [], versionLabel: identity.versionLabel || "",
   })).digest("hex");
-  return `lyrics:verified-v1:${identity.recordingId || "adhoc"}:${digest}`;
+  return `lyrics:verified-v3:${identity.recordingId || "adhoc"}:${digest}`;
 }
 
 /** Exact lookup stays fast; every remaining alias/search can independently recover a failed lookup. */
 export async function fetchLrcLibLyrics(identity: LyricIdentity, options: LyricProviderOptions = {}): Promise<LyricMatch> {
   const transport = createLyricTransport(options, "LRCLib");
   const variants = lyricIdentityVariants(identity);
-  const pairs = unique(variants.titles.flatMap(title => variants.artists.slice(0, 3).map(artist => `${title}\0${artist}`))).slice(0, 8).map(value => value.split("\0") as [string, string]);
+  const pairs = unique(variants.titles.slice(0, 4).flatMap(title => variants.artists.slice(0, 8).map(artist => `${title}\0${artist}`))).slice(0, 16).map(value => value.split("\0") as [string, string]);
   const candidates: LrcLibTrack[] = [];
   const failures: Extract<LyricResponse, { status: "unavailable" }>[] = [];
   const load = async (url: string) => {
@@ -111,20 +118,23 @@ export async function fetchLrcLibLyrics(identity: LyricIdentity, options: LyricP
   const exact = pairs[0] ? await load(exactUrl(pairs[0])) : undefined;
   if (exact && !Array.isArray(exact)) {
     const match = selectLyricsCandidate(identity, [exact as LrcLibTrack]);
-    if (match.status === "matched") return match;
+    if (match.status === "matched") {
+      if(match.track.instrumental||match.track.syncedLyrics&&parseTimedLyrics(match.track.syncedLyrics).some(line=>line.text.trim()))return match;
+      candidates.push(match.track);
+    }
   }
   const urls = unique([
-    ...pairs.slice(1).map(exactUrl),
     ...pairs.map(([title, artist]) => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title, artist_name: artist })}`),
+    ...(identity.album ? variants.titles.slice(0, 2).map(title => `https://lrclib.net/api/search?${new URLSearchParams({track_name: title, album_name: identity.album!})}`) : []),
     ...variants.titles.slice(0, 4).map(title => `https://lrclib.net/api/search?${new URLSearchParams({ q: `${title} ${identity.artist}` })}`),
     // Provider artist spelling can differ even when its returned metadata verifies.
     ...variants.titles.slice(0, 4).map(title => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title })}`),
   ]);
-  for (let index = 0; index < urls.length; index += 4) {
-    const responses = await Promise.all(urls.slice(index, index + 4).map(load));
+  for (let index = 0; index < urls.length; index++) {
+    const responses = [await load(urls[index])];
     for (const data of responses) if (Array.isArray(data)) candidates.push(...data as LrcLibTrack[]); else if (data) candidates.push(data as LrcLibTrack);
     const match = selectLyricsCandidate(identity, candidates);
-    if (match.status === "matched") return match;
+    if (match.status === "matched" && (match.track.instrumental||match.track.syncedLyrics&&parseTimedLyrics(match.track.syncedLyrics).some(line=>line.text.trim()))) return match;
     if (transport.signal.aborted) break;
   }
   const selected = selectLyricsCandidate(identity, candidates);

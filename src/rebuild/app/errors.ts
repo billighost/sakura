@@ -47,6 +47,18 @@ export function responseIssue(status:number, payload:unknown, context:ErrorConte
  const value=payload&&typeof payload==="object"?payload as Record<string,unknown>:{};
  const reason=String(value.reason||"");
  if(status===401)return issues.session;
+ if(context==="lyrics"&&reason.startsWith("lyrics-sync-")){
+  const messages:Record<string,string>={
+   "lyrics-sync-not-configured":"Auto sync is waiting for the free hosted worker to be connected. Your plain lyrics are still available.",
+   "lyrics-sync-source":"Refresh the lyrics and play a recording with verified full audio before auto syncing. Your original lyrics have been kept.",
+   "lyrics-sync-expired":"This auto-sync job expired. Start it again when the worker is less busy.",
+   "lyrics-sync-busy":"The free auto-sync worker is busy. Wait a minute before trying again.",
+   "lyrics-sync-language":"Auto sync currently supports English lyrics up to ten minutes. Your original lyrics have been kept.",
+   "lyrics-sync-uncertain":"Some words or line boundaries could not be heard clearly. Your original plain lyrics have been kept.",
+   "lyrics-sync-unavailable":"The free auto-sync worker is asleep, busy or out of its daily quota. Try again later. Your plain lyrics have been kept.",
+  };
+  if(messages[reason])return {...issues.busy,title:"Auto sync needs another try.",message:messages[reason],action:"Try auto sync again",href:undefined,linkLabel:undefined};
+ }
  if(status===409&&context==="account")return {...issues.validation,title:"An account already uses these details.",message:"That username or email is already in use. Sign in, or choose different account details."};
  if(status===409||value.status==="review")return issues.version;
  if(status===423)return {...issues.missing,title:"This Bloom is still growing.",message:"This listening story is not available yet. Check its opening date in Sakura Bloom.",href:"/bloom",linkLabel:"View Bloom dates"};

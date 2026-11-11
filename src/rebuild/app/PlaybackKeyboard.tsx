@@ -20,6 +20,7 @@ export function PlaybackKeyboard() {
       // Naming, sharing, confirmation, and preview dialogs retain native keys.
       if(topDialog&&!playbackDialogAllowsShortcuts(topDialog.dataset.dialogAppearance))return;
       const action=playbackShortcut(event,shortcutTargetIsInteractive(event.target));
+      if(event.repeat && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (event.code==="Space"||event.key===" ") && !shortcutTargetIsInteractive(event.target)){event.preventDefault();return;}
       if(!action||p.booting||!p.account)return;
       if(action==="search") { if(topDialog)return;event.preventDefault();router.push("/search");return; }
       if(action==="help") {event.preventDefault();setOpen(true);return;}
@@ -44,5 +45,5 @@ export function PlaybackKeyboard() {
     window.addEventListener("keydown",key);
     return()=>window.removeEventListener("keydown",key);
   },[open,router]);
-  return <><button className={s.trigger} type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-keyshortcuts="Shift+/" onClick={()=>setOpen(true)}><Icon name="keyboard" size={19}/></button>{open&&<PlayerDialog title="A few little shortcuts." subtitle="AT YOUR FINGERTIPS" onClose={()=>setOpen(false)}><p className={s.note}>Keep your place in the music.</p><dl className={s.shortcuts}>{PLAYBACK_SHORTCUTS.map(item=><div key={item.action}><dt>{item.label}</dt><dd><kbd>{item.keys}</kbd></dd></div>)}</dl><p className={s.footnote}>Shortcuts pause while you type or use a control. Press Escape to close a listening window. On a song or collection, Shift + F10 opens its options.</p></PlayerDialog>}</>;
+  return <><button className={s.trigger} type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-keyshortcuts="Shift+/" onClick={()=>setOpen(true)}><Icon name="keyboard" size={19}/></button>{open&&<PlayerDialog title="A few little shortcuts." subtitle="AT YOUR FINGERTIPS" onClose={()=>setOpen(false)}><p className={s.note}>Keep your place in the music.</p><dl className={s.shortcuts}>{PLAYBACK_SHORTCUTS.map(item=><div key={item.action}><dt>{item.label}</dt><dd><kbd>{item.keys}</kbd></dd></div>)}</dl><p className={s.footnote}>Space plays or pauses on lyric lines and transport controls; Enter activates the focused button. Forms, menus and sliders keep their native keys. Press Escape to close a listening window. On a song or collection, Shift + F10 opens its options.</p></PlayerDialog>}</>;
 }

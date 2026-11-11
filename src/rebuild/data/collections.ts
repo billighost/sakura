@@ -19,7 +19,7 @@ export async function listPlaylists(accountId:string,sql:Pick<PoolClient,"query"
   return rows.rows.map(p=>{
     const coverUrls=[p.coverUrl,...(Array.isArray(p.trackCoverUrls)?p.trackCoverUrls:[])].filter((url,index,all)=>typeof url==="string"&&url&&all.indexOf(url)===index).slice(0,4);
     const {trackCoverUrls:_,...playlist}=p;void _;
-    return {...playlist,revision:Number(p.revision),coverUrl:coverUrls[0]||null,coverUrls};
+    return {...playlist,hasCustomCover:Boolean(p.coverUrl),revision:Number(p.revision),coverUrl:coverUrls[0]||null,coverUrls};
   });
 }
 export async function getLibrary(accountId:string,url:URL) {
@@ -93,7 +93,7 @@ export async function getPlaylist(accountId:string,rawId:string) {
     return {...recording,...(addedAt?{addedAt}:{})};
   });
   const coverUrls=[playlist.coverUrl,...recordings.map(recording=>recording.coverUrl)].filter((url,index,all)=>typeof url==="string"&&url&&all.indexOf(url)===index).slice(0,4);
-  return {...playlist,coverUrl:coverUrls[0]||null,coverUrls,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
+  return {...playlist,hasCustomCover:Boolean(playlist.coverUrl),coverUrl:coverUrls[0]||null,coverUrls,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
     durationMs:recordings.reduce((sum,r)=>sum+(r.durationMs||0),0)};
 }
 export async function updatePlaylist(accountId:string,rawId:string,value:unknown) {

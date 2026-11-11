@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMusic } from "./MusicContext";
 import { SearchField, TrackList } from "./Elements";
 import { CollectionToolbar, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
+import { collectionTrackMatches } from "./collectionSearch";
 import { StickySearch } from "./StickySearch";
 import type { MusicTrack } from "./types";
 
@@ -21,13 +22,12 @@ export function TrackCollection({ tracks, room, label, firstSortLabel = "Origina
  const [presentation, setPresentation] = useRoomPresentation(music.account?.id, room);
  const {layout,sort,direction}=presentation;
  const [query,setQuery]=useState("");
- const match=query.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim();
  const unique = [...new Map(tracks.map(track => [music.effectiveId(track), track])).values()];
- const ordered = sortRoomTracks(unique.filter(track=>!match||[track.title,...track.artists,track.albumTitle||""].join(" ").normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").includes(match)), sort, direction);
+ const ordered = sortRoomTracks(unique.filter(track=>collectionTrackMatches(track,query)), sort, direction);
 
  return <section aria-label={label}>
   {searchable&&<StickySearch enabled={sticky} label={label+" search"}>
-   <SearchField value={query} onChange={setQuery} label={"Find in "+label.toLowerCase()} placeholder="Find a song or artist"/>
+   <SearchField value={query} onChange={setQuery} label={"Find in "+label.toLowerCase()} placeholder="Find a title, artist or album"/>
   </StickySearch>}
   <CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={ordered.length} firstSortLabel={firstSortLabel} dateSortLabel={dateSortLabel}/>
   <TrackList tracks={ordered} layout={layout} dateLabel={dateSortLabel}/>

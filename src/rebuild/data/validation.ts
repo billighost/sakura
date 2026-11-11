@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS = {
 export function preferencesPatch(value: unknown): Record<string,unknown> {
   const raw = object(value), result: Record<string,unknown> = {};
   const choices: Record<string,readonly string[]> = { theme:["system","dark","light"], bloomPerformance:["auto","1","2","3","4","5"], audioQuality:["high","balanced","data-saver"], audioTechnology:AUDIO_TECHNOLOGIES.map(mode=>mode.id),repeat:["off","one","all"] };
-  const booleans = ["japaneseReading","privateSession","reducedMotion","explicitContent","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
+  const booleans = ["japaneseReading","lyricReading","privateSession","reducedMotion","explicitContent","shuffle","previewLoop",...FEED_BOOLEAN_FIELDS];
   const allowed = new Set([...Object.keys(choices),...booleans,...FEED_NUMERIC_FIELDS,"openingAnimation","seedArtists","seedArtistSelections","seedGenres","onboarded","timeZone","volume","previewVolume","sleepTimerMinutes"]);
   if (Object.keys(raw).some(key=>!allowed.has(key))) throw new ProductError(400,"Unsupported setting");
   for (const [key,values] of Object.entries(choices)) if (raw[key] !== undefined) {

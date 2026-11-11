@@ -1,6 +1,11 @@
 ﻿"use client";
 import { useMemo, useRef, useState } from "react";
 import { useMusic } from "../app/MusicContext";
+import { lyricEdition } from "../lyrics/identity";
+import { LyricsUpload } from "./LyricsUpload";
+import { ReadingLanguageChoice } from "./ReadingLanguageChoice";
+import { AutoSyncButton } from "./AutoSyncButton";
+import { AlbumLink } from "../app/AlbumLink";
 import { ArtistLinks } from "../app/ArtistLinks";
 import { PlaybackRibbon } from "../app/ListeningControls";
 import { requestDialogClose } from "../app/dialogLifecycle";
@@ -74,22 +79,25 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
   }
 
   return <div className={s.lyricsView} ref={viewRef} data-lyrics-follow={follow && !selecting}>
-    {music.track && <div className={s.lyricsTrack}><h3>{music.track.title}</h3><p onClick={closeView}><ArtistLinks track={music.track}/> · {music.track.versionLabel}</p></div>}
+    {music.track && <div className={s.lyricsTrack}><h3>{music.track.title}</h3><p onClick={closeView}><ArtistLinks track={music.track}/> · {music.track.versionLabel} · <AlbumLink track={music.track} onNavigate={closeView}/></p></div>}
     {hasWords && <div className={s.chips}>
       {data?.timing === "synced" && <button type="button" aria-pressed={follow && !selecting} onClick={followWords}>{follow && !selecting ? "Following along" : "Follow the words"}</button>}
       <button type="button" aria-pressed={selecting} onClick={toggleSelection}>{selecting ? "Done selecting" : "Select lines"}</button>
-      {data?.hasJapanese && <button type="button" aria-label="Japanese reading guide" aria-pressed={reading} aria-busy={readingGuide.busy} title={reading ? "Reading guide stays on for Japanese songs. Choose to turn it off." : "Keep a reading guide for Japanese songs."} onClick={readingGuide.toggle}>{readingGuide.busy ? "Preparing readings…" : "Japanese reading guide"}</button>}
+      {readingGuide.language && <button type="button" aria-label={readingGuide.label} aria-pressed={reading} aria-busy={readingGuide.busy} title="Transliteration keeps the original lyrics. Names and pronunciations may need review." onClick={readingGuide.toggle}>{readingGuide.busy ? "Preparing readings…" : readingGuide.label}</button>}
       <button type="button" onClick={share}>Share {selected.length ? `${selected.length} lines` : "lyrics"}</button>
+      {music.track && data?.timing === "plain" && <AutoSyncButton key={`${music.account?.id}:${lyricInputKey(music.track)}`} track={music.track} lyrics={data} onSynced={lyrics.applyAutoSync}/>}
     </div>}
+    {readingGuide.language && hasWords && <ReadingLanguageChoice guide={readingGuide}/>}
     {message && <p className={s.hint} role="status">{message}</p>}
     {readingGuide.error && <p className={s.readingRecovery} role="status">Your reading choice is saved. {readingGuide.error} <button type="button" onClick={readingGuide.retry}>Try the reading again</button></p>}
     {lyrics.loading && <div className={s.empty}><span className={s.spinner}/><p>Finding the words for this recording…</p></div>}
     {lyrics.error && <RecoveryNotice error={lyrics.error} context="lyrics" retry={lyrics.retry}/>}
+    {music.track && !lyrics.loading && !hasWords && !data?.instrumental && !lyricEdition(music.track.title,music.track.versionLabel).includes("instrumental") && <LyricsUpload key={lyricInputKey(music.track)} track={music.track} onPublished={lyrics.applyPublishedLyrics}/>}
     {!music.track && <div className={s.empty}><p>Choose a song to discover its lyrics.</p></div>}
     {data?.instrumental && <div className={s.empty}><h3>Let the instruments speak.</h3><p>This recording is instrumental.</p></div>}
     {data && !data.instrumental && !hasWords && <div className={s.empty}><p>The words are not available for this recording yet.</p></div>}
     {hasWords && data && <>
-      <p className={s.hint}>{data.timing === "synced" ? selecting ? "Choose neighbouring lines for an exact lyric card." : "Tap a line to listen from that moment. Scroll to explore; bring the current words back into view to follow again." : "These lyrics are not time synced. Select lines to share them."}</p>
+      <p className={s.hint}>{data.timing === "synced" ? selecting ? "Choose neighbouring lines for an exact lyric card." : "Tap a line or press Enter to listen from that moment. Space plays or pauses. Scroll to explore; bring the current words back into view to follow again." : "These lyrics are not time synced. Select lines to share them."}</p>
       {moment.kind === "intro" && <p className={s.lyricsAwaiting} role="status">A little music before the words.</p>}
       <div className={s.lyricLines}>
         {data.lines.map((line, index) => !line.text.trim()
@@ -97,12 +105,12 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
             <span className={s.lyricInterludeDots} aria-hidden="true"><span/><span/><span/></span>
             {moment.kind === "interlude" && index === moment.index && <small role="status">Instrumental</small>}
           </div>
-          : <button type="button" key={`${line.start}-${index}`} ref={element => { lineRefs.current[index] = element; }} data-lyric-index={index} className={`${s.lyricLine} ${index === active ? s.currentLyric : ""} ${selected.includes(index) ? s.selectedLyric : ""}`} aria-pressed={selecting ? selected.includes(index) : undefined} aria-current={index === active ? "true" : undefined} title={!selecting && data.timing === "synced" ? `Listen from ${formatPlaybackTime(line.start * 1000)}` : undefined} onPointerDown={pause} onClick={() => chooseLine(index)}>
+          : <button type="button" key={`${line.start}-${index}`} ref={element => { lineRefs.current[index] = element; }} data-lyric-index={index} data-playback-shortcuts="listening" className={`${s.lyricLine} ${index === active ? s.currentLyric : ""} ${selected.includes(index) ? s.selectedLyric : ""}`} aria-pressed={selecting ? selected.includes(index) : undefined} aria-current={index === active ? "true" : undefined} title={!selecting && data.timing === "synced" ? `Listen from ${formatPlaybackTime(line.start * 1000)}` : undefined} onPointerDown={pause} onClick={() => chooseLine(index)}>
             <span>{line.words?.length && index === active ? line.words.map((word, wordIndex) => <span key={wordIndex} className={music.positionMs / 1000 >= word.start && (word.end === undefined || music.positionMs / 1000 < word.end) ? s.currentWord : ""}>{word.text}</span>) : line.text}</span>
             {reading && line.romanized && line.romanized.trim() !== line.text.trim() && <small>{line.romanized}{line.readingReviewNeeded && <span className={s.reviewMark} title="This line contains a reading that needs review"> · reading needs review</span>}</small>}
           </button>)}
       </div>
-      <p className={s.hint}>Lyrics: {data.provider}. {reading ? "Japanese readings use a word dictionary. Names and poetic pronunciations can vary." : ""}</p>
+      <p className={s.hint}>Lyrics: {data.provider}. {data.autoSyncEvidence ? "Timing matched to this audio by auto sync. " : ""}{reading ? "Transliteration keeps the original words. Names, polyphonic characters and poetic pronunciations may need review." : ""}</p>
     </>}
     <div className={s.lyricsControls} ref={controlsRef} data-lyrics-controls>
       <div className={s.lyricsProgress}><PlaybackRibbon compact positionMs={music.positionMs} durationMs={duration} label="Playback position in lyrics" disabled={!music.track || music.status === "resolving"} onSeek={position => { music.seek(position); if (!selecting) resume(); }}/></div>

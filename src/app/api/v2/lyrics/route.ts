@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const account = await requireRebuildAccount();
     if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const identity = parseLyricIdentity(request.nextUrl.searchParams);
-    const result = await resolveVerifiedLyrics(identity);
+    const result = await resolveVerifiedLyrics(identity, request.nextUrl.searchParams.get("refresh")==="1");
     if (result.status !== "matched") {
       const status = result.status === "unavailable" ? 503 : result.status === "ambiguous" ? 409 : 404;
       return NextResponse.json(result, { status, headers: { "Cache-Control": "private, no-store", ...(result.status === "unavailable" ? {"Retry-After": String(Math.max(1, Math.ceil((result.retryAfterMs || 5000) / 1000)))} : {}) } });

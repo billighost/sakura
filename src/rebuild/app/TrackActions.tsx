@@ -15,7 +15,7 @@ import { localId } from "./sessionState";
 import s from "./touch.module.css";
 
 export interface SongMenuAnchor {left:number;top:number;width:number;height:number}
-export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){
+export function TrackActions({track,onClose,anchor,initialTasteMenu=false}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor;initialTasteMenu?:boolean}){
   const music=useMusic();
   const titleId=useId();
   const menu=useRef<HTMLDivElement>(null);
@@ -23,7 +23,7 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
   const [creatingPlaylist,setCreatingPlaylist]=useState(false);
   const [playlistName,setPlaylistName]=useState("");
   const [playlistDescription,setPlaylistDescription]=useState("");
-  const [tasteMenu,setTasteMenu]=useState(false);
+  const [tasteMenu,setTasteMenu]=useState(initialTasteMenu);
   const [busy,setBusy]=useState(false);const busyRef=useRef(false);
   const [failure,setFailure]=useState<{issue:UserIssue;retry:()=>void}|null>(null);
   const close=useRef(onClose);
@@ -126,5 +126,5 @@ export function TrackActions({track,onClose,anchor}:{track:MusicTrack;onClose:()
       <Link role="menuitem" href={"/track/"+encodeURIComponent(id)} onClick={onClose}><Icon name="lyrics"/>Song details</Link>
     </>}
   </div>;
-  return createPortal(content,document.body);
+  return createPortal(content,document.querySelector('dialog[data-dialog-phase="open"]:not([inert])')||document.body);
 }

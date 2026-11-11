@@ -9,8 +9,9 @@ import { UserFacingError } from "../app/errors";
 import { useDialogLifecycle } from "../app/dialogLifecycle";
 import touch from "../app/touch.module.css";
 
-export type PlayerIconName = "play" | "pause" | "next" | "previous" | "close" | "up" | "down" | "heart" | "queue" | "lyrics" | "share" | "download" | "shuffle" | "repeat" | "volume" | "check" | "link" | "image" | "video" | "back";
+export type PlayerIconName = "play" | "pause" | "next" | "previous" | "close" | "up" | "down" | "heart" | "queue" | "lyrics" | "share" | "download" | "shuffle" | "repeat" | "volume" | "check" | "link" | "image" | "video" | "back" | "discover";
 const paths: Record<PlayerIconName, ReactNode> = {
+  discover: <><circle cx="12" cy="12" r="9"/><path d="m15 9-2 4-4 2 2-4z"/></>,
   play: <path d="m8 5 11 7-11 7Z"/>, pause: <><path d="M8 5v14M16 5v14"/></>,
   next: <><path d="m5 5 10 7-10 7ZM19 5v14"/></>, previous: <><path d="m19 5-10 7 10 7ZM5 5v14"/></>,
   close: <path d="m6 6 12 12M6 18 18 6"/>, up: <path d="m6 15 6-6 6 6"/>, down: <path d="m6 9 6 6 6-6"/>,
@@ -31,7 +32,7 @@ export function PlayerIcon({ name, size = 20 }: { name: PlayerIconName; size?: n
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 export function IconButton({ icon, label, active, shortcut, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: PlayerIconName; label: string; active?: boolean; shortcut?: string }) {
-  return <button type="button" {...props} aria-label={label} title={`${label}${shortcut ? ` (${shortcut})` : ""}`} data-shortcut={shortcut||undefined} aria-pressed={active} className={`${s.iconButton} ${active ? s.active : ""} ${className}`}><PlayerIcon name={icon}/></button>;
+  return <button type="button" {...props} aria-label={label} title={`${label}${shortcut ? ` (${shortcut})` : ""}`} data-shortcut={shortcut||undefined} data-playback-shortcuts={["play","pause","previous","next","shuffle","repeat"].includes(icon)?"listening":undefined} aria-pressed={active} className={`${s.iconButton} ${active ? s.active : ""} ${className}`}><PlayerIcon name={icon}/></button>;
 }
 export function PlayerButton({ icon, children, secondary, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: PlayerIconName; secondary?: boolean }) {
   return <button type="button" {...props} data-dialog-autofocus={props.autoFocus||undefined} className={`${s.button} ${secondary ? s.secondary : ""} ${props.className || ""}`}>{icon && <PlayerIcon name={icon} size={18}/>}<span>{children}</span></button>;

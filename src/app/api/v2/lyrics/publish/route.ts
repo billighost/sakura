@@ -1,0 +1,35 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireRebuildAccount } from "@/rebuild/auth";
+import { cardsForIds } from "@/rebuild/data/catalog";
+import { uuid } from "@/rebuild/data/validation";
+import { publishLyrics } from "@/rebuild/lyrics/publish";
+import { LyricRequestError } from "@/rebuild/lyrics/request";
+import { ProductError } from "@/rebuild/data/validation";
+import { parseTimedLyrics } from "@/rebuild/lyrics/parse";
+import { VERIFIED_LYRICS_VERSION } from "@/rebuild/lyrics/versions";
+import { resolveVerifiedLyrics } from "@/rebuild/lyrics/service";
+
+export const maxDuration=60;
+export async function POST(request:NextRequest) {
+  try {
+    const account=await requireRebuildAccount();
+    if(!account)return NextResponse.json({error:"Unauthorized"},{status:401});
+    const raw=await request.text();
+    if(raw.length>100_000)throw new LyricRequestError("Lyrics are too large",413);
+    let body:Record<string,unknown>;
+    try{body=JSON.parse(raw);}catch{throw new LyricRequestError("Invalid JSON");}
+    const recordingId=uuid(body?.recordingId,"recording ID");
+    const track=(await cardsForIds(account.id,[recordingId]))[0];
+    if(!track)throw new LyricRequestError("Verified recording not found",404);
+    const identity={recordingId,title:track.title,artist:track.artists[0]||"",artists:track.artists,album:track.albumTitle||undefined,durationSeconds:track.durationMs?track.durationMs/1000:undefined,versionLabel:(track.metadata.version as {labels?:string[]}|undefined)?.labels?.join(" ")};
+    const result=await publishLyrics(identity,body,{signal:request.signal});
+    if(result.track)resolveVerifiedLyrics.remember(identity,{status:"matched",provider:"lrclib",track:result.track});
+    const synced=result.track?.syncedLyrics?parseTimedLyrics(result.track.syncedLyrics):[];
+    const hasSynced=synced.some(line=>line.text.trim());
+    const lyrics=result.track?{lines:hasSynced?synced:(result.track.plainLyrics||"").split(/\r?\n/).map(text=>({text,start:0})),timing:hasSynced?"synced":"plain",provider:"lrclib",providerTrackId:result.track.id,instrumental:false,schemaVersion:VERIFIED_LYRICS_VERSION}:undefined;
+    return NextResponse.json({published:true,lyricsAvailable:Boolean(result.track),lyrics},{status:result.track?201:202,headers:{"Cache-Control":"private, no-store"}});
+  }catch(error){
+    if(error instanceof LyricRequestError||error instanceof ProductError)return NextResponse.json({error:error.message},{status:error.status});
+    return NextResponse.json({error:"Lyrics publishing is temporarily unavailable"},{status:503});
+  }
+}

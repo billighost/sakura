@@ -7,8 +7,10 @@
     "build": "node scripts/run-next.mjs build",
     "start": "node scripts/run-next.mjs start",
     "lint": "eslint",
+    "test:lyrics": "node --import tsx --test scripts/rebuild-lyrics.test.ts scripts/rebuild-lyrics-interactions.test.ts scripts/rebuild-whisper-sync.test.ts scripts/rebuild-hosted-sync.test.ts",
+    "test:lyrics:browser": "node --import tsx scripts/rebuild-lyrics-interactions-browser.mjs && node scripts/rebuild-auto-sync-browser.mjs",
     "migrate": "node scripts/rebuild-migrate.mjs --apply",
-    "test": "node scripts/test-rebuild-core.cjs && node scripts/test-rebuild-server.cjs && node --import tsx --test scripts/rebuild-origin.test.ts scripts/rebuild-lyrics.test.ts scripts/rebuild-lyric-follow.test.ts scripts/rebuild-player.test.ts scripts/rebuild-queue.test.ts scripts/rebuild-errors.test.ts scripts/rebuild-recording-jobs.test.ts scripts/rebuild-resources.test.ts scripts/rebuild-bloom.test.ts scripts/rebuild-bloom-listening.test.ts scripts/rebuild-bloom-refresh.test.ts scripts/rebuild-bloom-shelf.test.ts scripts/rebuild-bloom-audio.test.ts scripts/rebuild-bloom-sources.test.ts scripts/rebuild-listening-origin.test.ts scripts/rebuild-bloom-appearance.test.ts scripts/rebuild-bloom-service.test.ts scripts/rebuild-bloom-experience.test.ts scripts/rebuild-bloom-insights.test.ts scripts/rebuild-bloom-promotions.test.ts scripts/rebuild-bloom-world-variation.test.ts scripts/rebuild-db.test.ts scripts/rebuild-audio-technology-preferences.test.ts scripts/rebuild-navigation.test.ts scripts/rebuild-track-sorting.test.ts scripts/rebuild-collection-dates.test.ts scripts/rebuild-collection-presentation.test.ts scripts/rebuild-playlist-artwork.test.ts scripts/rebuild-player-controls.test.ts scripts/rebuild-playback-shortcuts.test.ts scripts/rebuild-japanese-reading-preferences.test.ts scripts/rebuild-gesture-intent.test.ts && node --import tsx --test scripts/rebuild-feed-preferences.test.ts scripts/rebuild-feed-items.test.ts scripts/rebuild-search-artists.test.ts scripts/rebuild-initial-taste.test.ts scripts/rebuild-preferences-sync.test.ts scripts/rebuild-personalization.test.ts scripts/rebuild-listening-evidence.test.ts scripts/rebuild-listening-outbox.test.ts scripts/rebuild-playback-integration.test.ts scripts/rebuild-hero-recommendations.test.ts",
+    "test": "node scripts/test-rebuild-core.cjs && node scripts/test-rebuild-server.cjs && node --import tsx --test scripts/rebuild-origin.test.ts scripts/rebuild-lyrics.test.ts scripts/rebuild-lyrics-interactions.test.ts scripts/rebuild-whisper-sync.test.ts scripts/rebuild-hosted-sync.test.ts scripts/rebuild-lyric-follow.test.ts scripts/rebuild-player.test.ts scripts/rebuild-queue.test.ts scripts/rebuild-errors.test.ts scripts/rebuild-recording-jobs.test.ts scripts/rebuild-resources.test.ts scripts/rebuild-bloom.test.ts scripts/rebuild-bloom-listening.test.ts scripts/rebuild-bloom-refresh.test.ts scripts/rebuild-bloom-shelf.test.ts scripts/rebuild-bloom-audio.test.ts scripts/rebuild-bloom-sources.test.ts scripts/rebuild-listening-origin.test.ts scripts/rebuild-bloom-appearance.test.ts scripts/rebuild-bloom-service.test.ts scripts/rebuild-bloom-experience.test.ts scripts/rebuild-bloom-insights.test.ts scripts/rebuild-bloom-promotions.test.ts scripts/rebuild-bloom-world-variation.test.ts scripts/rebuild-db.test.ts scripts/rebuild-audio-technology-preferences.test.ts scripts/rebuild-navigation.test.ts scripts/rebuild-track-sorting.test.ts scripts/rebuild-collection-dates.test.ts scripts/rebuild-collection-presentation.test.ts scripts/rebuild-playlist-artwork.test.ts scripts/rebuild-player-controls.test.ts scripts/rebuild-playback-shortcuts.test.ts scripts/rebuild-japanese-reading-preferences.test.ts scripts/rebuild-gesture-intent.test.ts && node --import tsx --test scripts/rebuild-feed-preferences.test.ts scripts/rebuild-feed-items.test.ts scripts/rebuild-search-artists.test.ts scripts/rebuild-initial-taste.test.ts scripts/rebuild-preferences-sync.test.ts scripts/rebuild-personalization.test.ts scripts/rebuild-listening-evidence.test.ts scripts/rebuild-listening-outbox.test.ts scripts/rebuild-playback-integration.test.ts scripts/rebuild-hero-recommendations.test.ts",
     "test:interactions:browser": "node scripts/rebuild-custom-controls-browser.mjs && node scripts/rebuild-gestures-browser.mjs && node scripts/rebuild-japanese-reading-browser.mjs && node scripts/rebuild-sticky-collections-browser.mjs",
     "test:motion:browser": "node scripts/rebuild-motion-lyrics-browser.mjs",
     "test:downloads": "node --import tsx --test scripts/rebuild-download-engine.test.ts scripts/rebuild-download-gate.test.ts scripts/rebuild-download-presentation.test.ts scripts/rebuild-download-start.test.ts scripts/rebuild-mini-lyrics.test.ts scripts/rebuild-shared-flight.test.ts scripts/rebuild-partial-playback.test.ts scripts/rebuild-playback-integration.test.ts scripts/rebuild-audio-route.test.ts && npm --prefix worker test",
@@ -45,6 +47,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
+    "es-hangul": "^2.4.0",
     "idb": "^8.0.3",
     "kuromoji": "^0.1.2",
     "mediabunny": "^1.65.2",
@@ -52,8 +55,10 @@
     "next": "^16.4.5",
     "next-auth": "^5.0.0-beta.32",
     "pg": "^8.22.0",
+    "pinyin-pro": "^3.29.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "transliteration": "^2.7.0",
     "wanakana": "^5.3.1"
   },
   "devDependencies": {

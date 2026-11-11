@@ -3,7 +3,7 @@ import type {ReadyPlayback} from "../data/catalog";
 import type {AudioTechnology} from "../audio/presets";
 import { collectionDate } from "../core/collectionDate";
 import type {InitialTasteProfile} from "../recommendations/initialTaste";
-export interface UserSettings {initialTasteProfile?:InitialTasteProfile;japaneseReading?:boolean}
+export interface UserSettings {initialTasteProfile?:InitialTasteProfile;japaneseReading?:boolean;lyricReading?:boolean}
 export interface MusicTrack {
  id: string;
  title: string;
@@ -13,6 +13,9 @@ export interface MusicTrack {
  artistId: string | null;
  albumId: string | null;
  albumTitle: string | null;
+ albumReference?: ProviderReference;
+ alternateTitles?: string[];
+ language?: string;
  durationMs: number;
  coverUrl: string | null;
  genres?: string[];
@@ -43,8 +46,15 @@ export function musicTrack(raw:Record<string,unknown>):MusicTrack {
  const references=(Array.isArray(raw.references)?raw.references:raw.reference?[raw.reference]:[]) as ProviderReference[];
  const reference=(raw.reference||references.find(r=>r.provider==="deezer"||r.provider==="spotify")) as ProviderReference|undefined;
  if(!reference||typeof reference.id!=="string")throw new Error("The song has no catalog reference.");
+ const aliases=Array.isArray(metadata.verifiedAliases)?metadata.verifiedAliases.filter(value=>{
+  if(!value||typeof value!=="object")return false;
+  const alias=value as {references?:ProviderReference[]};
+  return Array.isArray(alias.references)&&alias.references.some(ref=>[reference,...references].some(known=>known.provider===ref.provider&&known.id===ref.id));
+ }) as {metadata?:{title?:string;artists?:string[]}}[]:[];
+ const alternateTitles=[...new Set([...(Array.isArray(metadata.alternateTitles)?metadata.alternateTitles.filter((v):v is string=>typeof v==="string"):[]),...aliases.flatMap(alias=>typeof alias.metadata?.title==="string"?[alias.metadata.title]:[])])];
  const version=metadata.version as {kinds?:string[];labels?:string[]}|undefined;
  return {id:String(raw.recordingId||raw.id||reference.provider+":"+reference.id),title:String(metadata.title||""),artists:Array.isArray(metadata.artists)?metadata.artists.map(String):[],artistsComplete:typeof metadata.artistsComplete==="boolean"?metadata.artistsComplete:undefined,artistCredits:Array.isArray(raw.artistCredits)?raw.artistCredits as MusicTrack["artistCredits"]:Array.isArray(metadata.artistCredits)?metadata.artistCredits as MusicTrack["artistCredits"]:undefined,
+ albumReference:(raw.albumReference||metadata.albumReference) as ProviderReference|undefined,alternateTitles:alternateTitles.length?alternateTitles:undefined,language:typeof metadata.language==="string"?metadata.language:undefined,
  artistId:raw.artistId?String(raw.artistId):null,albumId:raw.albumId?String(raw.albumId):null,albumTitle:raw.albumTitle||metadata.albumTitle?String(raw.albumTitle||metadata.albumTitle):null,
  durationMs:Number(metadata.durationMs)||0,coverUrl:typeof (raw.coverUrl||metadata.coverUrl)==="string"?String(raw.coverUrl||metadata.coverUrl):null,versionLabel:typeof raw.versionLabel==="string"?raw.versionLabel:version?.labels?.length?version.labels.join(" · "):version?.kinds?.length?version.kinds.join(" · "):"Original recording",
  reference,references:references.length?references:[reference],explicit:metadata.explicit==="explicit",version:version as RecordingVersion|undefined,genres:Array.isArray(raw.genres)?raw.genres.map(String):[],readyPlayback:raw.readyPlayback as ReadyPlayback|undefined,addedAt:collectionDate(raw.addedAt)};

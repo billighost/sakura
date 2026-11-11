@@ -12,7 +12,7 @@ export interface ReadyPlayback {
 export interface RecordingCard {
   id: string; recordingId:string; title:string; artists:string[]; durationMs:number|null;
   metadata:Record<string,unknown>; coverUrl:string|null; artistImageUrl:string|null;
-  artistId:string|null; albumId:string|null; albumTitle:string|null;
+  artistId:string|null; albumId:string|null; albumTitle:string|null; albumReference?:ProviderReference;
   reference:ProviderReference; references:ProviderReference[];
   genres:string[]; popularity:number; playability:"ready"|"resolvable";
   liked?:boolean;
@@ -62,7 +62,7 @@ export function card(row: QueryResultRow): RecordingCard {
   return {id:row.id,recordingId:row.id,title:String(metadata.title),artists:Array.isArray(metadata.artists)?metadata.artists.map(String):[],
     durationMs:typeof metadata.durationMs==="number"?metadata.durationMs:null,metadata,
     coverUrl:safeImage(metadata.coverUrl||catalog.coverUrl),artistImageUrl:safeImage(row.artistImageUrl||metadata.artistImageUrl||catalog.artistImageUrl),
-    artistId:row.artistId||null,albumId:row.albumId||null,albumTitle:typeof (metadata.albumTitle||catalog.albumTitle)==="string"?String(metadata.albumTitle||catalog.albumTitle):null,
+    albumReference:(metadata.albumReference||catalog.albumReference) as ProviderReference|undefined,artistId:row.artistId||null,albumId:row.albumId||null,albumTitle:typeof (metadata.albumTitle||catalog.albumTitle)==="string"?String(metadata.albumTitle||catalog.albumTitle):null,
     reference,references:refs,genres:Array.isArray(metadata.genres)?metadata.genres.filter((genre):genre is string=>typeof genre==="string"&&Boolean(genre.trim())).map(genre=>genre.trim()):[],
     popularity:Math.max(0,Math.min(1,popularity)),artistCredits,playability:row.ready?"ready":"resolvable",...(playback?{readyPlayback:playback}:{}),...(typeof row.liked==="boolean"?{liked:row.liked}:{}),...(addedAt?{addedAt}:{})};
 }

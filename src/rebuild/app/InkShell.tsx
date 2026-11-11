@@ -18,6 +18,9 @@ const navigation=[{href:"/home",icon:"home",name:"Home"},{href:"/discover",icon:
 export function InkShell({children}:{children:ReactNode}){
  const viewportRef=useVisibleViewport();
  const p=useMusic();const pathname=usePathname();const router=useRouter();const main=useRef<HTMLDivElement>(null);const scrolls=useRef(new Map<string,number>());const [playerUnderlay,setPlayerUnderlay]=useState(false);const [sidebarMode,setSidebarMode]=useState<"auto"|"expanded"|"collapsed">("auto");const [shortSidebar,setShortSidebar]=useState(false);const sidebarCollapsed=sidebarMode==="collapsed"||sidebarMode==="auto"&&shortSidebar;const title=pathname.split("/")[1]||"home";
+ const modalPath=useRef(pathname);
+ const closeModal=p.closeModal;
+ useEffect(()=>{if(modalPath.current!==pathname){modalPath.current=pathname;setPlayerUnderlay(false);closeModal();}},[pathname,closeModal]);
  const closePlayer=()=>{setPlayerUnderlay(false);p.closeModal();};
  const openFromPlayer=(modal:"lyrics"|"queue"|"share")=>{setPlayerUnderlay(true);p.openModal(modal);};
  const closeOverlay=()=>{if(playerUnderlay){setPlayerUnderlay(false);p.openModal("player");}else p.closeModal();};

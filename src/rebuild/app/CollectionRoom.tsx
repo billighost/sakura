@@ -1,10 +1,10 @@
 "use client";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Artwork } from "./Elements";
 import { Branch, Blossom } from "./Brand";
 import type { RoomSort, RoomSortDirection } from "./trackSorting";
 import type { RoomLayout } from "./collectionPresentation";
-import { playlistArtworkSources } from "./playlistArtwork";
+import { playlistArtworkSources, safeArtworkUrl } from "./playlistArtwork";
 import { SelectPopover } from "./SelectPopover";
 import s from "./collection-room.module.css";
 
@@ -17,10 +17,15 @@ export function CollectionHero({eyebrow,title,description,covers=[],label,childr
  return <header className={s.hero}><div className={s.heroCopy}><span className={s.eyebrow}>{eyebrow}</span><h1>{title}</h1><p>{description}</p><div className={s.heroActions}>{children}</div></div><div className={s.albumGarden} aria-hidden="true"><Branch className={s.gardenBranch}/><div className={s.record}><i/><span>sakura</span></div>{covers.slice(0,3).map((cover,i)=><div className={s.albumFrame} key={cover.title+i}><Artwork url={cover.coverUrl} title=""/><span>{String(i+1).padStart(2,"0")} / a little music</span></div>)}{!covers.length&&<div className={s.emptyAlbum}><Blossom/><span>a little room<br/>for your songs</span></div>}<span className={s.gardenLabel}>{label}</span></div></header>;
 }
 
-export function PlaylistArtwork({title,coverUrl,coverUrls,className=""}:{title:string;coverUrl?:unknown;coverUrls?:unknown;className?:string}) {
- const sources=playlistArtworkSources(coverUrl,coverUrls);
- return <div className={`${s.playlistArtwork} ${className}`} data-cover-count={sources.length} role="img" aria-label={`${title} playlist artwork`}>
-  {sources.length?<div className={s.playlistArtworkGrid} aria-hidden="true">{sources.map((source,index)=><Artwork key={source} url={source} title="" className={s.playlistArtworkTile+" "+s["playlistArtworkTile"+(index+1)]}/>)}</div>:<div className={s.playlistArtworkEmpty}><Blossom/><span>{title.slice(0,1)||"S"}</span></div>}
+export function PlaylistArtwork({title,coverUrl,coverUrls,dedicatedCover=false,className=""}:{title:string;coverUrl?:unknown;coverUrls?:unknown;dedicatedCover?:boolean;className?:string}) {
+ const [failed,setFailed]=useState<string[]>([]);
+ const primary=safeArtworkUrl(coverUrl);
+ const candidates=(Array.isArray(coverUrls)?coverUrls:[]).map(safeArtworkUrl).filter((url):url is string=>Boolean(url)&&!failed.includes(url!));
+ const sources=playlistArtworkSources(primary&&!failed.includes(primary)?primary:null,candidates);
+ const displayed=dedicatedCover&&primary&&!failed.includes(primary)?sources.slice(0,1):sources;
+
+ return <div className={`${s.playlistArtwork} ${className}`} data-cover-count={displayed.length} role="img" aria-label={`${title} playlist artwork`}>
+  {displayed.length?<div className={s.playlistArtworkGrid} aria-hidden="true">{displayed.map((source,index)=><Artwork key={source} url={source} title="" onError={()=>setFailed(previous=>previous.includes(source)?previous:[...previous,source])} className={s.playlistArtworkTile+" "+s["playlistArtworkTile"+(index+1)]}/>)}</div>:<div className={s.playlistArtworkEmpty}><Blossom/><span>{title.slice(0,1)||"S"}</span></div>}
   <Branch className={s.playlistArtworkBranch}/><span className={s.playlistArtworkSeal} aria-hidden="true">s</span>
  </div>;
 }

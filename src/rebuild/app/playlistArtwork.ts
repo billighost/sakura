@@ -1,6 +1,6 @@
 const MAX_ARTWORK_URL_LENGTH=2000;
 
-function safeArtworkUrl(value:unknown) {
+export function safeArtworkUrl(value:unknown) {
  if(typeof value!=="string")return null;
  const trimmed=value.trim();
  if(!trimmed||trimmed.length>MAX_ARTWORK_URL_LENGTH)return null;

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Artwork, PlayerButton, PlayerDialog } from "../player/Primitives";
 import { requestDialogClose } from "./dialogLifecycle";
+import { AlbumLink } from "./AlbumLink";
 import { ArtistLinks } from "./ArtistLinks";
 import { Blossom } from "./Brand";
 import type { MusicTrack } from "./types";
@@ -14,7 +15,7 @@ export function DownloadRemovalDialog({track,onClose,onRemove}:{track:MusicTrack
  return <PlayerDialog appearance="note" closeDisabled={removing} className={s.dialog} subtitle="YOUR DOWNLOADED MUSIC" title="Remove this download?" onClose={onClose}>
   <div className={s.songCard}>
    <div className={s.art}><Artwork url={track.coverUrl} title={track.albumTitle||track.title}/><span aria-hidden="true"><Blossom/></span></div>
-   <div className={s.identity}><span>Saved on this device</span><strong dir="auto">{track.title}</strong><ArtistLinks track={track}/>{track.albumTitle&&<small dir="auto">{track.albumTitle}</small>}</div>
+   <div className={s.identity}><span>Saved on this device</span><strong dir="auto">{track.title}</strong><ArtistLinks track={track}/>{track.albumTitle&&<small dir="auto"><AlbumLink track={track} onNavigate={onClose}/></small>}</div>
   </div>
   <div className={s.note}><Blossom/><p>The offline copy will be removed from this device. The song stays in your library, likes, playlists and listening history.</p></div>
   {failed&&<p className={s.error} role="alert">This download is still on your device. Please try removing it again.</p>}

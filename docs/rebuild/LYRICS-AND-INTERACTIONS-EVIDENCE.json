@@ -1,0 +1,816 @@
+{
+  "checkedAt": "2026-11-11T14:20:30.650Z",
+  "scope": "Public metadata and test summaries only; no private accounts, audio URLs, full lyrics, secrets or model weights",
+  "baselineCommit": "dab5736d1c0fb1ca5af2ee20744cf75bc6f8d0af",
+  "liveLyrics": {
+    "scope": "Actual GET handler, synthetic auth, unmodified live catalogue/providers, no audio or writes",
+    "cases": [
+      {
+        "query": "Here Comes The Sun The Beatles",
+        "identity": {
+          "title": "Here Comes The Sun (Remastered 2009)",
+          "artist": "The Beatles",
+          "album": "Abbey Road (Remastered 2009)",
+          "duration": 184,
+          "catalogId": 116348464
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "Here Comes The Sun (Remastered 2009)",
+          "artist": "The Beatles",
+          "album": "Abbey Road (Remastered 2009)",
+          "durationSeconds": 184
+        },
+        "lines": 27,
+        "elapsedMs": 820,
+        "readingLanguage": null
+      },
+      {
+        "query": "Heroes David Bowie",
+        "identity": {
+          "title": "\"Heroes\" (2017 Remaster)",
+          "artist": "David Bowie",
+          "album": "\"Heroes\" (2017 Remaster)",
+          "duration": 371,
+          "catalogId": 461043312
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "Heroes - 2017 Remaster",
+          "artist": "David Bowie",
+          "album": "\"Heroes\" (2017 Remaster)",
+          "durationSeconds": 371
+        },
+        "lines": 47,
+        "elapsedMs": 223,
+        "readingLanguage": null
+      },
+      {
+        "query": "Dont Stop Me Now Queen",
+        "identity": {
+          "title": "Don't Stop Me Now",
+          "artist": "Queen",
+          "album": "Jazz",
+          "duration": 212,
+          "catalogId": 4092329741
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "Don’t Stop Me Now",
+          "artist": "Queen",
+          "album": "Jazz",
+          "durationSeconds": 212
+        },
+        "lines": 62,
+        "elapsedMs": 196,
+        "readingLanguage": null
+      },
+      {
+        "query": "Tian Mi Mi Teresa Teng",
+        "identity": {
+          "title": "甜蜜蜜",
+          "artist": "Teresa Teng",
+          "album": "鄧麗君3合1",
+          "duration": 208,
+          "catalogId": 10496622
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "甜蜜蜜",
+          "artist": "Teresa Teng",
+          "album": "鄧麗君十五週年",
+          "durationSeconds": 208
+        },
+        "lines": 33,
+        "elapsedMs": 1821,
+        "readingLanguage": "zh",
+        "readingSample": "tián mì mì nǐ xiào dé tián mì mì"
+      },
+      {
+        "query": "We Dont Talk Anymore Charlie Puth",
+        "identity": {
+          "title": "We Don't Talk Anymore (feat. Selena Gomez)",
+          "artist": "Charlie Puth",
+          "album": "Nine Track Mind",
+          "duration": 217,
+          "catalogId": 117797212
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "We Don’t Talk Anymore (feat. Selena Gomez)",
+          "artist": "Charlie Puth",
+          "album": "Nine Track Mind",
+          "durationSeconds": 218
+        },
+        "lines": 68,
+        "elapsedMs": 570,
+        "readingLanguage": null
+      },
+      {
+        "query": "See You Again Wiz Khalifa",
+        "identity": {
+          "title": "See You Again (feat. Charlie Puth)",
+          "artist": "Wiz Khalifa",
+          "album": "See You Again (feat. Charlie Puth)",
+          "duration": 229,
+          "catalogId": 95813354
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "See You Again (feat. Charlie Puth)",
+          "artist": "Wiz Khalifa",
+          "album": "See You Again (feat. Charlie Puth)",
+          "durationSeconds": 230
+        },
+        "lines": 50,
+        "elapsedMs": 360,
+        "readingLanguage": null
+      },
+      {
+        "query": "夜に駆ける YOASOBI",
+        "identity": {
+          "title": "夜に駆ける",
+          "artist": "YOASOBI",
+          "album": "夜に駆ける",
+          "duration": 261,
+          "catalogId": 824731152
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "plain",
+        "matchedRecording": {
+          "title": "夜に駆ける",
+          "artist": "YOASOBI",
+          "album": "夜に駆ける",
+          "durationSeconds": 259
+        },
+        "lines": 69,
+        "elapsedMs": 1043,
+        "readingLanguage": "ja",
+        "readingSample": "shizumu you ni toke te yuku you ni"
+      },
+      {
+        "query": "봄날 BTS",
+        "identity": {
+          "title": "Spring Day",
+          "artist": "BTS",
+          "album": "Proof",
+          "duration": 274,
+          "catalogId": 1783253587
+        },
+        "httpStatus": 200,
+        "provider": "lrclib",
+        "timing": "synced",
+        "matchedRecording": {
+          "title": "Spring Day",
+          "artist": "BTS",
+          "album": "Proof",
+          "durationSeconds": 274
+        },
+        "lines": 51,
+        "elapsedMs": 430,
+        "readingLanguage": "ko",
+        "readingSample": "bogo sipda, ireoke malhanikka deo bogo sipda"
+      }
+    ]
+  },
+  "candidateComparison": {
+    "scope": "Live candidate comparison against unmodified HEAD selector; search result sets are not proof the old full provider had no other candidate",
+    "metadataRequests": 50,
+    "responseBytes": 4454322,
+    "cases": [
+      {
+        "query": {
+          "title": "We Don't Talk Anymore",
+          "artist": "Charlie Puth"
+        },
+        "catalogId": 117797212,
+        "identity": {
+          "title": "We Don't Talk Anymore (feat. Selena Gomez)",
+          "artist": "Charlie Puth",
+          "artists": [
+            "Charlie Puth",
+            "Selena Gomez"
+          ],
+          "album": "Nine Track Mind",
+          "durationSeconds": 217
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "matched",
+          "id": 3339829,
+          "title": "We Don't Talk Anymore",
+          "artist": "Charlie Puth",
+          "album": "Nine Track Mind",
+          "duration": 218,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "INDUSTRY BABY",
+          "artist": "Lil Nas X"
+        },
+        "catalogId": 1439691952,
+        "identity": {
+          "title": "INDUSTRY BABY",
+          "artist": "Lil Nas X",
+          "artists": [
+            "Lil Nas X",
+            "Jack Harlow"
+          ],
+          "album": "INDUSTRY BABY",
+          "durationSeconds": 214
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 951351,
+          "title": "INDUSTRY BABY",
+          "artist": "Lil Nas X",
+          "album": "INDUSTRY BABY",
+          "duration": 212,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 951351,
+          "title": "INDUSTRY BABY",
+          "artist": "Lil Nas X",
+          "album": "INDUSTRY BABY",
+          "duration": 212,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Levitating",
+          "artist": "Dua Lipa"
+        },
+        "catalogId": 1124841682,
+        "identity": {
+          "title": "Levitating",
+          "artist": "Dua Lipa",
+          "artists": [
+            "Dua Lipa"
+          ],
+          "album": "Future Nostalgia",
+          "durationSeconds": 203
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 5512606,
+          "title": "Levitating",
+          "artist": "Dua Lipa",
+          "album": "Future Nostalgia",
+          "duration": 201,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 5512606,
+          "title": "Levitating",
+          "artist": "Dua Lipa",
+          "album": "Future Nostalgia",
+          "duration": 201,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Hips Don't Lie",
+          "artist": "Shakira"
+        },
+        "catalogId": 88897841,
+        "identity": {
+          "title": "Hips Don't Lie (feat. Wyclef Jean)",
+          "artist": "Shakira",
+          "artists": [
+            "Shakira",
+            "Wyclef Jean"
+          ],
+          "album": "Filtr presents R&B Party",
+          "durationSeconds": 221
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "matched",
+          "id": 5780133,
+          "title": "Hips Don't Lie",
+          "artist": "Shakira",
+          "album": "Oral Fixation, Vol. 2 (Expanded Edition)",
+          "duration": 221,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Let It Be",
+          "artist": "The Beatles"
+        },
+        "catalogId": 116348642,
+        "identity": {
+          "title": "Let It Be (Remastered 2015)",
+          "artist": "The Beatles",
+          "artists": [
+            "The Beatles"
+          ],
+          "album": "1 (Remastered 2015)",
+          "durationSeconds": 230
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "matched",
+          "id": 5046417,
+          "title": "Let It Be",
+          "artist": "The Beatles",
+          "album": "The Beatles' Ballads",
+          "duration": 230,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Starman",
+          "artist": "David Bowie"
+        },
+        "catalogId": 107471926,
+        "identity": {
+          "title": "Starman (2012 Remaster)",
+          "artist": "David Bowie",
+          "album": "The Rise and Fall of Ziggy Stardust and the Spiders from Mars (2012 Remaster)",
+          "durationSeconds": 254
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "matched",
+          "id": 5600735,
+          "title": "Starman",
+          "artist": "David Bowie",
+          "album": "The Rise and Fall of Ziggy Stardust and the Spiders from Mars (2012 Remaster)",
+          "duration": 254,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "I Want To Break Free",
+          "artist": "Queen"
+        },
+        "catalogId": 4092335521,
+        "identity": {
+          "title": "I Want to Break Free",
+          "artist": "Queen",
+          "album": "The Works",
+          "durationSeconds": 201
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 7315725,
+          "title": "I Want To Break Free",
+          "artist": "Queen",
+          "album": "The Works [UICY-40260]",
+          "duration": 201,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 7315725,
+          "title": "I Want To Break Free",
+          "artist": "Queen",
+          "album": "The Works [UICY-40260]",
+          "duration": 201,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Halo",
+          "artist": "Beyoncé"
+        },
+        "catalogId": 15593283,
+        "identity": {
+          "title": "Halo (Radio Edit)",
+          "artist": "Beyoncé",
+          "album": "Halo - Single & Remixes",
+          "durationSeconds": 224
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "What Was I Made For",
+          "artist": "Billie Eilish"
+        },
+        "catalogId": 2366043655,
+        "identity": {
+          "title": "What Was I Made For? [From The Motion Picture \"Barbie\"]",
+          "artist": "Billie Eilish",
+          "album": "What Was I Made For? [From The Motion Picture \"Barbie\"]",
+          "durationSeconds": 222
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "matched",
+          "id": 6433745,
+          "title": "What Was I Made For?",
+          "artist": "Billie Eilish",
+          "album": "What Was I Made For? [From The Motion Picture \"Barbie\"]",
+          "duration": 222,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "My Heart Will Go On",
+          "artist": "Céline Dion"
+        },
+        "catalogId": 14552280,
+        "identity": {
+          "title": "My Heart Will Go On (Love Theme from \"Titanic\")",
+          "artist": "Céline Dion",
+          "album": "My Love Essential Collection",
+          "durationSeconds": 280
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "Unchained Melody",
+          "artist": "The Righteous Brothers"
+        },
+        "catalogId": 885544,
+        "identity": {
+          "title": "Unchained Melody",
+          "artist": "The Righteous Brothers",
+          "album": "The Collection",
+          "durationSeconds": 214
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 4659562,
+          "title": "Unchained Melody",
+          "artist": "The Righteous Brothers",
+          "album": "100 Greatest Pop Ballads",
+          "duration": 217,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 4659562,
+          "title": "Unchained Melody",
+          "artist": "The Righteous Brothers",
+          "album": "100 Greatest Pop Ballads",
+          "duration": 217,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "愛にできることはまだあるかい",
+          "artist": "RADWIMPS"
+        },
+        "catalogId": 1326578912,
+        "identity": {
+          "title": "愛にできることはまだあるかい-2Key(原曲歌手:RADWIMPS)[ガイド無しカラオケ]",
+          "artist": "歌っちゃ王",
+          "album": "愛にできることはまだあるかい(ガイド無しカラオケ)[原曲歌手:RADWIMPS]",
+          "durationSeconds": 415
+        },
+        "baseline": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "current": {
+          "status": "missing",
+          "reason": "No verified title, artist, language and duration match"
+        },
+        "candidateCount": 0,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "光年之外",
+          "artist": "G.E.M."
+        },
+        "catalogId": 139025897,
+        "identity": {
+          "title": "光年之外 (電影 《Passengers》 中國區主題曲)",
+          "artist": "G.E.M.",
+          "album": "光年之外 (電影 《Passengers》 中國區主題曲)",
+          "durationSeconds": 235
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 5040999,
+          "title": "光年之外 (電影 《Passengers》 中國區主題曲)",
+          "artist": "G.E.M.",
+          "album": "光年之外 (電影 《Passengers》 中國區主題曲)",
+          "duration": 236,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 23151389,
+          "title": "光年之外",
+          "artist": "G.E.M.",
+          "album": "光年之外 (電影 《Passengers》 中國區主題曲)",
+          "duration": 235,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {
+        "query": {
+          "title": "打上花火",
+          "artist": "DAOKO"
+        }
+      },
+      {
+        "query": {
+          "title": "Stay",
+          "artist": "The Kid LAROI"
+        },
+        "catalogId": 1425844092,
+        "identity": {
+          "title": "STAY",
+          "artist": "The Kid LAROI",
+          "album": "STAY",
+          "durationSeconds": 140
+        },
+        "baseline": {
+          "status": "matched",
+          "id": 1734394,
+          "title": "STAY",
+          "artist": "The Kid Laroi",
+          "album": "STAY",
+          "duration": 142,
+          "timing": "synced"
+        },
+        "current": {
+          "status": "matched",
+          "id": 1734394,
+          "title": "STAY",
+          "artist": "The Kid Laroi",
+          "album": "STAY",
+          "duration": 142,
+          "timing": "synced"
+        },
+        "candidateCount": 20,
+        "controls": {
+          "wrongArtist": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          },
+          "instrumental": {
+            "status": "missing",
+            "reason": "No verified title, artist, language and duration match"
+          }
+        }
+      },
+      {}
+    ],
+    "limitation": "Broad search-pool improvements do not prove the old full resolver failed every recording; exact Starman and We Don't Talk Anymore already worked. Titanic annotation was fixed after this capture."
+  },
+  "browser": {
+    "scope": "Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes",
+    "checks": [
+      "1440px: pagination, collaborator/album/non-Latin searches, Chinese/Korean readings, current-recording taste actions, mouse/touch lyric focus, Space after click/selection, repeat/IME isolation, seek/volume/native slider keys, song keys, help/queue/player/lyrics/search shortcuts, album dialog navigation, 4-cover mix/3-cover broken fallback/0-cover empty/1-cover custom playlist, typed-space isolation and exact fresh upload result",
+      "390px: pagination, collaborator/album/non-Latin searches, Chinese/Korean readings, current-recording taste actions, mouse/touch lyric focus, Space after click/selection, repeat/IME isolation, seek/volume/native slider keys, song keys, help/queue/player/lyrics/search shortcuts, album dialog navigation, 4-cover mix/3-cover broken fallback/0-cover empty/1-cover custom playlist, typed-space isolation and exact fresh upload result"
+    ],
+    "pageErrors": []
+  },
+  "autoSync": {
+    "hostingDeployed": false,
+    "englishOnly": true,
+    "browserModelDownloads": false,
+    "browser": {
+      "scope": "Real UI; synthetic media, English lyric text and hosted responses; no external uploads/downloads",
+      "checks": [
+        "Cancel suppresses a late worker result and keeps plain lyrics.",
+        "Hosted result changes the existing lyric view to actual line timestamps.",
+        "Song changes reset sync state; worker failure keeps original plain words.",
+        "The browser fetched zero model files and uploaded zero audio files."
+      ],
+      "errors": [],
+      "requests": {
+        "started": 3,
+        "polls": 3
+      }
+    },
+    "realSinging": [
+      {
+        "title": "Someone Like You",
+        "artist": "Adele",
+        "model": "small.en",
+        "cpuInferenceMs": 238200,
+        "alignmentMs": 97,
+        "recognizedWordCoverage": 0.875,
+        "uncertainLines": 11,
+        "accepted": false
+      },
+      {
+        "title": "Perfect (Acoustic)",
+        "artist": "Ed Sheeran",
+        "model": "small.en",
+        "cpuInferenceMs": 699200,
+        "alignmentMs": 116,
+        "recognizedWordCoverage": 0.816,
+        "uncertainLines": 15,
+        "accepted": false
+      }
+    ],
+    "limitation": "No positive real full-song accuracy or live hosted speed evidence. All uncertain results retain unchanged plain source lyrics. Free hosting requires an eligible account that was not supplied."
+  },
+  "validation": {
+    "npmTest": 632,
+    "downloadAppTests": 236,
+    "downloadWorkerTests": 57,
+    "pythonWorkerTests": 4,
+    "build": "passed",
+    "typescript": "passed",
+    "eslintErrors": 0,
+    "optionalDatabaseBranch": "not executed without isolated PostgreSQL"
+  },
+  "downloadArchitecture": "Existing Cloudflare authorization owner, immutable CDN preparation and account/offline audio paths preserved; no acquisition or authorization owner started."
+}

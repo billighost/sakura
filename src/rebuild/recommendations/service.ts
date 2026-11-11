@@ -6,6 +6,7 @@ import { ProductError,uuid,ids,object } from "../data/validation";
 import { planMixes,type Candidate } from "./planner";
 import { SITUATIONAL_MIXES,eligibleSituations,planOfflineMixes,type SituationHistory } from "./situations";
 import {rankPersonalizedTracks,orderPersonalizedTracks,tasteExcluded,type TasteFeedback,type ListeningEvidence,type TasteSettings} from "./personalization";
+import {playlistArtworkSources} from "../app/playlistArtwork";
 import {FEED_DEFAULTS} from "../app/feedPreferences";
 
 const MIXES=SITUATIONAL_MIXES;
@@ -13,8 +14,10 @@ type Queryable=Pick<PoolClient,"query">;
 export async function listMixes(accountId:string,sql:Queryable=getRebuildPool()) {
   const rows=(await sql.query(`SELECT m.id,m.slot,m.kind,m.name,m.description,m.status,m.reason,
     m.eligible_count AS "eligibleCount",m.unique_artists AS "uniqueArtists",m.generated_at AS "generatedAt",m.expires_at AS "expiresAt",
-    (SELECT jsonb_agg(r.metadata->>'coverUrl' ORDER BY x.position) FROM sakura_v2."MixRecording" x
-      JOIN sakura_v2."Recording" r ON r.id=x.recording_id WHERE x.mix_id=m.id AND x.position<4) AS "coverUrls",
+    (SELECT jsonb_agg(art.url ORDER BY art.position) FROM (
+      SELECT r.metadata->>'coverUrl' AS url,MIN(x.position) AS position FROM sakura_v2."MixRecording" x
+      JOIN sakura_v2."Recording" r ON r.id=x.recording_id WHERE x.mix_id=m.id AND NULLIF(r.metadata->>'coverUrl','') IS NOT NULL
+      GROUP BY r.metadata->>'coverUrl' ORDER BY MIN(x.position) LIMIT 4) art) AS "coverUrls",
     (SELECT COUNT(*)::integer FROM sakura_v2."MixRecording" x WHERE x.mix_id=m.id) AS "trackCount"
     FROM sakura_v2."Mix" m WHERE m.account_id=$1::uuid ORDER BY CASE m.slot WHEN 'daily' THEN 0 WHEN 'discover' THEN 1 WHEN 'deep-cuts' THEN 2 ELSE 3 END`,[accountId])).rows;
   return rows.map(row=>{const definition=MIXES.find(m=>m.id===row.slot);return {...row,situation:definition?.situation,surfaces:definition?.surfaces||["discover"],rules:definition?.rules||[],coverUrls:(row.coverUrls||[]).filter(Boolean),playability:row.status==="ready"?"resolvable":"unavailable"};});
@@ -103,7 +106,7 @@ export async function getMix(accountId:string,rawId:string) {
   const retained=await cardsForIds(accountId,membership,sql);
   const feedback:TasteFeedback[]=feedbackRows.rows.map(f=>({target:f.target,targetId:f.target_id,kind:f.kind,expiresAt:f.expires_at?new Date(f.expires_at).toISOString():null}));
   const recordings=retained.filter(recording=>(settings.explicitContent!==false||recording.metadata.explicit!=="explicit")&&!tasteExcluded(recording,feedback));
-  return {...mix,recordings,tracks:recordings,trackCount:recordings.length,
+  return {...mix,recordings,tracks:recordings,coverUrls:playlistArtworkSources(null,recordings.map(recording=>recording.coverUrl)),trackCount:recordings.length,
     playability:mix.status==="ready"&&recordings.length?"resolvable":"unavailable",durationMs:recordings.reduce((s,r)=>s+(r.durationMs||0),0)};
   });
 }
@@ -131,7 +134,7 @@ async function offlineMixesFor(accountId:string,value:unknown,pool:Pick<PoolClie
   const ranked=rankPersonalizedTracks(allowed,{history:evidence,feedback,likedIds:[...favorites] as string[],settings:settings as TasteSettings}),byId=new Map(allowed.map(track=>[track.id,track]));
   const mixes=planOfflineMixes(allowed.map(c=>({...c,liked:favorites.has(c.id)})),{history,explicitContent:settings.explicitContent}).map(mix=>{
     const membership=new Set(mix.recordingIds),ordered=orderPersonalizedTracks(ranked.filter(item=>membership.has(item.track.id)),settings as TasteSettings).map(item=>item.track.id);
-    return {...mix,recordingIds:ordered,coverUrls:ordered.slice(0,4).flatMap(id=>byId.get(id)?.coverUrl?[byId.get(id)!.coverUrl!]:[])};
+    return {...mix,recordingIds:ordered,coverUrls:playlistArtworkSources(null,ordered.map(id=>byId.get(id)?.coverUrl))};
   });
   return {mixes,recordings:allowed,
     constraint:"Only requested canonical recordings; verify local blobs before playback."};

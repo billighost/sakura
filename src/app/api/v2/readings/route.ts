@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
-import { JAPANESE_READING_VERSION, japaneseReadingCacheKey, romanizeJapaneseLines } from "@/rebuild/lyrics/japanese";
+import { createHash } from "node:crypto";
+import { japaneseReadingCacheKey } from "@/rebuild/lyrics/japanese";
 import { LyricRequestError, parseReadingRequest } from "@/rebuild/lyrics/request";
+import { romanizeLyricLines } from "@/rebuild/lyrics/readings";
+import { readingEngine } from "@/rebuild/lyrics/language";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,12 +17,12 @@ export async function POST(request: NextRequest) {
     try { body = JSON.parse(raw); }
     catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
     const input = parseReadingRequest(body);
-    const lines = await romanizeJapaneseLines(input.lines);
+    const lines = await romanizeLyricLines(input.lines, input.language);
     return NextResponse.json({
-      recordingId: input.recordingId || null, language: "ja", engine: JAPANESE_READING_VERSION,
-      contentKey: japaneseReadingCacheKey(input.lines.map((line) => line.text), input.recordingId),
+      recordingId: input.recordingId || null, language: input.language, engine: readingEngine(input.language),
+      contentKey:input.language==="ja"?japaneseReadingCacheKey(input.lines.map(line=>line.text),input.recordingId):createHash("sha256").update(JSON.stringify([input.recordingId,input.language,readingEngine(input.language),input.lines])).digest("hex"),
       lines,
-      quality: { method: "dictionary-assisted", reviewNeeded: lines.some((line) => line.readingReviewNeeded), note: "Unusual names and poetic readings may need review." },
+      quality: { method: input.language==="ja"||input.language==="zh"?"dictionary-assisted":"script-transliteration", reviewNeeded: lines.some((line) => line.readingReviewNeeded), note: "Unusual names and poetic readings may need review." },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof LyricRequestError) return NextResponse.json({ error: error.message }, { status: error.status });

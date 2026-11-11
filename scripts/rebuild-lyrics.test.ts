@@ -372,7 +372,7 @@ test("verified stale lyrics survive provider outages and later empty indexes", a
 });
 
 test("cached readings survive a refresh of identical original lyrics", () => {
-  const originalLyrics: PlayerLyrics = {lines: [{text: "君の声", start: 1, end: 3, romanized: "kimi no koe", readingEngine: JAPANESE_READING_VERSION}], timing: "synced", provider: "lrclib", providerTrackId: 1, schemaVersion: "verified-lyrics-v2", hasJapanese: true};
+  const originalLyrics: PlayerLyrics = {lines: [{text: "君の声", start: 1, end: 3, romanized: "kimi no koe", readingEngine: JAPANESE_READING_VERSION}], timing: "synced", provider: "lrclib", providerTrackId: 1, schemaVersion: "verified-lyrics-v3", hasJapanese: true};
   const fresh = {...originalLyrics, lines: [{text: "君の声", start: 1, end: 3}], provider: "netease"};
   assert.equal(preserveLyricReadings(originalLyrics, fresh).lines[0].romanized, "kimi no koe");
   assert.equal(preserveLyricReadings(originalLyrics, {...fresh, lines: [{text: "君の声", start: 2, end: 3}]}).lines[0].romanized, undefined);

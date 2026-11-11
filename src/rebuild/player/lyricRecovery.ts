@@ -1,4 +1,5 @@
 import type { PlayerLyrics } from "./useLyrics";
+import { readingEngine } from "../lyrics/language";
 import { JAPANESE_READING_VERSION } from "../lyrics/versions";
 
 /** Fresh provider data must not discard an already verified pronunciation guide. */
@@ -10,7 +11,7 @@ export function preserveLyricReadings(previous: PlayerLyrics | undefined, next: 
   })) return next;
   return {...next, lines: next.lines.map((line, index) => {
     const old = previous.lines[index];
-    return line.romanized === undefined && old.readingEngine === JAPANESE_READING_VERSION && typeof old.romanized === "string" ? {...line, romanized: old.romanized, readingEngine: old.readingEngine, readingReviewNeeded: old.readingReviewNeeded} : line;
+    return line.romanized === undefined && old.readingEngine === (next.readingLanguage?readingEngine(next.readingLanguage):JAPANESE_READING_VERSION) && typeof old.romanized === "string" ? {...line, romanized: old.romanized, readingEngine: old.readingEngine, readingReviewNeeded: old.readingReviewNeeded} : line;
   })};
 }
 

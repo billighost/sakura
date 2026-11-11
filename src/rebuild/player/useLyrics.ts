@@ -2,11 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
-import { JAPANESE_READING_VERSION, VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
+import { lyricReadingLanguage, readingEngine, READING_VERSION, type ReadingLanguage } from "../lyrics/language";
+import { VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
 import { readJsonResponse, requestJson, userMessage, UserFacingError } from "../app/errors";
 import { LyricFlights } from "./lyricFlight";
 import { LYRIC_REQUEST_TIMEOUT_MS, lyricRetryAfter, waitForLyrics } from "../lyrics/transport";
 import { lyricRetryDelay, preserveLyricReadings } from "./lyricRecovery";
+import type { AutoSyncEvidence } from "../lyrics/autoSync";
 
 export interface PlayerLyricLine extends TimedLyric { romanized?: string; readingReviewNeeded?: boolean; readingEngine?: string }
 export interface PlayerLyrics {
@@ -17,13 +19,16 @@ export interface PlayerLyrics {
   instrumental?: boolean;
   schemaVersion: string;
   hasJapanese: boolean;
+  readingLanguage?: ReadingLanguage|null;
+  autoSyncEvidence?: AutoSyncEvidence;
 }
 type CacheValue = { key: string; savedAt: number; data: PlayerLyrics };
-type LyricInput = Pick<MusicTrack, "id" | "title" | "artists" | "albumTitle" | "durationMs">;
+type LyricInput = Pick<MusicTrack, "id" | "title" | "artists" | "albumTitle" | "durationMs"> & Partial<Pick<MusicTrack,"artistCredits">> & Partial<Pick<MusicTrack,"versionLabel" | "alternateTitles" | "language">>;
 const memory = new Map<string, CacheValue>();
 const flights = new LyricFlights<PlayerLyrics>();
 const readingFlights = new LyricFlights<PlayerLyrics>();
 const subscribers = new Map<string, Set<(data: PlayerLyrics) => void>>();
+const publicationVersions=new Map<string,number>();
 class LyricLoadError extends UserFacingError {
   constructor(error: UserFacingError, readonly retryAfterMs?: number) {super(error.issue, error.status);}
 }
@@ -85,7 +90,7 @@ async function writeCache(value: CacheValue) {
 }
 export function lyricInputKey(track: LyricInput) {
   const normalize = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
-  return JSON.stringify([VERIFIED_LYRICS_VERSION, JAPANESE_READING_VERSION, normalize(track.title), [...new Set(track.artists.map(normalize))].sort(), normalize(track.albumTitle || ""), Math.round(track.durationMs / 1000)]);
+  return JSON.stringify([VERIFIED_LYRICS_VERSION, READING_VERSION, normalize(track.title), [...new Set([...track.artists,...(track.artistCredits||[]).map(credit=>credit.name)].map(normalize))].sort(), normalize(track.albumTitle || ""), Math.round(track.durationMs / 1000), track.versionLabel,track.language,track.alternateTitles]);
 }
 export function useLyrics(track: MusicTrack | null) {
   const [retryVersion,setRetryVersion]=useState(0);
@@ -95,7 +100,7 @@ export function useLyrics(track: MusicTrack | null) {
   // metadata must keep the same subscription instead of canceling and fetching.
   const input = useMemo<LyricInput | null>(() => {
     if (!key) return null;
-    return { id: track!.id, title: track!.title, artists: [...track!.artists], albumTitle: track!.albumTitle, durationMs: track!.durationMs };
+    return { id: track!.id, title: track!.title, artists: [...new Set([...track!.artists,...(track!.artistCredits||[]).map(credit=>credit.name)])], albumTitle: track!.albumTitle, durationMs: track!.durationMs,versionLabel:track!.versionLabel,alternateTitles:track!.alternateTitles,language:track!.language };
   // The normalized key intentionally keeps this object stable when catalog
   // resolution only replaces a temporary recording ID.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,18 +132,26 @@ export function useLyrics(track: MusicTrack | null) {
       while (!controller.signal.aborted) { try {
         waitingForRetry = false;
         const request = flights.acquire(thisKey, async signal => {
+          const publicationBefore=publicationVersions.get(thisKey)||0;
           const query = new URLSearchParams({ recordingId: input.id, title: input.title });
           for (const artist of input.artists.length ? input.artists : [""]) query.append("artist", artist);
           if (input.durationMs > 0) query.set("duration", String(input.durationMs / 1000));
           if (input.albumTitle) query.set("album", input.albumTitle);
+          if(input.versionLabel)query.set("version",input.versionLabel);
+          for(const title of input.alternateTitles||[])query.append("alternateTitle",title);
+          if(retryVersion)query.set("refresh","1");
           const response = await fetch(`/api/v2/lyrics?${query}`, {credentials: "same-origin", signal: AbortSignal.any([signal, AbortSignal.timeout(LYRIC_REQUEST_TIMEOUT_MS)])});
           let payload: PlayerLyrics;
           try {payload = await readJsonResponse<PlayerLyrics>(response, {context: "lyrics"});}
           catch (error) {throw error instanceof UserFacingError ? new LyricLoadError(error, lyricRetryAfter(response.headers.get("Retry-After"))) : error;}
           if (!validLines(payload.lines) || !["synced", "plain"].includes(payload.timing) || (!payload.instrumental && !payload.lines.some(line => line.text.trim()))) throw new Error("Lyrics provider returned an invalid response.");
           const data: PlayerLyrics = { lines: payload.lines, timing: payload.timing, provider: payload.provider, providerTrackId: payload.providerTrackId, instrumental: payload.instrumental, schemaVersion: payload.schemaVersion,
+            readingLanguage: lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language),
             hasJapanese: payload.lines.some((line: PlayerLyricLine) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) };
           signal.throwIfAborted();
+          // A pre-publication provider request can finish after the upload. It
+          // must never overwrite the freshly read LRCLIB result on this device.
+          if((publicationVersions.get(thisKey)||0)!==publicationBefore&&memory.get(thisKey))return memory.get(thisKey)!.data;
           await writeCache({ key: thisKey, savedAt: Date.now(), data });
           return memory.get(thisKey)!.data;
         });
@@ -161,23 +174,52 @@ export function useLyrics(track: MusicTrack | null) {
     })();
     return () => { controller.abort(); release?.(); window.removeEventListener("online", retryConnection); document.removeEventListener("visibilitychange", retryConnection); };
   }, [key, input, retryVersion]);
-  const getJapaneseReadings = useCallback(async () => {
+  const applyPublishedLyrics=useCallback(async(payload?:PlayerLyrics)=>{
+    if(!input||!key)return;
+    if(!payload){setRetryVersion(version=>version+1);return;}
+    if(!validLines(payload.lines)||payload.schemaVersion!==VERIFIED_LYRICS_VERSION||!payload.lines.some(line=>line.text.trim()))throw new Error("Published lyrics did not match a valid provider response.");
+    const data={...payload,hasJapanese:payload.lines.some(line=>/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)),readingLanguage:lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language)};
+    publicationVersions.set(key,(publicationVersions.get(key)||0)+1);
+    await writeCache({key,savedAt:Date.now(),data});
+  },[input,key]);
+  const setReadingLanguage=useCallback(async(language:ReadingLanguage)=>{
+    if(!key)return;
+    const source=(await readCache(key))?.data;
+    if(!source)return;
+    const lines=source.lines.map(line=>{const {romanized,readingEngine,readingReviewNeeded,...original}=line;void romanized;void readingEngine;void readingReviewNeeded;return original;});
+    await writeCache({key,savedAt:Date.now(),data:{...source,readingLanguage:language,lines}});
+  },[key]);
+  const applyAutoSync=useCallback(async(lines:TimedLyric[],evidence:AutoSyncEvidence)=>{
+    if(!key)return;
+    const source=(await readCache(key))?.data;
+    if(!source||source.timing!=="plain"||!validLines(lines)||lines.length!==source.lines.length||lines.some((line,index)=>line.text!==source.lines[index].text))throw new Error("The sync result no longer matches these plain lyrics.");
+    const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(source.lines.map(line=>line.text))));
+    const sourceContentKey=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,"0")).join("");
+    if(evidence.sourceContentKey!==sourceContentKey||evidence.engine!=="whisper-small-en-v1"||!Number.isFinite(evidence.confidence)||evidence.confidence<0||evidence.confidence>1||!/^[a-f0-9]{64}$/.test(evidence.audioSha256))throw new Error("The sync evidence does not match this recording's lyrics.");
+    // Preserve readings by source line while replacing only verified timing.
+    const updated=lines.map((line,index)=>({...source.lines[index],...line}));
+    publicationVersions.set(key,(publicationVersions.get(key)||0)+1);
+    await writeCache({key,savedAt:Date.now(),data:{...source,lines:updated,timing:"synced",autoSyncEvidence:evidence}});
+  },[key]);
+  const getJapaneseReadings = useCallback(async (requestedLanguage?:ReadingLanguage) => {
     if (!input || !key) return;
     const source = (await readCache(key))?.data;
-    if (!source || source.lines.every(line => !line.text || line.readingEngine === JAPANESE_READING_VERSION && typeof line.romanized === "string")) return;
+    const language=requestedLanguage||source?.readingLanguage||"ja",engine=readingEngine(language);
+    if (!source || source.lines.every(line => !line.text || line.readingEngine === engine && typeof line.romanized === "string")) return;
     // The full lyric content is part of the flight identity, so an edited provider
     // response can never join an older pronunciation request.
     const content = JSON.stringify(source.lines.map(({text, start, end, words}) => ({text, start, end, words})));
-    const request = readingFlights.acquire(key + content, async signal => {
-      const payload = await requestJson<{engine:string;lines:PlayerLyricLine[]}>("/api/v2/readings", { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: input.id, language: "ja", lines: source.lines }) },{context:"lyrics"});
-      if (payload.engine !== JAPANESE_READING_VERSION || !validLines(payload.lines) || payload.lines.length !== source.lines.length || payload.lines.some((line, index) => line.text !== source.lines[index].text || line.start !== source.lines[index].start || line.end !== source.lines[index].end || JSON.stringify(line.words) !== JSON.stringify(source.lines[index].words) || typeof line.romanized !== "string" || line.readingEngine !== JAPANESE_READING_VERSION)) throw new Error("The reading guide did not match these lyrics.");
+    const request = readingFlights.acquire(key + language + content, async signal => {
+      const payload = await requestJson<{engine:string;lines:PlayerLyricLine[]}>("/api/v2/readings", { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: input.id, language, lines: source.lines }) },{context:"lyrics"});
+      if (payload.engine !== engine || !validLines(payload.lines) || payload.lines.length !== source.lines.length || payload.lines.some((line, index) => line.text !== source.lines[index].text || line.start !== source.lines[index].start || line.end !== source.lines[index].end || JSON.stringify(line.words) !== JSON.stringify(source.lines[index].words) || typeof line.romanized !== "string" || line.readingEngine !== engine)) throw new Error("The reading guide did not match these lyrics.");
       const latest = memory.get(key)?.data;
       if (latest && JSON.stringify(latest.lines.map(({text, start, end, words}) => ({text, start, end, words}))) !== content) return latest;
-      const data = {...source, lines: payload.lines};
+      if(latest?.readingLanguage&&latest.readingLanguage!==language)return latest;
+      const data = {...source, readingLanguage:language, lines: payload.lines};
       await writeCache({key, savedAt: Date.now(), data});
       return data;
     });
     try {await request.promise;} finally {request.release();}
   }, [input, key]);
-  return { data: result.key === key ? result.data : null, loading: Boolean(track) && (result.key !== key || result.loading), error: result.key === key ? result.error : null, getJapaneseReadings,retry:()=>setRetryVersion(v=>v+1) };
+  return { data: result.key === key ? result.data : null, loading: Boolean(track) && (result.key !== key || result.loading), error: result.key === key ? result.error : null, getJapaneseReadings,setReadingLanguage,applyPublishedLyrics,applyAutoSync,retry:()=>setRetryVersion(v=>v+1) };
 }
