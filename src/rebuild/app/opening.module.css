@@ -1,0 +1,47 @@
+.opening{--art-width:min(940px,102vw,102dvh);position:fixed;inset:0;z-index:600;display:none;overflow:hidden;align-items:center;justify-content:center;background:var(--ink-bg,#f5f5ee);color:var(--ink-text,#273b34);isolation:isolate;pointer-events:none;animation:openingFade 4.8s linear both}
+.opening[data-active=true],:global(html[data-sakura-opening=pending]) .opening{display:flex}
+.opening::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 50% 38%,color-mix(in srgb,var(--ink-petal,#d5ada8) 6%,transparent),transparent 62%)}
+.drawing{position:absolute;left:50%;top:45%;width:var(--art-width);height:auto;overflow:visible;transform:translate(-50%,-50%)}
+.wash{animation:washAppear 2.8s ease both}
+.tree{transform-box:view-box;transform-origin:50% 88%;animation:treeSway 1.55s ease-in-out 2.8s both}
+.branches>path,.bark>path,.ground>path{stroke-dasharray:100;stroke-dashoffset:100;animation:branchGrow var(--grow-duration,.8s) cubic-bezier(.23,.64,.36,1) var(--grow-delay,0s) both}
+.trunkReveal{stroke-dasharray:100;stroke-dashoffset:100;animation:branchGrow 1.3s cubic-bezier(.23,.64,.36,1) both}
+.branches>path:nth-child(n+8){opacity:.88}
+.branches>path:nth-child(n+29){opacity:.62}
+.bark>path{--grow-delay:1s;--grow-duration:1.3s;opacity:.52}
+.ground{stroke-width:1;opacity:.4}
+.ground>path{--grow-delay:.15s;--grow-duration:1.7s}
+.flower,.bud{transform-box:fill-box;transform-origin:center;animation:flowerBloom .82s cubic-bezier(.18,.72,.25,1) var(--bloom-delay,1s) both}
+.bud{animation-duration:.55s}
+.departing{animation:petalRelease .07s linear var(--flight-delay,3s) both}
+.wind,.flightField{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.wind{opacity:.17}
+.airLine{stroke-width:.65;stroke-dasharray:14 86;stroke-dashoffset:100;animation:windSweep 1.5s cubic-bezier(.3,.6,.4,1) calc(2.7s + var(--air-order)*.06s) both}
+.airLine:nth-child(2n){stroke:var(--ink-petal,#d5ada8);stroke-width:1.3;opacity:.8}
+.flightAnchor{position:absolute;left:calc(50% + var(--source-x)*var(--art-width));top:calc(45% + var(--source-y)*var(--art-width));width:calc(var(--art-width)*var(--petal-scale)*.1);height:calc(var(--art-width)*var(--petal-scale)*.1);transform:translate(-50%,-50%)}
+.airPetal{display:block;width:100%;height:100%;overflow:visible;animation:petalFlight 1.5s cubic-bezier(.22,.5,.35,1) var(--flight-delay) both;will-change:transform,opacity}
+.pollen{position:absolute;left:var(--pollen-x);top:var(--pollen-y);width:2px;height:2px;border-radius:50%;background:var(--ink-petal,#d5ada8);animation:pollenFlight 1.65s ease-out calc(2.7s + var(--pollen-order)*.025s) both}
+.wordmark{position:absolute;left:0;right:0;top:calc(45% + var(--art-width)*.32);text-align:center;font:clamp(43px,6vw,62px) var(--font-fraunces),Georgia,serif;line-height:1.15;letter-spacing:-.055em;animation:wordmarkAppear 1s ease 1.1s both}
+.caption,.tagline{display:block;font:9px var(--font-inter),Arial,sans-serif;letter-spacing:.19em;color:var(--ink-muted,#6c756b);line-height:1.5}
+.caption{font-size:8px;letter-spacing:.24em;margin-bottom:12px}
+.tagline{font-size:10px;letter-spacing:.04em;margin-top:12px}
+.skip{position:absolute;right:max(23px,env(safe-area-inset-right));top:max(22px,env(safe-area-inset-top));padding:9px 16px;border:1px solid var(--ink-line,#dbe0d5);border-radius:999px;background:transparent;color:var(--ink-muted,#6c756b);font:11px var(--font-inter),Arial,sans-serif;pointer-events:auto;cursor:pointer;transition:background .2s,color .2s}
+.skip:hover{background:var(--ink-text,#273b34);color:var(--ink-bg,#f5f5ee)}
+.skip:focus-visible{outline:2px solid var(--ink-accent,#446b57);outline-offset:4px}
+@keyframes branchGrow{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes washAppear{from{opacity:0;transform:scale(.92);transform-origin:center}to{opacity:1;transform:scale(1);transform-origin:center}}
+@keyframes flowerBloom{0%{opacity:0;transform:rotate(-13deg) scale(.06)}24%{opacity:.6;transform:rotate(-7deg) scale(.25)}70%{opacity:1;transform:rotate(2deg) scale(1.025)}100%{opacity:1;transform:rotate(0) scale(1)}}
+@keyframes petalRelease{from{opacity:1}to{opacity:0}}
+@keyframes treeSway{0%{transform:rotate(0)}35%{transform:rotate(-.35deg)}70%{transform:rotate(.85deg)}100%{transform:rotate(.15deg)}}
+@keyframes windSweep{0%{stroke-dashoffset:100;opacity:0}18%{opacity:.7}68%{opacity:1}100%{stroke-dashoffset:-55;opacity:0}}
+@keyframes petalFlight{0%{opacity:0;transform:translate3d(0,0,0) rotate(0)}4%{opacity:1}20%{transform:translate3d(5vw,calc(var(--lift)*.4),0) rotate(32deg)}52%{opacity:.95;transform:translate3d(32vw,var(--lift),0) rotate(calc(var(--turn)*.65)) scale(.95)}78%{opacity:.75;transform:translate3d(70vw,calc(var(--lift)*.45),0) rotate(var(--turn)) scale(.8)}100%{opacity:0;transform:translate3d(112vw,calc(var(--lift)*1.6),0) rotate(calc(var(--turn)*1.4)) scale(.55)}}
+@keyframes pollenFlight{0%{opacity:0;transform:translate(0,0)}20%{opacity:.42}100%{opacity:0;transform:translate(70vw,-12vh)}}
+@keyframes wordmarkAppear{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes openingFade{0%,89%{opacity:1}100%{opacity:0}}
+.opening[data-opening-gentle]{animation:none}
+.opening[data-opening-gentle] *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}
+.opening[data-opening-gentle] .departing{opacity:1}
+.opening[data-opening-gentle] .wind,.opening[data-opening-gentle] .flightField{display:none}
+@media(max-width:550px){.opening{--art-width:min(116vw,95dvh)}.drawing{top:44%}.flightAnchor{top:calc(44% + var(--source-y)*var(--art-width))}.wordmark{top:calc(44% + var(--art-width)*.34)}.caption{font-size:7px;margin-bottom:10px}.tagline{font-size:9px}}
+@media(max-height:570px) and (min-width:551px){.opening{--art-width:85dvh}.drawing{top:40%}.flightAnchor{top:calc(40% + var(--source-y)*var(--art-width))}.wordmark{top:calc(40% + var(--art-width)*.32);font-size:37px}.caption{font-size:7px;margin-bottom:6px}.tagline{font-size:9px;margin-top:6px}}
+@media(prefers-reduced-motion:reduce){.opening,.opening *{animation:none!important;transition:none!important;stroke-dashoffset:0!important}.departing{opacity:1}.wind,.flightField{display:none}}

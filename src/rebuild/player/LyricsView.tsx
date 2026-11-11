@@ -85,6 +85,8 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
       <button type="button" aria-pressed={selecting} onClick={toggleSelection}>{selecting ? "Done selecting" : "Select lines"}</button>
       {readingGuide.language && <button type="button" aria-label={readingGuide.label} aria-pressed={reading} aria-busy={readingGuide.busy} title="Transliteration keeps the original lyrics. Names and pronunciations may need review." onClick={readingGuide.toggle}>{readingGuide.busy ? "Preparing readings…" : readingGuide.label}</button>}
       <button type="button" onClick={share}>Share {selected.length ? `${selected.length} lines` : "lyrics"}</button>
+      {music.track && data?.timing === "plain" && <LyricsUpload track={music.track} initialLyrics={data} sync onPublished={lyrics.applyPublishedLyrics}/>}
+      {data?.timing === "plain" && <button type="button" disabled={lyrics.loading} onClick={lyrics.retry}>Check for updates</button>}
       {music.track && data?.timing === "plain" && <AutoSyncButton key={`${music.account?.id}:${lyricInputKey(music.track)}`} track={music.track} lyrics={data} onSynced={lyrics.applyAutoSync}/>}
     </div>}
     {readingGuide.language && hasWords && <ReadingLanguageChoice guide={readingGuide}/>}
@@ -111,6 +113,7 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
           </button>)}
       </div>
       <p className={s.hint}>Lyrics: {data.provider}. {data.autoSyncEvidence ? "Timing matched to this audio by auto sync. " : ""}{reading ? "Transliteration keeps the original words. Names, polyphonic characters and poetic pronunciations may need review." : ""}</p>
+      {music.track && <LyricsUpload track={music.track} initialLyrics={data} onPublished={lyrics.applyPublishedLyrics}/>}
     </>}
     <div className={s.lyricsControls} ref={controlsRef} data-lyrics-controls>
       <div className={s.lyricsProgress}><PlaybackRibbon compact positionMs={music.positionMs} durationMs={duration} label="Playback position in lyrics" disabled={!music.track || music.status === "resolving"} onSeek={position => { music.seek(position); if (!selecting) resume(); }}/></div>

@@ -24,6 +24,12 @@
   },
   "icons": [
     {
+      "src": "/icons/ink.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
       "src": "/icons/ink-192.png",
       "sizes": "192x192",
       "type": "image/png",
@@ -88,6 +94,33 @@
           "type": "image/png"
         }
       ]
+    },
+    {
+      "name": "Discover music",
+      "short_name": "Discover",
+      "description": "Find your next favorite",
+      "url": "/discover",
+      "icons": [
+        {
+          "src": "/icons/ink-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Sakura Bloom",
+      "short_name": "Bloom",
+      "description": "Your listening, in bloom",
+      "url": "/bloom",
+      "icons": [
+        {
+          "src": "/icons/ink-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }

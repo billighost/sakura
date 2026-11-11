@@ -75,4 +75,15 @@
 .actions>button,.cards .actions>button{min-width:44px;min-height:44px}
 @media(max-width:700px){.cover>.art,.cover>.play,.compact .cover>.art,.compact .cover>.play{width:44px;height:44px}.info>a:first-child{font-size:13px}.artists{font-size:10px}.details{font-size:9px}.cards .actions{grid-column:1/-1;justify-self:stretch;justify-content:flex-end}.cards .length{grid-column:1/-1;font-size:10px;margin-top:-2px}.cards .info>a:first-child{font-size:19px}.cards .artists{font-size:10px}.cards .details{font-size:9px}.cards .row{gap:8px}.compact .info>a:first-child{font-size:12px}.compact .artists{font-size:10px}}
 @media(max-width:380px){.cards .info>a:first-child{font-size:18px}.cards .row{padding:9px}.row{gap:8px}.cards .actions{justify-content:space-between}.cards .actions>button{flex:0 0 44px}.cards{grid-template-columns:minmax(0,1fr)}}
-.inlineAlbum{display:none;font-size:10px;color:var(--ink-muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inlineAlbum:hover,.album:hover{text-decoration:underline;color:var(--ink-accent)}.inlineAlbum:focus-visible,.album:focus-visible{outline:2px solid var(--ink-accent);outline-offset:3px}.cards .inlineAlbum{display:block}@media(max-width:850px){.inlineAlbum{display:block}}
+.credits{display:flex;align-items:baseline;gap:0;max-width:100%;width:100%;min-width:0;line-height:1.5}
+.credits .artists{flex:0 1 auto;min-width:0;max-width:100%}
+.inlineAlbum{display:none;align-items:baseline;gap:6px;min-width:0;overflow:hidden;font-size:10px;color:var(--ink-muted);white-space:nowrap;opacity:.8}
+.inlineAlbum>a,.inlineAlbum>span:last-child{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;color:inherit}
+.creditDot{flex-shrink:0;padding-left:6px;opacity:.5}
+.inlineAlbum>a:hover,.album:hover{text-decoration:underline;text-underline-offset:3px;color:var(--ink-accent)}
+.inlineAlbum>a:focus-visible,.album:focus-visible{outline:2px solid var(--ink-accent);outline-offset:3px}
+.details:empty{display:none}
+.cards .inlineAlbum{display:flex}
+.cards .credits .artists:has(+.inlineAlbum){max-width:55%}
+@media(max-width:850px){.inlineAlbum{display:flex;flex:1}.credits .artists:has(+.inlineAlbum){max-width:55%;flex-shrink:1}}
+@media(max-width:700px){.credits{line-height:1.55}.inlineAlbum{font-size:10px;gap:5px}.creditDot{padding-left:5px}.info{gap:3px}.details{gap:5px;font-size:8px;line-height:1.4}.details>time{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.version{max-width:100%}.row{min-height:76px}.cards .credits{flex-wrap:wrap;gap:1px}.cards .credits .artists:has(+.inlineAlbum){max-width:100%}.cards .inlineAlbum{flex-basis:100%;font-size:10px}.cards .creditDot{display:none}.compact .credits{line-height:1.5}.compact .inlineAlbum{font-size:9px}.compact .row{min-height:65px}}

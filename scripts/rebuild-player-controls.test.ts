@@ -20,13 +20,20 @@ test("player toggles expose pressed state and the repeat-one mark",()=>{
  assert.match(fullPlayer,/active=\{liked\}/);
 });
 
-test("mobile download activity combines the bloom with pause and resume",()=>{
+test("download activity keeps one accessible bloom control for pause, resume and retry on every screen",()=>{
  const room=readFileSync(new URL("../src/rebuild/app/DownloadsRoom.tsx",import.meta.url),"utf8");
  const styles=readFileSync(new URL("../src/rebuild/app/downloads-room.module.css",import.meta.url),"utf8");
- assert.match(room,/className=\{s\.mobileDownloadToggle\}/);
- assert.match(room,/<DownloadFlower percent=\{percent\} active=\{active\}\/?>/);
- assert.match(room,/name=\{paused\?"play":"pause"\}/);
- assert.match(styles,/@media\(max-width:700px\)[\s\S]*\.mobileDownloadToggle\{[^}]*display:grid/);
+ const control=room.match(/<button type="button" className=\{s\.transferControl\}[\s\S]*?<\/button>/)?.[0];
+ assert.ok(control,"The progress flower and playback toggle share one button");
+ assert.match(control,/aria-label=\{controlLabel\}/);
+ assert.match(control,/<DownloadFlower percent=\{percent\} active=\{active\}\/>/);
+ assert.match(control,/name=\{canRetry\?"repeat":paused\?"play":"pause"\}/);
+ assert.match(control,/onClick=\{canRetry\?\(\)=>p\.requestDownload\(job\.track\):toggle\}/);
+ assert.match(room,/toggle=\(\)=>paused\?p\.resumeDownload\(job\.recordingId\):p\.pauseDownload\(job\.recordingId\)/);
+ assert.match(room,/toggleLabel=\(paused\?"Resume ":"Pause "\)/);
+ assert.doesNotMatch(room,/mobileDownloadToggle|desktopDownloadToggle/);
+ assert.match(styles,/\.transferControl,\.transferEmblem\{[^}]*display:grid[^}]*width:48px;height:48px/);
+ assert.match(styles,/@media\(max-width:700px\)[\s\S]*\.jobTransfer\{[^}]*grid-column:1\/-1/);
 });
 
 test("active player controls have a visible botanical pressed treatment",()=>{

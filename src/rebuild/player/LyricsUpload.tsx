@@ -1,36 +1,91 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { useMusic } from "../app/MusicContext";
-import { requestJson, userMessage } from "../app/errors";
+import {useEffect,useMemo,useRef,useState} from "react";
+import {useMusic} from "../app/MusicContext";
+import {Blossom} from "../app/Brand";
+import {PlaybackRibbon} from "../app/ListeningControls";
 import type {MusicTrack} from "../app/types";
-import s from "./player.module.css";
-import type {PlayerLyrics} from "./useLyrics";
+import {publishLyricSubmission} from "./lyricPublish";
+import {Artwork,IconButton,PlayerDialog,PlayerIcon,formatPlaybackTime} from "./Primitives";
+import {lyricInputKey,type PlayerLyrics} from "./useLyrics";
+import {lyricMoment} from "./lyricFollow";
+import {lyricStudioError,lyricStudioLines,lrcTimestamp,readStudioDraft,stampStudioLine,studioPreview,timedStudioText,type LyricFormat} from "./lyricStudio";
+import s from "./lyrics-studio.module.css";
 
-export function LyricsUpload({track,onPublished}:{track:MusicTrack;onPublished:(lyrics?:PlayerLyrics)=>Promise<void>}) {
-  const music=useMusic(),[open,setOpen]=useState(false),[text,setText]=useState(""),[format,setFormat]=useState("plain"),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
-  const pending=useRef(false);
-  const controller=useRef<AbortController|null>(null);
-  useEffect(()=>()=>controller.current?.abort(),[track.id,music.account?.id]);
-  async function submit(event:React.FormEvent){
-    event.preventDefault();if(pending.current)return;pending.current=true;setBusy(true);setMessage("");
-    const owner=music.account?.id;
-    const operation=new AbortController();controller.current=operation;
-    try{
-      const canonical=await music.ensureRecording(track);
-      if(operation.signal.aborted)return;
-      const result=await requestJson<{published:boolean;lyrics?:PlayerLyrics}>("/api/v2/lyrics/publish",{method:"POST",signal:operation.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({recordingId:canonical.id,text,format})},{context:"save",accountId:owner,timeoutMs:60000});
-      if(operation.signal.aborted)return;
-      setOpen(false);setMessage("Published to LRCLIB. Fetching your lyrics…");await onPublished(result.lyrics);
-    }catch(error){if(!operation.signal.aborted)setMessage(userMessage(error,"save"));}
-    finally{pending.current=false;if(!operation.signal.aborted)setBusy(false);}
-  }
-  return <div className={s.lyricsUpload} data-playback-shortcuts="off">
-    {!open?<button type="button" onClick={()=>setOpen(true)}>Missing lyrics? Upload them</button>:<form onSubmit={submit}>
-      <p>Publish lyrics for <strong>{track.title}</strong> by {track.artists.join(", ")} to LRCLIB’s public database.</p>
-      <label>Lyrics format<select value={format} onChange={event=>setFormat(event.target.value)} disabled={busy}><option value="plain">Plain text</option><option value="lrc">Synced LRC</option></select></label>
-      <label>Lyrics<textarea value={text} onChange={event=>setText(event.target.value)} maxLength={20000} rows={8} required disabled={busy}/></label>
-      <label className={s.lyricsFile}>Choose a .txt or .lrc file<input type="file" accept=".txt,.lrc,text/plain" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file){if(file.size>80000){setMessage("Choose a lyric file under 80 KB.");return;}void file.text().then(value=>{setText(value);setFormat(file.name.toLowerCase().endsWith(".lrc")?"lrc":"plain");});}}}/></label>
-      <button type="submit" disabled={busy||!text.trim()}>{busy?"Publishing…":"Publish lyrics"}</button><button type="button" disabled={busy} onClick={()=>setOpen(false)}>Cancel</button>
-    </form>}{message&&<p role="status">{message}</p>}
-  </div>;
+type Props={track:MusicTrack;onPublished:(lyrics?:PlayerLyrics)=>Promise<void>;initialLyrics?:PlayerLyrics;sync?:boolean};
+function timingEvent(active:boolean,recordingId:string,entryId:string|null){window.dispatchEvent(new CustomEvent("sakura-lyric-timing",{detail:{active,recordingId,entryId}}));}
+export function LyricsUpload(props:Props){
+ const music=useMusic(),[open,setOpen]=useState(false);
+ const draftKey=`sakura-lyric-studio:${music.account?.id||"guest"}:${lyricInputKey(props.track)}`;
+ function launch(){if(props.sync){timingEvent(true,music.effectiveId(props.track),music.currentEntryId);music.seek(0);music.play(props.track);}setOpen(true);}
+ return <span className={s.launch} data-playback-shortcuts="off"><button type="button" onClick={launch}>{props.sync?"Sync lyrics":props.initialLyrics?"Edit & publish lyrics":"Missing lyrics? Add the words"}</button>{open&&<LyricsStudio key={draftKey} {...props} draftKey={draftKey} onClose={()=>setOpen(false)}/>}</span>;
+}
+function LyricsStudio({track,onPublished,initialLyrics,sync,draftKey,onClose}:Props&{draftKey:string;onClose:()=>void}){
+ const music=useMusic(),initialText=initialLyrics?.timing==="synced"?initialLyrics.lines.map(line=>`${lrcTimestamp(line.start)}${line.text}`).join("\n"):initialLyrics?.lines.map(line=>line.text).join("\n")||"";
+ const [draft]=useState(()=>readStudioDraft(draftKey)),initialWords=lyricStudioLines(draft?.text||initialText,draft?.format||"plain");
+ const [text,setText]=useState(draft?.text||initialText),[format,setFormat]=useState<LyricFormat>(draft?.format||(initialLyrics?.timing==="synced"?"lrc":"plain"));
+ const [lines,setLines]=useState<string[]>(sync?initialWords:draft?.lines||[]),[times,setTimes]=useState<(number|null)[]>(sync?initialWords.map(()=>null):draft?.times||[]);
+ const [stage,setStage]=useState<"edit"|"timing"|"review">(sync?"timing":"edit"),[preview,setPreview]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[progress,setProgress]=useState("");
+ const [storageFailed,setStorageFailed]=useState(false),[published,setPublished]=useState(false);
+ const operation=useRef<AbortController|null>(null),mounted=useRef(true),lineRefs=useRef<(HTMLButtonElement|null)[]>([]);
+ const identity=lyricInputKey(track),sameTrack=Boolean(music.track&&(music.effectiveId(music.track)===music.effectiveId(track)||lyricInputKey(music.track)===identity)),duration=track.durationMs||(sameTrack?music.durationMs:0),position=sameTrack?music.positionMs:0;
+ const next=times.findIndex(time=>time===null),captured=times.filter(time=>time!==null).length,timedText=timedStudioText(lines,times),captureReview=stage==="review"&&lines.length>0;
+ const submission=captureReview?timedText:text,submissionFormat=captureReview?"lrc":format;
+ const validation=lyricStudioError(submission,submissionFormat,duration)||(captureReview&&captured<lines.length?`Time the remaining ${lines.length-captured} ${lines.length-captured===1?"line":"lines"} before publishing.`:undefined);
+ const previewLines=useMemo(()=>studioPreview(submission,submissionFormat),[submission,submissionFormat]);
+ const moment=submissionFormat==="lrc"?lyricMoment(previewLines,position/1000):{index:-1};
+ useEffect(()=>{if(published)return;let active=true;try{localStorage.setItem(draftKey,JSON.stringify({text,format,lines,times,savedAt:Date.now()}));}catch{queueMicrotask(()=>{if(active)setStorageFailed(true);});}return()=>{active=false;};},[draftKey,text,format,lines,times,published]);
+ useEffect(()=>{mounted.current=true;if(sync)timingEvent(true,music.effectiveId(track),music.currentEntryId);return()=>{mounted.current=false;operation.current?.abort();timingEvent(false,music.effectiveId(track),null);};
+ // The studio keeps the selected recording through canonical ID resolution.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
+ useEffect(()=>{if(stage!=="timing")return;function finished(event:Event){const detail=(event as CustomEvent<{recordingId?:string}>).detail;if(detail?.recordingId&&detail.recordingId!==music.effectiveId(track))return;timingEvent(false,music.effectiveId(track),null);setStage("review");setPreview(true);setMessage("The song has finished. Review your timing, then publish when it feels right.");}window.addEventListener("sakura-lyric-timing-ended",finished);return()=>window.removeEventListener("sakura-lyric-timing-ended",finished);},[stage,music,track]);
+ useEffect(()=>{if(stage==="timing"&&sameTrack&&next>=0)lineRefs.current[next]?.scrollIntoView({block:"nearest",behavior:music.settings.reducedMotion?"instant":"smooth"});},[stage,sameTrack,next,music.settings.reducedMotion]);
+ function leaveTiming(){timingEvent(false,music.effectiveId(track),null);}
+ function startTiming(continueDraft=false){const words=continueDraft&&lines.length?lines:lyricStudioLines(text,format);if(!words.length){setMessage("Add the original words before starting tap timing.");return;}if(words.length>400||text.length>20000){setMessage("Keep lyrics under 400 lines and 20,000 characters.");return;}setLines(words);if(!continueDraft)setTimes(words.map(()=>null));timingEvent(true,music.effectiveId(track),music.currentEntryId);if(sameTrack)music.seek(continueDraft?Math.max(0,(times[Math.max(0,captured-1)]||0)*1000-1500):0);music.play(track);setStage("timing");setMessage("");}
+ function tap(index:number){if(!sameTrack||music.status!=="playing"){setMessage("Play this song, then tap the next line as its words begin.");return;}const clock=music.getPlaybackPosition?.()??music.positionMs;const stamped=stampStudioLine(times,index,clock);if(!stamped){setMessage("Tap lines in order. If you moved back in the song, undo the last timing first.");return;}setTimes(stamped);setMessage("");}
+ function undo(){const last=times.findLastIndex(time=>time!==null);if(last<0)return;setTimes(times.map((time,index)=>index>=last?null:time));if(sameTrack)music.seek(Math.max(0,(times[last]||0)*1000-1500));setMessage("");}
+ function review(){leaveTiming();setStage("review");setPreview(true);setMessage("");}
+ function edit(){leaveTiming();if(lines.length&&captured===lines.length){setText(timedText);setFormat("lrc");setLines([]);setTimes([]);}setStage("edit");setMessage("");}
+ function restartPreview(){leaveTiming();if(sameTrack)music.seek(0);music.play(track);}
+ function saveCopy(){const synced=captureReview&&captured===lines.length||!captureReview&&format==="lrc";const content=captureReview?(synced?timedText:lines.join("\n")):text;const url=URL.createObjectURL(new Blob([content],{type:"text/plain;charset=utf-8"})),link=document.createElement("a");link.href=url;link.download=`${track.title.replace(/[<>:"/\\|?*]/g,"_").slice(0,100)||"Sakura lyrics"}.${synced?"lrc":"txt"}`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+ function previewFrom(start:number){if(stage==="timing")return;if(sameTrack){music.seek(start*1000);if(["paused","idle","error"].includes(music.status))music.play(track);}else{music.play(track);setMessage("This song is starting. Tap the preview line again when playback begins.");}}
+ async function importFile(file:File){if(file.size>80000){setMessage("Choose a lyric file under 80 KB.");return;}try{const value=await file.text();if(!mounted.current)return;if(value.length>20000){setMessage("Keep lyrics under 20,000 characters.");return;}setText(value);setFormat(file.name.toLowerCase().endsWith(".lrc")?"lrc":"plain");setLines([]);setTimes([]);setMessage("");}catch{if(mounted.current)setMessage("This file could not be read. Try another .txt or .lrc file.");}}
+ async function publish(){if(operation.current||published)return;if(validation){setMessage(validation);return;}if(!music.account){setMessage("Sign in to publish these lyrics. Your draft stays on this device.");return;}if(music.offline){setMessage("Your draft is saved here. Reconnect to publish it to LRCLIB.");return;}const request=new AbortController();operation.current=request;setBusy(true);setMessage("");let accepted=false;
+  try{const canonical=await music.ensureRecording(track);request.signal.throwIfAborted();if(!canonical.albumTitle?.trim()||!canonical.durationMs)throw new Error("This song needs a verified album and duration before it can be published. Your draft is kept.");const reply=await publishLyricSubmission(canonical.id,submission,submissionFormat,{accountId:music.account.id,signal:request.signal,onProgress:value=>{if(mounted.current)setProgress(value.message);}});if(request.signal.aborted||!mounted.current)return;if(!reply.published)throw new Error("Publishing could not be confirmed. Your draft has been kept.");accepted=true;setPublished(true);setMessage("Published to LRCLIB. These words now have a home.");try{localStorage.removeItem(draftKey);}catch{}await onPublished(reply.lyrics);if(mounted.current)onClose();}
+  catch(error){if(mounted.current&&!request.signal.aborted)setMessage(accepted?"Your lyrics were published. Close the studio and refresh the words to see them.":error instanceof Error?error.message:"Publishing could not finish. Your draft has been kept.");}
+  finally{if(operation.current===request)operation.current=null;if(mounted.current){setBusy(false);setProgress("");}}
+ }
+ return <PlayerDialog title={stage==="timing"?"Let the words meet the music.":"A place for every word."} subtitle="THE LYRIC STUDIO" headerDetail={track.title} appearance="note" fullscreen wide onClose={onClose} className={s.dialog}>
+  <div className={s.studio} data-playback-shortcuts="off" data-lyric-studio>
+   <div className={s.topline}><span><Blossom/><i>put a little care into the words</i></span><button type="button" className={s.previewToggle} aria-expanded={preview} aria-controls="sakura-lyric-preview" onClick={()=>setPreview(value=>!value)}><PlayerIcon name="lyrics" size={17}/>{preview?"Close preview":"Open preview"}</button></div>
+   <div className={s.workspace} data-preview={preview||undefined}>
+    <section className={s.manuscript} aria-label="Lyric manuscript">
+     <div className={s.song}><Artwork url={track.coverUrl} title={track.title}/><div><small>THE WORDS BELONG TO</small><h3>{track.title}</h3><p>{track.artists.join(" · ")}</p><span>{track.albumTitle||"Album details will be checked before publishing"} · {formatPlaybackTime(duration)}</span></div></div>
+     <ol className={s.steps} aria-label="Lyric preparation"><li data-active={stage==="edit"||undefined}><span>01</span> The words</li><li data-active={stage==="timing"||undefined}><span>02</span> Their timing</li><li data-active={stage==="review"||undefined}><span>03</span> A final listen</li></ol>
+     {stage==="edit"?<>
+      <div className={s.editorHeading}><div><h4>Your lyric manuscript</h4><p>Paste the words, or bring a .txt or .lrc file.</p></div><label className={s.file}><PlayerIcon name="download" size={17}/><span>Bring a file</span><input type="file" accept=".txt,.lrc,text/plain" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void importFile(file);event.currentTarget.value="";}}/></label></div>
+      <div className={s.formats} role="group" aria-label="Lyrics format"><button type="button" aria-pressed={format==="plain"} onClick={()=>{if(format==="lrc")setText(lyricStudioLines(text,format).join("\n"));setFormat("plain");}} disabled={busy}>Original words <small>Plain text</small></button><button type="button" aria-pressed={format==="lrc"} onClick={()=>setFormat("lrc")} disabled={busy}>Words in time <small>Synced LRC</small></button></div>
+      <label className={s.editor}><span className={s.srOnly}>Lyrics text</span><textarea aria-label="Lyrics text" value={text} maxLength={20000} disabled={busy} spellCheck={false} placeholder={format==="plain"?"The first line of a song…\n\nGive every line room to breathe.":"[00:12.50]The first line of a song…\n[00:18.20]And the words that follow."} onChange={event=>{setText(event.target.value);setMessage("");}}/><span>{text.length.toLocaleString()} / 20,000 characters · {text.trim()?text.split(/\r?\n/).length:0} lines</span></label>
+      <div className={s.timingInvitation}><Blossom/><div><h4>Give the words their moment.</h4><p>Restart the song and tap each line as it begins. Sakura turns your taps into synced lyrics.</p></div><button type="button" onClick={()=>startTiming()} disabled={busy||!lyricStudioLines(text,format).length}>Start tap timing <PlayerIcon name="play" size={15}/></button></div>
+      {lines.length>0&&captured>0&&<button type="button" className={s.quietButton} onClick={()=>startTiming(true)}>Continue your saved timing · {captured} of {lines.length} lines</button>}
+     </>:stage==="timing"?<>
+      <div className={s.captureHeading}><div><h4>Tap the line when its words begin.</h4><p>{captured===lines.length?"Every line has a moment. Listen through, or review your timing now.":`${captured} of ${lines.length} lines timed. The next line is waiting for your tap.`}</p></div><button type="button" className={s.quietButton} onClick={undo} disabled={!captured}>Undo last tap</button></div>
+      {!sameTrack&&<p className={s.warning}>You changed songs. <button type="button" onClick={()=>startTiming(true)}>Return to this song</button> to continue timing it.</p>}
+      <div className={s.captureLines}>{lines.map((line,index)=><button ref={element=>{lineRefs.current[index]=element;}} type="button" key={index} data-next={index===next||undefined} data-stamped={times[index]!==null||undefined} disabled={index!==next} aria-label={`Time line ${index+1}: ${line}`} onClick={()=>tap(index)}><span>{times[index]===null?String(index+1).padStart(2,"0"):lrcTimestamp(times[index]!)}</span><b>{line}</b><i aria-hidden="true">{index===next?"tap":times[index]!==null?"✓":"·"}</i></button>)}</div>
+      <div className={s.captureActions}><button type="button" className={s.quietButton} onClick={()=>startTiming()}>Start again</button><button type="button" className={s.primaryButton} onClick={review}>Review timing <PlayerIcon name="next" size={15}/></button></div>
+     </>:<>
+      <div className={s.captureHeading}><div><h4>A final listen, a little polish.</h4><p>Adjust a line’s starting time, then listen in the preview.</p></div><button type="button" className={s.quietButton} onClick={edit}>Edit the manuscript</button></div>
+      <div className={s.reviewLines}>{lines.map((line,index)=><label key={index}><span>{String(index+1).padStart(2,"0")}</span><b>{line}</b><div><input type="number" min={index&&times[index-1]!==null?times[index-1]!:0} max={times[index+1]??duration/1000} step={.01} aria-label={`Start time for line ${index+1}`} value={times[index]??""} placeholder="—" onChange={event=>{const value=event.target.value===""?null:Number(event.target.value);if(value!==null&&(!Number.isFinite(value)||value<0||value>duration/1000||index>0&&times[index-1]!==null&&value<times[index-1]!||times[index+1]!==undefined&&times[index+1]!==null&&value>times[index+1]!))return;setTimes(times.map((time,at)=>at===index?value:time));}}/><small>seconds</small></div></label>)}</div>
+      {captured<lines.length&&<button type="button" className={s.quietButton} onClick={()=>startTiming(true)}>Continue tap timing</button>}
+     </>}
+    </section>
+    {preview&&<aside id="sakura-lyric-preview" className={s.preview} aria-label="Lyric playback preview"><div className={s.previewHead}><span>THE LISTENING WINDOW</span><Blossom/></div><h4>Hear how it feels.</h4><p>{submissionFormat==="lrc"?"Tap a line to listen from its moment.":"Original words, waiting for their music."}</p><button type="button" className={s.previewPlay} onClick={restartPreview} disabled={stage==="timing"}><PlayerIcon name="play" size={15}/>Restart song & preview</button><div className={s.previewLines}>{previewLines.length?previewLines.map((line,index)=><button type="button" key={index} aria-current={moment.index===index&&sameTrack?"true":undefined} disabled={submissionFormat==="plain"||stage==="timing"} onClick={()=>previewFrom(line.start)}><small>{submissionFormat==="lrc"?formatPlaybackTime(line.start*1000):String(index+1).padStart(2,"0")}</small><span>{line.text||"A little music between the words."}</span></button>):<div className={s.previewEmpty}><Blossom/><span>Your words will find their place here.</span></div>}</div></aside>}
+   </div>
+   <div className={s.footer}>
+    {(message||storageFailed||progress)&&<p className={s.status} role="status">{progress||message||"Browser storage is unavailable. Keep a copy of your text before closing."}</p>}
+    <div className={s.transport}><IconButton icon={sameTrack&&music.status==="playing"?"pause":"play"} label={sameTrack&&music.status==="playing"?"Pause studio song":"Play studio song"} onClick={()=>sameTrack?music.togglePlay():music.play(track)}/><PlaybackRibbon compact positionMs={position} durationMs={duration} disabled={!sameTrack} label="Lyric studio playback position" onSeek={music.seek}/>{stage==="timing"&&next>=0&&<button type="button" className={s.tapButton} onClick={()=>tap(next)} disabled={!sameTrack||music.status!=="playing"}>Time next line <span>{next+1}</span></button>}</div>
+    <div className={s.publishRow}><p><Blossom/><span>{busy?"Preparing your contribution. Your draft stays safe here.":published?"These words are now shared with LRCLIB.":"Your draft is kept on this device. Publishing shares it with LRCLIB’s public lyric library."}</span></p>{stage!=="timing"&&<button type="button" className={s.quietButton} onClick={saveCopy} disabled={!submission.trim()}>Save a copy</button>}{stage!=="timing"&&<button type="button" className={s.primaryButton} onClick={()=>void publish()} disabled={busy||published||!submission.trim()}>{busy?"Preparing publication…":"Publish to LRCLIB"}<PlayerIcon name="share" size={17}/></button>}{busy&&<button type="button" className={s.quietButton} onClick={()=>{operation.current?.abort();setBusy(false);setProgress("");setMessage("Publishing cancelled. Your draft has been kept.");}}>Cancel publication</button>}</div>
+   </div>
+  </div>
+ </PlayerDialog>;
 }

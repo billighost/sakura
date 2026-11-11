@@ -211,7 +211,7 @@ test("Concurrent identical lyric loads share one request and reuse the verified 
   assert.equal(loads, 1);
 });
 
-test("Missing lyrics retry after a short TTL while provider outages are never cached", async () => {
+test("Missing lyrics retry after seven days while provider outages are never cached", async () => {
   let clock = 0;
   let loads = 0;
   const resolver = createLyricsResolver({ now: () => clock, load: async () => { loads++; return { status: "missing", reason: "missing" }; } });
@@ -220,6 +220,9 @@ test("Missing lyrics retry after a short TTL while provider outages are never ca
   await resolver(identity);
   assert.equal(loads, 1);
   clock = 30_001;
+  await resolver(identity);
+  assert.equal(loads, 1);
+  clock = 7*24*60*60*1000;
   await resolver(identity);
   assert.equal(loads, 2);
   let outages = 0;
@@ -367,7 +370,7 @@ test("verified stale lyrics survive provider outages and later empty indexes", a
   const identity = {title: "Finesse", artist: "Bruno Mars", durationSeconds: 191};
   const verified = await resolver(identity);
   clock = 31 * 24 * 60 * 60 * 1000;
-  assert.deepEqual(await resolver(identity), verified);
+  assert.deepEqual(await resolver(identity,true), verified);
   assert.equal(calls, 2);
 });
 

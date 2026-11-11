@@ -11,7 +11,9 @@ import { Icon, type IconName } from "./Icon";
 import { SongGesture } from "./SongGesture";
 import { SmartQueueButton } from "./SmartQueueButton";
 import { RecoveryNotice } from "./RecoveryNotice";
-import { requestJson } from "./errors";
+import { requestJson,UserFacingError } from "./errors";
+import {browserOffline} from "./resourcePolicy";
+import {clearRecommendationCache,readRecommendationCache,recommendationCacheValid,recommendationCacheVersion,writeRecommendationCache} from "./recommendationCache";
 import type { SongMenuAnchor } from "./TrackActions";
 import { appendUniqueFeedItems } from "./feedItems";
 import { HeroGarden } from "./HeroGarden";
@@ -30,8 +32,8 @@ interface FeedState {
   totalCandidates: number; generatedAt: string;
 }
 interface CachedFeed { state: FeedState; savedAt: number }
-// Keeping a visited feed in memory preserves its songs when the shell restores
-// that route's scroll position. Nothing is retained after the browser closes.
+// Keep the full visited selection, including paginated songs, in memory and on
+// this device so reopening Home or Discover offline restores the same cards.
 const visitedFeeds = new Map<string, CachedFeed>();
 const CACHE_LIFETIME = 20 * 60 * 1000;
 const PAGE_SIZE = 12;
@@ -50,12 +52,14 @@ function emptyFeed(): FeedState {
 }
 function cachedFeed(key: string): FeedState {
   const saved = visitedFeeds.get(key);
-  return saved && Date.now() - saved.savedAt < CACHE_LIFETIME
+  return saved && recommendationCacheValid(key.split(":",1)[0],saved.savedAt)&&(browserOffline()||Date.now() - saved.savedAt < CACHE_LIFETIME)
     ? { ...saved.state, busy: false, error: null, refreshRequired: false } : emptyFeed();
 }
-function saveFeed(key: string, state: FeedState) {
+function saveFeed(accountId:string,key: string, state: FeedState,version:number) {
   visitedFeeds.delete(key);
-  visitedFeeds.set(key, { state: { ...state, busy: false, error: null }, savedAt: Date.now() });
+  const data={...state,busy:false,error:null},savedAt=Math.max(Date.now(),version+1);
+  visitedFeeds.set(key, { state:data, savedAt });
+  void writeRecommendationCache(accountId,"feed:"+key,data,version);
   while (visitedFeeds.size > 8) visitedFeeds.delete(visitedFeeds.keys().next().value!);
 }
 function asTrack(value: unknown): MusicTrack | null {
@@ -83,7 +87,8 @@ function parseFeed(raw: Record<string, unknown>): Pick<FeedState, "items" | "sec
     personalized: raw.personalized === true, totalCandidates: Math.max(0, Number(raw.totalCandidates) || 0),
     generatedAt: typeof raw.generatedAt === "string" ? raw.generatedAt : "" };
 }
-function clearAccountFeeds(accountId: string) {
+function clearAccountFeeds(accountId: string,invalidate=true) {
+  if(invalidate)clearRecommendationCache(accountId);
   for (const key of visitedFeeds.keys()) if (key.startsWith(accountId + ":")) visitedFeeds.delete(key);
 }
 
@@ -137,7 +142,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     if (!reset && feedRef.current.ready && !feedRef.current.nextCursor) return;
     request.current?.abort();
     if (reset) seenCursors.current.clear();
-    const controller = new AbortController(), epoch = ++generation.current;
+    const controller = new AbortController(), epoch = ++generation.current,cacheVersion=recommendationCacheVersion(accountId);
     request.current = controller;
     const previous = feedRef.current;
     const starting = { ...previous, busy: true, error: null, refreshRequired: false };
@@ -145,6 +150,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     const params = new URLSearchParams({ surface, mode, limit: String(PAGE_SIZE) });
     if (!reset && previous.nextCursor) params.set("cursor", previous.nextCursor);
     try {
+      if(browserOffline())throw new UserFacingError({kind:"offline",title:previous.ready?"Your saved selection is ready.":"This selection has not been saved yet.",message:previous.ready?"Reconnect to discover more songs. Your saved recommendations are still here.":"Open this page while connected to keep its recommendations available offline.",action:"Try again"});
       const raw = await requestJson<Record<string, unknown>>("/api/v2/feed?" + params,
         { signal: controller.signal }, { accountId, context: "page", acceptStatuses: [409, 410] });
       if (controller.signal.aborted || epoch !== generation.current) return;
@@ -160,7 +166,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
       // A repeated cursor cannot keep an observer making the same request.
       if (!reset && previous.nextCursor) seenCursors.current.add(previous.nextCursor);
       if (page.nextCursor && seenCursors.current.has(page.nextCursor)) next.nextCursor = null;
-      feedRef.current = next; setFeed(next); saveFeed(cacheKey, next);
+      if(recommendationCacheVersion(accountId)!==cacheVersion)return;
+      feedRef.current = next; setFeed(next); saveFeed(accountId,cacheKey, next,cacheVersion);
     } catch (error) {
       if (controller.signal.aborted || epoch !== generation.current) return;
       const failed = { ...previous, busy: false, error };
@@ -171,26 +178,37 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
   }, [accountId, cacheKey, mode, surface]);
 
   useEffect(() => {
-    if (!feedRef.current.ready) void load();
-    return () => { request.current?.abort(); request.current = null; };
-  }, [load]);
+    let active=true;
+    void (async()=>{
+      if(feedRef.current.ready)return;
+      const saved=await readRecommendationCache<FeedState>(accountId,"feed:"+cacheKey);
+      if(!active)return;
+      if(saved&&saved.data.ready&&Array.isArray(saved.data.items)&&Array.isArray(saved.data.sections)){
+        const restored={...saved.data,busy:false,error:null,refreshRequired:false};feedRef.current=restored;setFeed(restored);
+        if(browserOffline()||Date.now()-saved.savedAt<CACHE_LIFETIME)return;
+      }
+      await load(!!saved);
+    })();
+    const online=()=>{if(!feedRef.current.ready||feedRef.current.error)void load(true);};window.addEventListener("online",online);
+    return () => {active=false;request.current?.abort();request.current=null;window.removeEventListener("online",online);};
+  }, [load,accountId,cacheKey]);
   useEffect(() => {
     const node = sentinel.current;
-    if (!node || !feed.ready || !feed.nextCursor || feed.error || feed.refreshRequired) return;
+    if (!node || !feed.ready || !feed.nextCursor || feed.error || feed.refreshRequired||music.offline) return;
     const observer = new IntersectionObserver(entries => {
       if (entries.some(entry => entry.isIntersecting)) void load();
     }, { root: root.current?.closest("#music-main") || null, rootMargin: "420px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [feed.ready, feed.nextCursor, feed.error, feed.refreshRequired, load]);
+  }, [feed.ready, feed.nextCursor, feed.error, feed.refreshRequired, load,music.offline]);
   useEffect(() => {
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ accountId?: string }>).detail;
       if (detail?.accountId && detail.accountId !== accountId) return;
-      clearAccountFeeds(accountId);
+      clearAccountFeeds(accountId,event.type!=="sakura-recommendations-cleared");
       // Erasure takes effect even if the replacement request fails offline.
       // No card carrying a removed listening explanation remains cached or visible.
-      if (event.type === "sakura-personalization-cleared" || event.type === "sakura-listening-erased") {
+      if (event.type === "sakura-personalization-cleared" || event.type === "sakura-listening-erased"||event.type==="sakura-recommendations-cleared") {
         const cleared = emptyFeed(); feedRef.current = cleared; setFeed(cleared);
       }
       void load(true);
@@ -198,10 +216,12 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     window.addEventListener("sakura-taste-updated", changed);
     window.addEventListener("sakura-personalization-cleared", changed);
     window.addEventListener("sakura-listening-erased", changed);
+    window.addEventListener("sakura-recommendations-cleared",changed);
     return () => {
       window.removeEventListener("sakura-taste-updated", changed);
       window.removeEventListener("sakura-personalization-cleared", changed);
       window.removeEventListener("sakura-listening-erased", changed);
+      window.removeEventListener("sakura-recommendations-cleared",changed);
     };
   }, [accountId, load]);
 

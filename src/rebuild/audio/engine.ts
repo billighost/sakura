@@ -92,6 +92,13 @@ export async function renderAudio(buffer: AudioBuffer, mode: AudioTechnology, op
 }
 
 interface Branch { graph: AudioGraph; fader: GainNode; timer?: ReturnType<typeof setTimeout> }
+interface PlaybackSessionHost { audioSession?: { type: string } }
+/** Safari otherwise treats Web Audio as ambient sound and may interrupt it
+ * when the installed app goes into the background. Unsupported browsers keep
+ * their native media behavior. Claim playback before creating an audio graph. */
+export function configurePlaybackAudioSession(host: PlaybackSessionHost | undefined = typeof navigator === "undefined" ? undefined : navigator as PlaybackSessionHost): boolean {
+  try { if (!host?.audioSession) return false; host.audioSession.type = "playback"; return host.audioSession.type === "playback"; } catch { return false; }
+}
 /** iOS keeps HTMLMediaElement.volume fixed; a dry Web Audio gain controls listening level. */
 export function needsMediaVolumeGain(device: Pick<Navigator, "userAgent" | "platform" | "maxTouchPoints"> = navigator) {
   return /iPad|iPhone|iPod/i.test(device.userAgent) || device.platform === "MacIntel" && device.maxTouchPoints > 1;
@@ -105,14 +112,34 @@ export class MediaAudioEngine {
   private branches = new Set<Branch>();
   private mode: AudioTechnology = "none";
   private closed = false;
+  private readonly recover = () => {
+    if (this.closed || this.element.paused || this.element.ended) return;
+    configurePlaybackAudioSession();
+    // A suspended/interrupted graph is silent even while the native media
+    // element continues to advance. Recover the existing graph, never reload
+    // the recording or override a deliberate pause.
+    void this.resume().catch(() => {});
+  };
   readonly requiresVolumeGraph: boolean;
   constructor(private readonly element: HTMLMediaElement, options: { requiresVolumeGraph?: boolean } = {}) {
     this.volume = element.volume;
     this.requiresVolumeGraph = options.requiresVolumeGraph ?? needsMediaVolumeGain();
+    element.addEventListener("play", this.recover);
+    element.addEventListener("playing", this.recover);
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.recover);
+    if (typeof window !== "undefined") window.addEventListener("pageshow", this.recover);
   }
   get initialized() { return this.context !== null; }
   get currentMode() { return this.mode; }
-  async resume(): Promise<void> { if (this.context && ["suspended", "interrupted"].includes(this.context.state as string)) await this.context.resume(); }
+  async resume(): Promise<void> {
+    if (this.closed) return;
+    configurePlaybackAudioSession();
+    const context = this.context;
+    if (!context || !["suspended", "interrupted"].includes(context.state as string)) return;
+    // Safari can leave a background resume promise pending. A later foreground
+    // gesture must issue its own resume call instead of waiting behind it.
+    await context.resume();
+  }
   /** Listening volume belongs after dynamics, so changing volume doesn't change the sound. */
   setVolume(value: number) {
     this.volume = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
@@ -125,6 +152,7 @@ export class MediaAudioEngine {
   /** Call from a user gesture, after selecting a same-origin/blob or explicitly CORS-enabled source. */
   async setMode(value: AudioTechnology): Promise<void> {
     if (this.closed) return;
+    configurePlaybackAudioSession();
     const mode = audioTechnology(value);
     if (!this.context && mode === "none" && !this.requiresVolumeGraph) { this.mode = mode; return; }
     if (!this.context) {
@@ -138,8 +166,9 @@ export class MediaAudioEngine {
       const Constructor = globalThis.AudioContext;
       if (!Constructor) throw new Error("Audio technology is unavailable in this browser.");
       this.context = new Constructor({ latencyHint: "playback" });
+      this.context.addEventListener("statechange", this.recover);
       try { this.source = this.context.createMediaElementSource(this.element); }
-      catch (error) { void this.context.close(); this.context = null; throw error; }
+      catch (error) { this.context.removeEventListener("statechange", this.recover); void this.context.close(); this.context = null; throw error; }
       // Keep the requested level: on iOS the element getter always returns 1.
       this.master = this.context.createGain(); this.master.gain.value = this.volume; this.master.connect(this.context.destination);
       this.element.volume = 1;
@@ -174,6 +203,10 @@ export class MediaAudioEngine {
   }
   dispose() {
     if (this.closed) return; this.closed = true;
+    this.element.removeEventListener("play", this.recover); this.element.removeEventListener("playing", this.recover);
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.recover);
+    if (typeof window !== "undefined") window.removeEventListener("pageshow", this.recover);
+    this.context?.removeEventListener("statechange", this.recover);
     for (const branch of this.branches) { if (branch.timer) clearTimeout(branch.timer); branch.graph.dispose(); branch.fader.disconnect(); }
     this.branches.clear(); this.source?.disconnect(); this.master?.disconnect(); this.element.volume = this.volume; void this.context?.close().catch(() => {}); this.context = null; this.source = null; this.master = null;
   }

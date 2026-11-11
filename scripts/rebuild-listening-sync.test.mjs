@@ -10,20 +10,30 @@ import ts from 'typescript';
 const compiled=ts.transpileModule(await readFile('src/rebuild/app/listeningSync.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const state=(positionMs=0)=>({queue:[],currentEntryId:null,positionMs,sleepUntil:null});
 function setup(options={}){
- const mirror=new Map(),disk=new Map(),restored=[],requests=[],timers=new Map();let remote=null,stamp=1000,elapsed=0,serverTime=undefined,offline=false,holdGet=null,holdPut=null,nextTimer=0;
- const exports={};const localStorage={getItem:key=>mirror.get(key)||null,setItem:(key,value)=>mirror.set(key,value)};
+ const mirror=new Map(),disk=new Map(),restored=[],requests=[],timers=new Map(),storageErrors=[];let remote=null,stamp=1000,elapsed=0,serverTime=undefined,offline=false,holdGet=null,holdPut=null,nextTimer=0,blockedMirror=options.blockedMirror,blockedDisk=options.blockedDisk;
+ const exports={};const localStorage={getItem:key=>mirror.get(key)||null,setItem:(key,value)=>{if(blockedMirror)throw new Error('Storage unavailable');mirror.set(key,value);}};
  const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
  const transport=async(path,init={},options={})=>{
   requests.push({path,init,options});if(offline)throw new Error('offline');if(init.signal?.aborted)throw new DOMException('aborted','AbortError');
   if(!init.method){if(holdGet){const hold=holdGet;holdGet=null;return hold;}return {session:clone(remote),serverTime};}
   if(holdPut){const hold=holdPut;holdPut=null;return hold;}
   const sent=JSON.parse(init.body);if(sent.revision!==(remote?.revision||0))return {accepted:false,session:clone(remote),serverTime};
-  remote={state:sent.state,revision:sent.revision+1,deviceId:sent.deviceId,updatedAt:serverTime??++stamp};return {accepted:true,session:clone(remote),serverTime};
+  const updatedAt=serverTime??++stamp,choiceAt=sent.explicit===false?(remote?.choiceAt??remote?.updatedAt??updatedAt):Math.max(remote?.choiceAt??0,Math.min(sent.intentAt??updatedAt,updatedAt));
+  remote={state:sent.state,revision:sent.revision+1,deviceId:sent.deviceId,updatedAt,choiceAt};return {accepted:true,session:clone(remote),serverTime};
  };
- vm.runInNewContext(compiled,{exports,require:path=>path==='./offline'?{localRead:async(account)=>clone(disk.get(account)),localWrite:async(account,name,draft)=>disk.set(account,clone(draft))}:path==='./sessionState'?{localId:randomUUID}:{requestJson:transport},localStorage,crypto:{randomUUID},AbortController,DOMException,Date:{now:()=>++stamp},performance:options.monotonic?{now:()=>elapsed}:undefined,setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
- const deviceId=randomUUID(),sync=new exports.ListeningSync('account-a',deviceId,value=>restored.push(clone(value)));
- return {sync,deviceId,mirror,disk,restored,requests,writerIdentity:exports.deviceIdentity,get remote(){return remote;},set remote(value){remote=value;},offline(value){offline=value;},now(value){stamp=value;},elapsed(value){elapsed=value;},serverTime(value){serverTime=value;},hold(value){holdGet=value;},holdPut(value){holdPut=value;},newSync(writerId=deviceId){return new exports.ListeningSync('account-a',writerId,value=>restored.push(clone(value)));}};
+ vm.runInNewContext(compiled,{exports,require:path=>path==='./offline'?{localRead:async(account)=>clone(disk.get(account)),localWrite:async(account,name,draft)=>{if(blockedDisk)throw new Error('Storage unavailable');disk.set(account,clone(draft));}}:path==='./sessionState'?{localId:randomUUID}:{requestJson:transport},localStorage,crypto:{randomUUID},AbortController,DOMException,Date:{now:()=>++stamp},performance:options.monotonic?{now:()=>elapsed}:undefined,setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});
+ const deviceId=randomUUID(),sync=new exports.ListeningSync('account-a',deviceId,value=>restored.push(clone(value)),error=>storageErrors.push(error));
+ return {sync,deviceId,mirror,disk,restored,requests,storageErrors,storageAvailable(){blockedMirror=false;blockedDisk=false;},writerIdentity:exports.deviceIdentity,get remote(){return remote;},set remote(value){remote=value;},offline(value){offline=value;},now(value){stamp=value;},elapsed(value){elapsed=value;},serverTime(value){serverTime=value;},hold(value){holdGet=value;},holdPut(value){holdPut=value;},newSync(writerId=deviceId){return new exports.ListeningSync('account-a',writerId,value=>restored.push(clone(value)));}};
 }
+
+test('total storage failure is reported once and cannot start an undurable session upload',async()=>{
+ const f=setup({blockedMirror:true,blockedDisk:true});await f.sync.start();f.sync.change(state(23000));await assert.rejects(()=>f.sync.flush(),/Storage unavailable/);assert.equal(f.storageErrors.length,1);assert.equal(f.requests.filter(row=>row.init.method==='PUT').length,0);
+ f.sync.change(state(24000));await assert.rejects(()=>f.sync.flush(),/Storage unavailable/);assert.equal(f.storageErrors.length,1);f.storageAvailable();f.sync.change(state(25000));await f.sync.flush();assert.equal(f.remote.state.positionMs,25000);f.sync.stop();
+});
+
+for(const options of [{blockedMirror:true},{blockedDisk:true}])test('one healthy storage path safely preserves a listening session '+JSON.stringify(options),async()=>{
+ const f=setup(options);await f.sync.start();f.sync.change(state(23000));await f.sync.flush();assert.equal(f.remote.state.positionMs,23000);assert.equal(f.storageErrors.length,0);f.sync.stop();
+});
 test('an old playing device yields to another device even with a recent position checkpoint',async()=>{
  const f=setup();await f.sync.start();f.sync.change(state(10));await f.sync.flush();const revision=f.remote.revision;
  f.remote={state:state(50),revision:revision+1,deviceId:randomUUID(),updatedAt:2000};f.sync.change(state(15),false);await f.sync.refresh();assert.equal(f.restored.at(-1).positionMs,50);assert.equal(f.remote.state.positionMs,50);f.sync.stop();
@@ -48,6 +58,38 @@ test('a stale explicit choice yields on a write conflict even when another check
 });
 test('a newer deliberate choice retries its revision and wins an older remote write',async()=>{
  const f=setup();await f.sync.start();f.remote={state:state(50),revision:1,deviceId:randomUUID(),updatedAt:2000};f.now(3000);f.sync.change(state(70));await f.sync.flush();await f.sync.flush();assert.equal(f.remote.state.positionMs,70);assert.ok(!f.restored.some(value=>value.positionMs===50));f.sync.stop();
+});
+
+test('a later passive GET checkpoint cannot overrule a newer deliberate choice',async()=>{
+ const f=setup();f.remote={state:state(10),revision:1,deviceId:randomUUID(),updatedAt:1000,choiceAt:1000};await f.sync.start();
+ f.now(2000);f.sync.change(state(70));f.remote={...f.remote,state:state(15),revision:2,updatedAt:4000};f.now(4500);await f.sync.refresh();
+ assert.equal(f.remote.state.positionMs,70);assert.equal(f.restored.length,1);assert.ok(f.remote.choiceAt>1000&&f.remote.choiceAt<4000);f.sync.stop();
+});
+
+test('a passive checkpoint committed after an explicit PUT started does not reclaim ownership',async()=>{
+ const f=setup();f.remote={state:state(10),revision:1,deviceId:randomUUID(),updatedAt:1000,choiceAt:1000};await f.sync.start();
+ f.now(2000);f.sync.change(state(70));let resolve;f.holdPut(new Promise(done=>{resolve=done;}));const pending=f.sync.flush();
+ f.remote={...f.remote,state:state(15),revision:2,updatedAt:4000};f.now(4500);resolve({accepted:false,session:f.remote});await pending;await f.sync.flush();
+ assert.equal(f.remote.state.positionMs,70);assert.equal(f.restored.length,1);assert.equal(JSON.parse(f.requests.at(-1).init.body).explicit,true);f.sync.stop();
+});
+
+test('a newer remote deliberate choice still wins over an older local choice',async()=>{
+ const f=setup();f.remote={state:state(10),revision:1,deviceId:randomUUID(),updatedAt:1000,choiceAt:1000};await f.sync.start();
+ f.now(2000);f.sync.change(state(70));f.remote={...f.remote,state:state(90),revision:2,updatedAt:4000,choiceAt:3000};f.now(4500);await f.sync.flush();
+ assert.equal(f.remote.state.positionMs,90);assert.equal(f.restored.at(-1).positionMs,90);f.sync.stop();
+});
+
+test('acknowledged playback progress never advances the server choice timestamp',async()=>{
+ const f=setup();await f.sync.start();f.sync.change(state(10));await f.sync.flush();const choiceAt=f.remote.choiceAt;
+ f.now(4000);f.sync.change(state(70),false);await f.sync.flush();
+ assert.equal(f.remote.choiceAt,choiceAt);assert.ok(f.remote.updatedAt>choiceAt);assert.equal(JSON.parse(f.requests.at(-1).init.body).explicit,false);f.sync.stop();
+});
+
+test('an offline choice reopened under a new writer wins a later remote passive checkpoint',async()=>{
+ const f=setup();f.remote={state:state(10),revision:1,deviceId:randomUUID(),updatedAt:1000,choiceAt:1000};await f.sync.start();
+ f.now(2000);f.offline(true);f.sync.change(state(70));await assert.rejects(()=>f.sync.flush());f.sync.stop();
+ f.remote={...f.remote,state:state(15),revision:2,updatedAt:4000};f.now(4500);f.offline(false);const next=f.newSync(randomUUID());await next.start();
+ assert.equal(f.remote.state.positionMs,70);assert.equal(f.restored.at(-1).positionMs,70);assert.ok(f.remote.choiceAt<4000);next.stop();
 });
 test('malformed local listening cache is ignored without restoring broken queue entries',async()=>{
  const f=setup();f.mirror.set('sakura-v2-listening:account-a',JSON.stringify({state:{...state(),queue:[null]},revision:1,updatedAt:100,savedAt:100,pending:false}));await f.sync.start();assert.equal(f.restored.length,0);f.sync.stop();

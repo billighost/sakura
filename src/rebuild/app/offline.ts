@@ -3,13 +3,20 @@ import { openDB } from "idb";
 import type { MusicTrack, Account } from "./types";
 import {listeningTimeFallsInPeriod} from "./listeningEvidence";
 let database:ReturnType<typeof openDB>|null=null;
-const db=()=>database||(database=openDB("sakura-ink-v1",1,{upgrade(db){db.createObjectStore("entries");}}));
+const db=()=>database||(database=openDB("sakura-ink-v1",1,{upgrade(db){db.createObjectStore("entries");}}).catch(error=>{database=null;throw error;}));
 /** Shared database for atomic download chunk and manifest transactions. */
 export const offlineDatabase=db;
 const key=(accountId:string,name:string)=>"account:"+accountId+":"+name;
 export async function localRead<T>(accountId:string,name:string):Promise<T|undefined>{return (await db()).get("entries",key(accountId,name));}
 export async function localWrite(accountId:string,name:string,value:unknown){await (await db()).put("entries",value,key(accountId,name));}
 export async function localDelete(accountId:string,name:string){await (await db()).delete("entries",key(accountId,name));}
+/** Read a bounded account namespace without scanning other accounts or audio. */
+export async function localEntries<T>(accountId:string,prefix:string):Promise<Array<{name:string;value:T}>>{
+ const start=key(accountId,prefix),result:Array<{name:string;value:T}>=[];
+ let cursor=await (await db()).transaction("entries").store.openCursor(IDBKeyRange.bound(start,start+"\uffff"));
+ while(cursor){result.push({name:String(cursor.key).slice(key(accountId,"").length),value:cursor.value as T});cursor=await cursor.continue();}
+ return result;
+}
 export interface OfflineAudio {track:MusicTrack;blob:Blob;sha256:string;sizeBytes:number;savedAt:number;requested?:boolean}
 export function validOfflineAudio(value:unknown):value is OfflineAudio {
  const saved=value as Partial<OfflineAudio>|null;
@@ -37,6 +44,7 @@ const listenFlights=new Map<string,Promise<boolean>>();
 const listenControllers=new Map<string,AbortController>();
 const listenClearRanges=new Map<string,{period:"week"|"month"|"all";cutoffMs:number}[]>();
 const listenFlightChunks=new Map<string,ListenChunk>();
+const listenRejections=new Set<string>();
 function validListenChunk(value:unknown):value is ListenChunk {
  const chunk=value as Partial<ListenChunk>|null;
  return !!chunk&&typeof chunk.eventId==="string"&&!!chunk.eventId&&typeof chunk.recordingId==="string"&&!!chunk.recordingId&&Number.isSafeInteger(chunk.sequence)&&chunk.sequence!>=0&&chunk.sequence!<=100000&&Number.isSafeInteger(chunk.msPlayed)&&chunk.msPlayed!>=0&&chunk.msPlayed!<=120000&&Number.isSafeInteger(chunk.positionMs)&&chunk.positionMs!>=0&&chunk.positionMs!<=21600000&&typeof chunk.completed==="boolean"&&(chunk.skipped===undefined||typeof chunk.skipped==="boolean")&&(chunk.finished===undefined||typeof chunk.finished==="boolean")&&typeof chunk.context==="string"&&!!chunk.context.trim()&&chunk.context.length<=40&&(chunk.contextId==null||typeof chunk.contextId==="string"&&!!chunk.contextId.trim()&&chunk.contextId.length<=120)&&(chunk.occurredAt===undefined||typeof chunk.occurredAt==="string"&&Number.isFinite(Date.parse(chunk.occurredAt)));
@@ -52,10 +60,38 @@ export async function clearListeningOutbox(accountId:string,period:"week"|"month
  try{const names:string[]=[];for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith(prefix))names.push(name);}for(const name of names){let chunk:ListenChunk|undefined;try{chunk=JSON.parse(localStorage.getItem(name)||"null");}catch{}if(listeningTimeFallsInPeriod(chunk?.occurredAt,period,cutoffMs))localStorage.removeItem(name);}}catch{}
 }
 export async function deliverListen(accountId:string,chunk:ListenChunk,timeoutMs=10000):Promise<boolean>{
+ // A caller may reuse its accumulator after this function returns. Persist and
+ // retry the exact snapshot, since the server deduplicates by event + sequence.
+ chunk={...chunk};
  const name="listen:"+chunk.eventId+":"+chunk.sequence,mirror="sakura-v2-outbox:"+accountId+":"+chunk.eventId+":"+chunk.sequence;
  const pending=listenFlights.get(mirror);if(pending)return pending;
  let mirrored=false;try{localStorage.setItem(mirror,JSON.stringify(chunk));mirrored=true;}catch{}
- const flight=(async()=>{await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});if((listenClearRanges.get(accountId)||[]).some(range=>listeningTimeFallsInPeriod(chunk.occurredAt,range.period,range.cutoffMs))){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return false;}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);listenControllers.set(mirror,controller);try{const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});if(response.ok||[400,404,409,410].includes(response.status)){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}return false;}catch{/* The exact sequence remains queued for a later connection. */return false;}finally{clearTimeout(timer);if(listenControllers.get(mirror)===controller)listenControllers.delete(mirror);}})();
+ const flight=(async()=>{
+  await localWrite(accountId,name,chunk).catch(error=>{if(!mirrored)throw error;});
+  if((listenClearRanges.get(accountId)||[]).some(range=>listeningTimeFallsInPeriod(chunk.occurredAt,range.period,range.cutoffMs))){await localDelete(accountId,name).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return false;}
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);listenControllers.set(mirror,controller);listenRejections.delete(mirror);
+  try{
+   const response=await fetch("/api/v2/history",{method:"POST",headers:{"Content-Type":"application/json","X-Sakura-Account":accountId},body:JSON.stringify(chunk),keepalive:true,signal:controller.signal});
+   if(response.ok){
+    const receipt:unknown=await response.json();
+    const value=receipt&&typeof receipt==="object"?receipt as Record<string,unknown>:{};
+    const accepted=value.accepted===true&&(value.eventId===undefined||value.eventId===chunk.eventId)&&(value.sequence===undefined||value.sequence===chunk.sequence);
+    // Explicit privacy/deletion receipts intentionally erase evidence. A
+    // currently paused account, HTML error page or unmatched receipt does not.
+    const discarded=value.accepted===false&&(value.discarded===true||value.cleared===true);
+    if(accepted||discarded){await localDelete(accountId,name).catch(()=>{});await localDelete(accountId,"listen-rejection:"+chunk.eventId+":"+chunk.sequence).catch(()=>{});try{localStorage.removeItem(mirror);}catch{}return true;}
+    return false;
+   }
+   if([400,404,409,410].includes(response.status)){
+    // Keep the original evidence for recovery rather than treating an HTTP
+    // rejection as a receipt. A bad item must not block later healthy items.
+    listenRejections.add(mirror);
+    await localWrite(accountId,"listen-rejection:"+chunk.eventId+":"+chunk.sequence,{status:response.status,lastAttemptAt:Date.now()}).catch(()=>{});
+   }
+   return false;
+  }catch{/* The exact sequence remains queued for a later connection. */return false;}
+  finally{clearTimeout(timer);if(listenControllers.get(mirror)===controller)listenControllers.delete(mirror);}
+ })();
  listenFlights.set(mirror,flight);listenFlightChunks.set(mirror,chunk);try{return await flight;}finally{if(listenFlights.get(mirror)===flight){listenFlights.delete(mirror);listenFlightChunks.delete(mirror);}}
 }
 export async function drainListen(accountId:string,options:{timeoutMs?:number;maxDurationMs?:number;maxChunks?:number}={}){
@@ -64,5 +100,9 @@ export async function drainListen(accountId:string,options:{timeoutMs?:number;ma
  try{let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){const name=String(cursor.key);if(name.startsWith(key(accountId,"listen:"))){const chunk=cursor.value;if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidDisk.push(name.slice(key(accountId,"").length));}cursor=await cursor.continue();}}catch{}
  try{for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith("sakura-v2-outbox:"+accountId+":")){try{const chunk:unknown=JSON.parse(localStorage.getItem(name)||"null");if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidMirror.push(name);}catch{invalidMirror.push(name);}}}for(const name of invalidMirror)localStorage.removeItem(name);}catch{}
  await Promise.allSettled(invalidDisk.map(name=>localDelete(accountId,name)));
- for(const chunk of [...pending.values()].sort((a,b)=>a.eventId.localeCompare(b.eventId)||a.sequence-b.sequence).slice(0,options.maxChunks??100)){const remaining=deadline-performance.now();if(remaining<=0||!await deliverListen(accountId,chunk,Math.min(options.timeoutMs??10000,remaining)))break;}
+ for(const chunk of [...pending.values()].sort((a,b)=>a.eventId.localeCompare(b.eventId)||a.sequence-b.sequence).slice(0,options.maxChunks??100)){
+  const remaining=deadline-performance.now();if(remaining<=0)break;
+  const delivered=await deliverListen(accountId,chunk,Math.min(options.timeoutMs??10000,remaining));
+  if(!delivered&&!listenRejections.has("sakura-v2-outbox:"+accountId+":"+chunk.eventId+":"+chunk.sequence))break;
+ }
 }

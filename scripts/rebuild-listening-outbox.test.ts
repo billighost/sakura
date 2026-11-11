@@ -11,11 +11,11 @@ const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
 const cutoff=Date.UTC(2026,10,8);
 const chunk=(id:string,occurredAt="2026-11-07T00:00:00Z"):ListenChunk=>({eventId:id,recordingId:"recording",sequence:0,msPlayed:1000,positionMs:1000,completed:false,context:"home",occurredAt});
 
-function fixture(options:{status?:number}={}){
+function fixture(options:{status?:number;receipt?:Record<string,unknown>;statuses?:Record<string,number>;diskFailure?:boolean;mirrorFailure?:boolean}={}){
  const disk=new Map<string,unknown>(),mirror=new Map<string,string>(),requests:Array<{chunk:ListenChunk;signal:AbortSignal}>=[];let holdWrite:Promise<void>|null=null;
  const entries={
   async get(_store:string,key:string){return disk.get(key);},
-  async put(_store:string,value:unknown,key:string){if(holdWrite&&key.includes(":listen:"))await holdWrite;disk.set(key,value);},
+  async put(_store:string,value:unknown,key:string){if(options.diskFailure)throw new Error("Storage unavailable");if(holdWrite&&key.includes(":listen:"))await holdWrite;disk.set(key,value);},
   async delete(_store:string,key:string){disk.delete(key);},
   transaction(){return {done:Promise.resolve(),store:{async openCursor(range?:{lower:string;upper:string}){
    const keys=[...disk.keys()].sort().filter(key=>!range||key>=range.lower&&key<=range.upper);
@@ -24,8 +24,8 @@ function fixture(options:{status?:number}={}){
   }}};},
  };
  const exports:Record<string,unknown>={};
- const storage={get length(){return mirror.size;},key:(index:number)=>[...mirror.keys()][index]||null,getItem:(key:string)=>mirror.get(key)||null,setItem:(key:string,value:string)=>mirror.set(key,value),removeItem:(key:string)=>mirror.delete(key)};
- vm.runInNewContext(compiled,{exports,require:(name:string)=>name==="idb"?{openDB:async()=>entries}:name==="./listeningEvidence"?{listeningTimeFallsInPeriod}:{},localStorage:storage,IDBKeyRange:{bound:(lower:string,upper:string)=>({lower,upper})},AbortController,DOMException,Blob,performance,Date,setTimeout,clearTimeout,fetch:async(_url:string,init:{body:string;signal:AbortSignal})=>{requests.push({chunk:JSON.parse(init.body),signal:init.signal});if(options.status)return {ok:options.status>=200&&options.status<300,status:options.status};return new Promise((_resolve,reject)=>init.signal.addEventListener("abort",()=>reject(new DOMException("Canceled","AbortError")),{once:true}));}});
+ const storage={get length(){return mirror.size;},key:(index:number)=>[...mirror.keys()][index]||null,getItem:(key:string)=>mirror.get(key)||null,setItem:(key:string,value:string)=>{if(options.mirrorFailure)throw new Error("Storage unavailable");mirror.set(key,value);},removeItem:(key:string)=>mirror.delete(key)};
+ vm.runInNewContext(compiled,{exports,require:(name:string)=>name==="idb"?{openDB:async()=>entries}:name==="./listeningEvidence"?{listeningTimeFallsInPeriod}:{},localStorage:storage,IDBKeyRange:{bound:(lower:string,upper:string)=>({lower,upper})},AbortController,DOMException,Blob,performance,Date,setTimeout,clearTimeout,fetch:async(_url:string,init:{body:string;signal:AbortSignal})=>{const chunk:ListenChunk=JSON.parse(init.body);requests.push({chunk,signal:init.signal});const status=options.statuses?.[chunk.eventId]??options.status;if(status)return {ok:status>=200&&status<300,status,json:async()=>options.receipt??{accepted:true,eventId:chunk.eventId,sequence:chunk.sequence}};return new Promise((_resolve,reject)=>init.signal.addEventListener("abort",()=>reject(new DOMException("Canceled","AbortError")),{once:true}));}});
  return {disk,mirror,requests,api:exports as unknown as {deliverListen:(accountId:string,chunk:ListenChunk)=>Promise<boolean>;drainListen:(accountId:string)=>Promise<void>;clearListeningOutbox:(accountId:string,period:"week"|"month"|"all",cutoffMs:number)=>Promise<void>},hold(promise:Promise<void>){holdWrite=promise;}};
 }
 
@@ -53,10 +53,31 @@ test("corrupt outbox entries are removed without preventing healthy listening fr
  const f=fixture({status:200});f.disk.set("account:a:listen:broken:0",{eventId:null});f.mirror.set("sakura-v2-outbox:a:broken-json:0","{");f.mirror.set("sakura-v2-outbox:a:good:0",JSON.stringify(chunk("good")));f.disk.set("account:b:listen:broken:0",{eventId:null});await f.api.drainListen("a");assert.equal(f.requests.length,1);assert.equal(f.requests[0].chunk.eventId,"good");assert.equal(f.mirror.size,0);assert.equal(f.disk.has("account:a:listen:broken:0"),false);assert.equal(f.disk.has("account:b:listen:broken:0"),true);
 });
 
-for(const status of [400,404,409,410])test(`a permanently rejected ${status} listening chunk does not block later delivery`,async()=>{
- const f=fixture({status});for(const id of ["first","second"]){f.disk.set(`account:a:listen:${id}:0`,chunk(id));f.mirror.set(`sakura-v2-outbox:a:${id}:0`,JSON.stringify(chunk(id)));}await f.api.drainListen("a");assert.equal(f.requests.length,2);assert.equal(f.disk.size,0);assert.equal(f.mirror.size,0);
+for(const status of [400,404,409,410])test(`a rejected ${status} listening chunk is retained without blocking healthy delivery`,async()=>{
+ const f=fixture({statuses:{first:status,second:200}});for(const id of ["first","second"]){f.disk.set(`account:a:listen:${id}:0`,chunk(id));f.mirror.set(`sakura-v2-outbox:a:${id}:0`,JSON.stringify(chunk(id)));}await f.api.drainListen("a");assert.equal(f.requests.length,2);assert.equal(f.disk.has("account:a:listen:first:0"),true);assert.equal(f.disk.has("account:a:listen:second:0"),false);assert.equal(f.mirror.size,1);assert.equal((f.disk.get("account:a:listen-rejection:first:0") as {status:number}).status,status);
 });
 
 test("a session error keeps listening pending for the account's next sign-in",async()=>{
  const f=fixture({status:401});f.disk.set("account:a:listen:first:0",chunk("first"));await f.api.drainListen("a");assert.equal(f.requests.length,1);assert.equal(f.disk.has("account:a:listen:first:0"),true);assert.equal(f.mirror.size,1);
+});
+
+for(const receipt of [{},{accepted:true,eventId:"another-event",sequence:0},{accepted:true,sequence:1},{accepted:false,privateSession:true,retry:true}])test(`an unacknowledged successful HTTP response keeps exact evidence: ${JSON.stringify(receipt)}`,async()=>{
+ const f=fixture({status:200,receipt});assert.equal(await f.api.deliverListen("a",chunk("pending")),false);assert.equal(f.disk.has("account:a:listen:pending:0"),true);assert.equal(f.mirror.size,1);
+});
+
+test("a paused account retains prior listening until its later accepted retry",async()=>{
+ const options={status:200,receipt:{accepted:false,retry:true,privateSession:true} as Record<string,unknown>},f=fixture(options);
+ assert.equal(await f.api.deliverListen("a",chunk("before-pause")),false);options.receipt={accepted:true,eventId:"before-pause",sequence:0};await f.api.drainListen("a");assert.equal(f.disk.size,0);assert.equal(f.mirror.size,0);assert.equal(f.requests.length,2);assert.deepEqual(f.requests[0].chunk,f.requests[1].chunk);
+});
+
+for(const receipt of [{accepted:false,discarded:true,learningPaused:true},{accepted:false,cleared:true}])test("an explicit privacy or erasure receipt retires intentionally removed evidence",async()=>{
+ const f=fixture({status:200,receipt});assert.equal(await f.api.deliverListen("a",chunk("removed")),true);assert.equal(f.disk.size,0);assert.equal(f.mirror.size,0);
+});
+
+test("listening never starts uploading if both durable storage paths fail",async()=>{
+ const f=fixture({status:200,diskFailure:true,mirrorFailure:true});await assert.rejects(f.api.deliverListen("a",chunk("unsaved")),/Storage unavailable/);assert.equal(f.requests.length,0);
+});
+
+test("changing the caller accumulator cannot alter the queued listening payload",async()=>{
+ const f=fixture({status:503}),value=chunk("snapshot"),delivery=f.api.deliverListen("a",value);value.msPlayed=3000;await delivery;assert.equal(f.requests[0].chunk.msPlayed,1000);assert.equal((f.disk.get("account:a:listen:snapshot:0") as ListenChunk).msPlayed,1000);
 });

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { pushMusicUrl } from "./offlineNavigation";
 import { useMusic } from "./MusicContext";
 import { Icon } from "./Icon";
 import { PlayerDialog } from "../player/Primitives";
@@ -22,7 +23,7 @@ export function PlaybackKeyboard() {
       const action=playbackShortcut(event,shortcutTargetIsInteractive(event.target));
       if(event.repeat && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (event.code==="Space"||event.key===" ") && !shortcutTargetIsInteractive(event.target)){event.preventDefault();return;}
       if(!action||p.booting||!p.account)return;
-      if(action==="search") { if(topDialog)return;event.preventDefault();router.push("/search");return; }
+      if(action==="search") { if(topDialog)return;event.preventDefault();pushMusicUrl(router,"/search");return; }
       if(action==="help") {event.preventDefault();setOpen(true);return;}
       if(!p.track)return;
       event.preventDefault();

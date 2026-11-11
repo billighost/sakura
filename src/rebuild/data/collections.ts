@@ -1,4 +1,4 @@
-import { getRebuildPool,inTransaction } from "./db";
+import { getRebuildPool,inTransaction,inIdempotentTransaction } from "./db";
 import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
 import { ProductError,encodeCursor,ids,object,pageInput,text,uuid } from "./validation";
 import {randomUUID} from "node:crypto";
@@ -44,9 +44,17 @@ export async function getLibrary(accountId:string,url:URL) {
 export async function setFavorite(accountId:string,value:unknown) {
   const input=object(value),recordingId=uuid(input.recordingId,"recording ID");
   if(typeof input.liked!=="boolean")throw new ProductError(400,"Expected liked state");
-  const liked=input.liked;
-  await inTransaction(async client=>{
+  const liked=input.liked,operationId=input.operationId===undefined?undefined:uuid(input.operationId,"favorite operation ID");
+  return inIdempotentTransaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
+    if(operationId){
+      const previous=(await client.query(`SELECT recording_id,liked FROM sakura_v2."FavoriteOperationReceipt" WHERE account_id=$1::uuid AND operation_id=$2::uuid`,[accountId,operationId])).rows[0];
+      if(previous){
+        if(previous.recording_id!==recordingId||previous.liked!==liked)throw new ProductError(409,"Favorite operation belongs to another choice");
+        const current=(await client.query(`SELECT EXISTS(SELECT 1 FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid) AS liked`,[accountId,recordingId])).rows[0];
+        return {recordingId,liked:Boolean(current.liked),operationId,accepted:true,duplicate:true};
+      }
+    }
     if(liked){
       const inserted=await client.query(`INSERT INTO sakura_v2."Favorite"(account_id,recording_id)
         SELECT $1::uuid,r.id FROM sakura_v2."Recording" r WHERE r.id=$2::uuid AND ${VERIFIED}
@@ -54,10 +62,11 @@ export async function setFavorite(accountId:string,value:unknown) {
       if(!inserted.rowCount&&!(await client.query(`SELECT 1 FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid`,[accountId,recordingId])).rowCount)
         throw new ProductError(404,"Recording not found");
     }else await client.query(`DELETE FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid`,[accountId,recordingId]);
+    if(operationId)await client.query(`INSERT INTO sakura_v2."FavoriteOperationReceipt"(account_id,operation_id,recording_id,liked) VALUES($1::uuid,$2::uuid,$3::uuid,$4)`,[accountId,operationId,recordingId,liked]);
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    return {recordingId,liked,...(operationId?{operationId,accepted:true,duplicate:false}:{})};
   });
-  return {recordingId,liked};
 }
 export async function createPlaylist(accountId:string,value:unknown) {
   const input=object(value),name=text(input.name,"playlist name",120),description=input.description===undefined?"":text(input.description,"description",2000,true);

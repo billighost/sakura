@@ -55,7 +55,7 @@
 /* Each room arrives as its own paper object. Phases end after the first entrance,
    so changing the song, queue or current lyric never replays the composition. */
 .dialog[data-dialog-phase="opening"]::backdrop{animation:roomShade 520ms ease-out both}
-.dialog[data-dialog-phase="closing"]::backdrop{animation:roomShade 260ms ease-in reverse both}
+.dialog[data-dialog-phase="closing"]::backdrop{animation:roomShade 260ms ease-in reverse both;backdrop-filter:none;-webkit-backdrop-filter:none}
 .dialog[data-dialog-phase="closing"]{pointer-events:none}
 .dialog[data-dialog-appearance="player"][data-dialog-phase="opening"]{animation:sleeveUnfold 780ms cubic-bezier(.16,.8,.18,1) both;transform-origin:50% 100%}
 .dialog[data-dialog-appearance="player"][data-dialog-phase="opening"] .playerArt{animation:recordSettle 670ms 70ms cubic-bezier(.18,.72,.2,1) both;transform-origin:25% 85%}

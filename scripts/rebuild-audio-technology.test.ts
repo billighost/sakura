@@ -2,10 +2,18 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
-import { chromium } from "@playwright/test";
+import { chromium, webkit } from "@playwright/test";
 import { analyseAudio, comparisonGains, audioWaveform, encodeAudioWav, type SampleBuffer } from "../src/rebuild/audio/analysis";
 import { AUDIO_TECHNOLOGIES, audioTechnology } from "../src/rebuild/audio/presets";
-import { needsMediaVolumeGain } from "../src/rebuild/audio/engine";
+import { configurePlaybackAudioSession, needsMediaVolumeGain } from "../src/rebuild/audio/engine";
+
+test("background playback claims a playback audio session where supported and tolerates unavailable APIs", () => {
+  const host = { audioSession: { type: "auto" } };
+  assert.equal(configurePlaybackAudioSession(host), true); assert.equal(host.audioSession.type, "playback");
+  assert.equal(configurePlaybackAudioSession({}), false);
+  const blocked = { audioSession: { get type() { return "auto"; }, set type(_: string) { throw new Error("unsupported"); } } };
+  assert.equal(configurePlaybackAudioSession(blocked), false);
+});
 
 test("Fixed media volume detection covers iPhone and desktop-mode iPad", () => {
   assert.equal(needsMediaVolumeGain({ userAgent: "iPhone", platform: "iPhone", maxTouchPoints: 5 }), true);
@@ -50,6 +58,35 @@ async function browserModule(file: string, dependencies: Record<string, string> 
   for (const [name, url] of Object.entries(dependencies)) code = code.replaceAll(`"${name}"`, JSON.stringify(url));
   return "data:text/javascript;base64," + Buffer.from(code).toString("base64");
 }
+for (const browserName of ["Chrome", "WebKit"]) test(`${browserName} background recovery preserves native media and explicit pause`, { timeout: 60000 }, async t => {
+  const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets });
+  const wav = Buffer.from(encodeAudioWav(tone(0.1, 1, 8))).toString("base64");
+  const browser = browserName === "WebKit" ? await webkit.launch({ headless: true }) : await chromium.launch({ channel: "chrome", headless: true });
+  try {
+    const page = await browser.newPage(); await page.evaluate("globalThis.__name = (fn) => fn");
+    if (!await page.evaluate(() => typeof AudioContext === "function")) { t.skip("This Windows WebKit runtime has no Web Audio support; iPhone background audio needs device verification."); return; }
+    const result = await page.evaluate(async ({ engine, wav }) => {
+      const { MediaAudioEngine } = await import(engine);
+      const session = { type: "auto" }; Object.defineProperty(navigator, "audioSession", { value: session, configurable: true });
+      const media = new Audio("data:audio/wav;base64," + wav); media.loop = true;
+      const supportsGraph = typeof AudioContext === "function";
+      const controller = new MediaAudioEngine(media, { requiresVolumeGraph: supportsGraph }); await controller.setMode("none"); await media.play();
+      const context = controller.context as AudioContext | null, source = media.src;
+      await new Promise(resolve => setTimeout(resolve, 250)); const before = media.currentTime;
+      if (context) await context.suspend();
+      else { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow")); }
+      const deadline = performance.now() + 3000;
+      while (context && context.state !== "running" && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+      const recovered = context?.state ?? "native"; await new Promise(resolve => setTimeout(resolve, 100)); const progressed = media.currentTime > before;
+      media.pause(); if (context) await context.suspend(); document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow"));
+      await new Promise(resolve => setTimeout(resolve, 100)); const stayedPaused = media.paused && (!context || context.state === "suspended");
+      controller.dispose();
+      return { type: session.type, recovered, progressed, stayedPaused, sameSource: source === media.src };
+    }, { engine, wav });
+    assert.ok(["running", "native"].includes(result.recovered));
+    assert.deepEqual({ ...result, recovered: "checked" }, { type: "playback", recovered: "checked", progressed: true, stayedPaused: true, sameSource: true });
+  } finally { await browser.close(); }
+});
 test("iPhone fixed element volume still produces the saved level, mute and dry bypass", { timeout: 60000 }, async () => {
   const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets });
   const wav = Buffer.from(encodeAudioWav(tone(0.1, 1, 8))).toString("base64");

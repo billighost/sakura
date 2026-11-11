@@ -94,6 +94,7 @@ async function setup(width){
       counts.readings++;const body=request.postDataJSON(),lines=await romanizeLyricLines(body.lines,body.language);
       return route.fulfill({json:{engine:readingEngine(body.language),lines}});
     }
+    if(path==='/api/v2/lyrics/challenge')return route.fulfill({json:{prefix:'lyrics-fixture',target:'f'.repeat(64),expiresAt:Date.now()+240000}});
     if(path==='/api/v2/lyrics/publish'){
       publications++;assert.equal(request.postDataJSON().recordingId,tracks[3].id);
       return route.fulfill({status:201,json:{published:true,lyrics:{lines:[{text:'Freshly published words',start:0}],timing:'plain',provider:'lrclib',providerTrackId:400,schemaVersion:'verified-lyrics-v3'}}});
@@ -188,9 +189,9 @@ async function run(width){
     await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});await page.getByRole('searchbox',{name:'Find a liked song'}).fill('Unpublished');await page.getByRole('button',{name:'Play Unpublished fixture',exact:true}).click();
     await page.getByRole('button',{name:'Open now playing',exact:true}).click();player=page.locator('dialog[data-dialog-appearance="player"]');await expect(player).toHaveAttribute('data-dialog-phase','open');
     await player.getByRole('button',{name:'Lyrics',exact:true}).click();lyrics=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(lyrics).toHaveAttribute('data-dialog-phase','open');
-    await lyrics.getByRole('button',{name:'Missing lyrics? Upload them',exact:true}).click();const text=lyrics.getByRole('textbox',{name:'Lyrics',exact:true});await text.fill('Freshly published words');
+    await lyrics.getByRole('button',{name:'Missing lyrics? Add the words',exact:true}).click();const studio=page.locator('dialog').last(),text=studio.getByRole('textbox',{name:'Lyrics text',exact:true});await text.fill('Freshly published words');
     const pausedBefore=await page.evaluate(()=>window.readingFixtureAudio.paused);await text.press('Space');assert.equal(await page.evaluate(()=>window.readingFixtureAudio.paused),pausedBefore,'Typing Space never changes playback');
-    await lyrics.getByRole('button',{name:'Publish lyrics',exact:true}).click();await expect(lyrics.locator('button[data-lyric-index="0"]')).toContainText('Freshly published words');assert.equal(publications,width>=700?1:2);
+    await studio.getByRole('button',{name:'Publish to LRCLIB',exact:true}).click();await expect(lyrics.locator('button[data-lyric-index="0"]')).toContainText('Freshly published words');assert.equal(publications,width>=700?1:2);
     await page.screenshot({path:`${output}/complete-${width}.png`});
     report.checks.push(`${width}px: pagination, collaborator/album/non-Latin searches, Chinese/Korean readings, current-recording taste actions, mouse/touch lyric focus, Space after click/selection, repeat/IME isolation, seek/volume/native slider keys, song keys, help/queue/player/lyrics/search shortcuts, album dialog navigation, 4-cover mix/3-cover broken fallback/0-cover empty/1-cover custom playlist, typed-space isolation and exact fresh upload result`);
   }finally{await context.close();}

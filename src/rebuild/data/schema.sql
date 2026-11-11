@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS sakura_v2."Favorite" (
   created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(account_id,recording_id)
 );
 CREATE INDEX IF NOT EXISTS v2_favorite_order ON sakura_v2."Favorite"(account_id,created_at DESC,recording_id DESC);
+-- Receipts survive unlikes so retrying an acknowledged offline like cannot
+-- restore a song removed by another device after that operation committed.
+CREATE TABLE IF NOT EXISTS sakura_v2."FavoriteOperationReceipt" (
+  account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+  operation_id uuid NOT NULL,
+  recording_id uuid NOT NULL REFERENCES sakura_v2."Recording"(id) ON DELETE RESTRICT,
+  liked boolean NOT NULL, received_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(account_id,operation_id)
+);
 CREATE TABLE IF NOT EXISTS sakura_v2."Playlist" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,

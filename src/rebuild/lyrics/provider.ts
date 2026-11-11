@@ -124,7 +124,12 @@ export async function fetchLrcLibLyrics(identity: LyricIdentity, options: LyricP
     }
   }
   const urls = unique([
-    ...pairs.map(([title, artist]) => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title, artist_name: artist })}`),
+    ...pairs.slice(0,1).map(([title, artist]) => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title, artist_name: artist })}`),
+    // Newly published LRCLIB records can reach its title search before the
+    // artist/signature indexes. Returned metadata must still pass every
+    // recording identity check; query breadth never selects a recording.
+    ...variants.titles.slice(0,2).map(title => `https://lrclib.net/api/search?${new URLSearchParams({ q: title })}`),
+    ...pairs.slice(1).map(([title, artist]) => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title, artist_name: artist })}`),
     ...(identity.album ? variants.titles.slice(0, 2).map(title => `https://lrclib.net/api/search?${new URLSearchParams({track_name: title, album_name: identity.album!})}`) : []),
     ...variants.titles.slice(0, 4).map(title => `https://lrclib.net/api/search?${new URLSearchParams({ q: `${title} ${identity.artist}` })}`),
     // Provider artist spelling can differ even when its returned metadata verifies.

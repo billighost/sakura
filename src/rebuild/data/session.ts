@@ -8,6 +8,8 @@ import {musicTrack} from "../app/types";
 export function sessionPatch(value:unknown){
  const raw=object(value),state=object(raw.state);
  const deviceId=uuid(raw.deviceId,"device ID"),revision=integer(raw.revision,"session revision",0,Number.MAX_SAFE_INTEGER);
+ if(raw.explicit!==undefined&&typeof raw.explicit!=="boolean")throw new ProductError(400,"Invalid listening choice");
+ const explicit=raw.explicit!==false,intentAt=raw.intentAt===undefined?undefined:integer(raw.intentAt,"listening choice time",0,Number.MAX_SAFE_INTEGER);
  if(!Array.isArray(state.queue)||state.queue.length>SESSION_QUEUE_LIMIT)throw new ProductError(400,"Invalid listening queue");
  const seen=new Set<string>();
  const queue=state.queue.map(value=>{
@@ -31,10 +33,13 @@ export function sessionPatch(value:unknown){
  const current=queue.find(entry=>entry.entryId===currentEntryId);
  if(current&&current.track.durationMs&&positionMs>current.track.durationMs+5000)throw new ProductError(400,"Playback position exceeds song duration");
  const sleepUntil=state.sleepUntil==null?null:integer(state.sleepUntil,"sleep timer",0,Date.now()+86400000);
- return {deviceId,revision,state:{queue,currentEntryId,positionMs,sleepUntil} satisfies ListeningSession};
+ return {deviceId,revision,explicit,intentAt,state:{queue,currentEntryId,positionMs,sleepUntil} satisfies ListeningSession};
 }
 function record(row:Record<string,unknown>|undefined):SessionRecord|null {
- return row?{state:row.state as ListeningSession,revision:Number(row.revision),deviceId:String(row.device_id),updatedAt:new Date(String(row.updated_at)).getTime()}:null;
+ if(!row)return null;
+ const {__sakuraSession,...state}=row.state as ListeningSession&{__sakuraSession?:{choiceAt?:unknown}},updatedAt=new Date(String(row.updated_at)).getTime();
+ const choiceAt=typeof __sakuraSession?.choiceAt==="number"&&Number.isSafeInteger(__sakuraSession.choiceAt)&&__sakuraSession.choiceAt>=0?__sakuraSession.choiceAt:updatedAt;
+ return {state,revision:Number(row.revision),deviceId:String(row.device_id),updatedAt,choiceAt};
 }
 export async function getSession(accountId:string){
  const session=record((await getRebuildPool().query('SELECT * FROM sakura_v2."ListeningSession" WHERE account_id=$1::uuid',[accountId])).rows[0]);
@@ -50,9 +55,14 @@ export async function putSession(accountId:string,value:unknown){
    if(previous?.deviceId===patch.deviceId&&isDeepStrictEqual(previous.state,JSON.parse(JSON.stringify(patch.state))))return {accepted:true,session:previous};
    return {accepted:false,session:previous};
   }
+  // Keep choice ordering inside the existing JSONB envelope. Public state is
+  // stripped of this reserved field on reads and cannot supply it on writes.
+  // Checkpoints advance updated_at while retaining the latest deliberate choice.
+  const now=Date.now(),choiceAt=patch.explicit?Math.max(previous?.choiceAt??0,Math.min(patch.intentAt??now,now)):previous?.choiceAt??now;
+  const stored={...patch.state,__sakuraSession:{choiceAt}};
   const result=await client.query(`INSERT INTO sakura_v2."ListeningSession"(account_id,state,device_id,revision)
    VALUES($1::uuid,$2::jsonb,$3::uuid,1) ON CONFLICT(account_id) DO UPDATE SET state=EXCLUDED.state,
-   device_id=EXCLUDED.device_id,revision=sakura_v2."ListeningSession".revision+1,updated_at=now() RETURNING *`,[accountId,JSON.stringify(patch.state),patch.deviceId]);
+   device_id=EXCLUDED.device_id,revision=sakura_v2."ListeningSession".revision+1,updated_at=now() RETURNING *`,[accountId,JSON.stringify(stored),patch.deviceId]);
   return {accepted:true,session:record(result.rows[0])};
  });
  return {...result,serverTime:Date.now()};

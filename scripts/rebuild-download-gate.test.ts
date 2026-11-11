@@ -54,7 +54,7 @@ test("repeated listening uploads coalesce and remove the exact outbox only after
  let requests=0,release:(response:Response)=>void=()=>{};
  globalThis.fetch=async(_url,init)=>{requests++;assert.equal(new Headers(init?.headers).get("X-Sakura-Account"),"account-a");return new Promise<Response>(resolve=>{release=resolve;});};
  const first=deliverListen("account-a",listenChunk),second=deliverListen("account-a",listenChunk);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(requests,1);assert.equal(values.size,1);
- release(new Response("{}",{status:200}));assert.deepEqual(await Promise.all([first,second]),[true,true]);assert.equal(values.size,0);
+ release(Response.json({accepted:true,eventId:listenChunk.eventId,sequence:listenChunk.sequence}));assert.deepEqual(await Promise.all([first,second]),[true,true]);assert.equal(values.size,0);
 }));
 
 test("failed history drain stops at one request and preserves the backlog for each account",async()=>withListenStorage(async values=>{

@@ -1,4 +1,8 @@
-const CACHE="sakura-ink-shell-v3";
+const CACHE="sakura-ink-shell-v4";
+const ASSETS="sakura-ink-assets-v1";
+const ARTWORK="sakura-ink-artwork-v1";
+const resourceFlights=new Map();
+const documentFlights=new Map();
 const OFFLINE="/offline";
 const AUDIO_PREFIX="/_sakura/audio/";
 const audioCapabilities=new Map();
@@ -27,6 +31,8 @@ function revokeAudioCapability(token){const capability=audioCapabilities.get(tok
 self.addEventListener("message",event=>{
  const data=event.data,clientId=event.source?.id;
  if(!clientId||event.origin&&event.origin!==self.location.origin)return;
+ if(data?.type==="sakura-cache-route"&&typeof data.path==="string"&&data.path.length<2048&&musicPath(data.path)){event.waitUntil(cacheDocument(data.path).catch(()=>{}));return;}
+ if(data?.type==="sakura-warm-shell"){event.waitUntil(cacheDocument(OFFLINE,true).catch(()=>{}));return;}
  if(data?.type==="sakura-audio-revoke"){audioClientEpochs.set(clientId,(audioClientEpochs.get(clientId)||0)+1);revokedAudioClients.add(clientId);for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);await pruneAudioCapabilities(clientId);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type==="sakura-audio-revoke-token"&&audioUuid.test(data.token)){audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{const active=audioCapabilities.get(data.token),saved=active||await audioEntry("audio-bridge:"+data.token).catch(()=>undefined);if(saved?.clientId!==clientId)return;if(active)revokeAudioCapability(data.token);else await deleteAudioCapability(data.token);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type!=="sakura-audio-register"||!audioUuid.test(data.token)||!validAudioBridge(data.bridge)){if(data?.type==="sakura-audio-register")event.ports[0]?.postMessage({status:"unavailable"});return;}
@@ -121,16 +127,68 @@ async function serveDeviceAudio(request,clientId,token){
   return new Response(body,{status:range.partial?206:200,headers});
  }catch(error){cleanup();controller.abort(error);return new Response(null,{status:request.signal.aborted?499:503,headers:{"Cache-Control":"private, no-store"}});}
 }
+function musicPath(path){return /^\/(?:home|discover|search|library(?:\/downloaded)?|liked|downloads|offline|profile|settings|onboarding|import|(?:artist|album|playlist|mix|track)\/[^/]+|bloom(?:\/[^/]+)?)\/?$/.test(path);}
+async function cacheFirst(request,name){
+ const cache=await caches.open(name),saved=await cache.match(request,{ignoreSearch:name===ASSETS});if(saved)return saved;
+ const identity=new URL(request.url);if(name===ASSETS)identity.search="";
+ const key=name+":"+identity.href;let flight=resourceFlights.get(key);
+ if(!flight){
+  // One consumer cancelling its image does not cancel another consumer's copy.
+  flight=(async()=>{const response=await fetch(new Request(request,{signal:null}));if(response.ok&&response.status===200&&(name!==ARTWORK||response.headers.get("Content-Type")?.startsWith("image/"))){try{await cache.put(request,response.clone());}catch{}}return response;})();
+  resourceFlights.set(key,flight);void flight.finally(()=>{if(resourceFlights.get(key)===flight)resourceFlights.delete(key);}).catch(()=>{});
+ }
+ return (await flight).clone();
+}
+async function cacheDocument(path,refresh=false){
+ if(!musicPath(path))return;const cache=await caches.open(CACHE);
+ if(!refresh&&await cache.match(path))return;
+ let flight=documentFlights.get(path);if(flight)return flight;
+ flight=(async()=>{
+  const response=await fetch(path,{cache:"reload",credentials:"same-origin",headers:{Accept:"text/html"}});
+  // Never persist an authentication redirect as an offline music page.
+  if(!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return;
+  const savedResponse=response.clone(),html=await response.text();
+  const assets=[...new Set(html.match(/\/_next\/static\/[^"\s<>]+\.(?:js|css|woff2?)/g)||[])];
+  await Promise.allSettled(assets.map(url=>cacheFirst(new Request(new URL(url,self.location.origin)),ASSETS)));
+  try{await cache.put(path,savedResponse);}catch{}
+ })();documentFlights.set(path,flight);
+ try{return await flight;}finally{if(documentFlights.get(path)===flight)documentFlights.delete(path);}
+}
 self.addEventListener("install",event=>event.waitUntil((async()=>{
- const cache=await caches.open(CACHE);
- try{const response=await fetch(OFFLINE,{cache:"reload"});if(response.ok){await cache.put(OFFLINE,response.clone());const html=await response.text();const assets=[...new Set(html.match(/\/_next\/static\/[^"\s<>]+\.(?:js|css)/g)||[])];await Promise.allSettled(assets.map(url=>cache.add(url)));}}catch{}
+ await cacheDocument(OFFLINE,true).catch(()=>{});
+ await Promise.allSettled(["/icons/ink.svg","/icons/ink-180.png","/icons/ink-192.png","/icons/ink-512.png","/manifest.json","/lyric-publish-worker.js"].map(path=>cacheFirst(new Request(new URL(path,self.location.origin)),CACHE)));
  await self.skipWaiting();
 })()));
-self.addEventListener("activate",event=>event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith("sakura")&&name!==CACHE)await caches.delete(name);await self.clients.claim();})()));
+self.addEventListener("activate",event=>event.waitUntil((async()=>{
+ // Artwork and verified audio belong to the device, not this deployment. Keep
+ // the previous shell's hashed assets available to already-open player tabs.
+ await self.clients.claim();
+})()));
 self.addEventListener("fetch",event=>{
  const request=event.request;const url=new URL(request.url);
  if(["GET","HEAD"].includes(request.method)&&url.origin===self.location.origin&&url.pathname.startsWith(AUDIO_PREFIX)){event.respondWith(serveDeviceAudio(request,event.clientId,url.pathname.slice(AUDIO_PREFIX.length)));return;}
- if(request.method!=="GET"||url.origin!==self.location.origin||url.pathname.startsWith("/api/")||request.headers.has("RSC")||url.searchParams.has("_rsc"))return;
- if(request.mode==="navigate"){event.respondWith((async()=>{const cache=await caches.open(CACHE);try{const response=await fetch(request);if(response.ok)await cache.put(request,response.clone());return response;}catch{const saved=await cache.match(request,{ignoreSearch:true});if(saved)return saved;const offline=await cache.match(OFFLINE);if(url.pathname===OFFLINE)return offline||new Response("Your offline library has not been opened on this device yet.",{status:503,headers:{"Content-Type":"text/plain"}});return Response.redirect(new URL(OFFLINE,self.location.origin),302);}})());return;}
- if(url.pathname.startsWith("/_next/static/")||url.pathname.startsWith("/icons/")){event.respondWith((async()=>{const cache=await caches.open(CACHE);const saved=await cache.match(request);if(saved)return saved;const response=await fetch(request);if(response.ok){await cache.put(request,response.clone());const keys=await cache.keys();if(keys.length>250)await cache.delete(keys.find(key=>new URL(key.url).pathname!==OFFLINE));}return response;})());}
+ if(request.method!=="GET"||url.origin!==self.location.origin)return;
+ if(url.pathname==="/api/v2/image"){event.respondWith(cacheFirst(request,ARTWORK));return;}
+ // Account JSON is persisted by Sakura's account-scoped resource store. RSC
+ // responses vary by router state and must never share a URL-only cache.
+ if(url.pathname.startsWith("/api/")||request.headers.has("RSC")||url.searchParams.has("_rsc"))return;
+ if(request.mode==="navigate"){event.respondWith((async()=>{
+  const cache=await caches.open(CACHE);
+  try{
+   const response=await fetch(request);
+   if(response.ok&&!response.redirected&&musicPath(url.pathname)&&response.headers.get("Content-Type")?.includes("text/html")){
+    try{await cache.put(url.pathname,response.clone());}catch{}
+   }
+   return response;
+  }catch{
+   const saved=await cache.match(url.pathname);if(saved)return saved;
+   // Deliver the neutral client shell under the requested URL. Its offline
+   // renderer opens that page using account-scoped data, preserving deep links.
+   const offline=musicPath(url.pathname)&&await cache.match(OFFLINE);if(offline)return offline;
+   return new Response("Open Sakura once while connected to prepare this device for offline listening.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}});
+  }
+ })());return;}
+ if(url.pathname.startsWith("/_next/static/")){event.respondWith(cacheFirst(request,ASSETS));return;}
+ if(request.destination==="image"&&!url.pathname.startsWith("/icons/")&&url.pathname!=="/favicon.svg"){event.respondWith(cacheFirst(request,ARTWORK));return;}
+ if(url.pathname.startsWith("/icons/")||["/manifest.json","/favicon.svg","/lyric-publish-worker.js"].includes(url.pathname))event.respondWith(cacheFirst(request,CACHE));
 });

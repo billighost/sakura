@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { localDelete, localRead, localWrite } from "./offline";
 import { requestJson, userIssue, UserFacingError } from "./errors";
+import {browserOffline,canonicalResourcePath,durableCatalogResource,resourceIsFresh} from "./resourcePolicy";
 export interface ResourceState<T>{data:T|undefined;loading:boolean;error:UserFacingError|null;updatedAt:number}
 const EMPTY:ResourceState<never>={data:undefined,loading:false,error:null,updatedAt:0};
 type Resource={snapshot:ResourceState<unknown>;listeners:Set<()=>void>;flight:Promise<void>|null;controller:AbortController|null;generation:number;reload:boolean;cacheQueue:Promise<void>};
@@ -15,10 +16,13 @@ function rememberInvalidation(accountId:string,path:string,updatedAt:number){con
 function resource(key:string):Resource{let item=entries.get(key);if(!item){item={snapshot:EMPTY,listeners:new Set(),flight:null,controller:null,generation:0,reload:false,cacheQueue:Promise.resolve()};entries.set(key,item);}return item;}
 function update(item:Resource,patch:Partial<ResourceState<unknown>>){item.snapshot={...item.snapshot,...patch};for(const listener of item.listeners)listener();}
 export async function loadResource(accountId:string,path:string,force=false){
+ const originalPath=path;
+ path=canonicalResourcePath(path);
  const key=accountId+":"+path,item=resource(key);
+ if(force&&browserOffline()&&item.snapshot.data!==undefined){update(item,{loading:false,error:null});return;}
  if(force)invalidate(item,accountId,path);
  if(item.flight)return item.flight;
- if(!item.reload&&item.snapshot.data!==undefined&&fresh(item.snapshot.updatedAt))return;
+ if(!item.reload&&item.snapshot.data!==undefined&&(resourceIsFresh(path,item.snapshot.updatedAt)||browserOffline()))return;
  item.flight=(async()=>{
   let allowSaved=!force&&!item.reload;
   try{do{
@@ -27,12 +31,16 @@ export async function loadResource(accountId:string,path:string,force=false){
    update(item,{loading:item.snapshot.data===undefined,error:null});
    try{
     if(allowSaved&&item.snapshot.data===undefined){
-     const saved=await localRead<{data:unknown;updatedAt:number}>(accountId,"resource:"+path).catch(()=>undefined);
+     const saved=await localRead<{data:unknown;updatedAt:number}>(accountId,"resource:"+path).catch(()=>undefined)|| (originalPath!==path?await localRead<{data:unknown;updatedAt:number}>(accountId,"resource:"+originalPath).catch(()=>undefined):undefined);
      if(!current())continue;
-     if(saved&&Number.isFinite(saved.updatedAt)&&saved.updatedAt>invalidatedAt(accountId,path)){
+     if(saved&&Number.isFinite(saved.updatedAt)&&saved.updatedAt>0&&saved.updatedAt>listeningErasedAt(accountId,path)){
       update(item,{data:saved.data,updatedAt:saved.updatedAt,loading:false});
-      if(current()&&!item.reload&&fresh(saved.updatedAt))break;
+      if(current()&&!item.reload&&(saved.updatedAt>Math.max(invalidatedAt(accountId,path),invalidatedAt(accountId,originalPath))&&resourceIsFresh(path,saved.updatedAt)||browserOffline()))break;
      }
+    }
+    if(browserOffline()){
+     if(item.snapshot.data!==undefined){update(item,{loading:false,error:null});break;}
+     throw new UserFacingError({kind:"offline",title:"This page has not been saved on this device yet.",message:"Visit this page while connected to keep it available for your offline hours.",action:"Try again"});
     }
     const data=await requestJson(path,{signal:controller.signal},{accountId});if(!current())continue;
     const updatedAt=Math.max(Date.now(),invalidatedAt(accountId,path)+1);update(item,{data,updatedAt,loading:false,error:null});
@@ -50,21 +58,25 @@ export async function loadResource(accountId:string,path:string,force=false){
  })();return item.flight;
 }
 function cacheTask(item:Resource,task:()=>Promise<void>){const operation=item.cacheQueue.catch(()=>{}).then(task);item.cacheQueue=operation.catch(()=>{});return item.cacheQueue;}
-function invalidate(item:Resource,accountId:string,path:string,dropData=false){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);void cacheTask(item,()=>localDelete(accountId,"resource:"+path));update(item,{updatedAt:0,...(dropData?{data:undefined,error:null}: {})});}
-function fresh(updatedAt:number){const age=Date.now()-updatedAt;return updatedAt>0&&age>=-1000&&age<120000;}
+function invalidate(item:Resource,accountId:string,path:string,dropData=false){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);if(dropData)void cacheTask(item,()=>localDelete(accountId,"resource:"+path));update(item,{updatedAt:0,...(dropData?{data:undefined,error:null}: {})});}
 /** Stable snapshots are shared by subscribers and explicit prefetch callers. */
-export function resourceSnapshot<T>(accountId:string,path:string):ResourceState<T>{return (entries.get(accountId+":"+path)?.snapshot||EMPTY) as ResourceState<T>;}
-export function useResource<T>(accountId:string|null,path:string|null){const key=accountId&&path?accountId+":"+path:null;
+export function resourceSnapshot<T>(accountId:string,path:string):ResourceState<T>{return (entries.get(accountId+":"+canonicalResourcePath(path))?.snapshot||EMPTY) as ResourceState<T>;}
+export function useResource<T>(accountId:string|null,path:string|null){const canonicalPath=path?canonicalResourcePath(path):null,key=accountId&&canonicalPath?accountId+":"+canonicalPath:null;
  const subscribe=useCallback((listener:()=>void)=>{if(!key)return()=>{};const item=resource(key);item.listeners.add(listener);return()=>{item.listeners.delete(listener);};},[key]);
- const snapshot=useCallback(()=>accountId&&path?resourceSnapshot<T>(accountId,path):EMPTY,[accountId,path]);const result=useSyncExternalStore(subscribe,snapshot,()=>EMPTY) as ResourceState<T>;
- useEffect(()=>{if(accountId&&path)void loadResource(accountId,path);},[accountId,path]);
+ const snapshot=useCallback(()=>accountId&&canonicalPath?resourceSnapshot<T>(accountId,canonicalPath):EMPTY,[accountId,canonicalPath]);const result=useSyncExternalStore(subscribe,snapshot,()=>EMPTY) as ResourceState<T>;
+ useEffect(()=>{
+  if(!accountId||!path)return;
+  const load=()=>{void loadResource(accountId,path);};load();
+  window.addEventListener("online",load);
+  return()=>window.removeEventListener("online",load);
+ },[accountId,path]);
  // Effects start fetching after the first paint. An eligible empty snapshot is
  // already pending, so show its loading UI instead of flashing an empty room.
  return {...result,loading:result.loading||!!(accountId&&path&&result.data===undefined&&!result.error),retry:()=>{if(accountId&&path)void loadResource(accountId,path,true);}};
 }
 export function invalidateResources(accountId:string,prefix="/api/v2/",dropData=false){
  if(dropData){try{const stamp=Math.max(Date.now(),...Array.from(entries).filter(([key])=>key.startsWith(accountId+":")).map(([,item])=>item.snapshot.updatedAt+1));localStorage.setItem(erasureKey(accountId),String(stamp));for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key?.startsWith(`sakura-bloom-scene:${accountId}:`))localStorage.removeItem(key);}}catch{}}
- for(const [key,item]of entries){if(key.startsWith(accountId+":"+prefix)){const path=key.slice(accountId.length+1);invalidate(item,accountId,path,dropData&&listeningResource(path));if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}}
+ for(const [key,item]of entries){if(key.startsWith(accountId+":"+prefix)){const path=key.slice(accountId.length+1);if(prefix==="/api/v2/"&&durableCatalogResource(path))continue;invalidate(item,accountId,path,dropData&&listeningResource(path));if(item.listeners.size&&!item.flight)void loadResource(accountId,path);}}
 }
 export function clearResources(accountId:string){for(const [key,item] of entries)if(key.startsWith(accountId+":")){item.generation++;item.reload=false;item.controller?.abort();entries.delete(key);update(item,EMPTY);}}
 

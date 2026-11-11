@@ -6,6 +6,36 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {responseIssue,userMessage,UserFacingError} from "../src/rebuild/app/errors";
 import {settingsFields} from "../src/rebuild/app/preferences";
 import {preferencesPatch,DEFAULT_SETTINGS} from "../src/rebuild/data/validation";
+import {canonicalResourcePath,durableCatalogResource,resourceIsFresh} from "../src/rebuild/app/resourcePolicy";
+
+test("catalog identities outlive a time limit while evolving personal resources refresh",()=>{
+ const stamp=1700000000000,monthLater=stamp+31*86400000;
+ for(const path of ["/api/v2/artists/deezer%3A1","/api/v2/albums/album-1?cursor=2","/api/v2/recordings/recording-1","/api/v2/search?q=hana"])assert.equal(resourceIsFresh(path,stamp,monthLater),true,path);
+ for(const path of ["/api/v2/home","/api/v2/feed?surface=discover","/api/v2/library","/api/v2/bloom/shelf"])assert.equal(resourceIsFresh(path,stamp,monthLater),false,path);
+ assert.equal(durableCatalogResource("/api/v2/recordings/id/audio"),false);
+ assert.equal(resourceIsFresh("/api/v2/artists/id",monthLater+60000,stamp),false,"A corrupt future timestamp is never fresh");
+ assert.equal(canonicalResourcePath("/api/v2/search?kind=tracks&q=wind%20song"),canonicalResourcePath("/api/v2/search?q=wind+song&kind=tracks"));
+});
+
+test("equivalent catalog lookups share a flight and library edits do not refetch metadata",async t=>{
+ const account="resource-catalog-once",path="/api/v2/search?q=wind%20song&kind=tracks";let calls=0;
+ t.mock.method(globalThis,"fetch",async()=>{calls++;return Response.json({tracks:["wind"]});});
+ await Promise.all([loadResource(account,path),loadResource(account,"/api/v2/search?kind=tracks&q=wind+song")]);
+ assert.equal(calls,1);invalidateResources(account);await loadResource(account,path);assert.equal(calls,1);
+ assert.deepEqual(resourceSnapshot(account,"/api/v2/search?kind=tracks&q=wind%20song").data,{tracks:["wind"]});
+ await loadResource(account,path,true);assert.equal(calls,2,"Explicit refresh still reaches the provider");clearResources(account);
+});
+
+test("offline navigation serves old personal data without a failed fetch and explains an unvisited page",async t=>{
+ const account="resource-offline-cached",path="/api/v2/library",original=Object.getOwnPropertyDescriptor(globalThis,"navigator");let calls=0;
+ t.mock.method(globalThis,"fetch",async()=>{calls++;return Response.json({recordings:["saved song"]});});
+ await loadResource(account,path);
+ Object.defineProperty(globalThis,"navigator",{configurable:true,value:{onLine:false}});
+ t.after(()=>{if(original)Object.defineProperty(globalThis,"navigator",original);else Reflect.deleteProperty(globalThis,"navigator");clearResources(account);});
+ t.mock.method(Date,"now",()=>2000000000000);
+ await loadResource(account,path);assert.equal(calls,1);assert.deepEqual(resourceSnapshot(account,path).data,{recordings:["saved song"]});assert.equal(resourceSnapshot(account,path).error,null);
+ await loadResource(account,"/api/v2/albums/not-visited");assert.equal(calls,1);assert.equal(resourceSnapshot(account,"/api/v2/albums/not-visited").error?.issue.kind,"offline");
+});
 
 test("an uncached room shows loading from its first paint, before effects fetch",()=>{
  function Room({account,path}:{account:string|null;path:string|null}){
