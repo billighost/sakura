@@ -15,10 +15,11 @@ const noResult=text=>/no results?|not found|nothing found|no tracks|unsupported|
 /** Searches share the existing socket. Only conversations in the same chat
  * serialize; independent chats and byte streams can proceed concurrently. */
 class RebuildAudioService {
- constructor({telegram,api,bigInt,bots,queue,queueFor,ensureConnected,onFatal,pollIntervalMs=650,now=Date.now,sleep=wait}){
+ constructor({telegram,api,bigInt,bots,queue,queueFor,ensureConnected,onFatal,recoverMetadata,pollIntervalMs=650,now=Date.now,sleep=wait}){
   this.telegram=telegram;this.api=api;this.bigInt=bigInt;this.bots=new Set(bots.map(bot=>bot.toLowerCase()));
   this.queue=queue;this.queueFor=queueFor;this.ensureConnected=ensureConnected;this.pollIntervalMs=pollIntervalMs;this.now=now;this.sleep=sleep;
   this.onFatal=onFatal;
+  this.recoverMetadata=recoverMetadata;this.metadataFlights=new Map();this.metadataRecovered=new Map();
   this.documents=new Map();this.documentFlights=new Map();this.peerFlights=new Map();this.resolveFlights=new Map();this.resolved=new Map();
  }
  scope(bot){if(typeof bot!=="string"||!this.bots.has(bot.toLowerCase()))throw new Error("Unknown worker chat scope");return bot.toLowerCase();}
@@ -41,13 +42,29 @@ class RebuildAudioService {
   if(!attributes||attributes.voice||typeof attributes.title!=="string"||!attributes.title.trim()||typeof attributes.performer!=="string"||!attributes.performer.trim()||!Number.isFinite(Number(attributes.duration))||Number(attributes.duration)<=0||!Number.isSafeInteger(size)||size<4096||size>MAX_AUDIO||!AUDIO_MIMES.has(mimeType)||!/^[1-9]\d{0,14}$/.test(String(message.id)))return null;
   const metadata={title:attributes.title,artists:[attributes.performer],artistsComplete:false,durationMs:Math.round(Number(attributes.duration)*1000)};
   const audio={messageId:String(message.id),chatScope:bot,metadata,mimeType,size,fileId:String(document.id)};
-  const key=`${bot}:${message.id}`,previous=this.documents.get(key)?.audio;
+  const key=`${bot}:${message.id}`,entry=this.documents.get(key),previous=entry?.audio,rawMetadata=metadata;
+  if(previous&&previous.fileId===audio.fileId&&previous.size===audio.size&&previous.mimeType===audio.mimeType&&entry.rawMetadata&&JSON.stringify(entry.rawMetadata)===JSON.stringify(rawMetadata))audio.metadata=previous.metadata;
   if(previous&&(previous.fileId!==audio.fileId||previous.size!==audio.size||previous.mimeType!==audio.mimeType||JSON.stringify(previous.metadata)!==JSON.stringify(audio.metadata)))this.forgetSource(bot,message.id);
-  this.documents.delete(key);this.documents.set(key,{audio,document,checkedAt:this.now()});
+  this.documents.delete(key);this.documents.set(key,{audio,document,rawMetadata,checkedAt:this.now()});
   if(this.documents.size>1500)this.documents.delete(this.documents.keys().next().value);
   return audio;
  }
  candidate(audio){return {candidateId:audio.messageId,metadata:audio.metadata,audioKind:"full",references:[{provider:"telegram",scope:audio.chatScope,id:audio.messageId}]};}
+ async recover(audio){
+  if(!this.recoverMetadata)return audio;
+  const key=`${audio.chatScope}:${audio.messageId}:${audio.fileId}`;
+  if((this.metadataRecovered.get(key)||0)>this.now())return this.documents.get(`${audio.chatScope}:${audio.messageId}`)?.audio||audio;
+  if(!this.metadataFlights.has(key)){
+   let recovered=false;
+   const flight=Promise.resolve().then(()=>this.recoverMetadata(audio)).then(metadata=>{
+    const cached=this.documents.get(`${audio.chatScope}:${audio.messageId}`);
+    if(metadata&&cached?.audio.fileId===audio.fileId){recovered=true;cached.audio={...cached.audio,metadata};return cached.audio;}
+    return audio;
+   }).catch(()=>audio).finally(()=>{this.metadataFlights.delete(key);this.metadataRecovered.set(key,this.now()+(recovered?3600000:30000));if(this.metadataRecovered.size>1500)this.metadataRecovered.delete(this.metadataRecovered.keys().next().value);});
+   this.metadataFlights.set(key,flight);
+  }
+  return this.metadataFlights.get(key);
+ }
  select(request,audios){
   const matched=audios.filter(audio=>assessAudioCandidate(request,this.candidate(audio)).acceptable);
   const files=new Map(matched.map(audio=>[audio.fileId,audio]));
@@ -107,7 +124,11 @@ class RebuildAudioService {
     const recent=await this.telegram().getMessages(peer,{limit:64});
     if(this.now()>=botDeadline)return {status:"unavailable",reason:"audio-worker-queue-timeout"};
     const known=[...this.documents.values()].filter(value=>value.audio.chatScope===bot).map(value=>value.audio);
-    const audios=[...new Map([...known,...recent.map(message=>this.audio(message,bot)).filter(Boolean)].map(audio=>[audio.fileId,audio])).values()];
+    let audios=[...new Map([...known,...recent.map(message=>this.audio(message,bot)).filter(Boolean)].map(audio=>[audio.fileId,audio])).values()];
+    // Do not inspect every historical file. A bounded number of truncated
+    // candidates may recover their own embedded tags before strict matching.
+    let recovered=0;
+    audios=await Promise.all(audios.map(audio=>/…|\.{3}/u.test([audio.metadata.title,...audio.metadata.artists].join(" "))&&recovered++<2?this.recover(audio):audio));
     const audio=this.select(request,audios);if(audio)return {status:"ready",audio};
     const queries=searchQueries(request.metadata,references,request.references);
     for(let index=0;index<queries.length;index++){
@@ -141,7 +162,8 @@ class RebuildAudioService {
    const messages=await this.telegram().getMessages(peer,{limit:32,minId:sent.id});
    if(this.now()>=deadline)break;
    const fresh=messages.filter(message=>message?.id>sent.id&&!message.out).sort((a,b)=>a.id-b.id);
-   for(const message of fresh){const audio=this.audio(message,bot);if(audio)seen.set(audio.fileId,audio);}
+   let recovered=0;
+   for(const message of fresh){let audio=this.audio(message,bot);if(audio&&/…|\.{3}/u.test([audio.metadata.title,...audio.metadata.artists].join(" "))&&recovered++<2)audio=await this.recover(audio);if(audio)seen.set(audio.fileId,audio);}
    const audio=this.select(request,[...seen.values()]);if(audio)return {status:"ready",audio};
    if(fresh.some(message=>terminalMessage(message.message||"")))return {status:"unavailable",terminal:true,candidates:this.review(request,[...seen.values()])};
    if(fresh.some(message=>noResult(message.message||""))&&!seen.size)return {status:"unavailable"};
@@ -152,7 +174,7 @@ class RebuildAudioService {
     if(processedButtons.has(signature))continue;
     const ranked=buttons.map((button,index)=>buttonCandidate(button.text,index,request.metadata)).filter(Boolean)
      .map(candidate=>({candidate,assessment:assessAudioCandidate(request,candidate)}))
-     .filter(value=>value.assessment.acceptable||value.assessment.reasons.every(reason=>reason==="missing-duration"))
+     .filter(value=>value.assessment.acceptable||value.assessment.reasons.every(reason=>reason==="missing-duration")||inspectionCandidate(value.candidate,request))
      .sort((a,b)=>b.assessment.score-a.assessment.score||(b.candidate.bitrateKbps||0)-(a.candidate.bitrateKbps||0));
     if(!ranked.length){processedButtons.add(signature);continue;}
     if(clickedAt&&this.now()-clickedAt<Math.min(2000,this.pollIntervalMs*3))continue;
@@ -175,7 +197,7 @@ class RebuildAudioService {
   const key=`${scope}:${messageId}`,cached=this.documents.get(key);
   if(!refresh&&cached&&this.now()-cached.checkedAt<600000)return cached;
   if(this.documentFlights.has(key))return this.documentFlights.get(key);
-  const flight=(async()=>{if(this.ensureConnected)await this.ensureConnected();const peer=await this.peer(scope),messages=await this.telegram().getMessages(peer,{ids:[Number(messageId)]});const audio=this.audio(messages[0],scope);if(!audio){this.forgetSource(scope,messageId);throw new Error("Source audio not found");}return this.documents.get(key);})().catch(error=>{if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error)))this.onFatal?.(error);throw error;});
+  const flight=(async()=>{if(this.ensureConnected)await this.ensureConnected();const peer=await this.peer(scope),messages=await this.telegram().getMessages(peer,{ids:[Number(messageId)]});const audio=this.audio(messages[0],scope);if(!audio){this.forgetSource(scope,messageId);throw new Error("Source audio not found");}if(/…|\.{3}/u.test([audio.metadata.title,...audio.metadata.artists].join(" ")))await this.recover(audio);return this.documents.get(key);})().catch(error=>{if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error)))this.onFatal?.(error);throw error;});
   this.documentFlights.set(key,flight);try{return await flight;}finally{if(this.documentFlights.get(key)===flight)this.documentFlights.delete(key);}
  }
  async stream(bot,messageId,start,length,expectedAudio){
@@ -273,7 +295,7 @@ function buttonCandidate(label,index,expected){
  text=text.replace(/\[?\b(?:\d{2,4}\s*(?:kbps|kbit\/s|k)|flac|mp3|aac|m4a)\b\]?/giu," ").replace(/^[^\p{L}\p{N}]*/u,"").replace(/^\s*\d+[.)]\s*/,"").replace(/\s*[|·]\s*$/u,"").trim();
  const parts=text.split(/\s[-–—|:]\s/u);let title,performer;
  const known=normalizedRecording(expected).artists;
- const artistPart=value=>{const info=normalizedRecording({title:"candidate",artists:[value]},known);return info.primaryArtist===known[0]&&info.artists.every(artist=>known.includes(artist));};
+ const artistPart=value=>{const info=normalizedRecording({title:"candidate",artists:[value]},known);return info.primaryArtist===known[0]&&info.artists.every(artist=>known.includes(artist))||truncatedPrefix(value,known[0]);};
  if(parts.length>=2){
   if(artistPart(parts[0])){performer=parts[0];title=parts.slice(1).join(" - ");}
   else if(artistPart(parts[parts.length-1])){performer=parts[parts.length-1];title=parts.slice(0,-1).join(" - ");}
@@ -285,4 +307,15 @@ function buttonCandidate(label,index,expected){
  if(!parseRecordingTitle(title).base)return null;
  return {candidateId:String(index),metadata:{title,artists:[performer],artistsComplete:false,durationMs:duration?(Number(duration[1]||0)*3600+Number(duration[2])*60+Number(duration[3]))*1000:null},audioKind:/\b(?:preview|clip|snippet)\b/iu.test(label)?"preview":"full",...(bitrate?{bitrateKbps:Number(bitrate[1])}:{})};
 }
-module.exports={RebuildAudioService,buttonCandidate,searchQueries};
+function truncatedPrefix(value,expected){
+ if(typeof value!=="string"||!/(?:…|\.{3})\s*$/u.test(value))return false;
+ const prefix=normalizeMetadataText(value.replace(/(?:…|\.{3})\s*$/u,""));
+ return prefix.length>=12&&expected.startsWith(prefix);
+}
+function inspectionCandidate(candidate,request){
+ if(!candidate)return false;
+ const assessment=assessAudioCandidate(request,candidate),want=normalizedRecording(request.metadata);
+ if(!assessment.reasons.every(reason=>["title","artist","missing-duration"].includes(reason)))return false;
+ return (!assessment.reasons.includes("title")||truncatedPrefix(candidate.metadata.title,want.title))&&(!assessment.reasons.includes("artist")||truncatedPrefix(candidate.metadata.artists[0],want.primaryArtist));
+}
+module.exports={RebuildAudioService,buttonCandidate,searchQueries,inspectionCandidate};

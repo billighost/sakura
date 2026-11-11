@@ -112,13 +112,28 @@ test("stalled audio error bodies stop promptly and caller cancellation stays can
  }
 });
 
-test("a structured source failure still retries the same verified range through its alternate",async()=>{
+test("a structured direct-source failure retries the same verified range through the app fallback",async()=>{
  const data=bytes(4096),storage=new MemoryStorage(),requests:string[]=[];let snapshot:Record<string,DownloadEntry>={};
  const manager=new DurableDownloadManager({accountId:"account-a",storage,chunkBytes:4096,onChange:rows=>{snapshot=rows;},resolve:async value=>({track:value,url:"https://cdn.example/1",fallbackUrl:"/api/v2/recordings/1/audio?assetId=asset-1",assetId:"asset-1",sizeBytes:data.length,sha256:sha(data)}),fetcher:async(input,init)=>{
   requests.push(String(input));assert.equal(new Headers(init?.headers).get("Range"),"bytes=0-4095");if(requests.length===1)return Response.json({status:"unavailable",reason:"audio-source-unavailable"},{status:502});
   return new Response(data,{status:206,headers:{"Content-Type":"audio/mpeg","Content-Length":String(data.length),"Content-Range":`bytes 0-4095/${data.length}`}});
  }});
- try{await manager.enqueue(track("1"));assert.deepEqual(requests,["/api/v2/recordings/1/audio?assetId=asset-1","https://cdn.example/1"]);assert.equal(snapshot["1"].status,"ready");assert.equal(storage.audio.get("1")?.sha256,sha(data));}finally{manager.dispose();}
+ try{await manager.enqueue(track("1"));assert.deepEqual(requests,["https://cdn.example/1","/api/v2/recordings/1/audio?assetId=asset-1"]);assert.equal(snapshot["1"].status,"ready");assert.equal(storage.audio.get("1")?.sha256,sha(data));}finally{manager.dispose();}
+});
+
+for(const reopen of [false,true])test(`successful direct ranges avoid the Vercel proxy ${reopen?"after reopening a partial download":"for a fresh download"}`,async()=>{
+ const data=bytes(4096*4),storage=new MemoryStorage(),requests:Array<{url:string;start:number}>=[];
+ if(reopen){
+  storage.records.set("1",{version:1,recordingId:"1",track:track("1"),status:"queued",mode:"full",requested:true,priority:0,chunkBytes:4096,createdAt:Date.now(),updatedAt:Date.now(),fingerprint:{assetId:"asset-1",sizeBytes:data.length,sha256:sha(data)}});
+  const chunk=data.slice(0,4096);await storage.putChunk("1",{offset:0,blob:new Blob([chunk],{type:"audio/mpeg"}),sha256:sha(chunk)});
+ }
+ const f=setup({data,storage,onFetch:(url,start)=>requests.push({url,start}),resolve:async value=>({track:value,url:"https://cdn.example/1",fallbackUrl:"/api/v2/recordings/1/audio?assetId=asset-1",assetId:"asset-1",sizeBytes:data.length,sha256:sha(data)})});
+ try{
+  if(reopen){await f.manager.hydrate();await until(()=>f.snapshot["1"]?.status==="ready");}else await f.manager.enqueue(track("1"));
+  assert.ok(requests.length>0);assert.ok(requests.every(request=>request.url==="https://cdn.example/1"));
+  assert.deepEqual(requests.map(request=>request.start).sort((a,b)=>a-b),reopen?[4096,8192,12288]:[0,4096,8192,12288]);
+  assert.equal(storage.audio.get("1")?.sha256,sha(data));
+ }finally{f.manager.dispose();}
 });
 
 for(const reload of [false,true])for(const changed of [false,true])test(`failed download retry refreshes its source ${reload?"after reopening":"in the same session"} and ${changed?"replaces changed bytes":"retains matching chunks"}`,async()=>{

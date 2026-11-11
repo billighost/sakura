@@ -214,8 +214,9 @@ export class DurableDownloadManager {
   }catch(error){if(epoch===job.epoch&&!this.stopped&&!job.controller.signal.aborted&&!this.recover(job,error))this.fail(job,error);}
   finally{job.loading=false;this.resolving--;this.schedule();}}
  private async chunk(job:Job,offset:number){const epoch=job.epoch,source=job.source!,parent=job.controller.signal,controller=new AbortController(),abort=()=>controller.abort(parent.reason);if(parent.aborted)abort();else parent.addEventListener("abort",abort,{once:true});job.chunkControllers.set(offset,controller);const signal=controller.signal,end=Math.min(source.sizeBytes-1,offset+job.record.chunkBytes-1);try{
-   const sameOrigin=(url:string)=>{try{return typeof location!=="undefined"&&new URL(url,location.href).origin===location.origin||url.startsWith("/");}catch{return false;}};
-   const first=source.fallbackUrl&&sameOrigin(source.fallbackUrl)?source.fallbackUrl:source.url;const alternate=first===source.url?source.fallbackUrl:source.url;
+   // The resolver supplies a verified CDN/Worker URL. Use it before the app
+   // proxy so successful downloads do not consume Vercel audio bandwidth.
+   const first=source.url,alternate=source.fallbackUrl!==first?source.fallbackUrl:undefined;
    let result:Awaited<ReturnType<typeof fetchAudioRange>>|undefined,lastError:unknown;const structuralFailures=new Set<string>();
    for(let attempt=0;attempt<3;attempt++){signal.throwIfAborted();if(!this.isCurrent(job,epoch))return;if(!connected()){this.suspendForConnection();return;}const url=attempt===1&&alternate?alternate:first;
     job.inFlightBytes.set(offset,0);

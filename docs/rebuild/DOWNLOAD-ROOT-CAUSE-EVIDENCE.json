@@ -1,0 +1,1339 @@
+{
+  "investigatedAt": "2026-11-11T07:33:52.648Z",
+  "updatedAt": "2026-11-11T08:52:32.905Z",
+  "status": "Investigation and proposal only; implementation awaits user review",
+  "audioBytesTransferred": 0,
+  "userConfirmedHostingCause": "Render worker suspended because the bandwidth allowance was exhausted; user requested a free replacement host recommendation",
+  "scope": {
+    "database": "Read-only transaction; five canonical recordings and recent source jobs; no personal account/library/settings/listening changes",
+    "live": "Fresh source discovery for five selected canonical recordings plus health and authenticated capabilities; no audio retrieval",
+    "productionReplay": "Actual resolver/job classes using catalogue snapshots, captured live 503 and in-memory SQL writes; no authenticated live HTTP/browser download performed",
+    "historical": "Candidate metadata persisted by older source jobs; underlying file tags not freshly inspected because worker is suspended"
+  },
+  "workerHealth": [
+    {
+      "path": "/health",
+      "status": 503,
+      "elapsedMs": 633,
+      "contentType": "text/html; charset=utf-8",
+      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+    },
+    {
+      "path": "/v2/capabilities",
+      "status": 503,
+      "elapsedMs": 412,
+      "contentType": "text/html; charset=utf-8",
+      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+    }
+  ],
+  "recordings": [
+    {
+      "target": "sober",
+      "selectedReference": {
+        "provider": "deezer",
+        "id": "2394243075"
+      },
+      "canonicalMetadata": {
+        "title": "sober",
+        "artists": [
+          "Norhan"
+        ],
+        "durationMs": 173000,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "sober",
+              "artists": [
+                "Norhan"
+              ],
+              "durationMs": 173000,
+              "artistsComplete": true,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "2394243075"
+              },
+              {
+                "provider": "isrc",
+                "id": "QZNWX2393538"
+              }
+            ]
+          }
+        ]
+      },
+      "storedAudioAssetCount": 0,
+      "recentJobResults": [
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T07:20:58.901Z",
+          "updatedAt": "2026-11-11T07:20:59.092Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T16:57:23.958Z",
+          "updatedAt": "2026-11-10T16:57:24.168Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T14:39:25.784Z",
+          "updatedAt": "2026-11-10T14:39:26.010Z"
+        }
+      ],
+      "freshSourceDiscovery": {
+        "status": "unavailable",
+        "reason": "audio-worker-busy",
+        "retryable": true,
+        "elapsedMs": 574,
+        "requests": [
+          {
+            "path": "/v2/resolve",
+            "httpStatus": 503,
+            "elapsedMs": 569,
+            "upstreamBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+          }
+        ]
+      },
+      "aliasHydrationReplay": {
+        "canonicalNormalized": {
+          "title": "sober",
+          "primaryArtist": "norhan",
+          "artists": [
+            "norhan"
+          ],
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown",
+          "durationMs": 173000
+        },
+        "candidateAssessments": []
+      },
+      "productionClassReplay": {
+        "target": "sober",
+        "pendingStatus": "pending",
+        "jobState": "failed",
+        "result": {
+          "status": "unavailable",
+          "reason": "no-ready-audio",
+          "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+          "retryable": true,
+          "sourceReason": "audio-worker-busy"
+        },
+        "ui": {
+          "kind": "missing",
+          "title": "Audio is still being found for this song.",
+          "message": "We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",
+          "action": "Check again",
+          "href": "/search",
+          "linkLabel": "Find other versions"
+        },
+        "mode": "production classes replay with read-only catalogue snapshot and captured live upstream HTTP 503; SQL mutations are in memory; no network/audio transfers"
+      }
+    },
+    {
+      "target": "endless-quest-instrumental",
+      "selectedReference": {
+        "provider": "deezer",
+        "id": "3920119021"
+      },
+      "canonicalMetadata": {
+        "title": "众里寻他千百度(电视剧《逐玉》爱情主题曲) (The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')) (伴奏版)",
+        "artists": [
+          "张碧晨"
+        ],
+        "durationMs": 192000,
+        "artistsComplete": true,
+        "version": {
+          "kinds": [],
+          "labels": []
+        },
+        "explicit": "unknown"
+      },
+      "storedAudioAssetCount": 0,
+      "recentJobResults": [
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T07:20:50.845Z",
+          "updatedAt": "2026-11-11T07:20:51.139Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T06:08:40.673Z",
+          "updatedAt": "2026-11-11T06:08:40.956Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T16:57:18.977Z",
+          "updatedAt": "2026-11-10T16:57:19.305Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+            "sourceReason": "audio-source-unavailable"
+          },
+          "createdAt": "2026-11-10T08:45:53.859Z",
+          "updatedAt": "2026-11-10T08:47:03.676Z"
+        },
+        {
+          "state": "review",
+          "attempts": 1,
+          "result": {
+            "reason": "asset-mismatch",
+            "status": "review",
+            "candidates": [
+              {
+                "title": "众里寻他千百度(电视剧《逐玉》爱情主题曲) (The Endless Quest (Love Theme Song from the…",
+                "artists": [
+                  "张碧晨"
+                ],
+                "reasons": [
+                  "title"
+                ],
+                "durationMs": 192000
+              }
+            ],
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097"
+          },
+          "createdAt": "2026-11-09T14:03:58.026Z",
+          "updatedAt": "2026-11-09T14:04:14.777Z"
+        },
+        {
+          "state": "review",
+          "attempts": 1,
+          "result": {
+            "reason": "asset-mismatch",
+            "status": "review",
+            "candidates": [
+              {
+                "title": "众里寻他千百度(电视剧《逐玉》爱情主题曲) (The Endless Quest (Love Theme Song from the…",
+                "artists": [
+                  "张碧晨"
+                ],
+                "reasons": [
+                  "title"
+                ],
+                "durationMs": 192000
+              }
+            ],
+            "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097"
+          },
+          "createdAt": "2026-11-09T06:08:23.095Z",
+          "updatedAt": "2026-11-09T06:09:24.730Z"
+        }
+      ],
+      "freshSourceDiscovery": {
+        "status": "unavailable",
+        "reason": "audio-worker-busy",
+        "retryable": true,
+        "elapsedMs": 315,
+        "requests": [
+          {
+            "path": "/v2/resolve",
+            "httpStatus": 503,
+            "elapsedMs": 314,
+            "upstreamBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+          }
+        ]
+      },
+      "aliasHydrationReplay": {
+        "canonicalNormalized": {
+          "title": "众里寻他千百度 电视剧 逐玉 爱情主题曲 the endless quest love theme song from the tv series pursuit of jade 伴奏版",
+          "primaryArtist": "张碧晨",
+          "artists": [
+            "张碧晨"
+          ],
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown",
+          "durationMs": 192000
+        },
+        "candidateAssessments": [
+          {
+            "candidate": {
+              "title": "众里寻他千百度(电视剧《逐玉》爱情主题曲) (The Endless Quest (Love Theme Song from the…",
+              "artists": [
+                "张碧晨"
+              ],
+              "artistsComplete": false,
+              "durationMs": 192000
+            },
+            "before": [
+              "title"
+            ],
+            "after": [
+              "title"
+            ]
+          }
+        ]
+      },
+      "productionClassReplay": {
+        "target": "endless-quest-instrumental",
+        "pendingStatus": "pending",
+        "jobState": "failed",
+        "result": {
+          "status": "unavailable",
+          "reason": "no-ready-audio",
+          "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+          "retryable": true,
+          "sourceReason": "audio-worker-busy"
+        },
+        "ui": {
+          "kind": "missing",
+          "title": "Audio is still being found for this song.",
+          "message": "We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",
+          "action": "Check again",
+          "href": "/search",
+          "linkLabel": "Find other versions"
+        },
+        "mode": "production classes replay with read-only catalogue snapshot and captured live upstream HTTP 503; SQL mutations are in memory; no network/audio transfers"
+      }
+    },
+    {
+      "target": "vibration",
+      "selectedReference": {
+        "provider": "deezer",
+        "id": "797948692"
+      },
+      "canonicalMetadata": {
+        "title": "Vibration",
+        "artists": [
+          "Fireboy Dml"
+        ],
+        "durationMs": 198000,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "Vibration",
+              "artists": [
+                "Fireboy Dml"
+              ],
+              "durationMs": 198000,
+              "artistsComplete": true,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "797948692"
+              },
+              {
+                "provider": "isrc",
+                "id": "USUYG1281971"
+              }
+            ]
+          }
+        ]
+      },
+      "storedAudioAssetCount": 0,
+      "recentJobResults": [
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T07:20:53.115Z",
+          "updatedAt": "2026-11-11T07:20:53.380Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T16:57:20.655Z",
+          "updatedAt": "2026-11-10T16:57:20.897Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T13:04:03.540Z",
+          "updatedAt": "2026-11-10T13:04:03.771Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T13:03:56.178Z",
+          "updatedAt": "2026-11-10T13:03:56.510Z"
+        }
+      ],
+      "freshSourceDiscovery": {
+        "status": "unavailable",
+        "reason": "audio-worker-busy",
+        "retryable": true,
+        "elapsedMs": 335,
+        "requests": [
+          {
+            "path": "/v2/resolve",
+            "httpStatus": 503,
+            "elapsedMs": 334,
+            "upstreamBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+          }
+        ]
+      },
+      "aliasHydrationReplay": {
+        "canonicalNormalized": {
+          "title": "vibration",
+          "primaryArtist": "fireboy dml",
+          "artists": [
+            "fireboy dml"
+          ],
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown",
+          "durationMs": 198000
+        },
+        "candidateAssessments": []
+      },
+      "productionClassReplay": {
+        "target": "vibration",
+        "pendingStatus": "pending",
+        "jobState": "failed",
+        "result": {
+          "status": "unavailable",
+          "reason": "no-ready-audio",
+          "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+          "retryable": true,
+          "sourceReason": "audio-worker-busy"
+        },
+        "ui": {
+          "kind": "missing",
+          "title": "Audio is still being found for this song.",
+          "message": "We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",
+          "action": "Check again",
+          "href": "/search",
+          "linkLabel": "Find other versions"
+        },
+        "mode": "production classes replay with read-only catalogue snapshot and captured live upstream HTTP 503; SQL mutations are in memory; no network/audio transfers"
+      }
+    },
+    {
+      "target": "yoga-music",
+      "selectedReference": {
+        "provider": "deezer",
+        "id": "134124440"
+      },
+      "canonicalMetadata": {
+        "title": "Yoga Music",
+        "artists": [
+          "Nature Sounds Relaxation: Music for Sleep, Meditation, Massage Therapy, Spa, Rest & Relax Nature Sounds Artists, Natural Oasis"
+        ],
+        "durationMs": 287000,
+        "artistsComplete": true,
+        "explicit": "unknown",
+        "verifiedAliases": [
+          {
+            "metadata": {
+              "title": "Yoga Music",
+              "artists": [
+                "Nature Sounds Relaxation: Music for Sleep, Meditation, Massage Therapy, Spa, Rest & Relax Nature Sounds Artists, Natural Oasis"
+              ],
+              "durationMs": 287000,
+              "artistsComplete": true,
+              "explicit": "unknown"
+            },
+            "references": [
+              {
+                "provider": "deezer",
+                "id": "134124440"
+              },
+              {
+                "provider": "isrc",
+                "id": "PLL431695589"
+              }
+            ]
+          }
+        ]
+      },
+      "storedAudioAssetCount": 0,
+      "recentJobResults": [
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T07:20:53.101Z",
+          "updatedAt": "2026-11-11T07:20:53.335Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T16:57:20.654Z",
+          "updatedAt": "2026-11-10T16:57:20.878Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+            "sourceReason": "audio-worker-timeout"
+          },
+          "createdAt": "2026-11-10T08:46:43.960Z",
+          "updatedAt": "2026-11-10T08:47:53.258Z"
+        },
+        {
+          "state": "review",
+          "attempts": 1,
+          "result": {
+            "reason": "asset-mismatch",
+            "status": "review",
+            "candidates": [
+              {
+                "title": "Yoga Music",
+                "artists": [
+                  "Nature Sounds Relaxation: Music for Sleep, Meditation, Massage Therapy…"
+                ],
+                "reasons": [
+                  "artist"
+                ],
+                "durationMs": 287000
+              }
+            ],
+            "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915"
+          },
+          "createdAt": "2026-11-09T14:04:30.994Z",
+          "updatedAt": "2026-11-09T14:05:07.112Z"
+        },
+        {
+          "state": "review",
+          "attempts": 1,
+          "result": {
+            "reason": "asset-mismatch",
+            "status": "review",
+            "candidates": [
+              {
+                "title": "Yoga Music",
+                "artists": [
+                  "Nature Sounds Relaxation: Music for Sleep, Meditation, Massage Therapy…"
+                ],
+                "reasons": [
+                  "artist"
+                ],
+                "durationMs": 287000
+              }
+            ],
+            "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915"
+          },
+          "createdAt": "2026-11-09T13:36:17.359Z",
+          "updatedAt": "2026-11-09T13:36:57.070Z"
+        }
+      ],
+      "freshSourceDiscovery": {
+        "status": "unavailable",
+        "reason": "audio-worker-busy",
+        "retryable": true,
+        "elapsedMs": 349,
+        "requests": [
+          {
+            "path": "/v2/resolve",
+            "httpStatus": 503,
+            "elapsedMs": 347,
+            "upstreamBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+          }
+        ]
+      },
+      "aliasHydrationReplay": {
+        "canonicalNormalized": {
+          "title": "yoga music",
+          "primaryArtist": "nature sounds relaxation music for sleep meditation massage therapy spa rest relax nature sounds artists natural oasis",
+          "artists": [
+            "nature sounds relaxation music for sleep meditation massage therapy spa rest relax nature sounds artists natural oasis"
+          ],
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown",
+          "durationMs": 287000
+        },
+        "candidateAssessments": [
+          {
+            "candidate": {
+              "title": "Yoga Music",
+              "artists": [
+                "Nature Sounds Relaxation: Music for Sleep, Meditation, Massage Therapy…"
+              ],
+              "artistsComplete": false,
+              "durationMs": 287000
+            },
+            "before": [
+              "artist"
+            ],
+            "after": [
+              "artist"
+            ]
+          }
+        ]
+      },
+      "productionClassReplay": {
+        "target": "yoga-music",
+        "pendingStatus": "pending",
+        "jobState": "failed",
+        "result": {
+          "status": "unavailable",
+          "reason": "no-ready-audio",
+          "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+          "retryable": true,
+          "sourceReason": "audio-worker-busy"
+        },
+        "ui": {
+          "kind": "missing",
+          "title": "Audio is still being found for this song.",
+          "message": "We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",
+          "action": "Check again",
+          "href": "/search",
+          "linkLabel": "Find other versions"
+        },
+        "mode": "production classes replay with read-only catalogue snapshot and captured live upstream HTTP 503; SQL mutations are in memory; no network/audio transfers"
+      }
+    },
+    {
+      "target": "seul-le-temps",
+      "selectedReference": {
+        "provider": "deezer",
+        "id": "2894768241"
+      },
+      "canonicalMetadata": {
+        "title": "Seul le temps de se détendre",
+        "artists": [
+          "Détente nature",
+          "Rest & Relax Nature Sounds Artists",
+          "Nature Sounds for Sleep and Relaxation"
+        ],
+        "durationMs": 205000,
+        "explicit": "unknown"
+      },
+      "storedAudioAssetCount": 0,
+      "recentJobResults": [
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T07:20:50.891Z",
+          "updatedAt": "2026-11-11T07:20:51.532Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-11T06:08:40.692Z",
+          "updatedAt": "2026-11-11T06:08:40.984Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+            "sourceReason": "audio-worker-busy"
+          },
+          "createdAt": "2026-11-10T16:57:18.977Z",
+          "updatedAt": "2026-11-10T16:57:19.301Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+            "sourceReason": "audio-worker-timeout"
+          },
+          "createdAt": "2026-11-10T08:45:53.885Z",
+          "updatedAt": "2026-11-10T08:46:42.077Z"
+        },
+        {
+          "state": "review",
+          "attempts": 1,
+          "result": {
+            "reason": "asset-mismatch",
+            "status": "review",
+            "candidates": [
+              {
+                "title": "Seul le temps de se détendre",
+                "artists": [
+                  "Musique naturelle, Naturaleza Sonidos"
+                ],
+                "reasons": [
+                  "artist"
+                ],
+                "durationMs": 205000
+              }
+            ],
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072"
+          },
+          "createdAt": "2026-11-09T14:04:21.183Z",
+          "updatedAt": "2026-11-09T14:04:24.595Z"
+        },
+        {
+          "state": "failed",
+          "attempts": 1,
+          "result": {
+            "reason": "no-ready-audio",
+            "status": "unavailable",
+            "retryable": true,
+            "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+            "sourceReason": "audio-worker-timeout"
+          },
+          "createdAt": "2026-11-09T13:34:00.089Z",
+          "updatedAt": "2026-11-09T13:34:35.715Z"
+        }
+      ],
+      "freshSourceDiscovery": {
+        "status": "unavailable",
+        "reason": "audio-worker-busy",
+        "retryable": true,
+        "elapsedMs": 793,
+        "requests": [
+          {
+            "path": "/v2/resolve",
+            "httpStatus": 503,
+            "elapsedMs": 791,
+            "upstreamBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n</head>\n<body>\nThis service has been suspended by its owner.\n</body>\n</html>\n"
+          }
+        ]
+      },
+      "aliasHydrationReplay": {
+        "canonicalNormalized": {
+          "title": "seul le temps de se détendre",
+          "primaryArtist": "détente nature",
+          "artists": [
+            "détente nature",
+            "rest relax nature sounds artists",
+            "nature sounds for sleep and relaxation"
+          ],
+          "version": {
+            "kinds": [],
+            "labels": []
+          },
+          "explicit": "unknown",
+          "durationMs": 205000
+        },
+        "candidateAssessments": [
+          {
+            "candidate": {
+              "title": "Seul le temps de se détendre",
+              "artists": [
+                "Musique naturelle, Naturaleza Sonidos"
+              ],
+              "artistsComplete": false,
+              "durationMs": 205000
+            },
+            "before": [
+              "artist"
+            ],
+            "after": [
+              "artist"
+            ]
+          }
+        ]
+      },
+      "productionClassReplay": {
+        "target": "seul-le-temps",
+        "pendingStatus": "pending",
+        "jobState": "failed",
+        "result": {
+          "status": "unavailable",
+          "reason": "no-ready-audio",
+          "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+          "retryable": true,
+          "sourceReason": "audio-worker-busy"
+        },
+        "ui": {
+          "kind": "missing",
+          "title": "Audio is still being found for this song.",
+          "message": "We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",
+          "action": "Check again",
+          "href": "/search",
+          "linkLabel": "Find other versions"
+        },
+        "mode": "production classes replay with read-only catalogue snapshot and captured live upstream HTTP 503; SQL mutations are in memory; no network/audio transfers"
+      }
+    }
+  ],
+  "chineseVariantParsing": [
+    {
+      "title": "众里寻他千百度 (伴奏)",
+      "parsed": {
+        "base": "众里寻他千百度 伴奏",
+        "version": {
+          "kinds": [],
+          "labels": []
+        },
+        "featuredArtists": []
+      }
+    },
+    {
+      "title": "众里寻他千百度 (伴奏版)",
+      "parsed": {
+        "base": "众里寻他千百度 伴奏版",
+        "version": {
+          "kinds": [],
+          "labels": []
+        },
+        "featuredArtists": []
+      }
+    },
+    {
+      "title": "众里寻他千百度 (instrumental)",
+      "parsed": {
+        "base": "众里寻他千百度",
+        "version": {
+          "kinds": [
+            "instrumental"
+          ],
+          "labels": [
+            "instrumental"
+          ]
+        },
+        "featuredArtists": []
+      }
+    },
+    {
+      "title": "众里寻他千百度",
+      "parsed": {
+        "base": "众里寻他千百度",
+        "version": {
+          "kinds": [],
+          "labels": []
+        },
+        "featuredArtists": []
+      }
+    }
+  ],
+  "validation": {
+    "existingErrorAndRecordingJobTests": {
+      "command": "node --import tsx --test scripts/rebuild-errors.test.ts scripts/rebuild-recording-jobs.test.ts",
+      "passed": 13,
+      "failed": 0
+    },
+    "productionClassReplays": {
+      "command": "node --import tsx --test .local/download-production-replay.ts",
+      "passed": 5,
+      "failed": 0
+    },
+    "newDiagnosticRegressions": {
+      "command": "node --import tsx --test .local/download-root-regressions.ts",
+      "passed": 0,
+      "failed": 3,
+      "expectedFailure": true,
+      "failures": [
+        "Suspended HTML 503 is classified as audio-worker-busy",
+        "no-ready-audio with sourceReason audio-worker-busy is presented as missing recording",
+        "Chinese 伴奏 and 伴奏版 are not recognized as instrumental versions"
+      ]
+    }
+  },
+  "providerChecks": {
+    "apple": {
+      "at": "2026-11-11T07:42:12.189Z",
+      "market": "US",
+      "limitPerQuery": 10,
+      "audioFetched": false,
+      "results": [
+        {
+          "target": "sober",
+          "status": 200,
+          "resultCount": 1,
+          "firstFourMetadataResults": [
+            {
+              "id": 1700770824,
+              "title": "Sober",
+              "artist": "Norhan",
+              "durationMs": 173917,
+              "collection": "Sober - Single",
+              "hasPreview": true
+            }
+          ]
+        },
+        {
+          "target": "endless-quest-instrumental",
+          "status": 200,
+          "resultCount": 10,
+          "firstFourMetadataResults": [
+            {
+              "id": 1884874160,
+              "title": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'') [Instrumental]",
+              "artist": "Diamond Zhang",
+              "durationMs": 192909,
+              "collection": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')",
+              "hasPreview": true
+            },
+            {
+              "id": 1884874156,
+              "title": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')",
+              "artist": "Diamond Zhang",
+              "durationMs": 192909,
+              "collection": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')",
+              "hasPreview": true
+            },
+            {
+              "id": 1887755976,
+              "title": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')",
+              "artist": "Diamond Zhang",
+              "durationMs": 192909,
+              "collection": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'')",
+              "hasPreview": true
+            },
+            {
+              "id": 1887795575,
+              "title": "The Endless Quest (Love Theme Song from the TV Series ''Pursuit of Jade'') [Instrumental]",
+              "artist": "Diamond Zhang",
+              "durationMs": 192909,
+              "collection": "\"Pursuit of Jade\" Original Soundtrack",
+              "hasPreview": true
+            }
+          ]
+        },
+        {
+          "target": "vibration",
+          "status": 200,
+          "resultCount": 1,
+          "firstFourMetadataResults": [
+            {
+              "id": 1486437332,
+              "title": "Vibration",
+              "artist": "Fireboy DML",
+              "durationMs": 198462,
+              "collection": "Laughter, Tears & Goosebumps",
+              "hasPreview": true
+            }
+          ]
+        },
+        {
+          "target": "yoga-music",
+          "status": 200,
+          "resultCount": 10,
+          "firstFourMetadataResults": [
+            {
+              "id": 1549793367,
+              "title": "Nature Sounds",
+              "artist": "Ocean Sounds, Relaxation Music & Meditation Music",
+              "durationMs": 180000,
+              "collection": "Sleep By the Ocean",
+              "hasPreview": true
+            },
+            {
+              "id": 1527672101,
+              "title": "Relaxation",
+              "artist": "Yoga, Yoga Music, Yoga Sounds, Meditation & Yoga Workout Music",
+              "durationMs": 117053,
+              "collection": "Yoga & Chill",
+              "hasPreview": true
+            },
+            {
+              "id": 1002839301,
+              "title": "Nature Sounds Relaxation",
+              "artist": "Chakra Healing Music Academy",
+              "durationMs": 198861,
+              "collection": "Nature Sounds – Relaxation & Tibetan Chakra Meditation, Healing Massage and Spa, Yoga Music Sound Therapy for Chakra Balancing, Baby Deep Sleep, Studying Music",
+              "hasPreview": true
+            },
+            {
+              "id": 6822558878,
+              "title": "Theta Wave Relaxing Music to Deepen Your Sleep Meditation Ambient That Is Perfect for Inducing Sleep (Forest Where You Can Sleep in 3 Minutes)",
+              "artist": "Sleepy Nuts",
+              "durationMs": 393000,
+              "collection": "Peaceful Nature Sounds for Sleep Meditation Healing Relaxation and Inner Calm",
+              "hasPreview": true
+            }
+          ]
+        },
+        {
+          "target": "seul-le-temps",
+          "status": 200,
+          "resultCount": 10,
+          "firstFourMetadataResults": [
+            {
+              "id": 1437860793,
+              "title": "Bye Bye (feat. Medi Meyz)",
+              "artist": "Lyna Mahyem",
+              "durationMs": 282000,
+              "collection": "Bye Bye (feat. Medi Meyz) - Single",
+              "hasPreview": true
+            },
+            {
+              "id": 6793974782,
+              "title": "Îles grecques",
+              "artist": "Laurie Darmon",
+              "durationMs": 224093,
+              "collection": "Femme Studio",
+              "hasPreview": true
+            },
+            {
+              "id": 1445556707,
+              "title": "L'énergie de l'art oriental",
+              "artist": "Bouddha musique sanctuaire",
+              "durationMs": 166886,
+              "collection": "L'énergie de l'art oriental - Le temps japonais pour se détendre, Mélodie de repos, Il est temps de reprendre son souffle, L'énergie, c'est le pouvoir, Calmer Green dans le jardin",
+              "hasPreview": true
+            },
+            {
+              "id": 806830265,
+              "title": "Si seul",
+              "artist": "Rohff & Wallen",
+              "durationMs": 303400,
+              "collection": "Le code de l'horreur (Exclu SFR)",
+              "hasPreview": true
+            }
+          ]
+        }
+      ]
+    },
+    "audius": {
+      "at": "2026-11-11T07:42:12.189Z",
+      "query": "Vibration Fireboy DML",
+      "audioFetched": false,
+      "results": [
+        {
+          "id": "3v9mV",
+          "title": "Fireboy-DML-Vibration-(JustNaija.com)",
+          "uploader": "FEHOSIS'ART",
+          "uploaderVerified": false,
+          "isrc": null,
+          "isDownloadable": false,
+          "isOriginalAvailable": false
+        },
+        {
+          "id": "vg2bV",
+          "title": "Fireboy-DML-Vibration",
+          "uploader": "Colonel",
+          "uploaderVerified": false,
+          "isrc": null,
+          "isDownloadable": false,
+          "isOriginalAvailable": false
+        },
+        {
+          "id": "zyVEw",
+          "title": "Fireboy-DML-Vibration",
+          "uploader": "Mac123",
+          "uploaderVerified": false,
+          "isrc": null,
+          "isDownloadable": false,
+          "isOriginalAvailable": false
+        }
+      ]
+    }
+  },
+  "hostingResearch": {
+    "checkedAt": "2026-11-11T07:56:52.970Z",
+    "recommendation": "Updated: validate one Cloudflare SQLite Durable Object as the Telegram owner; on-demand Vercel Daemons is a second route. Previous Oracle proposal ruled out by user constraints.",
+    "userConstraints": {
+      "noPaymentCard": true,
+      "noPaidHostingBudget": true,
+      "hostedServiceRequired": true,
+      "deviceHostingRuledOut": true
+    },
+    "oraclePublishedAllowances": {
+      "outboundDataPerMonth": "10 TB",
+      "a1OcpuHoursPerMonth": 1500,
+      "a1MemoryGbHoursPerMonth": 9000,
+      "publishedEquivalent": "2 OCPUs and 12 GB memory",
+      "eligibilityForUser": "Ruled out: supported payment card required"
+    },
+    "cloudflare": {
+      "ordinaryWorkers": "No listed egress charge, but request-driven lifecycle; use router only, not a separate Telegram client per invocation",
+      "durableObject": "Available on Workers Free with SQLite; single owner candidate pending live runtime and update/eviction fencing proof",
+      "freeDurableObjectLimits": {
+        "requestsPerDay": 100000,
+        "durationGbSecondsPerDay": 13000,
+        "storageGbPerObject": 1,
+        "storageGbPerAccount": 5
+      },
+      "containers": "Requires Workers Paid plan at $5/month plus resource/other usage; not free",
+      "containerIncludedEgress": "1 TB North America/Europe; 500 GB in other listed regions"
+    },
+    "vercelDaemons": {
+      "available": "Hobby during beta",
+      "freeActiveCpuHoursPerMonth": 5,
+      "freeProvisionedMemoryGbHoursPerMonth": 420,
+      "hobbyInstanceSizesGiB": [
+        1,
+        2
+      ],
+      "proposedUse": "One 1 GiB daemon started for queued work, stops after idle; no continuously running 30/31-day assumption",
+      "inboundHttpTcpSupported": false,
+      "persistentLocalStorage": false
+    },
+    "telegramProtocolFinding": "Current Telegram docs say parallel main connections from the same or different IPs may invalidate an authorization. Bounded parallel sessions require explicit tmp_sessions and PFS; media-DC transfer sessions are separate. A fixed-IP proxy alone does not solve ownership.",
+    "offlineProbe": {
+      "mode": "Offline mock Workers-stream adapter and static dependency bundle; no Cloudflare runtime execution, deployment, credentials, or Telegram requests",
+      "gramjsVersion": "2.26.22",
+      "rawBundleBytes": 792032,
+      "gzipBundleBytes": 221180,
+      "builtinsExternal": true,
+      "remainingGates": [
+        "Wrangler/runtime compatibility including built-in imports",
+        "Real Cloudflare TCP connect and Telegram compatibility",
+        "Single Durable Object ownership across eviction and deployment",
+        "Memory/CPU/request limits and streaming backpressure",
+        "Authenticated audio Range and full-save checks"
+      ]
+    },
+    "workaroundSources": [
+      {
+        "key": "vercel-daemons",
+        "url": "https://vercel.com/docs/daemons",
+        "finalUrl": "https://vercel.com/docs/daemons",
+        "httpStatus": 200
+      },
+      {
+        "key": "vercel-daemons-limits",
+        "url": "https://vercel.com/docs/daemons/limits",
+        "finalUrl": "https://vercel.com/docs/daemons/limits",
+        "httpStatus": 200
+      },
+      {
+        "key": "vercel-hobby",
+        "url": "https://vercel.com/docs/plans/hobby",
+        "finalUrl": "https://vercel.com/docs/plans/hobby",
+        "httpStatus": 200
+      },
+      {
+        "key": "cf-do-rules",
+        "url": "https://developers.cloudflare.com/durable-objects/platform/known-issues/",
+        "finalUrl": "https://developers.cloudflare.com/durable-objects/platform/known-issues/",
+        "httpStatus": 200
+      },
+      {
+        "key": "cf-do-bestpractices",
+        "url": "https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/",
+        "finalUrl": "https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/",
+        "httpStatus": 200
+      },
+      {
+        "key": "cf-crypto",
+        "url": "https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/",
+        "finalUrl": "https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/",
+        "httpStatus": 200
+      },
+      {
+        "key": "telegram-errors-md",
+        "url": "https://core.telegram.org/api/errors.md",
+        "finalUrl": "https://core.telegram.org/api/errors.md",
+        "httpStatus": 200
+      },
+      {
+        "key": "telegram-pfs-md",
+        "url": "https://core.telegram.org/api/pfs.md",
+        "finalUrl": "https://core.telegram.org/api/pfs.md",
+        "httpStatus": 200
+      },
+      {
+        "key": "telegram-http",
+        "url": "https://core.telegram.org/mtproto/transports",
+        "finalUrl": "https://core.telegram.org/mtproto/transports",
+        "httpStatus": 200
+      },
+      {
+        "key": "telegram-media",
+        "url": "https://core.telegram.org/api/datacenter",
+        "finalUrl": "https://core.telegram.org/api/datacenter",
+        "httpStatus": 200
+      }
+    ],
+    "otherFreeOffers": {
+      "railway": "$1 recurring resource credit/month",
+      "googleCompute": "1 GB/month outbound to eligible destinations",
+      "fly": "$1 new-account trial up to seven days"
+    },
+    "constraints": [
+      "No live Cloudflare/Vercel deployment or ownership certification",
+      "Free compute/requests/transfer quotas remain applicable",
+      "Oracle and device hosting ruled out by user",
+      "No permanent free availability or unlimited egress guarantee"
+    ],
+    "sources": [
+      {
+        "key": "oracle-always-free",
+        "url": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
+        "finalUrl": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
+        "httpStatus": 200
+      },
+      {
+        "key": "oracle-free",
+        "url": "https://www.oracle.com/cloud/free/",
+        "finalUrl": "https://www.oracle.com/cloud/free/",
+        "httpStatus": 200
+      },
+      {
+        "key": "oracle-public-ip",
+        "url": "https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm",
+        "finalUrl": "https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm",
+        "httpStatus": 200
+      },
+      {
+        "key": "cloudflare-worker-limits",
+        "url": "https://developers.cloudflare.com/workers/platform/limits/",
+        "finalUrl": "https://developers.cloudflare.com/workers/platform/limits/",
+        "httpStatus": 200
+      },
+      {
+        "key": "cloudflare-worker-pricing",
+        "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+        "finalUrl": "https://developers.cloudflare.com/workers/platform/pricing/",
+        "httpStatus": 200
+      },
+      {
+        "key": "cloudflare-container-pricing",
+        "url": "https://developers.cloudflare.com/containers/pricing/",
+        "finalUrl": "https://developers.cloudflare.com/containers/platform/pricing/",
+        "httpStatus": 200
+      },
+      {
+        "key": "cloudflare-tcp",
+        "url": "https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/",
+        "finalUrl": "https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/",
+        "httpStatus": 200
+      },
+      {
+        "key": "google-free",
+        "url": "https://cloud.google.com/free/docs/free-cloud-features",
+        "finalUrl": "https://docs.cloud.google.com/free/docs/free-cloud-features?hl=ko",
+        "httpStatus": 200
+      },
+      {
+        "key": "railway-plans",
+        "url": "https://docs.railway.com/reference/pricing/plans",
+        "finalUrl": "https://docs.railway.com/pricing/plans",
+        "httpStatus": 200
+      },
+      {
+        "key": "fly-trial",
+        "url": "https://fly.io/docs/about/free-trial/",
+        "finalUrl": "https://docs.fly.io/about/free-trial",
+        "httpStatus": 200
+      }
+    ]
+  },
+  "limitations": [
+    "Hosting dashboard and exact usage have not been inspected; suspension is corroborated by live HTML and bandwidth cause was confirmed by the user",
+    "Deployed worker build/capabilities cannot be verified while suspended",
+    "No new full-file, checksum, decoded-duration, acoustic identity, or offline-completion certification",
+    "Current catalogue searches and alternate metadata do not establish downloadable full-file availability",
+    "Earlier source truncation origin and French artist identity require restored-worker/file evidence",
+    "Oracle signup/capacity and actual provisioning have not been tested for the user"
+  ],
+  "artifacts": {
+    "plan": "docs/rebuild/DOWNLOAD-ROOT-CAUSE-PLAN.md",
+    "hostingRecommendation": "docs/rebuild/WORKER-NO-CARD-WORKAROUNDS.md",
+    "previousHostingRecommendation": "docs/rebuild/WORKER-FREE-HOSTING-RECOMMENDATION.md",
+    "privateTraceDirectory": ".local/download-root-audit"
+  }
+}

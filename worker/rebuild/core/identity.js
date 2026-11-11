@@ -17,7 +17,7 @@ const VERSION_RULES = [
     ["remix", /\b(?:remix|mix)\b|リミックス|混音/iu],
     ["live", /\blive\b|ライブ|現場|现场/iu],
     ["acoustic", /\bacoustic\b|アコースティック/iu],
-    ["instrumental", /\b(?:instrumental|off[\s-]*vocal|backing[\s-]*track)\b|インストゥルメンタル/iu],
+    ["instrumental", /\b(?:instrumental|off[\s-]*vocal|backing[\s-]*track)\b|インストゥルメンタル|伴奏(?:版)?/iu],
     ["karaoke", /\bkaraoke\b|カラオケ/iu],
     ["demo", /\bdemo\b/iu],
     ["sped-up", /\b(?:sped[\s-]*up|speed[\s-]*up|nightcore)\b/iu],

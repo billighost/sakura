@@ -78,9 +78,15 @@ export class WorkerAudioDiscovery implements AudioSourceDiscovery {
         if(unsupportedScope)this.primaryScopeOnlyUntil=Date.now()+5*60000;
         response=await this.post("/v2/resolve",{...request,botScopes:[this.configuration.primaryBot]},signal);
       }
-      if (response.status === 404) this.compatibility = true;
-      else {
-        if (response.status === 429 || response.status === 503) return { status: "unavailable", reason: "audio-worker-busy", retryable: true };
+      // A proxy's 404 does not prove an older worker. Try legacy for this call,
+      // and cache compatibility only after its scoped audio validates below.
+      if (response.status !== 404) {
+        if (response.status === 429) return { status: "unavailable", reason: "audio-worker-busy", retryable: true };
+        if (response.status >= 500 || response.status === 401 || response.status === 403) {
+          const structured=String(response.payload.reason||"");
+          const recognized=new Set(["audio-worker-session-unavailable","audio-worker-disabled","audio-worker-not-configured","audio-worker-restarting","audio-worker-rate-limited","audio-worker-unavailable"]);
+          return {status:"unavailable",reason:recognized.has(structured)?structured:response.status===401||response.status===403?"audio-worker-authentication-failed":"audio-worker-unavailable",retryable:response.payload.retryable!==false&&![401,403].includes(response.status)};
+        }
         const initial=response.payload.status==="ready"?this.verifiedAsset(recording,row(response.payload.audio),"v2"):null;
         if(initial?.status==="ready")return initial;
         if(response.payload.status==="review"||initial?.status==="review"||response.payload.status==="unavailable"){
@@ -133,13 +139,16 @@ export class WorkerAudioDiscovery implements AudioSourceDiscovery {
         const url = ref.provider === "deezer" ? `https://www.deezer.com/track/${ref.id}` : `https://open.spotify.com/track/${ref.id}`;
         const selected = await this.post("/search-and-select", { query: url, references:this.matchingReferences(recording), expectedMetadata:recording.metadata, expectedTitle: recording.metadata.title, expectedArtist: recording.metadata.artists[0],
           targetDuration: recording.metadata.durationMs ? Math.round(recording.metadata.durationMs / 1000) : undefined, searchTimeoutMs: Math.min(15000, Math.floor(budget * .4)), selectTimeoutMs: Math.min(25000, Math.floor(budget * .6)), botUsername: this.configuration.primaryBot }, attemptSignal);
+        if (selected.status >= 500 || selected.status === 401 || selected.status === 403) {reason="audio-worker-unavailable";break;}
+        if (selected.status === 429) {reason="audio-worker-busy";break;}
         if (selected.status !== 200 || selected.payload.error) continue;
         const messageId = String(selected.payload.messageId ?? "");
         if (!/^[1-9]\d{0,14}$/.test(messageId)) { reason = "audio-source-invalid-response"; continue; }
         const info = await this.post("/audio-info", { messageId }, attemptSignal);
+        if (info.status >= 500) {reason="audio-worker-unavailable";break;}
         if (info.status !== 200) { reason = "audio-source-metadata-unavailable"; continue; }
         const verified = this.verifiedAsset(recording, { ...info.payload, messageId, chatScope: this.configuration.primaryBot }, "v1");
-        if (verified.status === "ready") return {...verified,...(verifiedRecordingAliases(recording).length?{verifiedMetadata:recording.metadata}:{})};
+        if (verified.status === "ready") {this.compatibility=true;return {...verified,...(verifiedRecordingAliases(recording).length?{verifiedMetadata:recording.metadata}:{})};}
         if (verified.status === "review") candidates.push(...verified.candidates);
         else reason = verified.reason;
       } catch { signal?.throwIfAborted(); reason = "audio-source-unavailable"; }

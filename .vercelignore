@@ -1,0 +1,16 @@
+# Deploy only application source and public assets. Local audit recordings,
+# credentials, databases and the separately hosted worker are private/local.
+.local/
+.mesh/
+worker/
+node_modules/
+.git/
+.next/
+.next-*/
+.env*
+test-results/
+playwright-report/
+coverage/
+*.log
+*.err
+*.tsbuildinfo

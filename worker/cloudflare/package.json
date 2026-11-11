@@ -1,0 +1,11 @@
+{
+  "name": "sakura-cloudflare-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "wrangler deploy --dry-run",
+    "dev": "wrangler dev",
+    "deploy": "node deploy.mjs",
+    "test": "node --test *.test.mjs"
+  }
+}

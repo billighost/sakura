@@ -1,0 +1,297 @@
+{
+  "checkedAt": "2026-11-11T11:44:26.531Z",
+  "application": "https://sakuraplayer.vercel.app",
+  "worker": "https://sakura-audio.bb2010ng.workers.dev",
+  "plan": "Workers Free with one SQLite Durable Object; no card or paid plan configured",
+  "applicationDeployment": "dpl_FgxFCkw5Spz4y6PZawpo6mFNTd8U",
+  "workerRevision": "0c3353e7-05e6-409c-99b5-8b793133c5db",
+  "audioTransfer": {
+    "limitBytes": 52428800,
+    "receivedBytes": 44004396,
+    "completeFiles": [
+      {
+        "target": "sober",
+        "expectedBytes": 7071029,
+        "sha256": "42b0aa2c358038d1af605b02478c89311dd20f258a83c44dd1370f5965627d59",
+        "measured": {
+          "container": "MPEG",
+          "codec": "MPEG 1 Layer 3",
+          "durationMs": 173949
+        },
+        "decodedEntireFile": true
+      },
+      {
+        "target": "vibration",
+        "expectedBytes": 8107056,
+        "sha256": "4c2c586e33e4d311253ee972d7ceeb72399e8402fed35b35f7fe495313f08ad2",
+        "measured": {
+          "container": "MPEG",
+          "codec": "MPEG 1 Layer 3",
+          "durationMs": 198504
+        },
+        "decodedEntireFile": true
+      },
+      {
+        "target": "endless-quest-instrumental",
+        "expectedBytes": 7987928,
+        "sha256": "c9857ab45b367b237c21d9a9a461afe05534e237cd2a296e1ea482b2e9754083",
+        "measured": {
+          "container": "MPEG",
+          "codec": "MPEG 1 Layer 3",
+          "durationMs": 192940
+        },
+        "decodedEntireFile": true
+      },
+      {
+        "target": "yoga-music",
+        "expectedBytes": 11772364,
+        "sha256": "acdff1675732f3ba71ebf8369a48e040fcc99a980a0946899b92248af3689dad",
+        "measured": {
+          "container": "MPEG",
+          "codec": "MPEG 1 Layer 3",
+          "durationMs": 287896
+        },
+        "decodedEntireFile": true
+      },
+      {
+        "target": "seul-le-temps",
+        "expectedBytes": 8541731,
+        "sha256": "6ab22c8e412a4892f9557265d440b9016fc11fed799544fedff5dd7de7033a76",
+        "measured": {
+          "container": "MPEG",
+          "codec": "MPEG 1 Layer 3",
+          "durationMs": 205845
+        },
+        "decodedEntireFile": true
+      }
+    ],
+    "diagnosticProbeBytes": 524288,
+    "scope": "Direct Cloudflare source-audit transfers only. Server-side preparation, CDN verification and earlier browser traffic are separate."
+  },
+  "production": [
+    {
+      "target": "sober",
+      "httpStatus": 200,
+      "status": "resolved",
+      "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+      "delivery": "cdn",
+      "sha256": "42b0aa2c358038d1af605b02478c89311dd20f258a83c44dd1370f5965627d59",
+      "polls": 4,
+      "signedHeadStatus": 200,
+      "signedHeadBytes": 7071029
+    },
+    {
+      "target": "endless-quest-instrumental",
+      "httpStatus": 200,
+      "status": "resolved",
+      "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+      "delivery": "cdn",
+      "sha256": "c9857ab45b367b237c21d9a9a461afe05534e237cd2a296e1ea482b2e9754083",
+      "polls": 3,
+      "signedHeadStatus": 200,
+      "signedHeadBytes": 7987928
+    },
+    {
+      "target": "vibration",
+      "httpStatus": 200,
+      "status": "resolved",
+      "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+      "delivery": "cdn",
+      "sha256": "4c2c586e33e4d311253ee972d7ceeb72399e8402fed35b35f7fe495313f08ad2",
+      "polls": 4,
+      "signedHeadStatus": 200,
+      "signedHeadBytes": 8107056
+    },
+    {
+      "target": "yoga-music",
+      "httpStatus": 200,
+      "status": "resolved",
+      "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+      "delivery": "cdn",
+      "sha256": "acdff1675732f3ba71ebf8369a48e040fcc99a980a0946899b92248af3689dad",
+      "polls": 4,
+      "signedHeadStatus": 200,
+      "signedHeadBytes": 11772364
+    },
+    {
+      "target": "seul-le-temps",
+      "httpStatus": 200,
+      "status": "resolved",
+      "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+      "delivery": "cdn",
+      "sha256": "6ab22c8e412a4892f9557265d440b9016fc11fed799544fedff5dd7de7033a76",
+      "polls": 4,
+      "signedHeadStatus": 200,
+      "signedHeadBytes": 8541731
+    }
+  ],
+  "browser": {
+    "origin": "https://sakuraplayer.vercel.app",
+    "checkedAt": "2026-11-11T11:41:26.943Z",
+    "results": [
+      {
+        "target": "sober",
+        "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+        "status": "saved",
+        "sha256": "42b0aa2c358038d1af605b02478c89311dd20f258a83c44dd1370f5965627d59",
+        "offlinePlayback": true
+      },
+      {
+        "target": "endless-quest-instrumental",
+        "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+        "status": "saved",
+        "sha256": "c9857ab45b367b237c21d9a9a461afe05534e237cd2a296e1ea482b2e9754083",
+        "offlinePlayback": true
+      },
+      {
+        "target": "vibration",
+        "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+        "status": "saved",
+        "sha256": "4c2c586e33e4d311253ee972d7ceeb72399e8402fed35b35f7fe495313f08ad2",
+        "offlinePlayback": true
+      },
+      {
+        "target": "yoga-music",
+        "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+        "status": "saved",
+        "sha256": "acdff1675732f3ba71ebf8369a48e040fcc99a980a0946899b92248af3689dad",
+        "offlinePlayback": true
+      },
+      {
+        "target": "seul-le-temps",
+        "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+        "status": "saved",
+        "sha256": "6ab22c8e412a4892f9557265d440b9016fc11fed799544fedff5dd7de7033a76",
+        "offlinePlayback": true
+      }
+    ],
+    "offlinePlayback": true,
+    "reusedAuditedAudioBytes": 43480108,
+    "newRemoteAudioBytes": 0,
+    "vercelProxyAudioRequests": 0,
+    "uninterceptedAudioResponses": [],
+    "pageErrors": [],
+    "mediaRequestSummary": [
+      {
+        "target": "sober",
+        "cdnRequests": 27,
+        "reusedBytes": 7071029
+      },
+      {
+        "target": "vibration",
+        "cdnRequests": 31,
+        "reusedBytes": 8107056
+      },
+      {
+        "target": "endless-quest-instrumental",
+        "cdnRequests": 31,
+        "reusedBytes": 7987928
+      },
+      {
+        "target": "yoga-music",
+        "cdnRequests": 45,
+        "reusedBytes": 11772364
+      },
+      {
+        "target": "seul-le-temps",
+        "cdnRequests": 33,
+        "reusedBytes": 8541731
+      }
+    ]
+  },
+  "checks": {
+    "core": 39,
+    "server": 96,
+    "worker": 57,
+    "cloudflareTransportAndTags": 11,
+    "errors": 8,
+    "recordingJobs": 5,
+    "downloadRoot": 3,
+    "audioInspection": 2,
+    "localWorkerRuntime": 2,
+    "hostedUnauthenticatedTcp": "passed before production activation; temporary proof Worker deleted afterward",
+    "typecheck": "passed",
+    "nextProductionBuild": "passed",
+    "focusedLint": {
+      "errors": 0,
+      "warnings": 1
+    },
+    "finalDownloadAndPlaybackRegressions": 229
+  },
+  "limits": [
+    "Structural, metadata and complete codec checks are not an acoustic fingerprint.",
+    "Browser offline/save acceptance reused the already audited byte-identical files through interception; real remote full source transfer and real live CDN preparation are recorded separately.",
+    "Cloudflare, Telegram, Vercel and Cloudinary limits still apply.",
+    "The earlier browser counter missed Vercel-proxied audio. The final browser run intercepts CDN and proxy endpoints, verifies every saved blob checksum, and requires zero proxy requests; its counters replace the earlier run."
+  ],
+  "finalReadOnlyProductionSmoke": {
+    "checkedAt": "2026-11-11T11:42:08.965Z",
+    "origin": "https://sakuraplayer.vercel.app",
+    "results": [
+      {
+        "target": "sober",
+        "recordingId": "197012b5-6ca0-48c7-a24a-16ce1d41bd76",
+        "status": 200,
+        "delivery": "cdn",
+        "sha256": "42b0aa2c358038d1af605b02478c89311dd20f258a83c44dd1370f5965627d59",
+        "headStatus": 200,
+        "bytes": 7071029,
+        "corsAllowsApp": true,
+        "corsExposesRange": true
+      },
+      {
+        "target": "endless-quest-instrumental",
+        "recordingId": "6688ce8f-c344-4ad3-a4f3-667db8f5a097",
+        "status": 200,
+        "delivery": "cdn",
+        "sha256": "c9857ab45b367b237c21d9a9a461afe05534e237cd2a296e1ea482b2e9754083",
+        "headStatus": 200,
+        "bytes": 7987928,
+        "corsAllowsApp": true,
+        "corsExposesRange": true
+      },
+      {
+        "target": "vibration",
+        "recordingId": "d77acc19-a0e7-46c1-ae51-062bb289f1cf",
+        "status": 200,
+        "delivery": "cdn",
+        "sha256": "4c2c586e33e4d311253ee972d7ceeb72399e8402fed35b35f7fe495313f08ad2",
+        "headStatus": 200,
+        "bytes": 8107056,
+        "corsAllowsApp": true,
+        "corsExposesRange": true
+      },
+      {
+        "target": "yoga-music",
+        "recordingId": "55a48a01-2acc-4a4a-8751-f61a83262915",
+        "status": 200,
+        "delivery": "cdn",
+        "sha256": "acdff1675732f3ba71ebf8369a48e040fcc99a980a0946899b92248af3689dad",
+        "headStatus": 200,
+        "bytes": 11772364,
+        "corsAllowsApp": true,
+        "corsExposesRange": true
+      },
+      {
+        "target": "seul-le-temps",
+        "recordingId": "86897905-3467-4600-8d1f-3fdaa9811072",
+        "status": 200,
+        "delivery": "cdn",
+        "sha256": "6ab22c8e412a4892f9557265d440b9016fc11fed799544fedff5dd7de7033a76",
+        "headStatus": 200,
+        "bytes": 8541731,
+        "corsAllowsApp": true,
+        "corsExposesRange": true
+      }
+    ],
+    "worker": {
+      "httpStatus": 200,
+      "revision": "0c3353e7-05e6-409c-99b5-8b793133c5db",
+      "acquisitionEnabled": true,
+      "ready": true,
+      "fatal": null
+    },
+    "newAudioBytes": 0,
+    "method": "Read-only production track metadata, CDN HEAD with browser Origin, authenticated Worker capabilities; no audio body requests"
+  }
+}

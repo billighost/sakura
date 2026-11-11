@@ -1,12 +1,25 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- CommonJS worker tests use Node's native runner. */
 const assert=require("node:assert/strict"),{test}=require("node:test");
-const {RebuildAudioService,buttonCandidate,searchQueries}=require("./service.cjs");
+const {RebuildAudioService,buttonCandidate,searchQueries,inspectionCandidate}=require("./service.cjs");
 const {assessAudioCandidate}=require("./core/matching.js");
 class Document{constructor(value){Object.assign(this,value);}}
 class DocumentAttributeAudio{constructor(value){Object.assign(this,value);}}
 const api={Document,DocumentAttributeAudio};
 function message(title="Finesse",artist="Bruno Mars",duration=191,size=5000){return{id:42,media:{document:new Document({id:123,accessHash:456,fileReference:Buffer.from("ref"),dcId:1,size,mimeType:"audio/mpeg",attributes:[new DocumentAttributeAudio({title,performer:artist,duration})]})}};}
 function service(client,options={}){return new RebuildAudioService({telegram:()=>client,api,bigInt:Number,bots:["primary","fallback"],queue:{depth:0,run:operation=>operation()},...options});}
+test("truncated message metadata recovers only from complete file tags and survives reference refresh",async()=>{
+ let reads=0;const metadata={title:"A sufficiently long recording title",artists:["Bruno Mars"],durationMs:191000};
+ const backend=service({async getEntity(){return"peer";},async getMessages(){return[message("A sufficiently long…")];}}, {recoverMetadata:async()=>{reads++;return metadata;}});
+ const input={reference:{provider:"deezer",id:"123"},metadata,botScopes:["primary"]};
+ const first=await backend.resolve(input);assert.equal(first.status,"ready");assert.equal(reads,1);
+ const refreshed=await backend.info("primary","42",true);assert.equal(refreshed.audio.metadata.title,metadata.title);assert.equal(reads,1);
+});
+test("a displayed prefix permits inspection but cannot authorize audio or a wrong edition",()=>{
+ const request={metadata:{title:"A sufficiently long recording title",artists:["Bruno Mars"],durationMs:191000}};
+ const candidate=buttonCandidate("Bruno Mars - A sufficiently long… [03:11]",0,request.metadata);
+ assert.equal(inspectionCandidate(candidate,request),true);assert.equal(assessAudioCandidate(request,candidate).acceptable,false);
+ const remix=buttonCandidate("Bruno Mars - A sufficiently long… (Remix) [03:11]",1,request.metadata);assert.equal(inspectionCandidate(remix,request),false);
+});
 test("worker uses scoped document identities for equal message IDs in different chats",async()=>{
  const client={async getEntity(bot){return bot;},async getMessages(bot){return[message(bot==="primary"?"Finesse":"Other",bot==="primary"?"Bruno Mars":"Other Artist")];}};
  const backend=service(client);assert.equal((await backend.info("primary","42")).audio.metadata.title,"Finesse");assert.equal((await backend.info("fallback","42")).audio.metadata.title,"Other");assert.equal(backend.documents.size,2);

@@ -13,6 +13,7 @@ const issues: Record<FailureKind, UserIssue> = {
  unknown: {kind:"unknown",title:"That didn’t finish this time.",message:"Something interrupted this step. Try again, or return to your music and come back later.",action:"Try again",href:"/home",linkLabel:"Return to music"},
 };
 const audioUnavailableIssue:UserIssue={...issues.missing,title:"Audio is still being found for this song.",message:"We haven’t found a verified full recording yet. Try again shortly, or explore its other versions.",action:"Check again",linkLabel:"Find other versions"};
+const audioServiceIssue:UserIssue={...issues.connection,title:"New song downloads are temporarily unavailable.",message:"Sakura’s download service is unavailable right now. Try again later. Songs already saved on this device are ready to play.",action:"Retry download"};
 const fallbacks: Record<ErrorContext, UserIssue> = {
  page: issues.connection, account: issues.connection,
  playback: {...issues.connection,title:"This song couldn’t start.",action:"Retry song"},
@@ -31,7 +32,7 @@ export function userIssue(error: unknown, context: ErrorContext = "page"): UserI
  const message=error instanceof Error?error.message:typeof error==="string"?error:"";
  const remembered=rememberedIssues.get(context+":"+message);if(remembered)return remembered;
  // Only known application copy is reused. Exception text and response bodies never reach the screen.
- const known=[fallbacks[context],audioUnavailableIssue,...Object.values(issues)].find(issue=>issue.message===message);
+ const known=[fallbacks[context],audioUnavailableIssue,audioServiceIssue,...Object.values(issues)].find(issue=>issue.message===message);
  if(known)return known;
  if(name==="QuotaExceededError"||name==="SecurityError"||name==="InvalidStateError")return issues.storage;
  if(/different or uncertain recording|recording.+(match|verify)|identity-conflict|ambiguous-audio|asset-mismatch|catalog-mismatch/.test(message))return issues.version;
@@ -51,6 +52,9 @@ export function responseIssue(status:number, payload:unknown, context:ErrorConte
  if(status===423)return {...issues.missing,title:"This Bloom is still growing.",message:"This listening story is not available yet. Check its opening date in Sakura Bloom.",href:"/bloom",linkLabel:"View Bloom dates"};
  if(status===410)return {...issues.missing,title:"This Bloom’s season has passed.",message:"The viewing window for this recap has closed. Open Sakura Bloom to see your next listening story.",href:"/bloom",linkLabel:"Open Sakura Bloom"};
  if(status===429)return issues.busy;
+ const sourceReason=String(value.sourceReason||reason);
+ if(sourceReason==="audio-worker-busy"||sourceReason==="audio-worker-rate-limited")return issues.busy;
+ if(/^audio-worker-(?:unavailable|session-unavailable|disabled|not-configured|authentication-failed|restarting|timeout|queue-timeout)$/.test(sourceReason))return audioServiceIssue;
  if(status===404||reason==="catalog-not-found"||reason==="recording-not-indexed")return context==="lyrics"?userIssue("no-lyrics",context):issues.missing;
  if([400,413,415,422].includes(status)) {
   const validation:Record<string,string>={"Username is already in use":"That username is already taken. Choose another username.","Email is already in use":"An account already uses that email. Sign in or use another email.","Invalid credentials":"Check your username or email and password, then sign in again."};

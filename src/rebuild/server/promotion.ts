@@ -7,6 +7,7 @@ import type {AudioTransport} from "./gateway";
 import type {RecordingIngestor} from "./ingestion";
 import {readMetadataJson} from "./providers";
 import {supportedAudioMime,normalizedAudioMime} from "./input";
+import {inspectFullAudio} from "./audio-inspection";
 
 const MAX_BYTES=120*1024*1024;
 export class AudioPromotionError extends Error {
@@ -103,6 +104,7 @@ export class AudioPromotions {
   if(source.ownerAccountId!==null||source.recordingId!==recording.recordingId||!assessAudioCandidate(recording,source.candidate).acceptable)throw new AudioPromotionError("integrity","The source is not this full catalog recording");
   const bytes=await completeAudio(await this.transport.open(source,null,controllerSignal),source.sizeBytes,controllerSignal),sha256=digest(bytes);
   if(source.sha256&&source.sha256!==sha256)throw new AudioPromotionError("integrity","The worker file checksum changed");
+  try{await inspectFullAudio(bytes,recording,source);}catch{throw new AudioPromotionError("integrity","The full audio container or embedded metadata could not be verified for this recording");}
   const checked={...source,sha256};await this.ingestor.persistAudio(recording,checked);
   if(!this.publisher||source.locator.kind==="https"){this.failures.delete(recording.recordingId+":"+source.assetId);return checked;}
   let published:StoredAudioAsset;

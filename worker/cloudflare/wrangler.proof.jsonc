@@ -1,0 +1,11 @@
+{
+  "name": "sakura-audio-proof",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": { "bindings": [{ "name": "TELEGRAM_OWNER", "class_name": "TelegramOwner" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TelegramOwner"] }],
+  "vars": { "TELEGRAM_ENABLED": "false", "TELEGRAM_OWNER_ID": "synthetic-runtime-proof", "RUNTIME_PROOF": "true" }
+}

@@ -26,7 +26,7 @@ function identifierEvidence(request, candidate) {
  * Providers often expose `kinds:["remix"]` while ID3 exposes `(Remix)`. */
 function versionEvidence(version) {
     const generic = /^(?:remix|mix|live|acoustic|instrumental|karaoke|demo|sped up|speed up|slowed|remaster|remastered|リミックス|ライブ|アコースティック|インストゥルメンタル|カラオケ|リマスター|混音|现场|現場)$/u;
-    const labels = version.labels.map(label => label.replace(/リミックス|混音/gu, " remix ").replace(/ライブ|现场|現場/gu, " live ").replace(/アコースティック/gu, " acoustic ").replace(/インストゥルメンタル/gu, " instrumental ").replace(/カラオケ/gu, " karaoke ").replace(/リマスター/gu, " remaster ").replace(/\bremastered\b/gu, "remaster").replace(/\bver\b/gu, "version").trim().replace(/\s+/gu, " "));
+    const labels = version.labels.map(label => label.replace(/リミックス|混音/gu, " remix ").replace(/ライブ|现场|現場/gu, " live ").replace(/アコースティック/gu, " acoustic ").replace(/インストゥルメンタル|伴奏(?:版)?/gu, " instrumental ").replace(/カラオケ/gu, " karaoke ").replace(/リマスター/gu, " remaster ").replace(/\bremastered\b/gu, "remaster").replace(/\bver\b/gu, "version").trim().replace(/\s+/gu, " "));
     return { kinds: version.kinds, labels: [...new Set(labels.filter(label => !generic.test(label)))].sort() };
 }
 /** Alternate writing is evidence only when a trusted catalogue read binds it

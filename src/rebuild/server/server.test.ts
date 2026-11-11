@@ -20,6 +20,7 @@ import { ProductionRecordingResolver } from "./production-resolver";
 import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
 import { CatalogArtistAliases } from "./artist-aliases";
 import {createHash,createHmac} from "node:crypto";
+import {waveAudio} from "../../../scripts/fixtures/audio";
 
 const recordingId = "11111111-1111-4111-8111-111111111111";
 const assetId = "22222222-2222-4222-8222-222222222222";
@@ -699,10 +700,10 @@ test("exhausted CDN quota blocks upload and altered CDN bytes never become ready
 });
 
 test("CDN preparation coalesces transfer/publication and persists unchanged canonical identity",async()=>{
- const bytes=Buffer.from("0123456789"),sha256=createHash("sha256").update(bytes).digest("hex"),saved:StoredAudioAsset[]=[];let opens=0,publishes=0;
+ const bytes=waveAudio(),sha256=createHash("sha256").update(bytes).digest("hex"),saved:StoredAudioAsset[]=[];let opens=0,publishes=0;
  class Ingestor extends RecordingIngestor{override async persistAudio(recording:CanonicalRecording,asset:StoredAudioAsset){assert.equal(recording.recordingId,recordingId);saved.push(asset);}}
- const ingestor=new Ingestor(ingestionDatabase().transaction,[]),promotions=new AudioPromotions({async open(){opens++;await new Promise(resolve=>setTimeout(resolve,10));return audioResponse(null);}},ingestor,{async publish(_recording,asset){publishes++;assert.equal(asset.sha256,sha256);return{...asset,locator:{kind:"https",url:"https://cdn.example.test/audio.mp3"}};}});
- const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const ingestor=new Ingestor(ingestionDatabase().transaction,[]),promotions=new AudioPromotions({async open(){opens++;await new Promise(resolve=>setTimeout(resolve,10));return new Response(new Uint8Array(bytes),{headers:{"Content-Type":"audio/wav"}});}},ingestor,{async publish(_recording,asset){publishes++;assert.equal(asset.sha256,sha256);return{...asset,locator:{kind:"https",url:"https://cdn.example.test/audio.wav"}};}});
+ const worker={...source,sizeBytes:bytes.length,mimeType:"audio/wav",locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
  const first=promotions.prepare(canonical,worker),second=promotions.prepare(canonical,worker);assert.equal(first,second);const result=await first;assert.equal(opens,1);assert.equal(publishes,1);assert.equal(saved.length,2);assert.equal(result.recordingId,recordingId);assert.equal(result.sha256,sha256);
 });
 
@@ -720,11 +721,11 @@ test("promotion failures stay with their source and cannot revoke another verifi
 });
 
 test("late failure of a distinct source cannot overwrite successful CDN preparation",async()=>{
- const sha256=createHash("sha256").update("0123456789").digest("hex"),repo=new MemoryRepository(),ingestor=new RecordingIngestor(ingestionDatabase().transaction,[]);
+ const bytes=waveAudio(),sha256=createHash("sha256").update(bytes).digest("hex"),repo=new MemoryRepository(),ingestor=new RecordingIngestor(ingestionDatabase().transaction,[]);
  let release:()=>void=()=>{};const pending=new Promise<void>(resolve=>{release=resolve;});
  const failed={...source,assetId:otherId,sha256:"b".repeat(64),candidate:{...source.candidate,candidateId:otherId},locator:{kind:"telegram-worker" as const,messageId:"41",chatScope:"primary"}};
- const good={...source,sha256,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
- const promotions=new AudioPromotions({async open(asset){if(asset.assetId===otherId)await pending;return audioResponse(null);}},ingestor,{async publish(_recording,asset){return{...asset,assetId:accountId,candidate:{...asset.candidate,candidateId:accountId},locator:{kind:"https",url:"https://cdn.example.test/checked.mp3"}};}});
+ const good={...source,sizeBytes:bytes.length,mimeType:"audio/wav",sha256,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const promotions=new AudioPromotions({async open(asset){if(asset.assetId===otherId)await pending;return new Response(new Uint8Array(bytes),{headers:{"Content-Type":"audio/wav"}});}},ingestor,{async publish(_recording,asset){return{...asset,assetId:accountId,candidate:{...asset.candidate,candidateId:accountId},locator:{kind:"https",url:"https://cdn.example.test/checked.wav"}};}});
  const late=promotions.prepare(canonical,failed),assertFailure=assert.rejects(late,error=>error instanceof AudioPromotionError&&error.reason==="integrity");
  const published=await promotions.prepare(canonical,good);release();await assertFailure;
  repo.assets=[published];const resolver=new RecordingResolver(repo,[]),result=await resolver.resolve({reference},accountId);
@@ -734,8 +735,8 @@ test("late failure of a distinct source cannot overwrite successful CDN preparat
 
 test("ready-worker preparation jobs keep a verified original available when CDN preparation fails",async()=>{
  for(const outcome of ["ready","quota","integrity"] as const){
-  const repo=new MemoryRepository(),sha256=createHash("sha256").update("0123456789").digest("hex");
-  const worker={...source,sha256,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};repo.assets=[worker];
+  const bytes=waveAudio(),repo=new MemoryRepository(),sha256=createHash("sha256").update(bytes).digest("hex");
+  const worker={...source,sha256,sizeBytes:bytes.length,mimeType:"audio/wav",locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};repo.assets=[worker];
   const row={id:otherId,accountId,recordingId,state:"queued",attempts:0,result:null as unknown};
   const query:ReadonlySql=async<Row>(statement:string,args:readonly unknown[])=>{
    let rows:unknown[]=[];
@@ -747,7 +748,7 @@ test("ready-worker preparation jobs keep a verified original available when CDN 
   };
   class Ingestor extends RecordingIngestor{override async persistAudio(_recording:CanonicalRecording,asset:StoredAudioAsset){repo.assets=repo.assets.filter(a=>a.assetId!==asset.assetId).concat(asset);}}
   let publications=0,discoveries=0;const ingestor=new Ingestor(ingestionDatabase().transaction,[]);
-  const promotions=new AudioPromotions({async open(){return audioResponse(null);}},ingestor,{async publish(_recording,asset){publications++;if(outcome!=="ready")throw new AudioPromotionError(outcome,"Preparation failed");return{...asset,assetId:otherId,candidate:{...asset.candidate,candidateId:otherId},locator:{kind:"https",url:"https://cdn.example.test/verified.mp3"}};}});
+  const promotions=new AudioPromotions({async open(){return new Response(new Uint8Array(bytes),{headers:{"Content-Type":"audio/wav"}});}},ingestor,{async publish(_recording,asset){publications++;if(outcome!=="ready")throw new AudioPromotionError(outcome,"Preparation failed");return{...asset,assetId:otherId,candidate:{...asset.candidate,candidateId:otherId},locator:{kind:"https",url:"https://cdn.example.test/verified.wav"}};}});
   const resolver=new RecordingResolver(repo,[],asset=>asset.locator.kind==="https"?asset.locator.url:undefined);
   const jobs=new AudioResolutionJobs(query,repo,ingestor,{async discover(){discoveries++;throw new Error("An existing exact source must not start another bot search");}},resolver,undefined,promotions);
   assert.equal(await jobs.needsPreparation(await resolver.resolve({reference},accountId),accountId),true);
@@ -843,10 +844,10 @@ test("a truncated source is a connection failure and cancellation stops full-fil
 
 test("full-file hashing is available without a configured CDN publisher",async()=>{
  const saved:StoredAudioAsset[]=[];class Ingestor extends RecordingIngestor{override async persistAudio(_recording:CanonicalRecording,asset:StoredAudioAsset){saved.push(asset);}}
- const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
- const promotions=new AudioPromotions({async open(){return audioResponse(null);}},new Ingestor(ingestionDatabase().transaction,[]));
+ const bytes=waveAudio(),worker={...source,sizeBytes:bytes.length,mimeType:"audio/wav",locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary"}};
+ const promotions=new AudioPromotions({async open(){return new Response(new Uint8Array(bytes),{headers:{"Content-Type":"audio/wav"}});}},new Ingestor(ingestionDatabase().transaction,[]));
  assert.equal(promotions.needsPreparation(worker),true);const checked=await promotions.prepare(canonical,worker);
- assert.equal(checked.sha256,createHash("sha256").update("0123456789").digest("hex"));assert.equal(checked.assetId,worker.assetId);assert.equal(saved.length,1);assert.equal(promotions.needsPreparation(checked),false);
+ assert.equal(checked.sha256,createHash("sha256").update(bytes).digest("hex"));assert.equal(checked.assetId,worker.assetId);assert.equal(saved.length,1);assert.equal(promotions.needsPreparation(checked),false);
 });
 
 test("stored source mismatch triggers a fresh discovery job while catalog mismatch stays explicit",async()=>{
