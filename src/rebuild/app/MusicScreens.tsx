@@ -1,202 +1,38 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useMusic } from "./MusicContext";
-import { useResource, loadResource, resourceSnapshot, invalidateResources } from "./resources";
-import {replaceMusicUrl} from "./offlineNavigation";
-import {readFavoriteDraft} from "./favorites";
-import { musicTrack, type MusicTrack } from "./types";
-import { Artwork, Button, SearchField, Empty, IconButton, LoadingRows, LoadError, PageTitle, SectionTitle, TrackList, TrackMenu, time } from "./Elements";
-import { requestJson, userMessage } from "./errors";
-import { RecoveryNotice } from "./RecoveryNotice";
-import {localId} from "./sessionState";
-import {useScreenActions} from "./screenActions";
-import { VolumeControl } from "./ListeningControls";
-import { AudioTechnologySettings } from "../audio/AudioTechnologySettings";
-import { BloomPerformanceSettings } from "../bloom/BloomPerformanceSettings";
-import { BloomShelf } from "../bloom/BloomPage";
-import { BloomPromotion } from "../bloom/BloomPromotion";
-import { planOfflineMixes } from "../recommendations/situations";
-import { groupArtistCards } from "../data/artistSelection";
-import type {ProviderReference} from "../core/types";
-import { ArtistLinks } from "./ArtistLinks";
-import { Blossom } from "./Brand";
-import { Icon } from "./Icon";
-import { AlbumLink } from "./AlbumLink";
-import { collectionTrackMatches } from "./collectionSearch";
-import { CollectionHero, CollectionToolbar, PlaylistArtwork, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
-import { TrackCollection } from "./TrackCollection";
-import { DownloadsRoom } from "./DownloadsRoom";
-import { StickySearch } from "./StickySearch";
-import { CollectionGesture } from "./CollectionGesture";
-import { SelectPopover } from "./SelectPopover";
-import { PersonalizedFeed } from "./PersonalizedFeed";
-import { SearchArtistSuggestions } from "./SearchArtistSuggestions";
-import { OnboardingTastePreview } from "./OnboardingTastePreview";
-import onboardingStyles from "./onboarding-taste.module.css";
-import { ListeningProfile } from "./ListeningProfile";
-import { FeedSettings } from "./FeedSettings";
-import { PersonalizationDataControls } from "./PersonalizationDataControls";
-import { SmartQueueButton } from "./SmartQueueButton";
-import { MixPlaylistDialog } from "./MixPlaylistDialog";
-import room from "./collection-room.module.css";
-import s from "./ink.module.css";
-type Data=Record<string,unknown>;
-type SearchKind="tracks"|"artists"|"albums";
-function list(value:unknown):MusicTrack[]{return Array.isArray(value)?value.map(t=>musicTrack(t as Data)):[];}
-function normalizedSearchText(value:string){return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim();}
-function searchTrackKey(track:MusicTrack){return [normalizedSearchText(track.title),track.artists.map(normalizedSearchText).sort().join("|"),normalizedSearchText(track.versionLabel),Math.round(track.durationMs/1000)].join("::");}
-function uniqueSearchTracks(...groups:MusicTrack[][]){const seen=new Set<string>();return groups.flat().filter(track=>{const key=searchTrackKey(track);if(seen.has(key))return false;seen.add(key);return true;});}
-function uniqueSearchEntities(...groups:Data[][]){const seen=new Set<string>();return groups.flat().filter(entity=>{const key=String(entity.id||entity.deezerId||entity.externalId||"");if(!key||seen.has(key))return false;seen.add(key);return true;});}
-function useApi(path:string|null){const {account}=useMusic();return useResource<Data>(account?.id||null,path);}
-function ResourceBody({resource,children}:{resource:ReturnType<typeof useApi>;children:React.ReactNode}){return resource.loading&&!resource.data?<LoadingRows/>:resource.error&&!resource.data?<LoadError message={resource.error} retry={resource.retry}/>:<>{resource.error&&resource.data&&<RecoveryNotice compact error={resource.error} retry={resource.retry}/>} {children}</>;}
-type Mix={surfaces?:string[];situation?:string;slot?:string;id:string;name:string;description?:string;coverUrls?:string[];trackCount?:number;status?:string;playability?:string;reason?:string};
-function MixCard({mix}:{mix:Mix}){const p=useMusic();const [busy,setBusy]=useState(false);const actions=useScreenActions(p.account?.id,mix.id);async function play(){const controller=actions.begin("play");if(!controller)return;setBusy(true);try{if(!p.account)return;const path="/api/v2/mixes/"+encodeURIComponent(mix.id);await loadResource(p.account.id,path);const snapshot=resourceSnapshot<Data>(p.account.id,path);if(!snapshot.data)throw snapshot.error||new Error("This mix has not been saved on this device yet.");const data=snapshot.data;if(!actions.current("play",controller))return;const tracks=list(data.recordings||data.tracks);if(!tracks.length)throw new Error("This mix is not ready yet. Choose another mix or browse the catalog.");p.play(tracks[0],tracks);}catch(e){if(actions.current("play",controller))p.reportError(e,"playback",()=>void play());}finally{if(actions.finish("play",controller))setBusy(false);}}return <CollectionGesture kind="mix" id={mix.id} title={mix.name} className={s.mixCard}><Link href={"/mix/"+mix.id} className={s.mixArtwork}><PlaylistArtwork title={mix.name} coverUrls={mix.coverUrls}/><span className={s.mixStamp}>sakura selects</span></Link><div><Link href={"/mix/"+mix.id}>{mix.name}</Link><IconButton icon="play" label={"Play "+mix.name} disabled={busy||mix.playability==="unavailable"||mix.status==="insufficient-candidates"} onClick={()=>void play()}/></div><p>{mix.description||"A different path through your music."}</p></CollectionGesture>;}
-function MixShelf(){const resource=useApi("/api/v2/mixes");const mixes=((resource.data?.mixes||[]) as Mix[]).filter(mix=>mix.status==="ready").slice(0,6);return mixes.length?<section aria-label="Listening collections"><SectionTitle title="Music for different moments" note="Short sessions, favorite genres, and familiar artists."/><div className={s.mixGrid}>{mixes.map(mix=><MixCard key={mix.id} mix={mix}/>)}</div></section>:null;}
-function Home(){return <><BloomPromotion/><PersonalizedFeed surface="home"><BloomShelf/><MixShelf/></PersonalizedFeed></>;}
+import { Empty, LoadingRows } from "./Elements";
 
-function Search(){
- const p=useMusic(),query=useSearchParams(),router=useRouter(),urlQuery=query.get("q")||"";
- const [input,setInput]=useState(urlQuery),[debounced,setDebounced]=useState(urlQuery),[loadingMore,setLoadingMore]=useState(false);
- const tab=["Songs","Artists","Albums"].includes(query.get("tab")||"")?query.get("tab")!:"Songs",kind:SearchKind=tab==="Artists"?"artists":tab==="Albums"?"albums":"tracks";
- const sentQuery=useRef<string|null>(null),loadingMoreRef=useRef(false),moreController=useRef<AbortController|null>(null),sentinel=useRef<HTMLDivElement|null>(null),latestSearchKey=useRef(debounced),retryMore=useRef<()=>void>(()=>{});
- const [extra,setExtra]=useState<{key:string;tracks:MusicTrack[];artists:Data[];albums:Data[];cursors:Partial<Record<SearchKind,string|null>>}>({key:"",tracks:[],artists:[],albums:[],cursors:{}});
- useEffect(()=>{if(sentQuery.current===urlQuery){sentQuery.current=null;return;}setInput(urlQuery);setDebounced(urlQuery);},[urlQuery]);
- useEffect(()=>{const timer=setTimeout(()=>{const next=input.trim();setDebounced(next);if(next!==urlQuery){sentQuery.current=next;replaceMusicUrl(router,"/search?"+new URLSearchParams({q:next,tab}),{scroll:false});}},350);return()=>clearTimeout(timer);},[input,urlQuery,router,tab]);
- useEffect(()=>{latestSearchKey.current=debounced;return()=>moreController.current?.abort();},[debounced]);
- const result=useApi(debounced?"/api/v2/search?q="+encodeURIComponent(debounced)+"&searchVersion=2":null),extraValid=extra.key===debounced;
- const tracks=uniqueSearchTracks(list(result.data?.tracks),...(extraValid?[extra.tracks]:[])),artists=uniqueSearchEntities((result.data?.artists||[]) as Data[],...(extraValid?[extra.artists]:[])),albums=uniqueSearchEntities((result.data?.albums||[]) as Data[],...(extraValid?[extra.albums]:[]));
- const baseCursors=(result.data?.nextCursors||{}) as Data,cursor=extraValid&&Object.prototype.hasOwnProperty.call(extra.cursors,kind)?extra.cursors[kind]:typeof baseCursors[kind]==="string"?String(baseCursors[kind]):null,totals=(result.data?.totals||{}) as Data,shown=kind==="tracks"?tracks.length:kind==="artists"?artists.length:albums.length,total=Math.max(shown,Number(totals[kind])||0);
- const more=useCallback(async()=>{if(!cursor||loadingMoreRef.current||!debounced)return;loadingMoreRef.current=true;setLoadingMore(true);const controller=new AbortController();moreController.current=controller;const requestKey=debounced;try{
-  if(!p.account)return;const path="/api/v2/search?"+new URLSearchParams({q:requestKey,kind,cursor,searchVersion:"2"});await loadResource(p.account.id,path);const snapshot=resourceSnapshot<Data>(p.account.id,path);if(!snapshot.data)throw snapshot.error||new Error("These results have not been saved on this device yet.");const data=snapshot.data;
-  if(controller.signal.aborted||latestSearchKey.current!==requestKey)return;const next=(data.nextCursors||{}) as Data;
-  setExtra(previous=>{const current=previous.key===requestKey?previous:{key:requestKey,tracks:[],artists:[],albums:[],cursors:{}};return {...current,tracks:kind==="tracks"?uniqueSearchTracks(current.tracks,list(data.tracks)):current.tracks,artists:kind==="artists"?uniqueSearchEntities(current.artists,(data.artists||[]) as Data[]):current.artists,albums:kind==="albums"?uniqueSearchEntities(current.albums,(data.albums||[]) as Data[]):current.albums,cursors:{...current.cursors,[kind]:typeof next[kind]==="string"?String(next[kind]):null}};});
- }catch(error){if(!controller.signal.aborted)p.reportError(error,"page",()=>retryMore.current());}finally{if(moreController.current===controller){moreController.current=null;loadingMoreRef.current=false;setLoadingMore(false);}}},[cursor,debounced,kind,p]);
- useEffect(()=>{retryMore.current=()=>void more();return()=>{retryMore.current=()=>{};};},[more]);
- useEffect(()=>{const node=sentinel.current;if(!node||!cursor)return;const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void more();},{rootMargin:"300px 0px"});observer.observe(node);return()=>observer.disconnect();},[cursor,more]);
- function changeTab(value:string){replaceMusicUrl(router,"/search?"+new URLSearchParams({q:debounced,tab:value}),{scroll:false});}
- return <><PageTitle eyebrow="Follow your curiosity" title="What’s on your mind?" description="Songs, voices, and the version you meant."/><StickySearch label="Music search"><SearchField value={input} onChange={value=>{setInput(value);if(!value){moreController.current?.abort();setDebounced("");sentQuery.current="";replaceMusicUrl(router,"/search?"+new URLSearchParams({q:"",tab}),{scroll:false});}}} autoFocus label="Search music" placeholder="Songs, artists, albums..."/></StickySearch><div className={s.chips}>{["Songs","Artists","Albums"].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>changeTab(value)}>{value}</button>)}</div>{!debounced?<SearchArtistSuggestions onChoose={setInput}/>:<ResourceBody resource={result}><SectionTitle title={"Results for “"+debounced+"”"} note={tab==="Songs"?"Original, remix, live, and acoustic recordings stay separate.":undefined}/>{tab==="Songs"?<TrackCollection tracks={tracks} room="search" label="Song search results" firstSortLabel="Relevance" searchable={false} sticky={false}/>:<div className={s.entityGrid}>{(tab==="Artists"?artists:albums).map((entity,i)=>{const href="/"+(tab==="Artists"?"artist":"album")+"/"+encodeURIComponent(String(entity.id||entity.deezerId||""));return <CollectionGesture key={String(entity.id||i)} kind={tab==="Artists"?"artist":"album"} id={String(entity.id||entity.deezerId||"")} title={String(entity.name||entity.title||"")}><Link href={href}><Artwork url={String(entity.imageUrl||entity.picture||entity.coverUrl||"")||null} title={String(entity.name||entity.title||"")}/><h3>{String(entity.name||entity.title||"")}</h3></Link>{tab==="Albums"&&entity.artistName?<Link href={entity.artistId?"/artist/"+encodeURIComponent(String(entity.artistId)):"/search?"+new URLSearchParams({q:String(entity.artistName),tab:"Artists"})}>{String(entity.artistName)}</Link>:<p>Artist</p>}</CollectionGesture>;})}</div>}<div ref={sentinel} className={s.searchMore} aria-live="polite"><span>{total>shown?`Showing ${shown} from about ${total} catalog matches.`:`${shown} ${shown===1?"match":"matches"}.`}</span>{cursor&&<Button secondary disabled={loadingMore} onClick={()=>void more()}>{loadingMore?"Loading more…":"Show more results"}</Button>}</div></ResourceBody>}</>;
-}
-function Discover(){return <PersonalizedFeed surface="discover"><MixShelf/></PersonalizedFeed>;}
-function Library({likedOnly=false}:{likedOnly?:boolean}){
- const p=useMusic(),router=useRouter(),actions=useScreenActions(p.account?.id);
- const resource=useApi("/api/v2/library?kind=all"),data=useApi(likedOnly?"/api/v2/library?kind=liked":null),active=likedOnly?data:resource;
- const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[query,setQuery]=useState("");
- const [presentation,setPresentation]=useRoomPresentation(p.account?.id,likedOnly?"liked":"library"),{layout,sort,direction}=presentation;
- const creation=useRef<{name:string;id:string}|null>(null);
- const [extra,setExtra]=useState<{base:number;tracks:MusicTrack[];cursor:string|null}>({base:0,tracks:[],cursor:null}),[loadingMore,setLoadingMore]=useState<number|null>(null);
- const [failedCursor,setFailedCursor]=useState<string|null>(null);
- const paging=useScreenActions(p.account?.id,String(likedOnly)+":"+active.updatedAt),extraValid=extra.base===active.updatedAt;
- const [favoriteCards,setFavoriteCards]=useState<{owner:string;tracks:MusicTrack[]}|null>(null);
- useEffect(()=>{const owner=p.account?.id;if(!owner)return;let live=true;void readFavoriteDraft(owner).then(draft=>{if(live)setFavoriteCards({owner,tracks:Object.values(draft?.pending||{}).filter(intent=>intent.liked).map(intent=>intent.track)});}).catch(()=>{});return()=>{live=false;};},[p.account?.id,p.liked]);
- const localLiked=[...(favoriteCards&&favoriteCards.owner===p.account?.id?favoriteCards.tracks:[]),...p.queue.map(entry=>entry.track),...Object.values(p.downloads).map(entry=>entry.track)].filter(track=>p.liked.has(p.effectiveId(track)));
- const allTracks=[...new Map([...list(active.data?.recordings),...(extraValid?extra.tracks:[]),...localLiked].filter(track=>!likedOnly||p.liked.has(p.effectiveId(track))).map(track=>[p.effectiveId(track),track])).values()];
- const match=normalizedSearchText(query),tracks=sortRoomTracks(allTracks.filter(track=>collectionTrackMatches(track,query)),sort,direction);
- const playlists=((resource.data?.playlists||[]) as Data[]).filter(playlist=>normalizedSearchText(String(playlist.name||"")).includes(match));
- const cursor=extraValid?extra.cursor:typeof active.data?.nextCursor==="string"?active.data.nextCursor:null;
- async function more(){
-  if(!cursor||!p.account)return;const controller=paging.begin("more");if(!controller)return;setLoadingMore(active.updatedAt);setFailedCursor(null);
-  try{const pagePath="/api/v2/library?kind="+(likedOnly?"liked":"all")+"&cursor="+encodeURIComponent(cursor);
-   await loadResource(p.account.id,pagePath);
-   const snapshot=resourceSnapshot<Data>(p.account.id,pagePath);
-   if(!snapshot.data||snapshot.error&&!p.offline)throw snapshot.error||new Error("This collection page is unavailable offline.");
-   const result=snapshot.data;
-   if(!paging.current("more",controller))return;
-   setExtra(previous=>({base:active.updatedAt,tracks:[...(previous.base===active.updatedAt?previous.tracks:[]),...list(result.recordings)],cursor:typeof result.nextCursor==="string"?result.nextCursor:null}));
-  }catch(error){if(paging.current("more",controller)){setFailedCursor(cursor);p.reportError(error,"page",()=>void more());}}finally{if(paging.finish("more",controller))setLoadingMore(null);}
+// These route-only imports live in a Client Component so Next can split them.
+const Home = dynamic(() => import("./MusicHomeScreen").then(module => module.Home), { loading: LoadingRows });
+const Discover = dynamic(() => import("./MusicHomeScreen").then(module => module.Discover), { loading: LoadingRows });
+const Search = dynamic(() => import("./MusicSearchScreen").then(module => module.Search), { loading: LoadingRows });
+const Library = dynamic(() => import("./MusicLibraryScreen").then(module => module.Library), { loading: LoadingRows });
+const Downloads = dynamic(() => import("./MusicDownloadsScreen").then(module => module.Downloads), { loading: LoadingRows });
+const Collection = dynamic(() => import("./MusicCollectionScreen").then(module => module.Collection), { loading: LoadingRows });
+const TrackDetails = dynamic(() => import("./MusicCollectionScreen").then(module => module.TrackDetails), { loading: LoadingRows });
+const Profile = dynamic(() => import("./ListeningProfile").then(module => module.ListeningProfile), { loading: LoadingRows });
+const Settings = dynamic(() => import("./MusicSettingsScreen").then(module => module.Settings), { loading: LoadingRows });
+const Onboarding = dynamic(() => import("./MusicOnboardingScreen").then(module => module.Onboarding), { loading: LoadingRows });
+const Import = dynamic(() => import("./MusicImportScreen").then(module => module.Import), { loading: LoadingRows });
+
+/** Fetch only the selected screen while account data is booting. Importing a
+ * module does not mount its components or start their resource requests. */
+export function preloadMusicScreen(pathname:string){
+ const section=pathname.split("/")[1];
+ switch(section){
+  case "home":case "discover":return import("./MusicHomeScreen");
+  case "search":return import("./MusicSearchScreen");
+  case "liked":return import("./MusicLibraryScreen");
+  case "library":return pathname.includes("/downloaded")?Promise.resolve():import("./MusicLibraryScreen");
+  case "playlist":case "mix":case "album":case "artist":case "track":return import("./MusicCollectionScreen");
+  case "profile":return import("./ListeningProfile");
+  case "settings":return import("./MusicSettingsScreen");
+  case "onboarding":return import("./MusicOnboardingScreen");
+  case "import":return import("./MusicImportScreen");
+  case "bloom":return import("../bloom/BloomPage");
+  default:return Promise.resolve();
  }
- // A collection query exhausts local membership pages, never the external catalogue.
- useEffect(()=>{
-  if(!match||!cursor||failedCursor===cursor||loadingMore===active.updatedAt)return;
-  const timer=setTimeout(()=>void more(),200);
-  return()=>clearTimeout(timer);
- // more owns cancellation and page identity through useScreenActions.
- // eslint-disable-next-line react-hooks/exhaustive-deps
- },[match,cursor,failedCursor,loadingMore,active.updatedAt,p.offline]);
- async function create(e?:React.FormEvent){
-  e?.preventDefault();const trimmed=name.trim();if(!trimmed)return;const controller=actions.begin("create");if(!controller)return;setBusy(true);
-  if(creation.current?.name!==trimmed)creation.current={name:trimmed,id:localId()};
-  try{const result=await requestJson("/api/v2/playlists",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({name:trimmed,requestId:creation.current.id})},{context:"save",accountId:p.account?.id});
-   if(!actions.current("create",controller))return;creation.current=null;setCreating(false);setName("");resource.retry();if(p.account)invalidateResources(p.account.id);p.notify("Playlist created.");router.push("/playlist/"+result.id);
-  }catch(error){if(actions.current("create",controller))p.reportError(error,"save",()=>void create());}finally{if(actions.finish("create",controller))setBusy(false);}
- }
- return <div className={room.libraryRoom}><CollectionHero eyebrow={likedOnly?"YOUR LIKED SONGS":"The things you keep"} title={likedOnly?"Your favorite songs.":"Your little music world."} description={likedOnly?"The songs you've liked, collected in one place.":"Your liked songs and playlists, together in one place."} covers={allTracks.slice(0,3)} label={likedOnly?p.liked.size+" liked songs":"your music, collected."}><Button icon="play" disabled={!tracks.length} onClick={()=>p.play(tracks[0],tracks)}>Play {likedOnly?"liked songs":"your collection"}</Button><SmartQueueButton scope={likedOnly?"liked":"collection"} tracks={likedOnly?undefined:allTracks} label={likedOnly?"Find my saved soundtrack":"Smart play this collection"}/>{!likedOnly&&<Button secondary icon="plus" disabled={busy} onClick={()=>setCreating(!creating)}>New playlist</Button>}</CollectionHero>
- {creating&&<form className={s.createPlaylist} onSubmit={create}><label>A name for your collection<input value={name} disabled={busy} onChange={e=>setName(e.target.value)} maxLength={80} required autoFocus placeholder="Songs for a softer day"/></label><button className={s.primaryButton} disabled={busy} type="submit">{busy?"Making room...":"Create playlist"}</button><Button secondary disabled={busy} onClick={()=>setCreating(false)}>Cancel</Button></form>}
- {!likedOnly&&<div className={room.shortcuts}><Link href="/liked"><span className={room.shortcutMark}><Icon name="heart"/></span><span><h3>Your liked songs.</h3><small>{p.liked.size} liked songs, kept close</small></span><Icon name="arrow"/></Link><Link href="/library/downloaded"><span className={room.shortcutMark}><Icon name="download"/></span><span><h3>Take it with you.</h3><small>{Object.values(p.downloads).filter(d=>d.status==="ready"&&d.requested!==false).length} songs ready offline</small></span><Icon name="arrow"/></Link></div>}
- <StickySearch label={likedOnly?"Liked songs search":"Library search"}><SearchField value={query} onChange={setQuery} label={likedOnly?"Find a liked song":"Find in your library"} placeholder="Find a title, artist or album"/></StickySearch><CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={tracks.length} firstSortLabel="Order added" dateSortLabel={likedOnly?"Date liked":"Date added"}/>
- <ResourceBody resource={active}>{!likedOnly&&<><SectionTitle title="Your playlists" note="Music for any part of your day." href="/import" action="Bring your music"/><div className={room.playlistShelf} data-layout={layout}>{playlists.map((playlist,i)=><CollectionGesture key={String(playlist.id)} kind="playlist" id={String(playlist.id)} title={String(playlist.name)}><Link className={room.playlist} href={"/playlist/"+encodeURIComponent(String(playlist.id))}><div className={room.playlistCover}><PlaylistArtwork dedicatedCover={playlist.hasCustomCover===true} coverUrl={playlist.coverUrl} coverUrls={playlist.coverUrls} title={String(playlist.name)}/><span className={room.playlistNumber}>{String(i+1).padStart(2,"0")}</span></div><div><h3>{String(playlist.name)}</h3><p>{Number(playlist.trackCount)||0} songs</p></div></Link></CollectionGesture>)}</div>{!playlists.length&&<div className={s.smallEmpty}>{match?"No collections match this search yet.":"Create a playlist to collect songs in your own order."}</div>}</>}
- <div className={room.songHeader}><h2>{likedOnly?"Your liked songs":"Songs you keep close"}</h2><span>{likedOnly?"A good place to come back to.":"Your soundtrack, your way."}</span></div>{match&&cursor&&failedCursor!==cursor&&!tracks.length?<LoadingRows/>:tracks.length?<TrackList tracks={tracks} layout={layout} dateLabel={likedOnly?"Liked":"Added"}/>:<Empty title={match?"No songs match your search.":likedOnly?"No liked songs yet.":"Your collection begins with a song."} description={match?"Try another name, or clear your search.":"Like a song to add it here. Liking a song does not download it."}/>}
- {match&&cursor&&failedCursor!==cursor&&<p role="status">Searching the rest of your collection...</p>}
- {cursor&&<Button secondary disabled={loadingMore===active.updatedAt} onClick={()=>void more()}>{loadingMore===active.updatedAt?"Loading more...":"Show more songs"}</Button>}</ResourceBody></div>;
 }
-function OfflineShelves({tracks}:{tracks:MusicTrack[]}){
- const p=useMusic();const mixes=planOfflineMixes(tracks.map(t=>({...t,liked:p.liked.has(p.effectiveId(t))})),{seed:"offline:"+new Date().toISOString().slice(0,10)}).filter(m=>m.status==="ready").slice(0,6);
- if(!mixes.length)return null;return <><SectionTitle title="A few paths through your saved songs" note="Mixes made entirely from songs downloaded on this device."/><div className={s.offlineMixes}>{mixes.map(mix=><button key={mix.id} onClick={()=>{const byId=new Map(tracks.map(t=>[t.id,t]));const queue=mix.recordingIds.map(id=>byId.get(id)).filter((t):t is MusicTrack=>Boolean(t));if(queue.length)p.play(queue[0],queue);}}><Blossom/><span><b>{mix.name}</b><small>{mix.trackCount} songs · ready offline</small></span><Icon name="play" size={18}/></button>)}</div></>;
-}
-function Downloads(){return <DownloadsRoom offlineShelves={tracks=><OfflineShelves tracks={tracks}/>}/>;}
-function Collection({kind,id}:{kind:"playlist"|"mix"|"album"|"artist";id:string}){
- const p=useMusic(),actions=useScreenActions(p.account?.id,kind+":"+id),base=kind==="mix"?"mixes":kind==="playlist"?"playlists":kind==="album"?"albums":"artists";
- const resource=useApi("/api/v2/"+base+"/"+encodeURIComponent(id)),data=resource.data,tracks=list(data?.recordings||data?.tracks);
- const [editing,setEditing]=useState(false),[renaming,setRenaming]=useState(false),[name,setName]=useState(""),[query,setQuery]=useState(""),[playlistMaker,setPlaylistMaker]=useState(false);
- const [presentation,setPresentation]=useRoomPresentation(p.account?.id,kind+":"+id),{layout,sort,direction}=presentation;
- const title=String(data?.name||data?.title||"A little music world"),url=data?.imageUrl||data?.coverUrl||(Array.isArray(data?.coverUrls)?data.coverUrls[0]:null);
- const match=normalizedSearchText(query),shown=sortRoomTracks(tracks.filter(track=>collectionTrackMatches(track,query)),sort,direction);
- const playable=shown.length?shown:tracks;
- async function rename(){
-  if(!p.account||!name.trim())return;const controller=actions.begin("rename");if(!controller)return;setRenaming(true);
-  try{await requestJson("/api/v2/playlists/"+encodeURIComponent(id),{method:"PATCH",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.trim()})},{context:"save",accountId:p.account.id});
-   if(!actions.current("rename",controller))return;setEditing(false);invalidateResources(p.account.id);resource.retry();
-  }catch(error){if(actions.current("rename",controller))p.reportError(error,"save",()=>void rename());}finally{if(actions.finish("rename",controller))setRenaming(false);}
- }
- return <ResourceBody resource={resource}>{data&&<><div className={s.collectionHero}>{(kind==="playlist"||kind==="mix")?<PlaylistArtwork dedicatedCover={data.hasCustomCover===true} coverUrl={data.coverUrl} coverUrls={[...(Array.isArray(data.coverUrls)?data.coverUrls:[]),...tracks.map(track=>track.coverUrl)]} title={title} className={room.collectionPlaylistArtwork}/>:<Artwork url={url as string} title={title} className={kind==="artist"?s.artistArtwork:""}/>}<div><span className={s.eyebrow}>{kind==="mix"?"SAKURA SELECTS / MADE FOR YOU":kind.toUpperCase()}</span><h1>{title}</h1><p>{String(data.description||data.bio||"A little closer to the music.")}</p><small>{tracks.length} songs · {Math.ceil(tracks.reduce((sum,t)=>sum+t.durationMs,0)/60000)} min</small><div className={s.buttonRow}><Button icon="play" disabled={!tracks.length||data.playability==="unavailable"} onClick={()=>p.play(playable[0],playable)}>Play {kind}</Button><SmartQueueButton scope="collection" tracks={tracks} label="Find my soundtrack here"/><IconButton icon="shuffle" disabled={!tracks.length} label={"Shuffle "+title} onClick={()=>{p.setShuffle(true);if(playable.length)p.play(playable[Math.floor(Math.random()*playable.length)],playable);}}/><IconButton icon="download" disabled={!tracks.length} label={"Download "+title} onClick={()=>tracks.forEach(p.requestDownload)}/>{kind==="mix"&&<IconButton icon="plus" disabled={!tracks.length} label={"Make a playlist from "+title} onClick={()=>setPlaylistMaker(true)}/>} {kind==="playlist"&&<IconButton icon="edit" disabled={renaming} label="Rename playlist" onClick={()=>{setName(title);setEditing(true);}}/>}</div></div></div>
- {editing&&<form className={s.createPlaylist} onSubmit={event=>{event.preventDefault();void rename();}}><input value={name} disabled={renaming} onChange={e=>setName(e.target.value)} maxLength={80} required aria-label="Playlist name"/><button type="submit" className={s.primaryButton} disabled={renaming||!name.trim()}>{renaming?"Saving name...":"Save name"}</button><Button secondary disabled={renaming} onClick={()=>setEditing(false)}>Cancel</Button></form>}
- <StickySearch label={title+" search"}><SearchField value={query} onChange={setQuery} label={"Find a song in this "+kind} placeholder="Find a title, artist or album"/></StickySearch><CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={shown.length} firstSortLabel={kind==="album"?"Track number":kind==="playlist"?"Playlist order":kind==="artist"?"Popular order":"Mix order"} dateSortLabel={kind==="playlist"?"Date added":undefined}/>{match&&!shown.length?<Empty title="No songs match your search." description="Try another name or clear your search to see the collection again."/>:<TrackList tracks={shown} layout={layout} dateLabel={kind==="playlist"?"Added":undefined}/>}
- {kind==="mix"&&<div className={s.note}><Icon name="queue"/><p>{String(data.reason||"A different mood from your other mixes, with familiar voices and a little discovery.")}</p><Link href="/settings">Shape my discovery</Link></div>}{kind==="artist"&&Array.isArray(data.albums)&&<><SectionTitle title="Their records"/><div className={s.entityGrid}>{(data.albums as Data[]).map(album=><CollectionGesture key={String(album.id)} kind="album" id={String(album.id)} title={String(album.title)}><Link href={"/album/"+album.id}><Artwork url={album.coverUrl as string} title={String(album.title)}/><h3>{String(album.title)}</h3></Link></CollectionGesture>)}</div></>}{playlistMaker&&kind==="mix"&&<MixPlaylistDialog key={id} mixId={id} mixName={title} tracks={tracks} onClose={()=>setPlaylistMaker(false)}/>}</>}</ResourceBody>;
-}
-function TrackDetails({id}:{id:string}){const p=useMusic();const resource=useApi("/api/v2/recordings/"+encodeURIComponent(id));const data=resource.data;const [menu,setMenu]=useState(false);let t:MusicTrack|null=null;try{if(data)t=musicTrack((data.recording||data) as Data);}catch{/* A malformed card has a clear unavailable view below. */}return <ResourceBody resource={resource}>{t?<><div className={s.collectionHero}><Artwork url={t.coverUrl} title={t.albumTitle||t.title}/><div><span className={s.eyebrow}>A LITTLE CLOSER TO THE SONG</span><h1>{t.title}</h1><ArtistLinks track={t}/><p><AlbumLink track={t}/> · {time(t.durationMs)}</p><span className={s.recordingBadge}>{t.versionLabel}</span><div className={s.buttonRow}><Button icon="play" onClick={()=>t&&p.play(t)}>Play song</Button><IconButton icon="heart" label="Keep this song" active={p.liked.has(t.id)} onClick={()=>t&&void p.toggleLike(t)}/><IconButton icon="download" label="Save on this device" onClick={()=>t&&p.requestDownload(t)}/><IconButton icon="more" label="Song options" onClick={()=>setMenu(true)}/></div></div></div><div className={s.detailGrid}><section><span className={s.eyebrow}>FOLLOW EVERY WORD</span><h2>There’s more<br/>between the lines.</h2><p>Synced lyrics and clear reading guides, with room to sing along.</p><Button secondary icon="lyrics" onClick={()=>{if(t){p.play(t);p.openModal("lyrics");}}}>Listen with lyrics</Button></section><section><span className={s.eyebrow}>THE RIGHT RECORDING</span><h2>Your song.<br/>Your version.</h2><p>{t.versionLabel}. Other recordings are separate, with their own audio and download entries.</p><Link href={"/search?q="+encodeURIComponent(t.title+" "+t.artists[0])}>Explore other recordings <Icon name="arrow" size={16}/></Link></section></div>{menu&&<TrackMenu track={t} onClose={()=>setMenu(false)}/>}</>:<Empty title="This song is unavailable." description="Look it up in the catalog and select the exact recording." href="/search" action="Find the song"/>}</ResourceBody>;}
-function Profile(){return <ListeningProfile/>;}
-function Settings(){const p=useMusic();const timer=p.settings.sleepTimerMinutes||15;async function change(patch:Parameters<typeof p.updateSettings>[0]){try{await p.updateSettings(patch);}catch(e){p.reportError(e,"save",()=>void change(patch));}}return <><PageTitle eyebrow="Make yourself at home" title="Just the way you like it."/><div className={s.settingsGrid}><AudioTechnologySettings/><BloomPerformanceSettings/><section><h2>The look & feel</h2><div className={s.settingRow}><div><b>Sakura opening</b><p>A little welcome at the start of a visit.</p></div><button className={s.switch} aria-label="Sakura opening animation" aria-pressed={p.settings.openingAnimation!==0} onClick={()=>void change({openingAnimation:p.settings.openingAnimation===0?1:0})}><i/></button></div><div className={s.settingRow}><div><b>Appearance</b><p>A beautiful place, in any light.</p></div><SelectPopover label="Appearance" value={p.settings.theme} onChange={theme=>void change({theme})} options={[{value:"system",label:"Follow device"},{value:"light",label:"Light"},{value:"dark",label:"Dark"}]}/></div><div className={s.settingRow}><div><b>Keep motion gentle</b><p>A still blossom instead of moving petals.</p></div><button className={s.switch} aria-pressed={p.settings.reducedMotion} aria-label="Reduce motion" onClick={()=>void change({reducedMotion:!p.settings.reducedMotion})}><i/></button></div><Button secondary icon="motion" onClick={()=>window.dispatchEvent(new Event("sakura-replay-opening"))}>Replay Sakura opening</Button></section><FeedSettings/><PersonalizationDataControls/><section><h2>Your sound</h2><div className={s.settingRow}><div><b>Streaming data</b><p>Control how eagerly upcoming songs are prepared.</p></div><SelectPopover label="Streaming data" value={p.settings.audioQuality} onChange={audioQuality=>void change({audioQuality})} options={[{value:"high",label:"Smooth playback"},{value:"balanced",label:"Balanced"},{value:"data-saver",label:"Save data"}]}/></div><div className={s.settingRow}><div><b>Volume</b><p>A comfortable place to listen.</p></div><VolumeControl compact label="Player volume" value={p.volume} onChange={p.setVolume}/></div><div className={s.settingRow}><div><b>Sleep timer</b><p>A quiet end to the evening.</p></div><SelectPopover label="Sleep timer minutes" value={timer} onChange={sleepTimerMinutes=>void change({sleepTimerMinutes})} options={[{value:5,label:"5 min"},{value:15,label:"15 min"},{value:30,label:"30 min"},{value:60,label:"60 min"}]}/></div><Button secondary icon="moon" onClick={()=>{p.setSleepTimer(p.sleepMinutes?null:timer);p.notify(p.sleepMinutes?"Sleep timer stopped.":timer+" minute sleep timer set.");}}>{p.sleepMinutes?"Cancel sleep timer":"Set sleep timer"}</Button></section><section><h2>Your library & privacy</h2><div className={s.settingRow}><div><b>Explicit songs</b><p>Include explicit recordings in discovery.</p></div><button className={s.switch} aria-label="Explicit songs" aria-pressed={p.settings.explicitContent!==false} onClick={()=>void change({explicitContent:p.settings.explicitContent===false})}><i/></button></div><div className={s.settingRow}><div><b>Private listening</b><p>Enjoy a moment without saving listening history.</p></div><button className={s.switch} aria-label="Private listening" aria-pressed={p.settings.privateSession} onClick={()=>void change({privateSession:!p.settings.privateSession})}><i/></button></div><Link href="/import">Bring your playlists <Icon name="arrow" size={15}/></Link><Link href="/library/downloaded">Manage device downloads <Icon name="arrow" size={15}/></Link><Button secondary onClick={()=>{void p.logout().catch(error=>p.reportError(error,"account",()=>void p.logout().catch(nextError=>p.reportError(nextError,"account"))));}}>Sign out — keep my downloads</Button></section></div></>;}
-function Onboarding(){const music=useMusic();return <OnboardingChoices key={music.account?.id}/>;}
-function OnboardingChoices(){
- const p=useMusic();const router=useRouter();const [draft,setDraft]=useState(()=>({version:p.artistChoiceVersion,selections:p.settings.seedArtistSelections||[],legacy:p.settings.seedArtists.filter(name=>!(p.settings.seedArtistSelections||[]).some(artist=>artist.name===name))}));const {selections,legacy}=draft;const [query,setQuery]=useState("");const [artistQuery,setArtistQuery]=useState("");const [busy,setBusy]=useState(false);const actions=useScreenActions(p.account?.id);
- const dirty=useRef(false),finishRef=useRef<()=>Promise<void>>(async()=>{});
- const setSelections=(update:(previous:typeof selections)=>typeof selections)=>setDraft(old=>({...old,selections:update(old.selections)}));
- const setLegacy=(update:(previous:string[])=>string[])=>setDraft(old=>({...old,legacy:update(old.legacy)}));
- useEffect(()=>{
-  if(draft.version===p.artistChoiceVersion)return;
-  let active=true;queueMicrotask(()=>{if(!active)return;const hadChanges=dirty.current;dirty.current=false;
-   setDraft({version:p.artistChoiceVersion,selections:p.settings.seedArtistSelections||[],legacy:p.settings.seedArtists.filter(name=>!(p.settings.seedArtistSelections||[]).some(artist=>artist.name===name))});
-   if(hadChanges&&!busy)p.notify("Your current artist choices are now shown. Review them before saving.");
-  });return()=>{active=false;};
- },[p,busy,draft.version]);
- function removeSelection(key:string){if(busy)return;dirty.current=true;setSelections(old=>old.filter(artist=>artist.selectionKey!==key));}
- function removeLegacy(name:string){if(busy)return;dirty.current=true;setLegacy(old=>old.filter(artist=>artist!==name));}
- useEffect(()=>{const timer=setTimeout(()=>setArtistQuery(query.trim()),350);return()=>clearTimeout(timer);},[query]);
- const resource=useApi(artistQuery?"/api/v2/search?q="+encodeURIComponent(artistQuery):"/api/v2/artists?limit=32");const rows=((resource.data?.artists||[]) as Data[]).map(row=>({id:String(row.id),name:String(row.name||""),imageUrl:String(row.imageUrl||row.picture||"")||null,trackCount:Number(row.trackCount)||0,albumCount:Number(row.albumCount)||0,reference:row.reference as ProviderReference|undefined,provider:row.provider as string|undefined,externalId:row.externalId as string|undefined}));const artists=groupArtistCards(rows);
- function pick(a:typeof artists[number]){if(busy)return;const selected=selections.some(s=>s.selectionKey===a.selectionKey)||legacy.includes(a.name);if(selected){dirty.current=true;setSelections(old=>old.filter(s=>s.selectionKey!==a.selectionKey));setLegacy(old=>old.filter(name=>name!==a.name));return;}if(selections.length+legacy.length>=20){p.notify("You can choose up to twenty artists. Remove one to add another.");return;}dirty.current=true;if(a.reference)setSelections(old=>[...old,{name:a.name,reference:a.reference!,selectionKey:a.selectionKey}]);else setLegacy(old=>[...old,a.name]);}
- async function finish(){const controller=actions.begin("finish");if(!controller)return;setBusy(true);try{await p.updateSettings({seedArtists:[...new Set([...legacy,...selections.map(a=>a.name)])],seedArtistSelections:selections,onboarded:true},{artistChoiceVersion:draft.version});if(actions.current("finish",controller))router.replace("/home");}catch(e){if(actions.current("finish",controller))p.reportError(e,"save",()=>void finishRef.current());}finally{if(actions.finish("finish",controller))setBusy(false);}}
- useLayoutEffect(()=>{finishRef.current=finish;});
- return <><PageTitle eyebrow="YOUR FAVORITE ARTISTS" title="Start with your favorite artists." description="Choose artists you enjoy to help shape your first recommendations. These choices can be changed later."/><SearchField value={query} onChange={value=>{setQuery(value);if(!value)setArtistQuery("");}} label="Find favorite artists" placeholder="Find a favorite artist"/>{selections.length+legacy.length>0&&<div className={s.chips+" "+onboardingStyles.chosenArtists} aria-label="Your chosen artists">{selections.map(a=><button key={a.selectionKey} aria-label={"Remove "+a.name} disabled={busy} onClick={()=>removeSelection(a.selectionKey)}>{a.name} ×</button>)}{legacy.map(name=><button key={name} aria-label={"Remove "+name} disabled={busy} onClick={()=>removeLegacy(name)}>{name} ×</button>)}</div>}<OnboardingTastePreview seedArtists={[...new Set([...legacy,...selections.map(artist=>artist.name)])]} seedArtistSelections={selections}/><ResourceBody resource={resource}><div className={s.entityGrid+" "+onboardingStyles.artistChoices}>{artists.slice(0,24).map(a=>{const selected=selections.some(s=>s.selectionKey===a.selectionKey)||legacy.includes(a.name);return <button className={s.artistPick} key={a.selectionKey} disabled={busy} aria-label={a.name} aria-pressed={selected} onClick={()=>pick(a)}><Artwork url={a.imageUrl} title={a.name}/><h3>{a.name}</h3>{selected&&<Icon name="check"/>}</button>;})}</div></ResourceBody><div className={s.onboardingFooter+" "+onboardingStyles.saveFooter}><span>{selections.length+legacy.length} {selections.length+legacy.length===1?"artist":"artists"} selected.</span><Button icon="arrow" onClick={()=>void finish()} disabled={busy}>{busy?"Saving your choices…":selections.length+legacy.length?"Save and continue":"Continue without artists"}</Button></div></>;
-}
-function Import(){
- const p=useMusic(),router=useRouter(),actions=useScreenActions(p.account?.id);
- const [url,setUrl]=useState(""),[result,setResult]=useState<{url:string;data:Data}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
- const currentUrl=useRef(""),importRequest=useRef<{url:string;id:string}|null>(null),ready=result?.url===url.trim()?result.data:null;
- function change(value:string){currentUrl.current=value.trim();setUrl(value);setResult(null);setError(null);actions.cancel("import");}
- async function preview(){
-  const submitted=url.trim();if(!submitted)return;const controller=actions.begin("import");if(!controller)return;setBusy(true);setError(null);setResult(null);
-  try{const data=await requestJson("/api/v2/import",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({url:submitted,confirm:false})},{context:"save",accountId:p.account?.id,timeoutMs:300000});
-   if(actions.current("import",controller)&&currentUrl.current===submitted)setResult({url:submitted,data});
-  }catch(e){if(actions.current("import",controller))setError(userMessage(e,"save"));}finally{if(actions.finish("import",controller))setBusy(false);}
- }
- async function confirm(){
-  const submitted=url.trim();if(!ready||!submitted)return;const controller=actions.begin("import");if(!controller)return;setBusy(true);setError(null);
-  if(importRequest.current?.url!==submitted)importRequest.current={url:submitted,id:localId()};
-  try{const data=await requestJson("/api/v2/import",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({url:submitted,confirm:true,requestId:importRequest.current.id})},{context:"save",accountId:p.account?.id,timeoutMs:300000});
-   if(!actions.current("import",controller)||currentUrl.current!==submitted)return;p.notify("Playlist imported.");if(p.account)invalidateResources(p.account.id);router.push("/playlist/"+data.playlistId);
-  }catch(e){if(actions.current("import",controller))setError(userMessage(e,"save"));}finally{if(actions.finish("import",controller))setBusy(false);}
- }
- return <><PageTitle eyebrow="YOUR PLAYLISTS, TOGETHER" title="Bring your playlists." description="Import a playlist and keep its songs in your library."/><div className={s.importCard}><Blossom/><h2>Your music belongs with you.</h2><p>Paste a public playlist link. Review its recordings before adding it to your library.</p><label>Playlist link<SearchField icon="link" value={url} onChange={change} label="Playlist link" placeholder="A Spotify or Deezer playlist link"/></label><Button icon="arrow" onClick={()=>void preview()} disabled={busy||!url.trim()}>{busy?"Finding your collection...":"Preview playlist"}</Button>{busy&&<Button secondary onClick={()=>actions.cancel("import")}>Cancel</Button>}{error&&<RecoveryNotice error={error} context="save" retry={()=>void(ready?confirm():preview())}/>}</div>{ready&&<><SectionTitle title={String(ready.name||"Your collection")} note="Exact catalog recordings. Audio availability is checked separately."/><TrackCollection tracks={list(ready.tracks||ready.recordings)} room="import" label="Playlist preview" firstSortLabel="Playlist order"/><Button icon="check" onClick={()=>void confirm()} disabled={busy}>Import this playlist</Button></>}</>;
-}
+
 export function MusicScreens({route}:{route:string[]}){const {account}=useMusic();const path=route.join("/"),key=(account?.id||"guest")+":"+path;if(path==="home")return <Home key={key}/>;if(path==="search")return <Search key={key}/>;if(path==="discover")return <Discover key={key}/>;if(path==="library")return <Library key={key}/>;if(path==="liked")return <Library key={key} likedOnly/>;if(path==="library/downloaded"||path==="downloads"||path==="offline")return <Downloads key={key}/>;if(path==="profile")return <Profile key={key}/>;if(path==="settings")return <Settings key={key}/>;if(path==="onboarding")return <Onboarding key={key}/>;if(path==="import")return <Import key={key}/>;if(["playlist","mix","album","artist"].includes(route[0])&&route[1])return <Collection key={key} kind={route[0] as "playlist"|"mix"|"album"|"artist"} id={route[1]}/>;if(route[0]==="track"&&route[1])return <TrackDetails key={key} id={route[1]}/>;return <Empty title="This page has moved." href="/home" action="Go to Home"/>;}

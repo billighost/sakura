@@ -1,6 +1,6 @@
 ﻿"use client";
 import { useMemo, useRef, useState } from "react";
-import { useMusic } from "../app/MusicContext";
+import { useMusic, usePlaybackProgress } from "../app/MusicContext";
 import { lyricEdition } from "../lyrics/identity";
 import { LyricsUpload } from "./LyricsUpload";
 import { ReadingLanguageChoice } from "./ReadingLanguageChoice";
@@ -29,7 +29,7 @@ export function LyricsView(props: LyricsViewProps) {
 }
 
 function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
-  const music = useMusic();
+  const music = useMusic(), progress = usePlaybackProgress();
   const lyrics = useLyrics(music.track);
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<{ source: string; indices: number[] }>({ source: "", indices: [] });
@@ -42,10 +42,10 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
   const data = lyrics.data;
   const lineSource = useMemo(() => JSON.stringify(data?.lines.map(line => [line.start, line.text]) || []), [data?.lines]);
   const selected = selection.source === lineSource ? selection.indices : [];
-  const moment = data?.timing === "synced" ? lyricMoment(data.lines, music.positionMs / 1000) : { index: -1, kind: "empty" as const };
+  const moment = data?.timing === "synced" ? lyricMoment(data.lines, progress.positionMs / 1000) : { index: -1, kind: "empty" as const };
   const active = moment.kind === "line" ? moment.index : -1;
   const { follow, pause, resume } = useLyricFollow({ targetIndex: moment.index, selecting, reducedMotion: music.settings.reducedMotion, viewRef, lineRefs, controlsRef, layoutVersion: `${lineSource}:${reading}` });
-  const duration = music.durationMs || music.track?.durationMs || 0;
+  const duration = progress.durationMs || music.track?.durationMs || 0;
   const hasWords = Boolean(data && !data.instrumental && data.lines.some(line => line.text.trim()));
 
   function followWords() { setSelecting(false); resume(); }
@@ -108,7 +108,7 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
             {moment.kind === "interlude" && index === moment.index && <small role="status">Instrumental</small>}
           </div>
           : <button type="button" key={`${line.start}-${index}`} ref={element => { lineRefs.current[index] = element; }} data-lyric-index={index} data-playback-shortcuts="listening" className={`${s.lyricLine} ${index === active ? s.currentLyric : ""} ${selected.includes(index) ? s.selectedLyric : ""}`} aria-pressed={selecting ? selected.includes(index) : undefined} aria-current={index === active ? "true" : undefined} title={!selecting && data.timing === "synced" ? `Listen from ${formatPlaybackTime(line.start * 1000)}` : undefined} onPointerDown={pause} onClick={() => chooseLine(index)}>
-            <span>{line.words?.length && index === active ? line.words.map((word, wordIndex) => <span key={wordIndex} className={music.positionMs / 1000 >= word.start && (word.end === undefined || music.positionMs / 1000 < word.end) ? s.currentWord : ""}>{word.text}</span>) : line.text}</span>
+            <span>{line.words?.length && index === active ? line.words.map((word, wordIndex) => <span key={wordIndex} className={progress.positionMs / 1000 >= word.start && (word.end === undefined || progress.positionMs / 1000 < word.end) ? s.currentWord : ""}>{word.text}</span>) : line.text}</span>
             {reading && line.romanized && line.romanized.trim() !== line.text.trim() && <small>{line.romanized}{line.readingReviewNeeded && <span className={s.reviewMark} title="This line contains a reading that needs review"> · reading needs review</span>}</small>}
           </button>)}
       </div>
@@ -116,7 +116,7 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
       {music.track && <LyricsUpload track={music.track} initialLyrics={data} onPublished={lyrics.applyPublishedLyrics}/>}
     </>}
     <div className={s.lyricsControls} ref={controlsRef} data-lyrics-controls>
-      <div className={s.lyricsProgress}><PlaybackRibbon compact positionMs={music.positionMs} durationMs={duration} label="Playback position in lyrics" disabled={!music.track || music.status === "resolving"} onSeek={position => { music.seek(position); if (!selecting) resume(); }}/></div>
+      <div className={s.lyricsProgress}><PlaybackRibbon compact positionMs={progress.positionMs} durationMs={duration} label="Playback position in lyrics" disabled={!music.track || music.status === "resolving"} onSeek={position => { music.seek(position); if (!selecting) resume(); }}/></div>
       <div className={s.lyricsTransport}>
         <IconButton icon="previous" label="Previous song" disabled={!music.track} onClick={music.previous}/>
         <IconButton icon={music.status === "playing" ? "pause" : "play"} label={music.status === "playing" ? "Pause" : "Play"} disabled={!music.track} onClick={music.togglePlay}/>

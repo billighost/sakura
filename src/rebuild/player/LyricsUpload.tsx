@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useRef,useState} from "react";
-import {useMusic} from "../app/MusicContext";
+import {useMusic,usePlaybackProgress} from "../app/MusicContext";
 import {Blossom} from "../app/Brand";
 import {PlaybackRibbon} from "../app/ListeningControls";
 import type {MusicTrack} from "../app/types";
@@ -21,6 +21,7 @@ export function LyricsUpload(props:Props){
  return <span className={s.launch} data-playback-shortcuts="off"><button type="button" onClick={launch}>{props.sync?"Sync lyrics":props.initialLyrics?"Edit & publish lyrics":"Missing lyrics? Add the words"}</button>{open&&<LyricsStudio key={draftKey} {...props} draftKey={draftKey} onClose={()=>setOpen(false)}/>}</span>;
 }
 function LyricsStudio({track,onPublished,initialLyrics,sync,draftKey,onClose}:Props&{draftKey:string;onClose:()=>void}){
+ const playbackProgress=usePlaybackProgress();
  const music=useMusic(),initialText=initialManuscript(initialLyrics);
  const [draft]=useState(()=>readStudioDraft(draftKey));
  const [text,setText]=useState(draft?.text??initialText),[format,setFormat]=useState<LyricFormat>(draft?.format||(initialLyrics?.timing==="synced"?"lrc":"plain"));
@@ -29,7 +30,7 @@ function LyricsStudio({track,onPublished,initialLyrics,sync,draftKey,onClose}:Pr
  const [stage,setStage]=useState<"edit"|"timing"|"review">(sync?(recovered.complete?"review":"timing"):"edit"),[preview,setPreview]=useState(Boolean(sync&&recovered.complete)),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[progress,setProgress]=useState("");
  const [storageFailed,setStorageFailed]=useState(false),[published,setPublished]=useState(false);
  const operation=useRef<AbortController|null>(null),mounted=useRef(true),lineRefs=useRef<(HTMLButtonElement|null)[]>([]);
- const identity=lyricInputKey(track),recordingId=music.effectiveId(track),sameTrack=Boolean(music.track&&(music.effectiveId(music.track)===recordingId||lyricInputKey(music.track)===identity)),duration=track.durationMs||(sameTrack?music.durationMs:0),position=sameTrack?music.positionMs:0;
+ const identity=lyricInputKey(track),recordingId=music.effectiveId(track),sameTrack=Boolean(music.track&&(music.effectiveId(music.track)===recordingId||lyricInputKey(music.track)===identity)),duration=track.durationMs||(sameTrack?playbackProgress.durationMs:0),position=sameTrack?playbackProgress.positionMs:0;
  const next=times.findIndex(time=>time===null),captured=times.filter(time=>time!==null).length,timedText=timedStudioText(lines,times),captureReview=stage==="review"&&lines.length>0;
  const submission=captureReview?timedText:text,submissionFormat=captureReview?"lrc":format;
  const validation=lyricStudioError(submission,submissionFormat,duration)||(captureReview&&captured<lines.length?`Time the remaining ${lines.length-captured} ${lines.length-captured===1?"line":"lines"} before publishing.`:undefined);
@@ -46,7 +47,7 @@ function LyricsStudio({track,onPublished,initialLyrics,sync,draftKey,onClose}:Pr
  function leaveTiming(){timingEvent(false,music.effectiveId(track),null);}
  function startTiming(continueDraft=false){const timing=recoverStudioTiming(text,format,continueDraft?{lines,times}:undefined),words=timing.lines;if(!words.length){setMessage("Add the original words before starting tap timing.");return;}if(words.length>400||text.length>20000){setMessage("Keep lyrics under 400 lines and 20,000 characters.");return;}setLines(words);setTimes(timing.times);if(sameTrack)music.seek(continueDraft?timing.positionMs:0);music.play(track);setStage("timing");setMessage("");}
  function updateManuscript(value:string,nextFormat:LyricFormat=format){const timing=recoverStudioTiming(value,nextFormat,{lines,times});setText(value);setFormat(nextFormat);if(lines.length){setLines(timing.lines);setTimes(timing.times);}setMessage("");}
- function tap(index:number){if(!sameTrack||music.status!=="playing"){setMessage("Play this song, then tap the next line as its words begin.");return;}const clock=music.getPlaybackPosition?.()??music.positionMs;const stamped=stampStudioLine(times,index,clock);if(!stamped){setMessage("Tap lines in order. If you moved back in the song, undo the last timing first.");return;}setTimes(stamped);setMessage("");}
+ function tap(index:number){if(!sameTrack||music.status!=="playing"){setMessage("Play this song, then tap the next line as its words begin.");return;}const clock=music.getPlaybackPosition?.()??playbackProgress.positionMs;const stamped=stampStudioLine(times,index,clock);if(!stamped){setMessage("Tap lines in order. If you moved back in the song, undo the last timing first.");return;}setTimes(stamped);setMessage("");}
  function undo(){const last=times.findLastIndex(time=>time!==null);if(last<0)return;setTimes(times.map((time,index)=>index>=last?null:time));if(sameTrack)music.seek(Math.max(0,(times[last]||0)*1000-1500));setMessage("");}
  function review(){leaveTiming();setStage("review");setPreview(true);setMessage("");}
  function edit(){leaveTiming();if(lines.length&&captured===lines.length){setText(timedText);setFormat("lrc");setLines([]);setTimes([]);}setStage("edit");setMessage("");}

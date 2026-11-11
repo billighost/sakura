@@ -307,7 +307,7 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
     const track = music.track;
     if (!track?.audioUrl && !track?.readyPlayback) return;
     const urls = [track.readyPlayback?.fallbackUrl, track.audioUrl, track.readyPlayback?.url].filter((value): value is string => Boolean(value));
-    void remote({ title: track.artists.join(", ") + " — " + track.title, url: urls[0] }, urls, Math.max(0, music.positionMs / 1000 - 5));
+    void remote({ title: track.artists.join(", ") + " — " + track.title, url: urls[0] }, urls, Math.max(0, (music.getPlaybackPosition?.()??music.positionMs) / 1000 - 5));
   }
   async function apply() {
     setSaving(true);

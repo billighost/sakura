@@ -42,7 +42,11 @@ try {
   const supported = await page.evaluate(async () => Boolean(await window.SakuraShareRenderer.videoExportMime("square")));
   let video = null;
   if (supported) {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
+      window.preparedSquare = await window.SakuraShareRenderer.renderShareCard({ track: window.fixtureTrack, lines: [], colorMode: "light", layout: "square" });
+      window.pngEncodeCount = 0;
+      const toBlob = HTMLCanvasElement.prototype.toBlob;
+      HTMLCanvasElement.prototype.toBlob = function (...args) { window.pngEncodeCount++;return toBlob.apply(this, args); };
       const rate = 22050;const count = rate * 3;const bytes = new ArrayBuffer(44 + count * 2);const view = new DataView(bytes);
       const ascii = (offset, text) => [...text].forEach((letter, index) => view.setUint8(offset + index, letter.charCodeAt(0)));
       ascii(0, "RIFF");view.setUint32(4, 36 + count * 2, true);ascii(8, "WAVE");ascii(12, "fmt ");view.setUint32(16, 16, true);view.setUint16(20, 1, true);view.setUint16(22, 1, true);view.setUint32(24, rate, true);view.setUint32(28, rate * 2, true);view.setUint16(32, 2, true);view.setUint16(34, 16, true);ascii(36, "data");view.setUint32(40, count * 2, true);
@@ -52,7 +56,9 @@ try {
       window.fixtureTrack.audioUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
       document.getElementById("video").onclick = () => {
         const controller = new AbortController();
-        window.videoResult = window.SakuraShareRenderer.renderShareVideo({ track: window.fixtureTrack, lines: [], colorMode: "light", layout: "square" }, { seconds: 1, startSeconds: .2, signal: controller.signal, onProgress: () => {} }).then(async result => ({ size: result.blob.size, mime: result.file.type, bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())) }));
+        let inputTurns = 0;
+        const clock = setInterval(() => inputTurns++, 0);
+        window.videoResult = window.SakuraShareRenderer.renderShareVideo({ track: window.fixtureTrack, lines: [], colorMode: "light", layout: "square" }, { seconds: 1, startSeconds: .2, signal: controller.signal, cardBlob: window.preparedSquare.blob, onProgress: () => {} }).then(async result => ({ size: result.blob.size, mime: result.file.type, bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())), pngEncodes: window.pngEncodeCount, inputTurns })).finally(() => clearInterval(clock));
       };
       document.getElementById("cancel").onclick = () => {
         const controller = new AbortController();
@@ -62,6 +68,8 @@ try {
     });
     await page.locator("#video").click();
     video = await page.evaluate(() => window.videoResult);
+    assert.equal(video.pngEncodes, 0, "Video reuses the prepared card without rendering or PNG encoding again");
+    assert.ok(video.inputTurns > 0, "Input tasks continue while video frames are encoded");
     assert.ok(video.size > 10000);assert.ok(video.mime.startsWith("video/webm"));assert.deepEqual(video.bytes.slice(0, 4), [26, 69, 223, 163]);
     const binary = Buffer.from(video.bytes);assert.ok(binary.includes(Buffer.from("A_OPUS")), "WebM includes encoded audio");assert.ok(binary.includes(Buffer.from("V_VP")), "WebM includes encoded video");
     const decoded = await page.evaluate(async bytes => {
@@ -83,8 +91,25 @@ try {
       return window.SakuraShareRenderer.renderShareVideo({ track: window.fixtureTrack, lines: [], colorMode: "light", layout: "square" }, { seconds: 1, startSeconds: 5, signal: new AbortController().signal, onProgress: () => {} }).then(() => "unexpected-success", error => error.message);
     });
     assert.ok(unavailable.includes("no audio at this clip position"));
+    const canceledArtwork = await page.evaluate(async () => {
+      const controller = new AbortController(), original = createImageBitmap;
+      let closed = 0;
+      const url = URL.createObjectURL(window.preparedSquare.blob);
+      window.createImageBitmap = async (...args) => {
+        const bitmap = await original(...args);
+        const close = bitmap.close.bind(bitmap);
+        bitmap.close = () => { closed++;close(); };
+        controller.abort();
+        return bitmap;
+      };
+      try {
+        const name = await window.SakuraShareRenderer.renderShareCard({ track: { ...window.fixtureTrack, coverUrl: url }, lines: [], colorMode: "light", layout: "square" }, controller.signal).then(() => "unexpected-success", error => error.name);
+        return { name, closed };
+      } finally { window.createImageBitmap = original;URL.revokeObjectURL(url); }
+    });
+    assert.deepEqual(canceledArtwork, { name: "AbortError", closed: 1 }, "Artwork finishing after cancellation releases its decoded bitmap");
   }
-  const report = { checkedAt: new Date().toISOString(), png: { width: png.width, height: png.height, bytes: png.size, exactText: true }, webmSupported: supported, webm: video ? { bytes: video.size, audioTrack: true, videoTrack: true, decoded: video.decoded, cancellation: "AbortError" } : null };
+  const report = { checkedAt: new Date().toISOString(), png: { width: png.width, height: png.height, bytes: png.size, exactText: true }, webmSupported: supported, webm: video ? { bytes: video.size, audioTrack: true, videoTrack: true, decoded: video.decoded, cancellation: "AbortError", preparedCardReused: video.pngEncodes === 0, inputTurns: video.inputTurns, canceledBitmapReleased: true } : null };
   await fs.writeFile(".local/rebuild-share-export-report.json", JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report));
 } finally { await browser.close();await new Promise(resolve => origin.close(resolve)); }

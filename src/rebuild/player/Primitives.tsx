@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import s from "./player.module.css";
-import { sameOriginArtworkUrl } from "./imageUrl";
+import { responsiveArtworkSources } from "./imageUrl";
 import { retainArtwork } from "./imageCache";
 import { useMusic } from "../app/MusicContext";
 import { RecoveryNotice } from "../app/RecoveryNotice";
@@ -37,15 +37,11 @@ export function IconButton({ icon, label, active, shortcut, className = "", ...p
 export function PlayerButton({ icon, children, secondary, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: PlayerIconName; secondary?: boolean }) {
   return <button type="button" {...props} data-dialog-autofocus={props.autoFocus||undefined} className={`${s.button} ${secondary ? s.secondary : ""} ${props.className || ""}`}>{icon && <PlayerIcon name={icon} size={18}/>}<span>{children}</span></button>;
 }
-export function Artwork({ url, title, className = "", priority = false }: { url: string | null | undefined; title: string; className?: string; priority?: boolean }) {
+export function Artwork({ url, title, className = "", priority = false, sizes }: { url: string | null | undefined; title: string; className?: string; priority?: boolean; sizes?: string }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const src = sameOriginArtworkUrl(url);
-  useEffect(() => {
-    if (!src) return;
-    void retainArtwork(src, priority).catch(() => undefined);
-  }, [src, priority]);
+  const { src, srcSet } = responsiveArtworkSources(url, true);
   return <div className={`${s.artwork} ${className}`}>
-    {src && failedUrl !== src ? <img src={src} alt={`${title} artwork`} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding="async" onError={() => setFailedUrl(src)}/> : <svg viewBox="0 0 300 300" aria-label={`${title}: artwork unavailable`} role="img"><rect width="300" height="300" fill="currentColor" opacity=".08"/><g fill="none" stroke="currentColor" strokeWidth="1.7" opacity=".5"><path d="M55 252C122 224 194 138 213 51M125 199C76 172 75 133 62 109c41 8 81 23 94 50M169 140c-6-55 17-88 35-104 4 37 10 65-21 90M202 89c23-24 51-25 72-22-13 25-29 40-66 33"/><path d="M101 199c29-39 51-41 77-48M161 150c37 7 49 16 67 41-39 2-64-8-65-32"/></g><text x="150" y="269" textAnchor="middle" fill="currentColor" opacity=".55" fontSize="17" fontFamily="Georgia,serif">a little good sound.</text></svg>}
+    {src && failedUrl !== src ? <img src={src} srcSet={srcSet} sizes={sizes || (priority ? "(max-width: 700px) 80vw, 440px" : "auto, 160px")} width={320} height={320} alt={`${title} artwork`} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding="async" onLoad={event => { if (priority) void retainArtwork(event.currentTarget.currentSrc || src, true).catch(() => undefined); }} onError={() => setFailedUrl(src)}/> : <svg viewBox="0 0 300 300" aria-label={`${title}: artwork unavailable`} role="img"><rect width="300" height="300" fill="currentColor" opacity=".08"/><g fill="none" stroke="currentColor" strokeWidth="1.7" opacity=".5"><path d="M55 252C122 224 194 138 213 51M125 199C76 172 75 133 62 109c41 8 81 23 94 50M169 140c-6-55 17-88 35-104 4 37 10 65-21 90M202 89c23-24 51-25 72-22-13 25-29 40-66 33"/><path d="M101 199c29-39 51-41 77-48M161 150c37 7 49 16 67 41-39 2-64-8-65-32"/></g><text x="150" y="269" textAnchor="middle" fill="currentColor" opacity=".55" fontSize="17" fontFamily="Georgia,serif">a little good sound.</text></svg>}
   </div>;
 }
 export function PlayerDialog({ title, subtitle, headerDetail, children, footer, onClose, wide = false, fullscreen = false, className = "", appearance = "note", closeDisabled = false }: { title: string; subtitle?: string; headerDetail?: string; children: ReactNode; footer?: ReactNode; onClose: () => void; wide?: boolean; fullscreen?: boolean; className?: string; appearance?: "player" | "lyrics" | "queue" | "share" | "note"; closeDisabled?: boolean }) {

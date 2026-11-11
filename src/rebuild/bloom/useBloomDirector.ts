@@ -4,20 +4,11 @@ import type {BloomPreparedStory,BloomRecap} from "./uiTypes";
 import {chapterHold} from "./story";
 import {sameBloomStory,mergeBloomRefresh,bloomProgressRecord,restoredBloomIndex} from "./refresh";
 import {BloomDirectorStaging,BloomStoryChangedError} from "./directorStaging";
-import {sameOriginArtworkUrl} from "../player/imageUrl";
 import {retainArtwork} from "../player/imageCache";
+import {bloomArtworkWarmUrls} from "./artworkWarmup";
 
 function prepareArtwork(prepared:BloomPreparedStory|null,index:number){
- if(!prepared)return;
- const chapters=prepared.chapters;
- const finale=chapters.filter(chapter=>["top-song","song-countdown","top-artist"].includes(chapter.id));
- const nearby=[chapters[index],chapters[index+1],...finale,...chapters].filter(Boolean);
- const urls=new Set(nearby.flatMap(chapter=>[
-  chapter.relatedRecording?.coverUrl,
-  ...(chapter.recordings||[]).map(entry=>entry.recording.coverUrl),
-  ...(chapter.artists||[]).flatMap(artist=>[artist.imageUrl,...artist.recordings.map(entry=>entry.recording.coverUrl)]),
- ]));
- for(const value of urls){const url=typeof value==="string"?sameOriginArtworkUrl(value):null;if(url)void retainArtwork(url).catch(()=>{});}
+ for(const url of bloomArtworkWarmUrls(prepared,index))void retainArtwork(url).catch(()=>{});
 }
 
 export function useBloomDirector({initial,onPrepare,onReveal,onComplete,storageKey}:{initial:BloomRecap;onPrepare?:()=>Promise<BloomPreparedStory>;onReveal:(id:string)=>Promise<BloomRecap>;onComplete:()=>Promise<BloomRecap>;storageKey?:string}){

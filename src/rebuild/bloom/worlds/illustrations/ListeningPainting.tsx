@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import {memo,type CSSProperties} from "react";
 import type { BloomWorldProps, BloomWorldId } from "../types";
 import { listeningPaintingLayout, paintingFraction } from "./layout";
 import s from "./painting.module.css";
@@ -31,7 +31,7 @@ function Keepsake({ world, colour }: { world: BloomWorldId; colour: string }) {
 }
 
 /** Saved experiences carry the seed; no wall clock or browser randomness enters the artwork. */
-export function ListeningPainting({ world, experience, scene, stage, listening, quality, reducedMotion, view }: Pick<BloomWorldProps, "experience" | "scene" | "stage" | "listening" | "quality" | "reducedMotion" | "view"> & { world: BloomWorldId }) {
+export const ListeningPainting=memo(function ListeningPainting({ world, experience, scene, stage, listening, quality, reducedMotion, view }: Pick<BloomWorldProps, "experience" | "scene" | "stage" | "listening" | "quality" | "reducedMotion" | "view"> & { world: BloomWorldId }) {
   if (!experience || view !== "story" || (scene !== "time" && scene !== "pattern")) return null;
   // The time chapter stays ornamental on replay, even after all later hours
   // have been disclosed; only the hours scene paints those measurements.
@@ -52,4 +52,4 @@ export function ListeningPainting({ world, experience, scene, stage, listening, 
       <path d="M144 202H214M266 202H336M231 202l9-4 9 4-9 4Z" fill="none" stroke="currentColor" strokeWidth=".7" opacity=".65"/>
     </svg>
   </div>;
-}
+});

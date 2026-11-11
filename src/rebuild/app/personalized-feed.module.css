@@ -1,4 +1,7 @@
 .feedRoom{position:relative;min-width:0}
+/* One observer per feed suspends decoration, including SVG paths, offscreen. */
+.feedRoom [data-motion-active="false"],.feedRoom [data-motion-active="false"] *,
+.feedRoom [data-motion-active="false"] *::before,.feedRoom [data-motion-active="false"] *::after{animation-play-state:paused!important}
 .welcome{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:2px 0 19px;color:var(--ink-muted);font-size:10px}
 .welcome>span{display:flex;align-items:center;gap:9px;letter-spacing:.05em}
 .welcome>span>svg{width:18px;height:18px;color:var(--ink-petal)}
@@ -130,8 +133,8 @@
 .currentSong{border-color:var(--ink-accent)}
 .currentSong .songTitle{color:var(--ink-accent)}
 .playingPetals{position:absolute;top:10px;right:10px;display:flex;gap:3px;align-items:center;height:20px;background:var(--ink-card);padding:5px 8px;border-radius:15px 4px 15px 4px}
-.playingPetals>i{display:block;height:9px;width:3px;background:var(--ink-accent);border-radius:70% 30% 70% 30%;animation:petalBeat .8s ease-in-out infinite alternate}
-.playingPetals>i:nth-child(2){height:5px;animation-delay:-.3s}.playingPetals>i:nth-child(3){height:7px;animation-delay:-.6s}
+.playingPetals>i{display:block;height:9px;width:3px;background:var(--ink-accent);border-radius:70% 30% 70% 30%;transform-origin:center;animation:petalBeat .8s ease-in-out infinite alternate}
+.playingPetals>i:nth-child(2){height:5px;--petal-scale:.8;animation-delay:-.3s}.playingPetals>i:nth-child(3){height:7px;--petal-scale:.57;animation-delay:-.6s}
 .chapterDivider{position:relative;display:flex;align-items:center;justify-content:center;gap:14px;margin:36px 0 47px;color:var(--ink-petal)}
 .chapterDivider>span{width:65px;height:1px;background:linear-gradient(90deg,transparent,var(--ink-line))}
 .chapterDivider>span:nth-of-type(2){transform:rotate(180deg)}
@@ -178,7 +181,7 @@
 @keyframes stemGrow{to{stroke-dashoffset:0}}
 @keyframes flowerOpen{from{opacity:0}to{opacity:.72}}
 @keyframes vinylTurn{to{transform:rotate(360deg)}}
-@keyframes petalBeat{to{height:4px}}
+@keyframes petalBeat{to{transform:scaleY(var(--petal-scale,.45))}}
 @keyframes flowerBreathe{50%{transform:rotate(12deg) scale(1.1);opacity:.65}}
 
 @media(min-width:1400px){.hero{min-height:435px}.heroMusic{padding-right:53px}.heroPick{max-width:305px}.pickCaption>div:first-child>a{font-size:25px}.heroCopy>p{max-width:370px}.featuredSong .songArtwork{min-height:260px}}

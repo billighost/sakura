@@ -1,31 +1,55 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { pushMusicUrl } from "./offlineNavigation";
 import { OfflineNavigationController } from "./NavigationUX";
 import { useMusic } from "./MusicContext";
+import { preloadMusicScreen } from "./MusicScreens";
 import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
 import { IconButton, PlayerBar } from "./Elements";
 import { RecoveryNotice } from "./RecoveryNotice";
 import { UserFacingError } from "./errors";
 import { SakuraOpening } from "./Opening";
-import { FullPlayer, LyricsView, QueueDialog, ShareDialog } from "../player";
 import {waitForFragment} from "./fragmentScroll";
 import {useVisibleViewport} from "./useVisibleViewport";
 import {PlaybackKeyboard} from "./PlaybackKeyboard";
 import s from "./ink.module.css";
+function ModalLoading(){return <div className={s.toast} role="status" aria-live="polite">Opening your listening room…</div>;}
+const FullPlayer=dynamic(()=>import("../player/FullPlayer").then(module=>module.FullPlayer),{ssr:false,loading:ModalLoading});
+const LyricsView=dynamic(()=>import("../player/LyricsView").then(module=>module.LyricsView),{ssr:false,loading:ModalLoading});
+const QueueDialog=dynamic(()=>import("../player/QueueDialog").then(module=>module.QueueDialog),{ssr:false,loading:ModalLoading});
+const ShareDialog=dynamic(()=>import("../player/ShareDialog").then(module=>module.ShareDialog),{ssr:false,loading:ModalLoading});
 const navigation=[{href:"/home",icon:"home",name:"Home"},{href:"/discover",icon:"discover",name:"Discover"},{href:"/search",icon:"search",name:"Search"},{href:"/library",icon:"library",name:"Your library"}] as const;
 export function InkShell({children}:{children:ReactNode}){
  const viewportRef=useVisibleViewport();
  const p=useMusic();const pathname=usePathname();const router=useRouter();const main=useRef<HTMLDivElement>(null);const scrolls=useRef(new Map<string,number>());const [playerUnderlay,setPlayerUnderlay]=useState(false);const [sidebarMode,setSidebarMode]=useState<"auto"|"expanded"|"collapsed">("auto");const [shortSidebar,setShortSidebar]=useState(false);const sidebarCollapsed=sidebarMode==="collapsed"||sidebarMode==="auto"&&shortSidebar;const title=pathname.split("/")[1]||"home";
  const modalPath=useRef(pathname);
+ useEffect(()=>{if(navigator.onLine&&!p.offline)void preloadMusicScreen(pathname).catch(()=>{});},[pathname,p.offline]);
  const closeModal=p.closeModal;
  useEffect(()=>{if(modalPath.current!==pathname){modalPath.current=pathname;setPlayerUnderlay(false);closeModal();}},[pathname,closeModal]);
  const closePlayer=()=>{setPlayerUnderlay(false);p.closeModal();};
  const openFromPlayer=(modal:"lyrics"|"queue"|"share")=>{setPlayerUnderlay(true);p.openModal(modal);};
  const closeOverlay=()=>{if(playerUnderlay){setPlayerUnderlay(false);p.openModal("player");}else p.closeModal();};
+ const hasDeviceSongs=Object.values(p.downloads).some(entry=>entry.status==="ready"&&entry.requested!==false);
+ useEffect(()=>{
+  if(p.booting||!p.account?.id||p.offline||!hasDeviceSongs)return;
+  const pending=[()=>import("../player/FullPlayer"),()=>import("../player/LyricsView"),()=>import("../player/QueueDialog")];
+  let stopped=false,warming=false,timer:ReturnType<typeof setTimeout>|undefined,idle:number|undefined;
+  const eligible=()=>navigator.onLine&&document.visibilityState==="visible"&&!!navigator.serviceWorker?.controller;
+  const cancel=()=>{if(timer!==undefined)clearTimeout(timer);if(idle!==undefined)window.cancelIdleCallback(idle);timer=undefined;idle=undefined;};
+  const schedule=()=>{
+   cancel();if(stopped||warming||!pending.length||!eligible())return;
+   timer=setTimeout(()=>{timer=undefined;const warm=async()=>{idle=undefined;if(stopped||warming||!eligible())return;warming=true;try{await pending[0]();if(stopped)return;pending.shift();}catch{return;}finally{warming=false;}schedule();};if(typeof window.requestIdleCallback==="function")idle=window.requestIdleCallback(()=>void warm(),{timeout:15000});else void warm();},3000);
+  };
+  // Saved songs need these chunks on the next offline launch. Load them one at
+  // a time after startup so the service worker caches the actual requests.
+  // Sharing and video export remain on demand.
+  schedule();document.addEventListener("visibilitychange",schedule);window.addEventListener("online",schedule);navigator.serviceWorker?.addEventListener("controllerchange",schedule);
+  return()=>{stopped=true;cancel();document.removeEventListener("visibilitychange",schedule);window.removeEventListener("online",schedule);navigator.serviceWorker?.removeEventListener("controllerchange",schedule);};
+ },[p.booting,p.account?.id,p.offline,hasDeviceSongs]);
  useEffect(()=>{if(!p.booting&&!p.account&&!p.error&&pathname!=="/offline")router.replace("/login?next="+encodeURIComponent(pathname));},[p.booting,p.account,p.error,pathname,router]);
  useLayoutEffect(()=>{
   const container=main.current;if(!container)return;let stopFragment=()=>{},pendingFrame:number|null=null;
