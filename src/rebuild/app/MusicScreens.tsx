@@ -16,6 +16,7 @@ const screens={
  collection:()=>import("./MusicCollectionScreen").then(module=>module.Collection),
  track:()=>import("./MusicCollectionScreen").then(module=>module.TrackDetails),
  profile:()=>import("./ListeningProfile").then(module=>module.ListeningProfile),
+ topSongs:()=>import("./TopSongsMix").then(module=>module.TopSongsMix),
  settings:()=>import("./MusicSettingsScreen").then(module=>module.Settings),
  onboarding:()=>import("./MusicOnboardingScreen").then(module=>module.Onboarding),
  import:()=>import("./MusicImportScreen").then(module=>module.Import),
@@ -27,13 +28,15 @@ const Library=dynamic(screens.library,{loading:LoadingRows});
 const Collection=dynamic(screens.collection,{loading:LoadingRows});
 const TrackDetails=dynamic(screens.track,{loading:LoadingRows});
 const Profile=dynamic(screens.profile,{loading:LoadingRows});
+const TopSongs=dynamic(screens.topSongs,{loading:LoadingRows});
 const Settings=dynamic(screens.settings,{loading:LoadingRows});
 const Onboarding=dynamic(screens.onboarding,{loading:LoadingRows});
 const Import=dynamic(screens.import,{loading:LoadingRows});
 
 /** Import only the selected screen while account data is booting. */
 export function preloadMusicScreen(pathname:string):Promise<unknown>{
- const section=pathname.split("/")[1];
+ const route=pathname.split("/").filter(Boolean),section=route[0];
+ if(section==="mix"&&route[1]==="top-songs")return screens.topSongs();
  switch(section){
   case "home":return screens.home();
   case "discover":return screens.discover();
@@ -50,4 +53,4 @@ export function preloadMusicScreen(pathname:string):Promise<unknown>{
  }
 }
 
-export function MusicScreens({route}:{route:string[]}){const {account}=useMusic();const path=route.join("/"),key=(account?.id||"guest")+":"+path;if(path==="home")return <Home key={key}/>;if(path==="search")return <Search key={key}/>;if(path==="discover")return <Discover key={key}/>;if(path==="library")return <Library key={key}/>;if(path==="liked")return <Library key={key} likedOnly/>;if(path==="library/downloaded"||path==="downloads"||path==="offline")return <Downloads key={key}/>;if(path==="profile")return <Profile key={key}/>;if(path==="settings")return <Settings key={key}/>;if(path==="onboarding")return <Onboarding key={key}/>;if(path==="import")return <Import key={key}/>;if(["playlist","mix","album","artist"].includes(route[0])&&route[1])return <Collection key={key} kind={route[0] as "playlist"|"mix"|"album"|"artist"} id={route[1]}/>;if(route[0]==="track"&&route[1])return <TrackDetails key={key} id={route[1]}/>;return <Empty title="This page has moved." href="/home" action="Go to Home"/>;}
+export function MusicScreens({route}:{route:string[]}){const {account}=useMusic();const path=route.join("/"),key=(account?.id||"guest")+":"+path;if(path==="home")return <Home key={key}/>;if(path==="search")return <Search key={key}/>;if(path==="discover")return <Discover key={key}/>;if(path==="library")return <Library key={key}/>;if(path==="liked")return <Library key={key} likedOnly/>;if(path==="library/downloaded"||path==="downloads"||path==="offline")return <Downloads key={key}/>;if(path==="profile")return <Profile key={key}/>;if(path==="mix/top-songs")return <TopSongs key={key}/>;if(path==="settings")return <Settings key={key}/>;if(path==="onboarding")return <Onboarding key={key}/>;if(path==="import")return <Import key={key}/>;if(["playlist","mix","album","artist"].includes(route[0])&&route[1])return <Collection key={key} kind={route[0] as "playlist"|"mix"|"album"|"artist"} id={route[1]}/>;if(route[0]==="track"&&route[1])return <TrackDetails key={key} id={route[1]}/>;return <Empty title="This page has moved." href="/home" action="Go to Home"/>;}

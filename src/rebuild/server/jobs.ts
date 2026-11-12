@@ -7,6 +7,7 @@ import type { AudioSourceDiscovery } from "./sources";
 import type { RecordingResolver } from "./resolver";
 import type { PlaybackTargets } from "./targets";
 import type { AudioPromotions } from "./promotion";
+import { selectedResolvedAsset } from "./resolved-asset";
 
 interface JobRow { id: string; accountId: string; recordingId: string; state: string; result: ResolveRecordingResult | null; leaseUntil: Date | null; attempts: number }
 const JOB_SELECT = `SELECT id,account_id AS "accountId",recording_id AS "recordingId",state,result,lease_until AS "leaseUntil",attempts FROM sakura_v2."AudioResolveJob"`;
@@ -15,7 +16,7 @@ const JOB_SELECT = `SELECT id,account_id AS "accountId",recording_id AS "recordi
 export class AudioResolutionJobs {
   private running = new Map<string, Promise<void>>();
   constructor(private readonly query: ReadonlySql,private readonly repository: RecordingRepository,private readonly ingestor: RecordingIngestor,private readonly discovery: AudioSourceDiscovery,private readonly resolver: RecordingResolver,private readonly targets?:PlaybackTargets,private readonly promotions?:AudioPromotions) {}
-  async needsPreparation(result:ResolveRecordingResult,accountId:string){if(result.status!=="resolved"||!this.promotions?.configured)return false;const asset=await this.repository.findAudio(result.recording.recordingId,result.playback.assetId,accountId);return Boolean(asset&&this.promotions.needsPreparation(asset));}
+  async needsPreparation(result:ResolveRecordingResult,accountId:string){if(result.status!=="resolved"||!this.promotions?.configured)return false;const asset=selectedResolvedAsset(result,accountId)??await this.repository.findAudio(result.recording.recordingId,result.playback.assetId,accountId);return Boolean(asset&&this.promotions.needsPreparation(asset));}
   decoratePreparation(result:ResolveRecordingResult):ResolveRecordingResult{if(result.status!=="resolved")return result;const reason=this.promotions?.failureReason(result.recording.recordingId,result.playback.assetId);if(reason==="integrity")return{status:"review",reason:"asset-mismatch",recordingId:result.recording.recordingId,candidates:[{title:result.recording.metadata.title,artists:result.recording.metadata.artists,durationMs:result.recording.metadata.durationMs??null,reasons:["full-file-integrity-review"]}]};return reason?{...result,playback:{...result.playback,delivery:"worker-fallback",preparationFailure:reason}}:result;}
   async enqueue(recording: CanonicalRecording,accountId: string,stage?:"finding-source"|"preparing-audio"): Promise<ResolveRecordingResult> {
     const id = randomUUID();

@@ -64,7 +64,7 @@ async function room({width = 1440, reduced = false, opening = false, blockedStor
   await page.route('**/api/v2/**', async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     // Authentication is real. All product fixtures and mutations remain inside this browser.
-    if (path === '/api/v2/profile') return route.continue();
+    if ((path==='/api/v2/bootstrap'||path === '/api/v2/profile')) return route.continue();
     if (path === '/api/v2/settings') return route.fulfill({json: {theme: 'light', privateSession: true, reducedMotion: reduced, onboarded: true, seedArtists: [], seedGenres: []}});
     if (path === '/api/v2/home') {requests.home++; return route.fulfill({json: {featured: tracks, mixes: [], recent: [], needsOnboarding: false}});}
     if (path === '/api/v2/library') {

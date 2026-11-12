@@ -27,7 +27,7 @@ try {
  await context.addInitScript(() => {sessionStorage.setItem("sakura-ink-opening", "1"); const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.studioAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;});
  await context.route("**/api/**", async route => {
   const request = route.request(), path = new URL(request.url()).pathname, data = request.method() === "POST" || request.method() === "PUT" || request.method() === "PATCH" ? request.postDataJSON() : {};network.push({path,method:request.method(),range:request.headers().range});
-  if (path === "/api/v2/profile") return route.fulfill({ json: { profile: account } });
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if ((path==="/api/v2/bootstrap"||path === "/api/v2/profile")) return route.fulfill({ json: { profile: account } });
   if (path === "/api/auth/session") return route.fulfill({ json: { user: account } });
   if (path === "/api/v2/settings") {
    if (request.method() === "PATCH") { const { expectedRevision, ...patch } = data; assert.equal(expectedRevision, settingsRevision); ++settingsRevision; Object.assign(settings, patch); for (const key of Object.keys(patch)) fieldRevisions[key] = settingsRevision; }
@@ -72,8 +72,8 @@ try {
  await studio.getByRole("button", { name: "Close", exact: true }).click(); await expect(page.locator("[data-lyric-studio]")).toHaveCount(0);
  await page.getByRole("button", { name: "Missing lyrics? Add the words", exact: true }).click(); await expect(page.getByRole("textbox", { name: "Lyrics text" })).toHaveValue("First draft line\nSecond draft line"); checks.push("Closing and reopening retains the exact manuscript draft; plain preview shows every line");
  await page.locator('input[type="file"]').setInputFiles({ name: "garden.lrc", mimeType: "text/plain", buffer: Buffer.from("[00:01.00]The first petals find the light\n[00:03.00]A song is carried on the breeze\n[00:06.00]And every word has room to bloom") });
- await expect(page.getByRole("button", { name: "Words in time Synced LRC" })).toHaveAttribute("aria-pressed", "true");
- await page.getByRole("button", { name: "Open preview", exact: true }).click(); await page.getByRole("button", { name: "Restart song & preview", exact: true }).click();
+ await expect(page.getByRole("heading", { name: "Your synced lyrics are ready." })).toBeVisible();
+ await expect(page.getByRole("complementary", { name: "Lyric playback preview" })).toContainText("A song is carried on the breeze"); await page.getByRole("button", { name: "Restart song & preview", exact: true }).click();
  await page.getByRole("complementary", { name: "Lyric playback preview" }).getByRole("button").filter({ hasText: "A song is carried" }).click(); await expect.poll(() => page.evaluate(() => window.studioProbe?.positionMs)).toBeGreaterThanOrEqual(3000); checks.push("LRC file import selects synced format; preview line starts playback at its timestamp");
  for (const width of [320, 390, 1440]) { await page.setViewportSize({ width, height: width > 700 ? 1000 : 844 }); const fit = await page.locator("[data-lyric-studio]").evaluate(el => ({ width: el.clientWidth, scroll: el.scrollWidth })); assert.ok(fit.scroll <= fit.width + 1, `Studio overflows at ${width}: ${JSON.stringify(fit)}`); await page.screenshot({ path: `${output}/editor-${width}.png` }); }
  checks.push("Editor and side preview fit 320px, 390px and desktop without horizontal overflow");

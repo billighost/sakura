@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { getRebuildServices } from "@/rebuild/server/runtime";
 
@@ -16,5 +17,9 @@ async function serve(request: Request, context: { params: Promise<{ recordingId:
   }
 }
 
-export async function GET(request: Request, context: { params: Promise<{ recordingId: string }> }) { return serve(request, context, "GET"); }
-export async function HEAD(request: Request, context: { params: Promise<{ recordingId: string }> }) { return serve(request, context, "HEAD"); }
+export async function GET(request: Request, context: { params: Promise<{ recordingId: string }> }) {
+  return withApiTiming("/api/v2/recordings/[recordingId]/audio", request, () => serve(request, context, "GET"));
+}
+export async function HEAD(request: Request, context: { params: Promise<{ recordingId: string }> }) {
+  return withApiTiming("/api/v2/recordings/[recordingId]/audio", request, () => serve(request, context, "HEAD"));
+}

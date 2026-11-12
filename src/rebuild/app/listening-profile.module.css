@@ -60,4 +60,9 @@
 @media(max-width:500px){.chartCard .smallNote,.dataControls .smallNote{font-size:11px!important}.statsGrid span{font-size:11px}.statsGrid small{font-size:10px;line-height:1.6}.genreRows b{font-size:12px}.genreRows small{font-size:11px}.chartDates{font-size:10px}.habitStats span{font-size:11px}.habitStats p{font-size:10px}.hourDetail>span,.hourDetail>small{font-size:11px}.sectionDescription{font-size:11px!important}.presets>button>small{font-size:10px}.feedSlider>p,.feedToggle p{font-size:11px!important}.sliderEnds{font-size:10px}.feedbackList small{font-size:10px}.feedbackList b{font-size:12px}.adjustments>summary{font-size:12px}.adjustments>summary>small{font-size:10px}.artistCard>small{font-size:10px}.artistGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .startNote>a{min-height:44px;flex-shrink:0}
+.topSongActions{display:flex;align-items:center;gap:19px;flex-wrap:wrap;justify-content:flex-end}
+.viewAllSongs{display:inline-flex;align-items:center;gap:13px;min-height:44px;text-decoration:none;color:var(--ink-accent);font-size:11px;border-bottom:1px solid color-mix(in srgb,var(--ink-petal) 65%,var(--ink-line));padding:0 2px;transition:gap .2s,border-color .2s}
+.viewAllSongs:hover{gap:18px;border-color:var(--ink-accent)}.viewAllSongs:focus-visible{outline:2px solid var(--ink-accent);outline-offset:4px}
+@media(max-width:500px){.topSongActions{flex-direction:column;align-items:flex-end;gap:4px}.topSongActions>button{font-size:10px!important;padding:9px 11px;max-width:125px;white-space:normal;line-height:1.5!important}.viewAllSongs{font-size:11px;gap:10px}}
+@media(prefers-reduced-motion:reduce){.viewAllSongs{transition:none}}
 @media(max-width:500px){.startNote{align-items:flex-start;flex-wrap:wrap}.startNote>svg{margin-top:3px}.startNote>p{flex-basis:calc(100% - 48px)}.startNote>a{margin-left:36px}}

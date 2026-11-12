@@ -14,6 +14,7 @@ function fixture(triggers=false){
  const client={async query(sql:string,args:unknown[]=[]){
   const key=args[0]+":"+args[1];let rows:unknown[]=[],rowCount=0;
   if(sql.includes("pg_advisory_xact_lock"))return {rows,rowCount};
+  if(sql.includes("AS receipt"))return {rows:[{liked:favorites.has(key),revision:choices.get(key)?.revision??null,receipt:receipts.get(args[0]+":"+args[2])??null}],rowCount:1};
   if(sql.startsWith("SELECT recording_id,liked,conflict FROM")){const receipt=receipts.get(key);return {rows:receipt?[receipt]:[],rowCount:receipt?1:0};}
   if(sql.startsWith("SELECT revision FROM")){const choice=choices.get(key);return {rows:choice?[choice]:[],rowCount:choice?1:0};}
   if(sql.startsWith("SELECT c.recording_id,c.revision,")){const prefix=String(args[0])+":";const ids=new Set([...choices.keys(),...favorites].filter(id=>id.startsWith(prefix)));return {rows:[...ids].map(id=>({recording_id:id.slice(prefix.length),liked:favorites.has(id),revision:choices.get(id)?.revision??1}))};}

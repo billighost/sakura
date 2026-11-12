@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, type QueryConfig } from "pg";
+import { measureApiStage } from "../server/performance";
 
 type AccountRow = { id:string;username:string;email:string;avatarUrl:string|null };
 const runtime = globalThis as unknown as { sakuraV2ProductPool?: Pool;sakuraV2AccountReads?:Map<string,Promise<AccountRow|null>> };
@@ -52,19 +53,19 @@ export async function readAccountById(id:string):Promise<AccountRow|null> {
 }
 
 export async function inTransaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getRebuildPool().connect();
+  const client = await measureApiStage("db_acquire",()=>getRebuildPool().connect());
   let releaseError:Error|undefined;
   try {
-    await client.query("BEGIN");
+    await measureApiStage("db_control",()=>client.query("BEGIN"));
     const result = await operation(client);
-    await client.query("COMMIT");
+    await measureApiStage("db_control",()=>client.query("COMMIT"));
     return result;
   } catch (error) {
     // A timed-out socket must leave the pool. Returning it as healthy makes the
     // next unrelated request inherit the same stalled connection.
     const failure=error instanceof Error?error:new Error("Transaction failed");
     if(connectionFailure(error))releaseError=failure;
-    else await client.query("ROLLBACK").catch(rollbackError=>{releaseError=rollbackError instanceof Error?rollbackError:failure;});
+    else await measureApiStage("db_control",()=>client.query("ROLLBACK")).catch(rollbackError=>{releaseError=rollbackError instanceof Error?rollbackError:failure;});
     throw error;
   } finally { client.release(releaseError); }
 }

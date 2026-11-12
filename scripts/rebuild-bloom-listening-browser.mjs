@@ -3,6 +3,7 @@
  * Run with node --import tsx scripts/rebuild-bloom-listening-browser.mjs.
  */
 import 'dotenv/config';
+import {bloomAudioFixture} from './fixtures/bloom-audio.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {encode} from 'next-auth/jwt';
@@ -52,6 +53,7 @@ async function journey(world,width,variant='rich'){
  const context=await browser.newContext({viewport:{width,height:variant==='short'?600:width<500?700:800},reducedMotion:moving?'no-preference':'reduce',acceptDownloads:true,serviceWorkers:'block'});
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.__bloomAudios=[];window.Audio=function(...args){const audio=new NativeAudio(...args);window.__bloomAudios.push(audio);return audio;};window.Audio.prototype=NativeAudio.prototype;});
+ const preparedAudio=bloomAudioFixture(cards);
  const page=await context.newPage();debug=page;debugInfo={world,width,variant,phase:'loading',requests:[]};page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error'&&/hydration|hydrated|did not match|uncaught|minified react error/i.test(message.text()))errors.push(message.text());});
  const revealed=new Set(archival?snapshot.chapters.map(chapter=>chapter.id):variant==='refresh'?snapshot.chapters.slice(0,2).map(chapter=>chapter.id):[]),mutations=[],clears=[];let completed=archival,releaseErased,serverReadCompleted=false;const stamp='2026-11-08T12:00:00.000Z';
  const erasedGate=new Promise(resolve=>{releaseErased=resolve;});
@@ -61,9 +63,10 @@ async function journey(world,width,variant='rich'){
  await context.route('**/fixture-bloom-listening.wav',route=>route.fulfill({body:wav,contentType:'audio/wav'}));
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  if(await preparedAudio(route))return;
   if(path.startsWith('/api/v2/bloom'))debugInfo.requests.push({method:request.method(),path});
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{theme,privateSession:true,learnFromListening:false,reducedMotion:!moving,bloomPerformance:low?'1':'5',onboarded:true,openingAnimation:0,volume:.2,timeZone:'Africa/Lagos'}});
   if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});
   if(path==='/api/v2/image'){
@@ -159,7 +162,7 @@ async function archiveCovers(){
  const page=await context.newPage();debug=page;page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const archives=worlds.map((world,index)=>{const year=2015+index;return {...annual,...rich,id:`yearly-${year}`,periodStart:`${year}-01-01T00:00:00+01:00`,periodEnd:`${year+1}-01-01T00:00:00+01:00`,worldId:world,status:'archived',completed:true,chapterCount:rich.chapters.length,chapters:rich.chapters.map(chapter=>discloseBloomChapter(chapter,true))};});
  archives.push({...annual,...legacy,id:'yearly-2001',worldId:'japan',status:'archived',completed:true,chapterCount:legacy.chapters.length,chapters:legacy.chapters.map(chapter=>discloseBloomChapter(chapter,true))});
- await page.route('**/api/**',route=>{const url=new URL(route.request().url()),path=url.pathname;if(path==='/api/auth/session')return route.fulfill({json:{user:account}});if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});if(path==='/api/v2/settings')return route.fulfill({json:{theme:'dark',privateSession:true,learnFromListening:false,reducedMotion:true,bloomPerformance:'1',onboarded:true,openingAnimation:0,timeZone:'Africa/Lagos'}});if(path==='/api/v2/bloom')return route.fulfill({json:{items:[],schedule:{timeZone:'Africa/Lagos'}}});if(path==='/api/v2/bloom/archive')return route.fulfill({json:{items:archives}});return route.fulfill({json:{session:null,recordings:[],playlists:[]}});});
+ await page.route('**/api/**',route=>{const url=new URL(route.request().url()),path=url.pathname;if(path==='/api/auth/session')return route.fulfill({json:{user:account}});if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});if(path==='/api/v2/settings')return route.fulfill({json:{theme:'dark',privateSession:true,learnFromListening:false,reducedMotion:true,bloomPerformance:'1',onboarded:true,openingAnimation:0,timeZone:'Africa/Lagos'}});if(path==='/api/v2/bloom')return route.fulfill({json:{items:[],schedule:{timeZone:'Africa/Lagos'}}});if(path==='/api/v2/bloom/archive')return route.fulfill({json:{items:archives}});return route.fulfill({json:{session:null,recordings:[],playlists:[]}});});
  await page.goto(base+'/bloom',{waitUntil:'domcontentloaded',timeout:90000});await page.getByRole('button',{name:'Yearly',exact:true}).click();await expect(page.locator('[data-bloom-cover-listening]')).toHaveCount(worlds.length);
  const covers=page.locator('[data-bloom-cover-listening]');for(let index=0;index<worlds.length;index++){await covers.nth(index).scrollIntoViewIfNeeded();await covers.nth(index).locator('..').locator('img').evaluate(image=>image.decode());}
  const kinds=await covers.evaluateAll(nodes=>nodes.map(node=>({world:node.getAttribute('data-bloom-cover-listening'),drawing:node.querySelector('g')?.innerHTML})));

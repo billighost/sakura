@@ -1,6 +1,7 @@
 /** Shared recommendation rules. This file has no database or browser dependency. */
 import {FEED_DEFAULTS} from "../app/feedPreferences";
 import {initialTasteGenreWeights,type InitialTasteProfile} from "./initialTaste";
+import {sequenceCandidates} from "./personalizationSequence";
 export interface TasteTrack {
   id:string; title?:string; artists:string[]; artistId?:string|null;
   artistCredits?:{artistId?:string|null;name:string;role?:"primary"|"featured";reference?:{provider:string;id:string}}[];
@@ -136,6 +137,14 @@ export function orderPersonalizedTracks<T extends TasteTrack>(ranked:readonly Ra
   const ordered:RankedTrack<T>[]=[],counts=new Map<string,number>(),variety=amount(settings.artistVariety,FEED_DEFAULTS.artistVariety),lastArtists:string[]=[];
   let previous:{key:string;genres:Set<string>}|undefined;
   const bound=Math.max(0,Math.min(ranked.length,Math.floor(limit)));
+  if(Number.isFinite(bound)&&ranked.every(item=>Number.isFinite(item.score))){
+    const scores=ranked.map(item=>item.score).sort((a,b)=>a-b);
+    const roundingBound=Number.EPSILON*(scores.reduce((maximum,score)=>Math.max(maximum,Math.abs(score)),1)+Math.log1p(ranked.length)*.65+4.2)*8;
+    // Almost equal inputs can exchange their input-order priority after a
+    // floating point penalty and genre bonus. Retain the scan for this rare case.
+    const nearTies=scores.some((score,index)=>index>0&&score!==scores[index-1]&&score-scores[index-1]<=roundingBound);
+    if(!nearTies)return sequenceCandidates(pending.map(choice=>({...choice,score:choice.item.score})),variety,bound);
+  }
   while(pending.length&&ordered.length<bound){
     let best=0,bestScore=-Infinity;
     const alternate=variety>=.5&&previous&&pending.some(item=>item.key!==previous!.key);

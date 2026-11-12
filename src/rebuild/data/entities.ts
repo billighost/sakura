@@ -3,6 +3,7 @@ import { CARD_SELECT,VERIFIED,card,type RecordingCard } from "./catalog";
 import { getRebuildPool,inTransaction } from "./db";
 import { ProductError,uuid } from "./validation";
 import type { CatalogRecording } from "../server/contracts";
+import {createHash} from "node:crypto";
 
 export function entityReference(raw:string):{provider:"deezer"|"spotify";id:string}|null {
   const spotify=/^spotify:([a-zA-Z0-9]{22})$/.exec(raw);
@@ -27,7 +28,7 @@ async function catalogCards(accountId:string,catalog:readonly CatalogRecording[]
 
 export async function artistEntity(accountId:string,rawId:string) {
   const reference=entityReference(rawId),pool=getRebuildPool();
-  const existing=(await pool.query(`SELECT id,name,image_url AS "imageUrl",provider,external_id AS "externalId" FROM sakura_v2."Artist"
+  const existing=(await pool.query(`SELECT id,name,image_url AS "imageUrl",provider,external_id AS "externalId",provenance->>'catalogDetailSignature' AS "catalogDetailSignature" FROM sakura_v2."Artist"
     WHERE ${reference?"provider=$1 AND external_id=$2":"id=$1::uuid"}`,[...(reference?[reference.provider,reference.id]:[uuid(rawId,"artist ID")])])).rows[0];
   if(!existing&&!reference)throw new ProductError(404,"Artist not found");
   const provider=reference?.provider||existing?.provider;
@@ -35,13 +36,17 @@ export async function artistEntity(accountId:string,rawId:string) {
   const detailId=provider==="spotify"?`spotify:${providerId}`:providerId;
   let detail:Awaited<ReturnType<ReturnType<typeof getRebuildServices>["catalog"]["detail"]>>|null=null;
   if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("artist",detailId);}catch{if(!existing)throw new ProductError(503,"Artist catalog is temporarily unavailable");}
+  const savedSignature=existing?.catalogDetailSignature;if(existing)delete existing.catalogDetailSignature;
+  const detailSignature=detail?createHash("sha256").update(JSON.stringify(detail)).digest("hex"):undefined;
   let artist=existing;
-  if(detail){
+  // Public provider metadata is still read in full. Only identical persistence
+  // work is skipped; account-specific playback cards remain fresh on every read.
+  if(detail&&(!existing||savedSignature!==detailSignature)){
     artist=await inTransaction(async client=>{
       const result=(await client.query(`INSERT INTO sakura_v2."Artist"(provider,external_id,name,image_url,provenance)
         VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(provider,external_id) DO UPDATE SET
-        name=EXCLUDED.name,image_url=COALESCE(EXCLUDED.image_url,sakura_v2."Artist".image_url),updated_at=now()
-        RETURNING id,name,image_url AS "imageUrl",provider,external_id AS "externalId"`,[provider,providerId,detail!.name,detail!.imageUrl||null,JSON.stringify({catalog:detail!.reference})])).rows[0];
+        name=EXCLUDED.name,image_url=COALESCE(EXCLUDED.image_url,sakura_v2."Artist".image_url),provenance=sakura_v2."Artist".provenance||EXCLUDED.provenance,updated_at=now()
+        RETURNING id,name,image_url AS "imageUrl",provider,external_id AS "externalId"`,[provider,providerId,detail!.name,detail!.imageUrl||null,JSON.stringify({catalog:detail!.reference,catalogDetailSignature:detailSignature})])).rows[0];
       const albums=[...new Map(detail!.albums.map(album=>[`${album.reference.provider}:${album.reference.id}`,{provider:album.reference.provider,id:album.reference.id,title:album.title,cover:album.coverUrl||null,release:album.releaseDate||null}])).values()];
       if(albums.length)await client.query(`INSERT INTO sakura_v2."Album"(provider,external_id,title,artist_id,cover_url,release_date,provenance)
         SELECT x.provider,x.id,x.title,$1::uuid,x.cover,x.release,jsonb_build_object('catalog',jsonb_build_object('provider',x.provider,'id',x.id))
@@ -63,7 +68,7 @@ export async function artistEntity(accountId:string,rawId:string) {
 
 export async function albumEntity(accountId:string,rawId:string) {
   const reference=entityReference(rawId),pool=getRebuildPool();
-  let album=(await pool.query(`SELECT a.id,a.title,a.cover_url AS "coverUrl",a.artist_id AS "artistId",ar.name AS "artistName",a.release_date AS "releaseDate",a.provider,a.external_id AS "externalId"
+  let album=(await pool.query(`SELECT a.id,a.title,a.cover_url AS "coverUrl",a.artist_id AS "artistId",ar.name AS "artistName",a.release_date AS "releaseDate",a.provider,a.external_id AS "externalId",a.provenance->>'catalogDetailSignature' AS "catalogDetailSignature"
     FROM sakura_v2."Album" a LEFT JOIN sakura_v2."Artist" ar ON ar.id=a.artist_id WHERE ${reference?"a.provider=$1 AND a.external_id=$2":"a.id=$1::uuid"}`,[...(reference?[reference.provider,reference.id]:[uuid(rawId,"album ID")])])).rows[0];
   if(!album&&!reference)throw new ProductError(404,"Album not found");
   const provider=reference?.provider||album?.provider;
@@ -71,7 +76,9 @@ export async function albumEntity(accountId:string,rawId:string) {
   const detailId=provider==="spotify"?`spotify:${providerId}`:providerId;
   let detail:Awaited<ReturnType<ReturnType<typeof getRebuildServices>["catalog"]["detail"]>>|null=null;
   if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("album",detailId);}catch{if(!album)throw new ProductError(503,"Album catalog is temporarily unavailable");}
-  if(detail){
+  const savedSignature=album?.catalogDetailSignature;if(album)delete album.catalogDetailSignature;
+  const detailSignature=detail?createHash("sha256").update(JSON.stringify(detail)).digest("hex"):undefined;
+  if(detail&&(!album||savedSignature!==detailSignature)){
     const entity=detail;
     album=await inTransaction(async client=>{
       let artistId=album?.artistId||null;
@@ -82,8 +89,8 @@ export async function albumEntity(accountId:string,rawId:string) {
       }
       const row=(await client.query(`INSERT INTO sakura_v2."Album"(provider,external_id,title,artist_id,cover_url,release_date,provenance)
         VALUES($1,$2,$3,$4::uuid,$5,$6,$7::jsonb) ON CONFLICT(provider,external_id) DO UPDATE SET
-        title=EXCLUDED.title,cover_url=COALESCE(EXCLUDED.cover_url,sakura_v2."Album".cover_url),release_date=COALESCE(EXCLUDED.release_date,sakura_v2."Album".release_date)
-        RETURNING id,title,cover_url AS "coverUrl",artist_id AS "artistId",release_date AS "releaseDate"`,[provider,providerId,entity.title,artistId,entity.coverUrl||null,entity.releaseDate||null,JSON.stringify({catalog:entity.reference,genres:entity.genres})])).rows[0];
+        title=EXCLUDED.title,cover_url=COALESCE(EXCLUDED.cover_url,sakura_v2."Album".cover_url),release_date=COALESCE(EXCLUDED.release_date,sakura_v2."Album".release_date),provenance=sakura_v2."Album".provenance||EXCLUDED.provenance
+        RETURNING id,title,cover_url AS "coverUrl",artist_id AS "artistId",release_date AS "releaseDate"`,[provider,providerId,entity.title,artistId,entity.coverUrl||null,entity.releaseDate||null,JSON.stringify({catalog:entity.reference,genres:entity.genres,catalogDetailSignature:detailSignature})])).rows[0];
       return {...row,artistName:entity.artist||album?.artistName||null};
     });
   }

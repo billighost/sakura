@@ -5,7 +5,7 @@ const page=await context.newPage();let indexCalls=0,patchCalls=0,newData=false;l
 const account={id:'90000000-0000-4000-8000-000000000021',username:'review_resource',email:'resource@example.invalid'};
 await page.addInitScript(()=>sessionStorage.setItem('sakura-ink-opening','1'));
 await page.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;
- if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+ if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account}});
  if(path==='/api/v2/settings'){if(route.request().method()==='PATCH'){patchCalls++;newData=true;}return route.fulfill({json:{theme:'dark',privateSession:true,reducedMotion:true,onboarded:true,seedArtists:[],seedGenres:[]}});}
  if(path==='/api/v2/library')return route.fulfill({json:{recordings:[]}});
  if(path==='/api/v2/bloom'){const fresh=newData;indexCalls++;if(indexCalls===1)await blocked;return route.fulfill({json:{items:[{id:'weekly-review-race',period:'weekly',periodStart:'2026-10-26T00:00:00+01:00',periodEnd:'2026-11-02T00:00:00+01:00',publishAt:'2026-11-02T00:00:00+01:00',expiresAt:'2026-11-08T00:00:00+01:00',timeZone:'Africa/Lagos',status:'available',chapterCount:1,teaser:fresh?'NEW server snapshot':'OLD server snapshot'}],schedule:{timeZone:'Africa/Lagos'}}});}

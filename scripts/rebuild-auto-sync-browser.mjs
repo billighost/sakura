@@ -37,7 +37,7 @@ try{
   if(url.hostname==='res.cloudinary.com'||/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return route.fulfill({body:wav,contentType:'audio/wav',headers:{'Accept-Ranges':'bytes'}});
   if(!path.startsWith('/api/'))return route.continue();
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',audioTechnology:'none',audioQuality:'balanced',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.4,shuffle:false,repeat:'off',revision:1,fieldRevisions:{}}});
   if(path==='/api/v2/home')return route.fulfill({json:{featured:tracks,mixes:[],recent:tracks}});
   if(path==='/api/v2/library')return route.fulfill({json:{recordings:tracks,tracks,playlists:[],nextCursor:null}});

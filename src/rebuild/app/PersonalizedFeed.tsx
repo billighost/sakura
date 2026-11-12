@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMusic } from "./MusicContext";
-import { musicTrack, type MusicTrack } from "./types";
+import { musicTrack, type MusicTrack, type UserSettings } from "./types";
 import { Artwork, Button, TrackMenu, time } from "./Elements";
 import { ArtistLinks } from "./ArtistLinks";
 import { Blossom } from "./Brand";
@@ -11,7 +11,9 @@ import { Icon, type IconName } from "./Icon";
 import { SongGesture } from "./SongGesture";
 import { SmartQueueButton } from "./SmartQueueButton";
 import { RecoveryNotice } from "./RecoveryNotice";
-import { requestJson,UserFacingError } from "./errors";
+import { UserFacingError } from "./errors";
+import { recommendationJson } from "./recommendationTransport";
+import { feedTasteKey, feedViewKey } from "./feedIdentity";
 import {browserOffline} from "./resourcePolicy";
 import {clearRecommendationCache,readRecommendationCache,recommendationCacheValid,recommendationCacheVersion,writeRecommendationCache} from "./recommendationCache";
 import type { SongMenuAnchor } from "./TrackActions";
@@ -93,13 +95,30 @@ function clearAccountFeeds(accountId: string,invalidate=true) {
   for (const key of visitedFeeds.keys()) if (key.startsWith(accountId + ":")) visitedFeeds.delete(key);
 }
 
+/** Fill the same cache the visible feed consumes before its route opens. */
+export async function prefetchPersonalizedFeed(accountId: string, surface: Surface, settings: UserSettings, signal: AbortSignal, mode: Mode = "balanced") {
+  signal.throwIfAborted();
+  if (browserOffline()) return;
+  const cacheKey = feedViewKey(accountId, surface, mode, settings), version = recommendationCacheVersion(accountId);
+  if (cachedFeed(cacheKey).ready) return;
+  const saved = await readRecommendationCache<FeedState>(accountId, "feed:" + cacheKey);
+  signal.throwIfAborted();
+  if (saved?.data.ready && Array.isArray(saved.data.items) && Array.isArray(saved.data.sections) && Date.now() - saved.savedAt < CACHE_LIFETIME) {
+    if (recommendationCacheVersion(accountId) === version) visitedFeeds.set(cacheKey, { state: saved.data, savedAt: saved.savedAt });
+    return;
+  }
+  const params = new URLSearchParams({ surface, mode, limit: String(PAGE_SIZE) });
+  const raw = await recommendationJson(accountId, "/api/v2/feed?" + params, signal, { identity: cacheKey, acceptStatuses: [409, 410] });
+  signal.throwIfAborted();
+  if (recommendationCacheVersion(accountId) !== version || typeof raw.error === "string") return;
+  const state: FeedState = { ...parseFeed(raw), ready: true, busy: false, error: null, refreshRequired: false };
+  saveFeed(accountId, cacheKey, state, version);
+}
+
 export function PersonalizedFeed({ surface, children }: { surface: Surface; children?: ReactNode }) {
   const music = useMusic();
   const settings = music.settings;
-  const tasteKey = JSON.stringify([settings.discovery, settings.seedArtists, settings.seedGenres,
-    settings.seedArtistSelections, settings.explicitContent, settings.artistVariety,
-    settings.repeatTolerance, settings.newReleaseBias, settings.deepCutBias, settings.timeAware,
-    settings.learnFromListening, settings.timeZone, settings.privateSession, settings.initialTasteProfile]);
+  const tasteKey = feedTasteKey(settings);
   return <FeedRoom key={(music.account?.id || "guest") + ":" + surface + ":" + tasteKey}
     surface={surface} tasteKey={tasteKey}>{children}</FeedRoom>;
 }
@@ -152,8 +171,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     if (!reset && previous.nextCursor) params.set("cursor", previous.nextCursor);
     try {
       if(browserOffline())throw new UserFacingError({kind:"offline",title:previous.ready?"Your saved selection is ready.":"This selection has not been saved yet.",message:previous.ready?"Reconnect to discover more songs. Your saved recommendations are still here.":"Open this page while connected to keep its recommendations available offline.",action:"Try again"});
-      const raw = await requestJson<Record<string, unknown>>("/api/v2/feed?" + params,
-        { signal: controller.signal }, { accountId, context: "page", acceptStatuses: [409, 410] });
+      const raw = await recommendationJson(accountId, "/api/v2/feed?" + params,
+        controller.signal, { identity: cacheKey, force: reset, acceptStatuses: [409, 410] });
       if (controller.signal.aborted || epoch !== generation.current) return;
       if (!Array.isArray(raw.items) && typeof raw.error === "string") {
         const changed = { ...previous, busy: false, refreshRequired: true, error: null };

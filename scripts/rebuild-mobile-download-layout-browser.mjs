@@ -24,7 +24,7 @@ try{
  await context.addInitScript(()=>sessionStorage.setItem('sakura-ink-opening','1'));
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account}});
   if(path==='/api/v2/settings'){if(request.method()==='PATCH')Object.assign(settings,request.postDataJSON());return route.fulfill({json:settings});}
   if(path==='/api/v2/library')return route.fulfill({json:{recordings:tracks,playlists:[]}});
   if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});

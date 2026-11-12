@@ -57,7 +57,7 @@ await context.route("https://res.cloudinary.com/autoplay-fixture/**", audio);
 await context.route("**/api/**", async route => {
   const request = route.request(), path = new URL(request.url()).pathname, method = request.method(); report.requests.push({ path, method });
   const owner = request.headers()["x-sakura-account"]; if (owner && owner !== account.id) return route.fulfill({ status: 401, json: { error: "Session changed" } });
-  if (path === "/api/v2/profile") return route.fulfill({ json: { profile: account } });
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if ((path==="/api/v2/bootstrap"||path === "/api/v2/profile")) return route.fulfill({ json: { profile: account } });
   if (path === "/api/v2/settings") { if (method === "PATCH") Object.assign(settings, request.postDataJSON()); return route.fulfill({ json: { ...settings, revision: 0 } }); }
   if (path === "/api/v2/home") return route.fulfill({ json: { featured: tracks, mixes: [], needsOnboarding: false } });
   if (path === "/api/v2/library") return route.fulfill({ json: { recordings: [], playlists: [] } });

@@ -1,10 +1,10 @@
 "use client";
 import type {DownloadEntry,MusicTrack} from "./types";
-import type {OfflineAudio} from "./offline";
+import {validOfflineAudio,type OfflineAudio} from "./offline";
 import {indexedDownloadStorage} from "./downloadStorage";
 import {audioSha256,DownloadIntegrityError,fetchAudioRange} from "./downloadRange";
 import {UserFacingError} from "./errors";
-import type {DownloadChunk,DownloadFingerprint,DownloadSource,DownloadStorage,PartialDownloadRecord} from "./downloadTypes";
+import type {DownloadChunk,DownloadFingerprint,DownloadSource,DownloadStorage,PartialDownloadRecord,PreparedFullAudio} from "./downloadTypes";
 export type {DownloadSource,DownloadStorage,DownloadFingerprint,PartialDownloadRecord} from "./downloadTypes";
 
 const CHUNK_BYTES=256*1024,MAX_BYTES=120*1024*1024,PRIORITY_WARMUP_MS=200,PLAYBACK_READ_AHEAD_CHUNKS=3;
@@ -34,6 +34,7 @@ interface Job {
  needsZeroProbe?:boolean;
  recoveryAttempts:number;recoveryTimer?:ReturnType<typeof setTimeout>;
 }
+interface FullPreparation {recordingId:string;originalId:string;targetId?:string;owner:string;controller:AbortController;io:Promise<void>;timer?:ReturnType<typeof setInterval>;release:()=>void}
 export interface DownloadManagerOptions {
  accountId:string;resolve:(track:MusicTrack,signal:AbortSignal,options?:{refresh?:boolean})=>Promise<DownloadSource>;
  onChange:(entries:Record<string,DownloadEntry>)=>void;onError?:(error:unknown,track:MusicTrack)=>void;
@@ -52,6 +53,7 @@ export class DurableDownloadManager {
  private sequence=0;private priorityIds:string[]=[];private currentId:string|undefined;private owner=id();
  private channel:BroadcastChannel|undefined;
  private priorityWake:ReturnType<typeof setTimeout>|undefined;private pruneAgain=false;
+ private fullPreparations=new Set<FullPreparation>();private ownedPreparations=new Set<string>();
  private online=()=>{for(const job of this.jobs.values()){if(job.entry.status==="failed"&&job.record.requested)void this.resume(job.record.recordingId).catch(()=>{});else if(activeStatus(job.entry.status))this.schedule();}};
  private offline=()=>this.suspendForConnection();
  constructor(private options:DownloadManagerOptions){
@@ -98,8 +100,9 @@ export class DurableDownloadManager {
  }
  enqueue(track:MusicTrack,options:{mode?:"full"|"prefix"|"playback";priority?:number;requested?:boolean}={}):Promise<void>{
   if(this.stopped)return Promise.reject(new DOMException("Downloads stopped","AbortError"));
-  const mode=options.mode??"full",requested=options.requested??mode==="full";
+  let mode=options.mode??"full";const requested=options.requested??mode==="full";
   const canonical=this.aliases.get(referenceKey(track))||this.aliases.get(track.id)||track.id;
+  if(this.fullPinned(canonical))mode="full";
   const deletion=this.deleting.get(canonical);if(deletion)return deletion.then(()=>this.enqueue(track,options));
   if(this.complete[canonical])return requested?this.promoteComplete(canonical,track):Promise.resolve();
   let job=this.jobs.get(canonical);
@@ -111,6 +114,46 @@ export class DurableDownloadManager {
   this.aliases.set(referenceKey(track),canonical);this.aliases.set(track.id,canonical);this.emit();const epoch=job.epoch;void this.save(job).then(()=>this.schedule()).catch(error=>{if(this.isCurrent(job!,epoch))this.fail(job!,error);});return job.promise;
  }
  setPriorities(recordingIds:string[],currentId?:string){this.priorityIds=recordingIds;this.currentId=currentId;for(const job of this.jobs.values())if(activeStatus(job.entry.status)&&(!job.lease||job.loading))job.warmingAt=Date.now();this.schedule();void this.pruneCache().catch(()=>{});}
+ private fullPinned(recordingId:string){for(const value of this.fullPreparations)if((this.aliases.get(value.recordingId)||value.recordingId)===recordingId||value.targetId===recordingId||value.recordingId===recordingId)return true;return false;}
+ private pinFull(preparation:FullPreparation):Promise<void>{
+  preparation.io=preparation.io.then(async()=>{if(!this.fullPreparations.has(preparation))return;await this.storage.pinAutomatic?.(preparation.recordingId,preparation.owner,Date.now()+90000);});return preparation.io;
+ }
+ private async moveFullPins(previous:string,canonical:string){
+  if(this.ownedPreparations.delete(previous))this.ownedPreparations.add(canonical);
+  await Promise.all([...this.fullPreparations].filter(value=>value.recordingId===previous).map(async value=>{
+   const old=value.recordingId;value.targetId=canonical;
+   value.io=value.io.then(async()=>{if(!this.fullPreparations.has(value))return;await this.storage.pinAutomatic?.(canonical,value.owner,Date.now()+90000);if(this.fullPreparations.has(value))value.recordingId=canonical;else await this.storage.releaseAutomaticPin?.(canonical,value.owner);await this.storage.releaseAutomaticPin?.(old,value.owner);});await value.io;
+  }));
+ }
+ /** Full verified media joins the scheduler and remains pinned for the consumer's lifetime. */
+ async prepareFull(track:MusicTrack,signal:AbortSignal):Promise<PreparedFullAudio>{
+  signal.throwIfAborted();if(this.stopped)throw new DOMException("Downloads stopped","AbortError");
+  if(this.fullPreparations.size>=64)throw new Error("Too many audio experiences are being prepared.");
+  const recordingId=this.aliases.get(referenceKey(track))||this.aliases.get(track.id)||track.id;
+  const previous=this.jobFor(recordingId);if(!previous||previous.record.mode!=="full")this.ownedPreparations.add(recordingId);
+  const preparation:FullPreparation={recordingId,originalId:recordingId,owner:this.owner+":prepare:"+id(),controller:new AbortController(),io:Promise.resolve(),release:()=>{}};
+  const abort=()=>{preparation.controller.abort(signal.reason??new DOMException("Audio preparation canceled","AbortError"));preparation.release();};
+  preparation.release=()=>{
+   if(!this.fullPreparations.delete(preparation))return;signal.removeEventListener("abort",abort);if(preparation.timer)clearInterval(preparation.timer);
+   preparation.controller.abort(new DOMException("Audio preparation released","AbortError"));
+   // Storage can still reject eviction until its asynchronous pin removal commits.
+   void preparation.io.catch(()=>{}).then(()=>this.storage.releaseAutomaticPin?.(preparation.recordingId,preparation.owner)).then(()=>this.pruneCache()).catch(()=>{});
+   const canonical=preparation.targetId??this.aliases.get(preparation.recordingId)??preparation.recordingId,job=this.jobFor(canonical)??this.jobFor(preparation.originalId);
+   if(!this.fullPinned(canonical)&&this.ownedPreparations.delete(canonical)&&!this.stopped&&job&&!job.record.requested&&!this.cacheProtected(job.record.recordingId))void this.pause(job.record.recordingId).catch(()=>{});
+  };
+  this.fullPreparations.add(preparation);signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();
+  if(this.storage.pinAutomatic&&this.fullPreparations.has(preparation))preparation.timer=setInterval(()=>{void this.pinFull(preparation).catch(error=>{preparation.controller.abort(error);preparation.release();});},30000);
+  let rejectAbort:(error:unknown)=>void=()=>{};const canceled=new Promise<never>((_,reject)=>{rejectAbort=reject;});
+  const stopped=()=>rejectAbort(preparation.controller.signal.reason??new DOMException("Audio preparation canceled","AbortError"));preparation.controller.signal.addEventListener("abort",stopped,{once:true});if(preparation.controller.signal.aborted)stopped();
+  try{
+   const work=(async()=>{await this.pinFull(preparation);preparation.controller.signal.throwIfAborted();await this.enqueue(track,{mode:"full",requested:false,priority:40});preparation.controller.signal.throwIfAborted();const canonical=this.aliases.get(referenceKey(track))||this.aliases.get(track.id)||track.id;let audio=await this.storage.ready(canonical);
+    // Another tab can evict an unpinned cache before this consumer arrives.
+    // Reconcile its stale ready snapshot once, then rebuild through normal checks.
+    if((!validOfflineAudio(audio)||audio.track.id!==canonical)&&this.complete[canonical]?.status==="ready"){delete this.complete[canonical];preparation.controller.signal.throwIfAborted();await this.enqueue({...track,id:canonical},{mode:"full",requested:false,priority:40});preparation.controller.signal.throwIfAborted();audio=await this.storage.ready(canonical);}
+    if(!validOfflineAudio(audio)||audio.track.id!==canonical)throw new Error("This soundtrack has not finished saving. Resume its download to prepare it.");return {audio,release:preparation.release};})();
+   return await Promise.race([work,canceled]);
+  }catch(error){preparation.release();throw error;}finally{preparation.controller.signal.removeEventListener("abort",stopped);}
+ }
  private promoteComplete(recordingId:string,track:MusicTrack,force=false):Promise<void>{
   const existing=this.promotions.get(recordingId);if(existing)return existing;const previous=this.complete[recordingId];if(previous?.status==="ready"&&previous.requested===true&&!force)return Promise.resolve();
   const pending={...previous,recordingId,track:previous?.track||track,status:"queued" as const,requested:true,mode:"full" as const,operationId:id(),downloadedBytes:previous?.downloadedBytes||0,totalBytes:previous?.totalBytes??null};this.complete[recordingId]=pending;this.emit();
@@ -126,15 +169,25 @@ export class DurableDownloadManager {
   return {track:record.track,url,fallbackUrl:url,...fingerprint,mimeType:record.mimeType||job?.source?.mimeType};
  }
  /** Playback joins the existing chunk flight; canceling a reader leaves downloads running. */
+ async warmPlaybackPosition(recordingId:string,positionMs:number,durationMs:number,signal:AbortSignal):Promise<void>{
+  signal.throwIfAborted();const canonical=this.aliases.get(recordingId)||recordingId;
+  if(this.complete[canonical]?.status==="ready"||!Number.isFinite(positionMs)||positionMs<=0||!Number.isFinite(durationMs)||durationMs<=0)return;
+  const job=this.jobFor(canonical),size=job?.record.fingerprint?.sizeBytes??job?.source?.sizeBytes;
+  if(!job||!size)return;
+  // Compressed files may use variable bitrate. Keep the opening container probe
+  // and native seek; this only warms an estimated neighborhood of the position.
+  const offset=Math.floor(Math.min(size-1,Math.max(0,Math.floor(positionMs/durationMs*size)))/job.record.chunkBytes)*job.record.chunkBytes;
+  if(offset>0)await this.ensureChunk(canonical,offset,signal);
+ }
  async ensureChunk(recordingId:string,offset:number,signal?:AbortSignal):Promise<DownloadChunk|undefined>{
   signal?.throwIfAborted();const canonical=this.aliases.get(recordingId)||recordingId,job=this.jobFor(canonical);
   if(!Number.isSafeInteger(offset)||offset<0||offset%(job?.record.chunkBytes??this.chunkBytes)!==0)throw new DownloadIntegrityError("This playback range does not belong to the recording.");
   if(!job){const audio=await this.storage.ready(canonical);if(!audio||offset>=audio.sizeBytes)return;const blob=audio.blob.slice(offset,Math.min(audio.sizeBytes,offset+this.chunkBytes),audio.blob.type);return {offset,blob,sha256:await audioSha256(blob)};}
   if(!Number.isSafeInteger(offset)||offset<0||offset%job.record.chunkBytes!==0||job.record.fingerprint&&offset>=job.record.fingerprint.sizeBytes)throw new DownloadIntegrityError("This playback range does not belong to the recording.");
-  const existing=job.chunks.get(offset);if(existing&&await audioSha256(existing.blob)===existing.sha256){if(!job.record.requested){job.record.mode="playback";job.record.playbackOffset=offset;job.entry.mode="playback";this.preemptPlaybackWork(job,offset);if(connected())void this.enqueue(job.record.track,{mode:"playback",requested:false}).catch(()=>{});else void this.save(job).catch(()=>{});}return existing;}else if(existing){job.chunks.delete(offset);this.updateBytes(job);}
+  const existing=job.chunks.get(offset);if(existing&&await audioSha256(existing.blob)===existing.sha256){if(!job.record.requested&&!this.fullPinned(canonical)){job.record.mode="playback";job.record.playbackOffset=offset;job.entry.mode="playback";this.preemptPlaybackWork(job,offset);if(connected())void this.enqueue(job.record.track,{mode:"playback",requested:false}).catch(()=>{});else void this.save(job).catch(()=>{});}return existing;}else if(existing){job.chunks.delete(offset);this.updateBytes(job);}
   if(job.wholeFlight?.epoch===job.epoch&&job.wholeFlight.offset===offset)return;
   if(!connected())throw new Error("The connection is offline. This part of the song is not saved on this device.");
-  if(!job.record.requested){job.record.mode="playback";job.record.playbackOffset=offset;job.entry.mode="playback";}job.urgent.add(offset);
+  if(!job.record.requested&&!this.fullPinned(canonical)){job.record.mode="playback";job.record.playbackOffset=offset;job.entry.mode="playback";}job.urgent.add(offset);
   return new Promise<DownloadChunk|undefined>((resolve,reject)=>{const group=job.waiters.get(offset)||new Set();const detach=()=>{signal?.removeEventListener("abort",abort);group.delete(waiter);if(!group.size){job.waiters.delete(offset);job.urgent.delete(offset);this.schedule();}};const waiter={resolve:(chunk:DownloadChunk|undefined)=>{detach();resolve(chunk);},reject:(error:unknown)=>{detach();reject(error);}};const abort=()=>waiter.reject(signal?.reason??new DOMException("Canceled","AbortError"));group.add(waiter);job.waiters.set(offset,group);signal?.addEventListener("abort",abort,{once:true});if(signal?.aborted)abort();this.preemptPlaybackWork(job,offset,true);void this.enqueue(job.record.track,{mode:job.record.requested?"full":"playback",requested:job.record.requested}).catch(()=>{});this.schedule();});
  }
  private responseMode(job:Job,epoch:number,offset:number,whole:boolean){if(!this.isCurrent(job,epoch)||!job.active.has(offset))return;if(!whole){if(job.wholeFlight?.epoch===epoch&&job.wholeFlight.offset===offset)job.wholeFlight=undefined;job.needsZeroProbe=false;job.rangeReady=true;this.schedule();return;}job.wholeFlight={epoch,offset};job.needsZeroProbe=offset!==0;for(const waiter of job.waiters.get(offset)||[])waiter.resolve(undefined);job.waiters.delete(offset);job.urgent.delete(offset);}
@@ -153,7 +206,7 @@ export class DurableDownloadManager {
  async pause(recordingId:string):Promise<void>{const job=this.jobFor(recordingId);if(!job||job.entry.status==="ready")return;const reconcileCommit=job.committing,epoch=++job.epoch;job.entry.status="paused";job.controller.abort();job.controller=new AbortController();this.release(job);this.rejectChunks(job,new DOMException("Download paused","AbortError"));this.settle(job);this.emit();if(!reconcileCommit){await this.save(job);return;}await job.io;if(!this.isCurrent(job,epoch))return;job.committing=false;let saved=await this.storage.ready(job.record.recordingId);if(!this.isCurrent(job,epoch))return;if(saved){if(job.record.requested&&saved.requested!==true)saved=await this.storage.promoteRequested(job.record.recordingId);if(!saved||!this.isCurrent(job,epoch))return;this.complete[job.record.recordingId]={recordingId:saved.track.id,track:saved.track,status:"ready",downloadedBytes:saved.sizeBytes,totalBytes:saved.sizeBytes,operationId:job.entry.operationId,sha256:saved.sha256,requested:saved.requested!==false,mode:"full",updatedAt:saved.savedAt};this.jobs.delete(job.record.recordingId);this.settle(job);this.emit();return;}await this.save(job);}
  /** Paused/skipped automatic songs retain their exact verified playback chunks. */
  async prepare(recordingId:string):Promise<void>{
-  const job=this.jobFor(recordingId);if(!job||job.record.requested||job.record.mode==="prefix")return;
+  const job=this.jobFor(recordingId);if(!job||job.record.requested||job.record.mode==="prefix"||this.fullPinned(job.record.recordingId))return;
   const failed=job.entry.status==="failed",playback=job.record.mode==="playback",epoch=++job.epoch;if(!playback){job.record.mode="prefix";job.record.playbackOffset=undefined;}job.controller.abort();job.controller=new AbortController();this.release(job);this.rejectChunks(job,new DOMException("Playback moved on","AbortError"));this.settle(job);if(!failed)job.entry.error=undefined;
   const target=this.targetBytes(job);let complete=playback||target>0;for(let offset=0;!playback&&offset<target;offset+=job.record.chunkBytes)if(!job.chunks.has(offset)){complete=false;break;}job.entry.status=failed?"failed":complete?"prepared":"queued";job.warmingAt=Date.now();this.updateBytes(job);if(!complete&&!failed)this.resetPromise(job);this.emit();
   await job.io;if(!this.isCurrent(job,epoch)||job.record.requested)return;const saved=await this.storage.ready(job.record.recordingId);if(!this.isCurrent(job,epoch)||job.record.requested)return;
@@ -163,7 +216,7 @@ export class DurableDownloadManager {
  resume(recordingId:string):Promise<void>{const job=this.jobFor(recordingId);return job?this.enqueue(job.record.track,{mode:job.record.mode,requested:job.record.requested,priority:job.record.priority}):Promise.resolve();}
  cancel(recordingId:string):Promise<void>{const canonical=this.aliases.get(recordingId)||recordingId,pending=this.deleting.get(canonical);if(pending)return pending;const job=this.jobFor(canonical),promotion=this.promotions.get(canonical);if(!job){if(!promotion)return Promise.resolve();delete this.complete[canonical];const operation=promotion.catch(()=>{}).then(()=>this.clearExclusive(canonical,true)).then(()=>this.broadcastRemoval(canonical)).finally(()=>{this.deleting.delete(canonical);this.emit();this.schedule();});this.deleting.set(canonical,operation);return operation;}const jobId=job.record.recordingId;job.epoch++;job.controller.abort();this.release(job);this.jobs.delete(jobId);const error=new DOMException("Canceled","AbortError");this.rejectChunks(job,error);this.settle(job,error);const operation=job.io.then(()=>this.clearExclusive(jobId,true)).then(()=>this.broadcastRemoval(jobId)).finally(()=>{this.deleting.delete(canonical);this.emit();this.schedule();});this.deleting.set(canonical,operation);return operation;}
  remove(recordingId:string):Promise<void>{const canonical=this.aliases.get(recordingId)||recordingId,pending=this.deleting.get(canonical);if(pending)return pending;if(this.jobFor(canonical))return this.cancel(canonical);const promotion=this.promotions.get(canonical);delete this.complete[canonical];const operation=(promotion?.catch(()=>{})||Promise.resolve()).then(()=>this.clearExclusive(canonical,true)).then(()=>this.broadcastRemoval(canonical)).finally(()=>{if(this.deleting.get(canonical)===operation)this.deleting.delete(canonical);this.emit();this.schedule();});this.deleting.set(canonical,operation);return operation;}
- dispose(){if(this.stopped)return;this.stopped=true;if(this.priorityWake)clearTimeout(this.priorityWake);this.channel?.close();this.channel=undefined;if(typeof window!=="undefined"){window.removeEventListener("online",this.online);window.removeEventListener("offline",this.offline);}for(const job of this.jobs.values()){job.epoch++;job.controller.abort();if(job.retryTimer)clearTimeout(job.retryTimer);this.release(job);const error=new DOMException("Downloads stopped","AbortError");this.rejectChunks(job,error);this.settle(job,error);}}
+ dispose(){if(this.stopped)return;this.stopped=true;for(const preparation of [...this.fullPreparations])preparation.release();this.ownedPreparations.clear();if(this.priorityWake)clearTimeout(this.priorityWake);this.channel?.close();this.channel=undefined;if(typeof window!=="undefined"){window.removeEventListener("online",this.online);window.removeEventListener("offline",this.offline);}for(const job of this.jobs.values()){job.epoch++;job.controller.abort();if(job.retryTimer)clearTimeout(job.retryTimer);this.release(job);const error=new DOMException("Downloads stopped","AbortError");this.rejectChunks(job,error);this.settle(job,error);}}
  private suspendForConnection(){if(this.stopped)return;for(const job of this.jobs.values()){if(!activeStatus(job.entry.status))continue;const epoch=++job.epoch;job.controller.abort();job.controller=new AbortController();this.release(job);job.entry.status="queued";job.inFlightBytes.clear();this.updateBytes(job);this.rejectChunks(job,new Error("The connection is offline. Saved audio will resume when it returns."));void this.save(job).catch(error=>{if(this.isCurrent(job,epoch))this.fail(job,error);});}this.emit();}
  private priority(job:Job){const recordingId=job.record.recordingId;if(recordingId===(this.currentId&&this.aliases.get(this.currentId)||this.currentId))return 100000;if(job.waiters.size)return 90000;const index=this.priorityIds.findIndex(value=>(this.aliases.get(value)||value)===recordingId);return index<0?(job.record.requested?2000:0)+Math.max(-100,Math.min(100,job.record.priority)):80000-Math.min(index,50)*50;}
  private schedule(){if(this.scheduled||this.stopped)return;this.scheduled=true;queueMicrotask(()=>{this.scheduled=false;this.pump();});}
@@ -199,7 +252,7 @@ export class DurableDownloadManager {
    }
    if(!source.assetId||!Number.isSafeInteger(source.sizeBytes)||source.sizeBytes<=0||source.sizeBytes>MAX_BYTES||!/^[a-f0-9]{64}$/i.test(source.sha256||""))throw new DownloadIntegrityError("This recording needs a verified audio fingerprint before it can be saved. Check again.");
    const canonical=source.track.id,old=job.record.recordingId;
-   if(canonical!==old){const other=this.jobs.get(canonical);this.aliases.set(old,canonical);this.aliases.set(referenceKey(job.record.track),canonical);this.jobs.delete(old);
+   if(canonical!==old){await this.moveFullPins(old,canonical);if(!this.isCurrent(job,epoch))return;const other=this.jobs.get(canonical);this.aliases.set(old,canonical);this.aliases.set(referenceKey(job.record.track),canonical);this.jobs.delete(old);
     if(other&&other!==job){const pending=this.enqueue(other.record.track,{mode:job.record.mode,requested:job.record.requested,priority:job.record.priority});pending.then(()=>this.settle(job),error=>this.settle(job,error));for(const [offset,group] of job.waiters){void this.ensureChunk(canonical,offset).then(chunk=>{if(chunk)for(const waiter of group)waiter.resolve(chunk);else for(const waiter of group)waiter.reject(new Error("This part of the song could not be prepared."));},error=>{for(const waiter of group)waiter.reject(error);});}job.waiters.clear();this.release(job);await job.io;await this.storage.clear(old);this.emit();return;}
     this.release(job);job.record.recordingId=canonical;job.record.track=source.track;job.entry.recordingId=canonical;job.entry.track=source.track;this.jobs.set(canonical,job);await job.io;if(!this.isCurrent(job,epoch))return;await this.storage.clear(old);if(!this.isCurrent(job,epoch))return;
    }
@@ -233,9 +286,9 @@ export class DurableDownloadManager {
  private async finish(job:Job){if(job.loading||!activeStatus(job.entry.status))return;job.loading=true;const epoch=job.epoch;try{
    let complete=true;for(let offset=0;offset<job.source!.sizeBytes;offset+=job.record.chunkBytes)if(!job.chunks.has(offset)){complete=false;break;}if(!complete){job.entry.status="prepared";await this.save(job);if(!this.isCurrent(job,epoch))return;this.settle(job);this.release(job);this.emit();void this.pruneCache(job.record.recordingId).catch(()=>{});return;}
    const blob=new Blob([...job.chunks.values()].sort((a,b)=>a.offset-b.offset).map(chunk=>chunk.blob),{type:job.record.mimeType||"audio/mpeg"});if(blob.size!==job.source!.sizeBytes||await audioSha256(blob)!==job.record.fingerprint!.sha256)throw new DownloadIntegrityError("The audio file did not match this verified recording. Check again.");if(epoch!==job.epoch||this.stopped)return;
-   // A fully verified file is already occupying the same durable storage as an
-   // explicit download. Keep it in Saved even when playback fetched the bytes.
-   job.record.requested=true;job.entry.requested=true;
+   // Experience preparation owns an evictable cache lease. Explicit saves and
+   // ordinary full playback downloads retain their existing Saved behavior.
+   if(!this.fullPinned(job.record.recordingId)){job.record.requested=true;job.entry.requested=true;}
    job.committing=true;let committed:OfflineAudio|undefined;await this.withIO(job,epoch,async()=>{await this.storage.finalize(job.record.recordingId,{track:job.record.track,blob,sizeBytes:blob.size,sha256:job.record.fingerprint!.sha256,savedAt:Date.now(),requested:job.record.requested});committed=await this.storage.ready(job.record.recordingId);});if(!this.isCurrent(job,epoch))return;
    if(job.record.requested&&committed?.requested!==true){await this.withIO(job,epoch,async()=>{committed=await this.storage.promoteRequested(job.record.recordingId);});if(!this.isCurrent(job,epoch))return;}
    if(!committed)throw new Error("The completed song could not be saved on this device. Please try again.");
@@ -253,7 +306,7 @@ export class DurableDownloadManager {
   void this.save(job).catch(saveError=>{if(this.isCurrent(job,epoch))this.fail(job,saveError);});this.emit();return true;
  }
  private fail(job:Job,error:unknown){if(this.stopped||this.jobs.get(job.record.recordingId)!==job)return;job.epoch++;job.committing=false;job.controller.abort();job.controller=new AbortController();job.entry.status="failed";job.entry.error=error instanceof Error?error.message:"The song could not finish saving. Your progress is safe.";this.release(job);this.rejectChunks(job,error);this.settle(job,error);if(error instanceof DownloadIntegrityError){job.record.refreshSource=true;job.chunks.clear();job.source=undefined;job.record.mimeType=undefined;job.rangeReady=false;job.inFlightBytes.clear();this.updateBytes(job);void this.withIO(job,job.epoch,()=>this.storage.clear(job.record.recordingId)).then(()=>this.save(job)).catch(()=>{});}else void this.save(job).catch(()=>{});this.emit();if(job.record.requested)this.options.onError?.(error,job.record.track);this.schedule();}
- private cacheProtected(recordingId:string,protectId?:string){return recordingId===protectId||recordingId===(this.currentId&&this.aliases.get(this.currentId)||this.currentId)||this.priorityIds.slice(0,3).some(value=>(this.aliases.get(value)||value)===recordingId);}
+ private cacheProtected(recordingId:string,protectId?:string){return this.fullPinned(recordingId)||recordingId===protectId||recordingId===(this.currentId&&this.aliases.get(this.currentId)||this.currentId)||this.priorityIds.slice(0,3).some(value=>(this.aliases.get(value)||value)===recordingId);}
  /** Serialize eviction with clicks and atomically refuse any explicit stored download. */
  private evictAutomatic(recordingId:string,protectId?:string):Promise<boolean>{
   const job=this.jobs.get(recordingId),entry=job?.entry||this.complete[recordingId];if(!entry||entry.requested!==false||this.cacheProtected(recordingId,protectId)||this.deleting.has(recordingId))return Promise.resolve(false);
@@ -261,7 +314,7 @@ export class DurableDownloadManager {
   let removed=false;const operation=(job?.io||Promise.resolve()).then(async()=>{
    if(this.stopped||this.cacheProtected(recordingId,protectId)||job?.record.requested||this.complete[recordingId]?.requested===true){if(job&&active){job.entry.status="queued";job.warmingAt=Date.now();this.resetPromise(job);}return;}
    removed=await this.withExclusive(recordingId,()=>this.storage.clearAutomatic(recordingId));if(removed){if(!job||this.jobs.get(recordingId)===job)this.jobs.delete(recordingId);if(this.complete[recordingId]?.requested===false)delete this.complete[recordingId];return;}
-   const saved=await this.storage.ready(recordingId),record=await this.storage.read(recordingId);if(saved){this.complete[recordingId]={recordingId,track:saved.track,status:"ready",downloadedBytes:saved.sizeBytes,totalBytes:saved.sizeBytes,sha256:saved.sha256,operationId:job?.entry.operationId||id(),requested:saved.requested!==false,mode:"full",updatedAt:saved.savedAt};if(!job||this.jobs.get(recordingId)===job)this.jobs.delete(recordingId);}else if(job&&this.jobs.get(recordingId)===job&&record){job.record={...record,requested:true};job.entry.requested=true;job.entry.mode="full";job.entry.status=active?"queued":record.status;if(active){job.warmingAt=Date.now();this.resetPromise(job);}}
+   const saved=await this.storage.ready(recordingId),record=await this.storage.read(recordingId);if(saved){this.complete[recordingId]={recordingId,track:saved.track,status:"ready",downloadedBytes:saved.sizeBytes,totalBytes:saved.sizeBytes,sha256:saved.sha256,operationId:job?.entry.operationId||id(),requested:saved.requested!==false,mode:"full",updatedAt:saved.savedAt};if(!job||this.jobs.get(recordingId)===job)this.jobs.delete(recordingId);}else if(job&&this.jobs.get(recordingId)===job&&record){job.record={...record};job.entry.requested=record.requested;job.entry.mode=record.mode;job.entry.status=active?"queued":record.status;if(active){job.warmingAt=Date.now();this.resetPromise(job);}}
   }).finally(()=>{this.deleting.delete(recordingId);this.emit();this.schedule();});this.deleting.set(recordingId,operation);return operation.then(()=>removed);
  }
  /** Complete and partial automatic cache share one budget; explicit files stay untouched. */

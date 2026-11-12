@@ -50,7 +50,11 @@
     ".next-personalized-build/types/**/*.ts",
     ".next-personalized-build/dev/types/**/*.ts",
     ".next-bloom-openings-build/types/**/*.ts",
-    ".next-bloom-openings-build/dev/types/**/*.ts"
+    ".next-bloom-openings-build/dev/types/**/*.ts",
+    ".next-performance-bloom-dev/types/**/*.ts",
+    ".next-performance-bloom-dev/dev/types/**/*.ts",
+    ".next-performance-prod/types/**/*.ts",
+    ".next-performance-prod/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

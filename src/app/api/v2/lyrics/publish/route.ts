@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { cardsForIds } from "@/rebuild/data/catalog";
@@ -9,9 +10,11 @@ import { ProductError } from "@/rebuild/data/validation";
 import { parseTimedLyrics } from "@/rebuild/lyrics/parse";
 import { VERIFIED_LYRICS_VERSION } from "@/rebuild/lyrics/versions";
 import { resolveVerifiedLyrics } from "@/rebuild/lyrics/service";
+import { recordingLyricIdentity } from "@/rebuild/lyrics/recordingIdentity";
 
 export const maxDuration=60;
 export async function POST(request:NextRequest) {
+  return withApiTiming("/api/v2/lyrics/publish", request, async () => {
   try {
     if(!sameRequestOrigin(request))return NextResponse.json({error:"Invalid request origin"},{status:403});
     const account=await requireRebuildAccount();
@@ -24,8 +27,8 @@ export async function POST(request:NextRequest) {
     const recordingId=uuid(body?.recordingId,"recording ID");
     const track=(await cardsForIds(account.id,[recordingId]))[0];
     if(!track)throw new LyricRequestError("Verified recording not found",404);
-    const identity={recordingId,title:track.title,artist:track.artists[0]||"",artists:track.artists,album:track.albumTitle||undefined,durationSeconds:track.durationMs?track.durationMs/1000:undefined,versionLabel:(track.metadata.version as {labels?:string[]}|undefined)?.labels?.join(" ")};
-    const result=await publishLyrics(identity,body,{signal:request.signal});
+    const identity=recordingLyricIdentity({ ...track, recordingId });
+    const result=await publishLyrics(identity,body,{signal:request.signal,readback:false});
     if(result.track)resolveVerifiedLyrics.remember(identity,{status:"matched",provider:"lrclib",track:result.track});
     const synced=result.track?.syncedLyrics?parseTimedLyrics(result.track.syncedLyrics):[];
     const hasSynced=synced.some(line=>line.text.trim());
@@ -36,4 +39,6 @@ export async function POST(request:NextRequest) {
     if(error instanceof LyricRequestError||error instanceof ProductError)return NextResponse.json({error:error.message},{status:error.status});
     return NextResponse.json({error:"Lyrics publishing is temporarily unavailable"},{status:503});
   }
+
+  });
 }

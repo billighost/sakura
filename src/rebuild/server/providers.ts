@@ -4,6 +4,8 @@ import { parseRecordingMetadata } from "./input";
 import { ProviderError } from "./contracts";
 import type { CatalogProvider, CatalogRecording } from "./contracts";
 import type { ProviderReference,ArtistCredit } from "../core/types";
+import { ProviderFlight } from "./provider-flight";
+import {getSharedPublicCache,setSharedPublicCache,publicCatalogMetadata} from "./redisCache";
 
 const USER_AGENT = "Sakura/2.0 (https://github.com/billighost/sakura)";
 type JsonObject = Record<string, unknown>;
@@ -28,7 +30,7 @@ async function getJson(fetcher: typeof fetch, url: string, signal?: AbortSignal,
     catch(error){if(signal?.aborted)throw error;if(attempt===0)continue;throw new ProviderError("unavailable","Catalogue provider did not answer");}
     if(response.status===404){await response.body?.cancel();return null;}
     if(!response.ok){await response.body?.cancel();if(attempt===0&&[429,502,503,504].includes(response.status))continue;throw new ProviderError("unavailable","Catalogue provider is unavailable");}
-    try{return await readMetadataJson(response);}catch(error){if(signal?.aborted)throw error;if(attempt===0&&error instanceof ProviderError&&(error.code==="timeout"||error.code==="unavailable"))continue;throw error;}
+    try{const value=await readMetadataJson(response);signal?.throwIfAborted();return value;}catch(error){if(signal?.aborted)throw error;if(attempt===0&&error instanceof ProviderError&&(error.code==="timeout"||error.code==="unavailable"))continue;throw error;}
   }
   throw new ProviderError("unavailable","Catalogue provider did not answer");
 }
@@ -123,7 +125,12 @@ export class SpotifyCatalogProvider implements CatalogProvider {
   readonly provider = "spotify" as const;
   private token: { value: string; expiresAt: number } | null = null;
   private metadata = new Map<string,{value:unknown;expires:number}>();
-  constructor(private readonly clientId: string, private readonly clientSecret: string, private readonly fetcher: typeof fetch = fetch) {}
+  private readonly tokenReads = new ProviderFlight<string>(1);
+  private readonly metadataReads = new ProviderFlight<unknown>();
+  private readonly sharedCacheEnabled:boolean;
+  constructor(private readonly clientId: string, private readonly clientSecret: string, private readonly fetcher: typeof fetch = fetch) {
+    this.sharedCacheEnabled=fetcher===fetch;
+  }
   async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
     referenceKey({ provider: "isrc", id: isrc });
     const payload = obj(await this.getMetadata(`/search?type=track&limit=4&q=${encodeURIComponent("isrc:" + isrc.toUpperCase())}`, signal));
@@ -138,27 +145,49 @@ export class SpotifyCatalogProvider implements CatalogProvider {
     return candidates;
   }
   private async bearer(signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted();
     if (this.token && this.token.expiresAt > Date.now() + 30000) return this.token.value;
     if (!this.clientId || !this.clientSecret) throw new ProviderError("not-configured", "Spotify catalogue credentials are not configured");
-    const response = await fetchAudioHeaders("https://accounts.spotify.com/api/token", {
-      method: "POST", signal, headerTimeoutMs: 5000,
-      headers: { Authorization: `Basic ${Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: "grant_type=client_credentials",
-    }, this.fetcher);
-    if (!response.ok) { await response.body?.cancel(); throw new ProviderError("unavailable", "Spotify catalogue authorization failed"); }
-    const token = obj(await readMetadataJson(response));
-    if (typeof token.access_token !== "string" || typeof token.expires_in !== "number") throw new ProviderError("invalid-response", "Spotify returned an invalid token response");
-    this.token = { value: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
-    return this.token.value;
+    return this.tokenReads.run("token",signal,async sharedSignal=>{
+      const response = await fetchAudioHeaders("https://accounts.spotify.com/api/token", {
+        method: "POST", signal:sharedSignal, headerTimeoutMs: 5000,
+        headers: { Authorization: `Basic ${Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: "grant_type=client_credentials",
+      }, this.fetcher);
+      if (!response.ok) { await response.body?.cancel(); throw new ProviderError("unavailable", "Spotify catalogue authorization failed"); }
+      const token = obj(await readMetadataJson(response));
+      sharedSignal.throwIfAborted();
+      if (typeof token.access_token !== "string" || typeof token.expires_in !== "number" || !Number.isFinite(token.expires_in) || token.expires_in<=0) throw new ProviderError("invalid-response", "Spotify returned an invalid token response");
+      this.token = { value: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
+      return this.token.value;
+    });
   }
   /** Server-only public catalogue request; tokens never enter returned metadata. */
   async getMetadata(path: string, signal?: AbortSignal): Promise<unknown> {
     if (!/^\/(?:search\?|artists\/[A-Za-z0-9]{22}(?:\/(?:top-tracks|albums))?(?:\?|$)|albums\/[A-Za-z0-9]{22}(?:\/tracks)?(?:\?|$))/.test(path)) throw new ProviderError("invalid-response", "Unsupported Spotify catalogue operation");
+    signal?.throwIfAborted();
     const cached=this.metadata.get(path);if(cached&&cached.expires>Date.now())return structuredClone(cached.value);
-    const token = await this.bearer(signal);
-    const value=await getJson(this.fetcher, `https://api.spotify.com/v1${path}`, signal, { Authorization: `Bearer ${token}` });
-    if(value!==null){if(this.metadata.size>=400)this.metadata.delete(this.metadata.keys().next().value!);this.metadata.set(path,{value:structuredClone(value),expires:Date.now()+5*60*1000});}
-    return value;
+    if(cached)this.metadata.delete(path);
+    const value=await this.metadataReads.run(path,signal,async sharedSignal=>{
+      const shared=this.sharedCacheEnabled?await getSharedPublicCache<unknown>("provider_spotify",`metadata:${path}`):undefined;
+      sharedSignal.throwIfAborted();
+      if(shared&&typeof shared==="object"&&!Array.isArray(shared)&&!(shared as Record<string,unknown>).error){
+        if(this.metadata.size>=400)this.metadata.delete(this.metadata.keys().next().value!);
+        this.metadata.set(path,{value:structuredClone(shared),expires:Date.now()+30000});
+        return shared;
+      }
+      const token = await this.bearer(sharedSignal);
+      const result=await getJson(this.fetcher, `https://api.spotify.com/v1${path}`, sharedSignal, { Authorization: `Bearer ${token}` });
+      sharedSignal.throwIfAborted();
+      if(result!==null){
+        if(this.metadata.size>=400)this.metadata.delete(this.metadata.keys().next().value!);
+        this.metadata.set(path,{value:structuredClone(result),expires:Date.now()+5*60*1000});
+        if(this.sharedCacheEnabled)await setSharedPublicCache("provider_spotify",`metadata:${path}`,publicCatalogMetadata(result),300);
+        sharedSignal.throwIfAborted();
+      }
+      return result;
+    });
+    return structuredClone(value);
   }
   async getExact(reference: ProviderReference, signal?: AbortSignal): Promise<CatalogRecording | null> {
     if (reference.provider !== "spotify" || !/^[A-Za-z0-9]{22}$/.test(reference.id)) throw new ProviderError("invalid-response", "Invalid Spotify reference");
@@ -193,19 +222,29 @@ export function spotifyCatalogTrack(payload: unknown): CatalogRecording {
 export class CachedCatalogProvider implements CatalogProvider {
   readonly provider: CatalogProvider["provider"];
   private readonly entries = new Map<string, { value: CatalogRecording; expiresAt: number }>();
+  private readonly reads = new ProviderFlight<CatalogRecording|null>();
+  private readonly isrcReads = new ProviderFlight<readonly CatalogRecording[]>(200);
   constructor(private readonly upstream: CatalogProvider, private readonly ttlMs = 15 * 60 * 1000, private readonly capacity = 1000) { this.provider = upstream.provider; }
   async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
-    return this.upstream.getByIsrc ? this.upstream.getByIsrc(isrc, signal) : [];
+    signal?.throwIfAborted();
+    const key=referenceKey({provider:"isrc",id:isrc});
+    if(!this.upstream.getByIsrc)return [];
+    return structuredClone(await this.isrcReads.run(key,signal,sharedSignal=>this.upstream.getByIsrc!(isrc,sharedSignal)));
   }
   async getExact(reference: ProviderReference, signal?: AbortSignal) {
     const key = referenceKey(reference);
+    signal?.throwIfAborted();
     const cached = this.entries.get(key);
     if (cached && cached.expiresAt > Date.now()) return structuredClone(cached.value);
     if (cached) this.entries.delete(key);
-    const value = await this.upstream.getExact(reference, signal);
-    if (!value) return null;
-    if (this.entries.size >= this.capacity) this.entries.delete(this.entries.keys().next().value!);
-    this.entries.set(key, { value: structuredClone(value), expiresAt: Date.now() + this.ttlMs });
-    return value;
+    const value=await this.reads.run(key,signal,async sharedSignal=>{
+      const result = await this.upstream.getExact({...reference}, sharedSignal);
+      sharedSignal.throwIfAborted();
+      if (!result) return null;
+      if (this.entries.size >= this.capacity) this.entries.delete(this.entries.keys().next().value!);
+      this.entries.set(key, { value: structuredClone(result), expiresAt: Date.now() + this.ttlMs });
+      return result;
+    });
+    return structuredClone(value);
   }
 }

@@ -3,6 +3,12 @@ interface Flight<T> { controller: AbortController; promise: Promise<T>; users: n
 /** Mini/fullscreen players share a request; closing one does not cancel the other. */
 export class LyricFlights<T> {
   private flights = new Map<string, Flight<T>>();
+  invalidate(key: string) {
+    const flight = this.flights.get(key);
+    if (!flight) return;
+    this.flights.delete(key);
+    flight.controller.abort(new DOMException("Lyrics changed", "AbortError"));
+  }
   acquire(key: string, load: (signal: AbortSignal) => Promise<T>) {
     let flight = this.flights.get(key);
     if (!flight || flight.controller.signal.aborted) {

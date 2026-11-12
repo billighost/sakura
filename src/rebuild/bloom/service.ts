@@ -11,6 +11,10 @@ import {bloomArtistKey,discloseBloomListening} from "./listening";
 import {createBloomExperience} from "./experience";
 import type {BloomShelfItem} from "./uiTypes";
 export type BloomChapter = SavedBloomChapter;
+interface StoredBloom {
+ snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;
+ time_zone:string;created_at?:Date|string;
+}
 async function zone(accountId:string,client:PoolClient){const settings=await getSettings(accountId,client);return validTimeZone(settings.timeZone)?settings.timeZone:DEFAULT_BLOOM_TIME_ZONE;}
 function window(id:string,now:Date,timeZone:string){try{return bloomWindow(id,now,timeZone);}catch{throw new ProductError(400,"Invalid Bloom period");}}
 function requireAvailable(item:BloomWindow){
@@ -88,9 +92,11 @@ export async function listBloom(accountId:string,rawPeriod:string|null,now=new D
   const period=(rawPeriod||"weekly") as BloomPeriod;if(!["weekly","monthly","yearly"].includes(period))throw new ProductError(400,"Invalid Bloom period");
   return inTransaction(async client=>{
   await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-  const timeZone=await zone(accountId,client),items=[];
-  for(const item of bloomWindows(period,now,timeZone)){
-    const saved=(await client.query(`SELECT snapshot,revealed_chapters,completed_at,time_zone FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,item.id])).rows[0];
+  const timeZone=await zone(accountId,client),items=[],windows=bloomWindows(period,now,timeZone);
+  const rows=(await client.query(`SELECT recap_id,snapshot,revealed_chapters,completed_at,time_zone FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=ANY($2::text[])`,[accountId,windows.map(item=>item.id)])).rows;
+  const byId=new Map(rows.map(row=>[row.recap_id,row]));
+  for(const item of windows){
+    const saved=byId.get(item.id);
     const effective=saved?window(item.id,now,saved.time_zone):item;
     let count=saved?.snapshot?.chapters?.length||0,status=effective.status as string;
     if(status==="available"&&!saved){
@@ -116,16 +122,20 @@ export async function listBloomShelf(accountId:string,now=new Date()){
    jsonb_array_length(snapshot->'chapters') AS chapter_count,completed_at,snapshot->'experience' AS experience,
    CASE WHEN completed_at IS NOT NULL THEN snapshot->'listening' END AS listening
    FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=ANY($2::text[])`,[accountId,windows.map(item=>item.id)])).rows;
+  const byId=new Map(saved.map(row=>[row.recap_id,row]));
+  const pending=windows.filter(item=>item.status==="available"&&!byId.has(item.id));
+  const presence=pending.length?(await client.query(`SELECT w.recap_id,EXISTS(
+   SELECT 1 FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l
+    ON l.account_id=c.account_id AND l.event_id=c.event_id
+   WHERE c.account_id=$1::uuid AND c.occurred_at>=w.period_start AND c.occurred_at<w.period_end AND c.audible_ms>0) AS present
+   FROM unnest($2::text[],$3::timestamptz[],$4::timestamptz[]) AS w(recap_id,period_start,period_end)`,[accountId,pending.map(item=>item.id),pending.map(item=>item.periodStart),pending.map(item=>item.periodEnd)])).rows:[];
+  const hasListening=new Set(presence.filter(row=>row.present).map(row=>row.recap_id));
   const items:BloomShelfItem[]=[];
   for(const item of windows){
-   const row=saved.find(value=>value.recap_id===item.id),effective=row?window(item.id,now,row.time_zone):item;
+   const row=byId.get(item.id),effective=row?window(item.id,now,row.time_zone):item;
    let status:BloomShelfItem["status"]=effective.status;
    if(status==="available"){
-    const hasListening=row?Number(row.chapter_count)>0:(await client.query(`SELECT EXISTS(
-     SELECT 1 FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l
-      ON l.account_id=c.account_id AND l.event_id=c.event_id
-     WHERE c.account_id=$1::uuid AND c.occurred_at>=$2::timestamptz AND c.occurred_at<$3::timestamptz AND c.audible_ms>0) AS present`,[accountId,effective.periodStart,effective.periodEnd])).rows[0].present;
-    if(!hasListening)status="empty";
+    if(!(row?Number(row.chapter_count)>0:hasListening.has(item.id)))status="empty";
    }
    const version=row?Number(row.version)||1:4,worldId=row?.world_id||fallbackWorld(effective,version);
    items.push({...effective,status,version,worldId,
@@ -135,66 +145,56 @@ export async function listBloomShelf(accountId:string,now=new Date()){
   return {items,schedule:{timeZone}};
  });
 }
-export async function getBloom(accountId:string,id:string,now=new Date()){
-  return inTransaction(async client=>{
+async function loadBloom(accountId:string,id:string,now:Date,client:PoolClient,lock:""|" FOR SHARE"|" FOR UPDATE"=""){
     // A story cannot persist measurements while their owner is erasing them.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const timeZone=await zone(accountId,client);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-bloom:${accountId}:${id}`]);
-    let row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,id])).rows[0];
-    const item=window(id,now,row?.time_zone||timeZone);requireAvailable(item);
+    let row=(await client.query<StoredBloom>(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2${lock}`,[accountId,id])).rows[0];
+    const item=window(id,now,row?.time_zone||await zone(accountId,client));requireAvailable(item);
     if(!row){
       const data=await snapshot(accountId,item,client);
       // A late offline sync can still contribute until someone starts a real
       // story. Empty periods must not be frozen permanently by opening the page.
-      if(!data.chapters.length)return view(item,{snapshot:data,revealed_chapters:[],completed_at:null});
-      row=(await client.query(`INSERT INTO sakura_v2."BloomRecap"(account_id,recap_id,time_zone,period_start,period_end,snapshot)
+      if(!data.chapters.length)return {item,row:{snapshot:data,revealed_chapters:[],completed_at:null,time_zone:item.timeZone} as StoredBloom};
+      row=(await client.query<StoredBloom>(`INSERT INTO sakura_v2."BloomRecap"(account_id,recap_id,time_zone,period_start,period_end,snapshot)
         VALUES($1::uuid,$2,$3,$4::timestamptz,$5::timestamptz,$6::jsonb) RETURNING *`,[accountId,id,item.timeZone,item.periodStart,item.periodEnd,JSON.stringify(data)])).rows[0];
     }
-    return view(item,row);
-  });
+    return {item,row};
+}
+export async function getBloom(accountId:string,id:string,now=new Date()){
+  return inTransaction(async client=>{const {item,row}=await loadBloom(accountId,id,now,client);return view(item,row);});
 }
 /** Explicit story entry may stage its immutable facts ahead of navigation.
  * Keep the ordinary view concealed and never advance the saved reveal frontier
  * or completion date merely because the browser prepared the next scenes. */
 export async function prepareBloom(accountId:string,id:string,now=new Date()){
-  const existing=await getBloom(accountId,id,now);
-  if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
   return inTransaction(async client=>{
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR SHARE`,[accountId,id])).rows[0];
-    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
-    const item=window(id,now,row.time_zone);requireAvailable(item);
+    const {item,row}=await loadBloom(accountId,id,now,client," FOR SHARE");
+    if(!row.snapshot.chapters.length)throw new ProductError(409,"This Bloom has no listening story yet");
     return {story:view(item,row),chapters:row.snapshot.chapters as SavedBloomChapter[],listening:row.snapshot.listening};
   });
 }
 export async function revealBloom(accountId:string,id:string,rawChapterId:unknown,now=new Date()){
-  const chapterId=text(rawChapterId,"Bloom chapter",80);const existing=await getBloom(accountId,id,now);
-  if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
+  const chapterId=text(rawChapterId,"Bloom chapter",80);
   return inTransaction(async client=>{
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR UPDATE`,[accountId,id])).rows[0];
-    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
-    const item=window(id,now,row.time_zone);requireAvailable(item);
+    const {item,row}=await loadBloom(accountId,id,now,client," FOR UPDATE");
+    if(!row.snapshot.chapters.length)throw new ProductError(409,"This Bloom has no listening story yet");
     const chapters=row.snapshot.chapters as BloomChapter[],index=chapters.findIndex(c=>c.id===chapterId);
     if(index<0)throw new ProductError(404,"Bloom chapter not found");
     const revealed=new Set<string>(row.revealed_chapters);
     if(chapters.slice(0,index).some(c=>!revealed.has(c.id)))throw new ProductError(409,"Reveal the previous Bloom chapters first");
+    if(revealed.has(chapterId))return view(item,row);
     revealed.add(chapterId);
     await client.query(`UPDATE sakura_v2."BloomRecap" SET revealed_chapters=$3::text[] WHERE account_id=$1::uuid AND recap_id=$2`,[accountId,id,[...revealed]]);
     return view(item,{...row,revealed_chapters:[...revealed]});
   });
 }
 export async function completeBloom(accountId:string,id:string,now=new Date()){
-  const existing=await getBloom(accountId,id,now);
-  if(existing.status==="empty")throw new ProductError(409,"This Bloom has no listening story yet");
   return inTransaction(async client=>{
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const row=(await client.query(`SELECT * FROM sakura_v2."BloomRecap" WHERE account_id=$1::uuid AND recap_id=$2 FOR UPDATE`,[accountId,id])).rows[0];
-    if(!row)throw new ProductError(404,"This listening story was removed. Refresh Bloom to continue.");
-    const item=window(id,now,row.time_zone);requireAvailable(item);
+    const {item,row}=await loadBloom(accountId,id,now,client," FOR UPDATE");
     if(!row.snapshot.chapters.length)throw new ProductError(409,"This Bloom has no listening story yet");
     if(row.snapshot.chapters.some((c:BloomChapter)=>!row.revealed_chapters.includes(c.id)))throw new ProductError(409,"Reveal every chapter before completing this Bloom");
+    if(row.completed_at)return view(item,row);
     const updated=(await client.query(`UPDATE sakura_v2."BloomRecap" SET completed_at=COALESCE(completed_at,$3::timestamptz)
       WHERE account_id=$1::uuid AND recap_id=$2 RETURNING *`,[accountId,id,now])).rows[0];return view(item,updated);
   });

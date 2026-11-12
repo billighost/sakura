@@ -5,20 +5,25 @@ import { requestJson, userIssue, UserFacingError } from "./errors";
 import {browserOffline,canonicalResourcePath,durableCatalogResource,resourceIsFresh} from "./resourcePolicy";
 export interface ResourceState<T>{data:T|undefined;loading:boolean;error:UserFacingError|null;updatedAt:number}
 const EMPTY:ResourceState<never>={data:undefined,loading:false,error:null,updatedAt:0};
-type Resource={snapshot:ResourceState<unknown>;listeners:Set<()=>void>;flight:Promise<void>|null;controller:AbortController|null;generation:number;reload:boolean;cacheQueue:Promise<void>};
+type Resource={snapshot:ResourceState<unknown>;listeners:Set<()=>void>;flight:Promise<void>|null;controller:AbortController|null;generation:number;reload:boolean;cacheQueue:Promise<void>;accessedAt:number;cachePending:number};
 const entries=new Map<string,Resource>();
 const storageKey=(accountId:string,path:string)=>"sakura-v2-resource-invalidated:"+accountId+":"+path;
+const revocationKey=(accountId:string,path:string)=>"sakura-v2-resource-revoked:"+accountId+":"+path;
+const revocations=new Map<string,number>();
 const erasureKey=(accountId:string)=>"sakura-v2-listening-resource-erased:"+accountId;
 const listeningResource=(path:string)=>/^\/api\/v2\/(bloom|history|profile|taste|feed|home|mixes|listening|personalization)(\/|\?|$)/.test(path)||path.startsWith("/api/v2/search/suggestions");
 function listeningErasedAt(accountId:string,path:string){try{const stamp=listeningResource(path)?Number(localStorage.getItem(erasureKey(accountId))):0;return Number.isFinite(stamp)?stamp:0;}catch{return 0;}}
 function invalidatedAt(accountId:string,path:string){try{const value=Number(localStorage.getItem(storageKey(accountId,path))),erased=listeningResource(path)?Number(localStorage.getItem(erasureKey(accountId))):0;return Math.max(Number.isFinite(value)?value:0,Number.isFinite(erased)?erased:0);}catch{return 0;}}
 function rememberInvalidation(accountId:string,path:string,updatedAt:number){const stamp=Math.max(Date.now(),updatedAt+1,invalidatedAt(accountId,path));try{localStorage.setItem(storageKey(accountId,path),String(stamp));}catch{}return stamp;}
-function resource(key:string):Resource{let item=entries.get(key);if(!item){item={snapshot:EMPTY,listeners:new Set(),flight:null,controller:null,generation:0,reload:false,cacheQueue:Promise.resolve()};entries.set(key,item);}return item;}
+function revokedAt(accountId:string,path:string){const key=revocationKey(accountId,path),memory=revocations.get(key)||0;try{const saved=Number(localStorage.getItem(key));return Math.max(memory,Number.isFinite(saved)?saved:0);}catch{return memory;}}
+function rememberRevocation(accountId:string,path:string,updatedAt:number){const stamp=Math.max(rememberInvalidation(accountId,path,updatedAt),revokedAt(accountId,path));const key=revocationKey(accountId,path);revocations.set(key,stamp);try{localStorage.setItem(key,String(stamp));}catch{}return stamp;}
+function resource(key:string):Resource{let item=entries.get(key);if(!item){item={snapshot:EMPTY,listeners:new Set(),flight:null,controller:null,generation:0,reload:false,cacheQueue:Promise.resolve(),accessedAt:Date.now(),cachePending:0};entries.set(key,item);if(entries.size>160){const retired=[...entries].filter(([candidate,value])=>candidate!==key&&!value.listeners.size&&!value.flight&&!value.cachePending).sort((a,b)=>a[1].accessedAt-b[1].accessedAt);for(const [candidate,value]of retired){if(entries.size<=160)break;value.generation++;entries.delete(candidate);}}}item.accessedAt=Date.now();return item;}
 function update(item:Resource,patch:Partial<ResourceState<unknown>>){item.snapshot={...item.snapshot,...patch};for(const listener of item.listeners)listener();}
 export async function loadResource(accountId:string,path:string,force=false){
  const originalPath=path;
  path=canonicalResourcePath(path);
  const key=accountId+":"+path,item=resource(key);
+ if(item.snapshot.data!==undefined&&item.snapshot.updatedAt<=revokedAt(accountId,path))invalidate(item,accountId,path,true);
  if(force&&browserOffline()&&item.snapshot.data!==undefined){update(item,{loading:false,error:null});return;}
  if(force)invalidate(item,accountId,path);
  if(item.flight)return item.flight;
@@ -33,7 +38,7 @@ export async function loadResource(accountId:string,path:string,force=false){
     if(allowSaved&&item.snapshot.data===undefined){
      const saved=await localRead<{data:unknown;updatedAt:number}>(accountId,"resource:"+path).catch(()=>undefined)|| (originalPath!==path?await localRead<{data:unknown;updatedAt:number}>(accountId,"resource:"+originalPath).catch(()=>undefined):undefined);
      if(!current())continue;
-     if(saved&&Number.isFinite(saved.updatedAt)&&saved.updatedAt>0&&saved.updatedAt>listeningErasedAt(accountId,path)){
+     if(saved&&Number.isFinite(saved.updatedAt)&&saved.updatedAt>0&&saved.updatedAt>Math.max(listeningErasedAt(accountId,path),revokedAt(accountId,path))){
       update(item,{data:saved.data,updatedAt:saved.updatedAt,loading:false});
       if(current()&&!item.reload&&(saved.updatedAt>Math.max(invalidatedAt(accountId,path),invalidatedAt(accountId,originalPath))&&resourceIsFresh(path,saved.updatedAt)||browserOffline()))break;
      }
@@ -43,22 +48,27 @@ export async function loadResource(accountId:string,path:string,force=false){
      throw new UserFacingError({kind:"offline",title:"This page has not been saved on this device yet.",message:"Visit this page while connected to keep it available for your offline hours.",action:"Try again"});
     }
     const data=await requestJson(path,{signal:controller.signal},{accountId});if(!current())continue;
-    const updatedAt=Math.max(Date.now(),invalidatedAt(accountId,path)+1);update(item,{data,updatedAt,loading:false,error:null});
-    await cacheTask(item,async()=>{if(current())await localWrite(accountId,"resource:"+path,{data,updatedAt});});
+    const updatedAt=Math.max(Date.now(),invalidatedAt(accountId,path)+1,revokedAt(accountId,path)+1);update(item,{data,updatedAt,loading:false,error:null});
+    // Subscribers already see the response. Explicit preparation callers still
+    // await persistence so an immediate reload can consume the prepared data.
+    await cacheTask(item,async()=>{if(current())await localWrite(accountId,"resource:"+path,{data,updatedAt});}).catch(()=>{});
    }catch(error){if(current()){
     const issue=error instanceof UserFacingError?error:new UserFacingError(userIssue(error));
     // Definitive unavailable/session responses must not resurrect old private
     // content on the next navigation from its persisted browser cache.
     const unavailable=issue.issue.kind==="missing"||issue.issue.kind==="session";
-    if(unavailable){rememberInvalidation(accountId,path,item.snapshot.updatedAt);await cacheTask(item,()=>localDelete(accountId,"resource:"+path));}
-    if(current())update(item,{loading:false,error:issue,...(unavailable?{data:undefined,updatedAt:0}:{})});
+    if(unavailable){
+     rememberRevocation(accountId,path,item.snapshot.updatedAt);
+     update(item,{loading:false,error:issue,data:undefined,updatedAt:0});
+     await cacheTask(item,()=>localDelete(accountId,"resource:"+path)).catch(()=>{});
+    }else if(current())update(item,{loading:false,error:issue});
    }}finally{allowSaved=false;if(item.controller===controller)item.controller=null;}
   }while(item.reload&&entries.get(key)===item);
   }finally{item.flight=null;item.controller=null;}
  })();return item.flight;
 }
-function cacheTask(item:Resource,task:()=>Promise<void>){const operation=item.cacheQueue.catch(()=>{}).then(task);item.cacheQueue=operation.catch(()=>{});return item.cacheQueue;}
-function invalidate(item:Resource,accountId:string,path:string,dropData=false){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);if(dropData)void cacheTask(item,()=>localDelete(accountId,"resource:"+path));update(item,{updatedAt:0,...(dropData?{data:undefined,error:null}: {})});}
+function cacheTask(item:Resource,task:()=>Promise<void>){item.cachePending++;const operation=item.cacheQueue.catch(()=>{}).then(task).finally(()=>{item.cachePending--;});item.cacheQueue=operation.catch(()=>{});return operation;}
+function invalidate(item:Resource,accountId:string,path:string,dropData=false){item.generation++;item.reload=true;item.controller?.abort();rememberInvalidation(accountId,path,item.snapshot.updatedAt);if(dropData)void cacheTask(item,()=>localDelete(accountId,"resource:"+path)).catch(()=>{});update(item,{updatedAt:0,...(dropData?{data:undefined,error:null}: {})});}
 /** Stable snapshots are shared by subscribers and explicit prefetch callers. */
 export function resourceSnapshot<T>(accountId:string,path:string):ResourceState<T>{return (entries.get(accountId+":"+canonicalResourcePath(path))?.snapshot||EMPTY) as ResourceState<T>;}
 export function useResource<T>(accountId:string|null,path:string|null){const canonicalPath=path?canonicalResourcePath(path):null,key=accountId&&canonicalPath?accountId+":"+canonicalPath:null;

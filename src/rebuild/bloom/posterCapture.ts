@@ -65,9 +65,7 @@ export async function exportCinematicBloom(recap:BloomRecap,design:BloomDesign,t
     const style=getComputedStyle(source,pseudo);
     if(style.content!=="none"&&style.content!=="normal")pseudoStyles.push(`[data-poster-node="${index}"]${pseudo}{${copyStyles(style)};content:${style.content}}`);
    }
-   if(source instanceof HTMLImageElement&&copy instanceof HTMLImageElement){
-    imageCopies.push({copy,url:source.currentSrc||source.src});
-   }
+   if(source instanceof HTMLImageElement&&copy instanceof HTMLImageElement)imageCopies.push({copy,url:source.currentSrc||source.src});
    await checkpoint();
   }
   const imageFlights=new Map<string,Promise<string>>();

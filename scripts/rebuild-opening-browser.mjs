@@ -27,7 +27,7 @@ try{
   await context.addCookies([{name:"authjs.session-token",value:token,url:base}]);
   await context.route("**/api/**",async route=>{
    const path=new URL(route.request().url()).pathname;
-   if(path==="/api/v2/profile")return route.fulfill({json:{profile:account}});
+   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==="/api/v2/bootstrap"||path==="/api/v2/profile"))return route.fulfill({json:{profile:account}});
    if(path==="/api/auth/session")return route.fulfill({json:{user:account}});
    if(path==="/api/v2/settings")return route.fulfill({json:{theme:label==="dark"?"dark":"light",audioTechnology:"none",privateSession:true,reducedMotion:false,openingAnimation:1,onboarded:true,seedArtists:[],seedGenres:[],volume:.8}});
    if(path==="/api/v2/listening-session")return route.fulfill({json:{session:null,serverTime:Date.now()}});

@@ -5,6 +5,7 @@ import {useResource} from "../app/resources";
 import {RecoveryNotice} from "../app/RecoveryNotice";
 import {Icon} from "../app/Icon";
 import {BloomCover} from "./BloomCover";
+import {BloomReadyLink} from "./BloomReadyLink";
 import {bloomDate,type BloomShelfItem} from "./uiTypes";
 import {bloomDesignForItem} from "./design";
 import {bloomWorld} from "./worlds/registry";
@@ -35,7 +36,7 @@ export function BloomShelf(){
      <h3>{world.name}</h3><p className={s.period}>{bloomDate(item.periodStart,item.timeZone)} — {bloomDate(end,item.timeZone)}</p>
      <p>{promotion?promotion.detail:ready?world.description:upcoming?"Your next listening world is growing. Music saved during these dates becomes the story.":"No listening was saved for this period. Explore a song you love to start your next Bloom."}</p>
      <p className={s.timing}>{upcoming?<>Opens <time dateTime={item.publishAt}>{bloomOpeningDate(item.publishAt,item.timeZone)}</time></>:ready?<>Available through <time dateTime={item.expiresAt}>{bloomDate(new Date(Date.parse(item.expiresAt)-1).toISOString(),item.timeZone)}</time></>:null}</p>
-     <Link className={ready?s.primary:s.link} href={ready?`/bloom/${item.id}`:upcoming?`/bloom?period=${item.period}`:"/discover"}>{ready?item.completed?"Revisit my Bloom":"Check your Sakura Bloom":upcoming?promotion?"See what's coming":"View Bloom schedule":"Explore music"}<Icon name="arrow" size={16}/></Link>
+     <BloomReadyLink id={item.id} enabled={ready} className={ready?s.primary:s.link} href={ready?`/bloom/${item.id}`:upcoming?`/bloom?period=${item.period}`:"/discover"}>{ready?item.completed?"Revisit my Bloom":"Check your Sakura Bloom":upcoming?promotion?"See what's coming":"View Bloom schedule":"Explore music"}<Icon name="arrow" size={16}/></BloomReadyLink>
     </div>
    </article>;
   })}</div>:!resource.error?<p className={s.loading}>Your next listening story will appear here. <Link href="/bloom">View Bloom schedule</Link></p>:null}

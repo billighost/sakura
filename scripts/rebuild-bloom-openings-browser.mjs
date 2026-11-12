@@ -3,6 +3,7 @@
  * Run: node --import tsx scripts/rebuild-bloom-openings-browser.mjs
  */
 import 'dotenv/config';
+import {bloomAudioFixture} from './fixtures/bloom-audio.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {encode} from 'next-auth/jwt';
@@ -58,12 +59,14 @@ async function journey({world,width,motion}){
   const NativeContext=window.AudioContext;
   if(NativeContext){window.AudioContext=class extends NativeContext{constructor(...args){super(...args);window.__openingContexts.push(this);}};}
  },{bookmarkKey,bookmark});
+ const preparedAudio=bloomAudioFixture(cards);
  const page=await context.newPage();page.setDefaultTimeout(45000);const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.route('**/opening-fixture.wav',route=>route.fulfill({body:wav,contentType:'audio/wav'}));
  await page.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  if(await preparedAudio(route))return;
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,reducedMotion:motion==='reduce',bloomPerformance:'5',onboarded:true,openingAnimation:0}});
   if(path==='/api/v2/image')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#243851"/><circle cx="280" cy="125" r="110" fill="#e2b993"/><path d="M0 300Q140 105 400 320V400H0" fill="#889b8b"/></svg>'});
   if(path.endsWith('/prepare'))return route.fulfill({json:{story:recap(),chapters:snapshot.chapters,listening:snapshot.listening}});

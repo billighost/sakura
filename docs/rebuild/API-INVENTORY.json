@@ -1,0 +1,595 @@
+{
+  "routes": 52,
+  "methods": 69,
+  "untimed": [],
+  "inventory": [
+    {
+      "route": "/api/auth/[...nextauth]",
+      "file": "src/app/api/auth/[...nextauth]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/auth/register",
+      "file": "src/app/api/auth/register/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/albums",
+      "file": "src/app/api/v2/albums/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/albums/[id]",
+      "file": "src/app/api/v2/albums/[id]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/artists",
+      "file": "src/app/api/v2/artists/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/artists/[id]",
+      "file": "src/app/api/v2/artists/[id]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/audio-preview",
+      "file": "src/app/api/v2/audio-preview/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom",
+      "file": "src/app/api/v2/bloom/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/[id]",
+      "file": "src/app/api/v2/bloom/[id]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/[id]/complete",
+      "file": "src/app/api/v2/bloom/[id]/complete/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/[id]/prepare",
+      "file": "src/app/api/v2/bloom/[id]/prepare/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/[id]/reveal",
+      "file": "src/app/api/v2/bloom/[id]/reveal/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/archive",
+      "file": "src/app/api/v2/bloom/archive/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bloom/shelf",
+      "file": "src/app/api/v2/bloom/shelf/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/bootstrap",
+      "file": "src/app/api/v2/bootstrap/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/catalog/[kind]/[id]",
+      "file": "src/app/api/v2/catalog/[kind]/[id]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/collection-view",
+      "file": "src/app/api/v2/collection-view/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "PATCH",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/feed",
+      "file": "src/app/api/v2/feed/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/feed/hero",
+      "file": "src/app/api/v2/feed/hero/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/history",
+      "file": "src/app/api/v2/history/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/home",
+      "file": "src/app/api/v2/home/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/image",
+      "file": "src/app/api/v2/image/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/import",
+      "file": "src/app/api/v2/import/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/library",
+      "file": "src/app/api/v2/library/route.ts",
+      "methods": [
+        {
+          "method": "DELETE",
+          "timed": true
+        },
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/library/state",
+      "file": "src/app/api/v2/library/state/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/listening-session",
+      "file": "src/app/api/v2/listening-session/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "PUT",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/lyrics",
+      "file": "src/app/api/v2/lyrics/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/lyrics/challenge",
+      "file": "src/app/api/v2/lyrics/challenge/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/lyrics/publish",
+      "file": "src/app/api/v2/lyrics/publish/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/lyrics/sync",
+      "file": "src/app/api/v2/lyrics/sync/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/mixes",
+      "file": "src/app/api/v2/mixes/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/mixes/[id]",
+      "file": "src/app/api/v2/mixes/[id]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/mixes/offline",
+      "file": "src/app/api/v2/mixes/offline/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/onboarding/preview",
+      "file": "src/app/api/v2/onboarding/preview/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/personalization/data",
+      "file": "src/app/api/v2/personalization/data/route.ts",
+      "methods": [
+        {
+          "method": "DELETE",
+          "timed": true
+        },
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/playlists",
+      "file": "src/app/api/v2/playlists/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/playlists/[id]",
+      "file": "src/app/api/v2/playlists/[id]/route.ts",
+      "methods": [
+        {
+          "method": "DELETE",
+          "timed": true
+        },
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "PATCH",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/playlists/[id]/tracks",
+      "file": "src/app/api/v2/playlists/[id]/tracks/route.ts",
+      "methods": [
+        {
+          "method": "DELETE",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/profile",
+      "file": "src/app/api/v2/profile/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "PATCH",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/readings",
+      "file": "src/app/api/v2/readings/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/[recordingId]",
+      "file": "src/app/api/v2/recordings/[recordingId]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/[recordingId]/audio",
+      "file": "src/app/api/v2/recordings/[recordingId]/audio/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "HEAD",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/index",
+      "file": "src/app/api/v2/recordings/index/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/jobs/[jobId]",
+      "file": "src/app/api/v2/recordings/jobs/[jobId]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/resolve",
+      "file": "src/app/api/v2/recordings/resolve/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/search",
+      "file": "src/app/api/v2/search/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/search/suggestions",
+      "file": "src/app/api/v2/search/suggestions/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/settings",
+      "file": "src/app/api/v2/settings/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "PATCH",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/shares",
+      "file": "src/app/api/v2/shares/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/shares/[slug]",
+      "file": "src/app/api/v2/shares/[slug]/route.ts",
+      "methods": [
+        {
+          "method": "GET",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/smart-queue",
+      "file": "src/app/api/v2/smart-queue/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/taste",
+      "file": "src/app/api/v2/taste/route.ts",
+      "methods": [
+        {
+          "method": "DELETE",
+          "timed": true
+        },
+        {
+          "method": "GET",
+          "timed": true
+        },
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    }
+  ]
+}

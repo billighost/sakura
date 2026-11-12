@@ -34,19 +34,23 @@ export async function recordHistory(accountId:string,value:unknown) {
   return inIdempotentTransaction(async client=>{
     // Clearing data and recording increments serialize on the same account lock.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const prefs=(await client.query(`SELECT preferences FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid`,[accountId])).rows[0];
+    const gate=(await client.query(`SELECT
+      (SELECT preferences FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid) AS preferences,
+      EXISTS(SELECT 1 FROM sakura_v2."ListeningPrivacyWindow" WHERE account_id=$1::uuid AND
+        ($2::timestamptz IS NULL OR ($2::timestamptz>=started_at AND (ended_at IS NULL OR $2::timestamptz<ended_at)))) AS paused,
+      EXISTS(SELECT 1 FROM sakura_v2."ClearedListeningEvent" WHERE account_id=$1::uuid AND event_id=$3::uuid) OR
+      EXISTS(SELECT 1 FROM sakura_v2."HistoryDeletion" WHERE account_id=$1::uuid AND
+        ($2::timestamptz IS NULL OR ($2::timestamptz<=cleared_at AND (period_start IS NULL OR $2::timestamptz>=period_start)))) AS erased,
+      (SELECT jsonb_build_object('id',r.id,'metadata',r.metadata) FROM sakura_v2."Recording" r WHERE r.id=$4::uuid AND ${VERIFIED}) AS recording`,
+      [accountId,chunk.occurredAt||null,chunk.eventId,chunk.recordingId])).rows[0];
+    const prefs=gate;
     if(prefs?.preferences?.privateSession)return {accepted:false,retry:true,privateSession:true};
     if(prefs?.preferences?.learnFromListening===false)return {accepted:false,retry:true,learningPaused:true};
-    const privateInterval=(await client.query(`SELECT EXISTS(SELECT 1 FROM sakura_v2."ListeningPrivacyWindow" WHERE account_id=$1::uuid AND
-      ($2::timestamptz IS NULL OR ($2::timestamptz>=started_at AND (ended_at IS NULL OR $2::timestamptz<ended_at)))) AS paused`,[accountId,chunk.occurredAt||null])).rows[0];
+    const privateInterval=gate;
     if(privateInterval?.paused)return {accepted:false,discarded:true,learningPaused:true};
-    const erased=(await client.query(`SELECT
-      EXISTS(SELECT 1 FROM sakura_v2."ClearedListeningEvent" WHERE account_id=$1::uuid AND event_id=$2::uuid) OR
-      EXISTS(SELECT 1 FROM sakura_v2."HistoryDeletion" WHERE account_id=$1::uuid AND
-        ($3::timestamptz IS NULL OR ($3::timestamptz<=cleared_at AND (period_start IS NULL OR $3::timestamptz>=period_start)))) AS erased`,
-      [accountId,chunk.eventId,chunk.occurredAt||null])).rows[0];
+    const erased=gate;
     if(erased?.erased)return {accepted:false,discarded:true,cleared:true};
-    const recording=(await client.query(`SELECT r.id,r.metadata FROM sakura_v2."Recording" r WHERE r.id=$1::uuid AND ${VERIFIED}`,[chunk.recordingId])).rows[0];
+    const recording=gate.recording;
     if(!recording)throw new ProductError(404,"Recording not found");
     const duration=Number(recording.metadata.durationMs)||21600000;
     if(chunk.positionMs>duration+5000)throw new ProductError(400,"Playback position exceeds recording duration");

@@ -1,5 +1,5 @@
 import { getRebuildPool,inTransaction } from "./db";
-import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
+import { VERIFIED,cardsForIds } from "./catalog";
 import { getSettings } from "./settings";
 import { listPlaylists } from "./collections";
 import { ensureMixes } from "../recommendations/service";
@@ -14,13 +14,23 @@ export async function getHome(accountId:string) {
   await pool.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
   const settings=await getSettings(accountId,pool);
   const mixes=await ensureMixes(accountId,false,pool);
-  const recentRows=await pool.query(`SELECT recording_id FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0 AND last_played_at IS NOT NULL ORDER BY last_played_at DESC,recording_id LIMIT 12`,[accountId]);
-  const favorites=await pool.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid ORDER BY created_at DESC,recording_id LIMIT 12`,[accountId]);
-  const featuredRows=await pool.query(`${CARD_SELECT} WHERE ${VERIFIED} AND ($2::boolean OR COALESCE(r.metadata->>'explicit','unknown')<>'explicit')
-      ORDER BY COALESCE((r.metadata->>'popularity')::numeric,0.5) DESC,r.created_at DESC,r.id LIMIT 24`,[accountId,settings.explicitContent]);
+  const shelves=(await pool.query(`SELECT
+    COALESCE((SELECT jsonb_agg(recording_id ORDER BY last_played_at DESC,recording_id) FROM (
+      SELECT recording_id,last_played_at FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0 AND last_played_at IS NOT NULL
+      ORDER BY last_played_at DESC,recording_id LIMIT 12
+    ) recent),'[]'::jsonb) AS recent,
+    COALESCE((SELECT jsonb_agg(recording_id ORDER BY created_at DESC,recording_id) FROM (
+      SELECT recording_id,created_at FROM sakura_v2."Favorite" WHERE account_id=$1::uuid ORDER BY created_at DESC,recording_id LIMIT 12
+    ) liked),'[]'::jsonb) AS liked,
+    COALESCE((SELECT jsonb_agg(id ORDER BY popularity DESC,created_at DESC,id) FROM (
+      SELECT r.id,r.created_at,COALESCE((r.metadata->>'popularity')::numeric,0.5) AS popularity FROM sakura_v2."Recording" r
+      WHERE ${VERIFIED} AND ($2::boolean OR COALESCE(r.metadata->>'explicit','unknown')<>'explicit')
+      ORDER BY popularity DESC,r.created_at DESC,r.id LIMIT 24
+    ) featured),'[]'::jsonb) AS featured`,[accountId,settings.explicitContent])).rows[0] as {recent:string[];liked:string[];featured:string[]};
   const playlists=await listPlaylists(accountId,pool);
-  const recent=await cardsForIds(accountId,recentRows.rows.map(r=>r.recording_id),pool),liked=await cardsForIds(accountId,favorites.rows.map(r=>r.recording_id),pool);
-  return {recent,liked,mixes,featured:featuredRows.rows.map(card),playlists,needsOnboarding:!settings.onboarded,
+  const selected=await cardsForIds(accountId,[...new Set([...shelves.recent,...shelves.liked,...shelves.featured])],pool),byId=new Map(selected.map(recording=>[recording.id,recording]));
+  const shelf=(recordingIds:readonly string[])=>recordingIds.flatMap(id=>{const recording=byId.get(id);return recording?[recording]:[];});
+  return {recent:shelf(shelves.recent),liked:shelf(shelves.liked),mixes,featured:shelf(shelves.featured),playlists,needsOnboarding:!settings.onboarded,
     generatedAt:new Date().toISOString(),schemaVersion:2};
   });
 }
@@ -28,21 +38,24 @@ export async function getHome(accountId:string) {
 export async function getProfile(accountId:string) {
   return inTransaction(async pool=>{
   await pool.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-  const user=await pool.query(`SELECT id,username,email,"avatarUrl",bio,"createdAt" FROM public."User" WHERE id=$1::uuid`,[accountId]);
-  const summary=await pool.query(`SELECT audible_ms,play_count,completed_count,skipped_count FROM sakura_v2."LifetimeListeningSummary" WHERE account_id=$1::uuid`,[accountId]);
-  const counts=await pool.query(`SELECT (SELECT COUNT(*) FROM sakura_v2."Favorite" WHERE account_id=$1::uuid)::integer AS liked,
+  const projection=(await pool.query(`SELECT jsonb_build_object('id',u.id,'username',u.username,'email',u.email,'avatarUrl',u."avatarUrl",'bio',u.bio,'createdAt',u."createdAt") AS profile,
+      totals.audible_ms,totals.play_count,totals.completed_count,totals.skipped_count,
+      (SELECT COUNT(*) FROM sakura_v2."Favorite" WHERE account_id=$1::uuid)::integer AS liked,
       (SELECT COUNT(*) FROM sakura_v2."Playlist" WHERE account_id=$1::uuid)::integer AS playlists,
-      (SELECT COUNT(*) FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0)::integer AS "uniqueRecordings"`,[accountId]);
-  const artists=await pool.query(`SELECT a.id,a.name,a.image_url AS "imageUrl",SUM(s.audible_ms)::text AS "audibleMs" FROM sakura_v2."ListeningRecordingSummary" s
+      (SELECT COUNT(*) FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid AND audible_ms>0)::integer AS "uniqueRecordings",
+      COALESCE((SELECT jsonb_agg(artists ORDER BY artists."audibleMs"::bigint DESC,artists.id) FROM (
+        SELECT a.id,a.name,a.image_url AS "imageUrl",SUM(s.audible_ms)::text AS "audibleMs" FROM sakura_v2."ListeningRecordingSummary" s
       JOIN sakura_v2."RecordingArtist" ra ON ra.recording_id=s.recording_id AND ra.position=0 JOIN sakura_v2."Artist" a ON a.id=ra.artist_id
-      WHERE s.account_id=$1::uuid AND s.audible_ms>0 GROUP BY a.id ORDER BY SUM(s.audible_ms) DESC,a.id LIMIT 10`,[accountId]);
+      WHERE s.account_id=$1::uuid AND s.audible_ms>0 GROUP BY a.id ORDER BY SUM(s.audible_ms) DESC,a.id LIMIT 10
+      ) artists),'[]'::jsonb) AS artists
+      FROM public."User" u LEFT JOIN sakura_v2."LifetimeListeningSummary" totals ON totals.account_id=u.id WHERE u.id=$1::uuid`,[accountId])).rows[0];
   const settings=await getSettings(accountId,pool);
-  if(!user.rows[0])throw new ProductError(401,"Unauthorized");
-  const totals=summary.rows[0];
+  if(!projection)throw new ProductError(401,"Unauthorized");
+  const totals=projection;
   const stats={audibleMs:Number(totals?.audible_ms||0),listeningHours:Number(totals?.audible_ms||0)/3600000,
-    playCount:Number(totals?.play_count||0),completedCount:Number(totals?.completed_count||0),skippedCount:Number(totals?.skipped_count||0),...counts.rows[0]};
+    playCount:Number(totals?.play_count||0),completedCount:Number(totals?.completed_count||0),skippedCount:Number(totals?.skipped_count||0),liked:projection.liked,playlists:projection.playlists,uniqueRecordings:projection.uniqueRecordings};
   const insights=await getListeningInsights(accountId,settings.timeZone,pool);
-  return {profile:user.rows[0],stats,topArtists:artists.rows.map(a=>({...a,audibleMs:Number(a.audibleMs)})),insights,
+  return {profile:projection.profile,stats,topArtists:(projection.artists as Array<{id:string;name:string;imageUrl:string|null;audibleMs:string}>).map(a=>({...a,audibleMs:Number(a.audibleMs)})),insights,
     tasteEvidence:insights.tasteEvidence,tasteFeedback:insights.tasteFeedback,
     onboarding:{onboarded:settings.onboarded,seedArtists:settings.seedArtists,seedGenres:settings.seedGenres,initialTasteGenres:initialTasteGenreWeights(settings,insights.tasteFeedback).map(genre=>genre.name)}};
   });

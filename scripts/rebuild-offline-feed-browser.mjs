@@ -23,7 +23,7 @@ await context.route('**/api/**',async route=>{
   if(path.endsWith('/hero')){counts.heroes++;return route.fulfill({json:{item:empty?null:{track:tracks[discover?3:2],reason:'Saved hero fixture',lane:'similar'},refreshAt:Date.now()+3600000}});}
   counts.feeds++;return route.fulfill({json:{items:empty?[]:[{track:tracks[discover?1:0],reason:'Saved selection fixture',lane:'similar'}],sections:[],nextCursor:null,personalized:true,totalCandidates:empty?0:1,generatedAt:new Date().toISOString()}});
  }
- if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+ if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
  if(path==='/api/v2/settings')return route.fulfill({json:settings});
  if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
  if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});

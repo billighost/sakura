@@ -5,7 +5,7 @@ import ts from "typescript";
 import { chromium, webkit } from "@playwright/test";
 import { analyseAudio, comparisonGains, audioWaveform, encodeAudioWav, type SampleBuffer } from "../src/rebuild/audio/analysis";
 import { AUDIO_TECHNOLOGIES, audioTechnology } from "../src/rebuild/audio/presets";
-import { configurePlaybackAudioSession, needsMediaVolumeGain } from "../src/rebuild/audio/engine";
+import { configurePlaybackAudioSession, needsMediaVolumeGain, MediaAudioEngine } from "../src/rebuild/audio/engine";
 
 test("background playback claims a playback audio session where supported and tolerates unavailable APIs", () => {
   const host = { audioSession: { type: "auto" } };
@@ -20,6 +20,13 @@ test("Fixed media volume detection covers iPhone and desktop-mode iPad", () => {
   assert.equal(needsMediaVolumeGain({ userAgent: "Macintosh Safari", platform: "MacIntel", maxTouchPoints: 5 }), true);
   assert.equal(needsMediaVolumeGain({ userAgent: "Macintosh Safari", platform: "MacIntel", maxTouchPoints: 0 }), false);
   assert.equal(needsMediaVolumeGain({ userAgent: "Android", platform: "Linux", maxTouchPoints: 5 }), false);
+});
+
+test("output-device changes recover the existing graph and respect pause, ending and disposal",async()=>{
+ const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator"),devices=new EventTarget();Object.defineProperty(globalThis,"navigator",{value:{mediaDevices:devices},configurable:true});
+ class Media extends EventTarget {volume=.5;paused=false;ended=false;src="https://audio.example/unchanged";}
+ const media=new Media(),engine=new MediaAudioEngine(media as unknown as HTMLMediaElement,{requiresVolumeGraph:false});let resumes=0;engine.resume=async()=>{resumes++;};
+ try{devices.dispatchEvent(new Event("devicechange"));await Promise.resolve();assert.equal(resumes,1);assert.equal(media.src,"https://audio.example/unchanged");media.paused=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);media.paused=false;media.ended=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);media.ended=false;engine.dispose();devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);}finally{engine.dispose();if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}
 });
 
 function tone(amplitude = 0.1, channels = 2, seconds = 3, sampleRate = 48000): SampleBuffer {
@@ -68,6 +75,7 @@ for (const browserName of ["Chrome", "WebKit"]) test(`${browserName} background 
     const result = await page.evaluate(async ({ engine, wav }) => {
       const { MediaAudioEngine } = await import(engine);
       const session = { type: "auto" }; Object.defineProperty(navigator, "audioSession", { value: session, configurable: true });
+      const devices=new EventTarget();Object.defineProperty(navigator,"mediaDevices",{value:devices,configurable:true});
       const media = new Audio("data:audio/wav;base64," + wav); media.loop = true;
       const supportsGraph = typeof AudioContext === "function";
       const controller = new MediaAudioEngine(media, { requiresVolumeGraph: supportsGraph }); await controller.setMode("none"); await media.play();
@@ -78,7 +86,8 @@ for (const browserName of ["Chrome", "WebKit"]) test(`${browserName} background 
       const deadline = performance.now() + 3000;
       while (context && context.state !== "running" && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
       const recovered = context?.state ?? "native"; await new Promise(resolve => setTimeout(resolve, 100)); const progressed = media.currentTime > before;
-      media.pause(); if (context) await context.suspend(); document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow"));
+      devices.dispatchEvent(new Event("devicechange"));
+      media.pause(); if (context) await context.suspend(); document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow"));devices.dispatchEvent(new Event("devicechange"));
       await new Promise(resolve => setTimeout(resolve, 100)); const stayedPaused = media.paused && (!context || context.state === "suspended");
       controller.dispose();
       return { type: session.type, recovered, progressed, stayedPaused, sameSource: source === media.src };

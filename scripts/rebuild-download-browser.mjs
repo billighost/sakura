@@ -204,7 +204,7 @@ async function fixtureApi(route){
  if(request.headers()['x-sakura-account']&&request.headers()['x-sakura-account']!==account.id)return route.fulfill({status:401,json:{error:'Account changed'}});
  if(/\/recordings\/[^/]+\/audio$/.test(path))return audio(route);
  if(connectionOnly&&!networkAvailable){report.offlineApiRequests??=[];report.offlineApiRequests.push({path,method:request.method(),at:Date.now()});return route.abort('internetdisconnected');}
- if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+ if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
  if(path==='/api/v2/settings'){if(request.method()==='PATCH')Object.assign(settings,request.postDataJSON());return route.fulfill({json:settings});}
  if(path==='/api/v2/collection-view'){
   if(request.method()==='PATCH'){

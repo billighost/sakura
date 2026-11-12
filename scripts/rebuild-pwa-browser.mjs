@@ -29,7 +29,7 @@ const server=createServer(async(request,response)=>{
   if(!networkAvailable){response.destroy();return;}
   if(/^\/api(?:\/|$)/.test(path)){
    report.apiRequests.push({path,method});let bytes=0;const chunks=[];for await(const chunk of request){bytes+=chunk.length;if(bytes>1024*1024){response.writeHead(413);response.end();return;}chunks.push(chunk);}const body=chunks.length?JSON.parse(Buffer.concat(chunks).toString("utf8")):{};
-   if(path==="/api/v2/profile"){if(holdBootProfile){heldProfiles.add(response);response.on("close",()=>heldProfiles.delete(response));return;}return json(response,{profile:account,stats:{},topArtists:[]});}
+   if(path==='/api/v2/library/state'){json(response,{favoriteStates:{}});return;}if((path==="/api/v2/bootstrap"||path==="/api/v2/profile")){if(holdBootProfile){heldProfiles.add(response);response.on("close",()=>heldProfiles.delete(response));return;}return json(response,{profile:account,stats:{},topArtists:[]});}
    if(path==="/api/v2/image"){response.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=31536000"});response.end(pixel);return;}
    if(path==="/api/v2/settings"){
     if(method==="PATCH"){

@@ -2,8 +2,18 @@ import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
 import { sameOriginArtworkUrl } from "./imageUrl";
 import { checkExportCanceled as abort, yieldExport } from "./exportWork";
+import { ShareAudioPreparation, shareAudioSourceKey } from "./sharePreparation";
+export { ShareAudioPreparation } from "./sharePreparation";
 
 export interface ShareCardInput { track: MusicTrack; lines: readonly TimedLyric[]; colorMode: "light" | "dark"; layout: "portrait" | "square" }
+export function shareCardKey(input: ShareCardInput) {
+  return JSON.stringify([input.track.reference.provider, input.track.reference.id, input.track.title, input.track.artists, input.track.coverUrl,
+    input.track.versionLabel, input.lines.map(line => [line.text, line.start, line.end]), input.colorMode, input.layout]);
+}
+export function shareVideoKey(input: ShareCardInput, accountId: string | null | undefined, startSeconds: number, seconds: number) {
+  return JSON.stringify([shareCardKey(input), shareAudioSourceKey(input.track, accountId), startSeconds, seconds]);
+}
+export interface RenderedShareCard { key: string; canvas: HTMLCanvasElement; blob: Blob; file: File }
 const wordSegments = new Intl.Segmenter(undefined, { granularity: "word" });
 const graphemeSegments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 function wrap(context: CanvasRenderingContext2D, text: string, width: number) {
@@ -52,7 +62,7 @@ async function loadArtwork(url: string | null, signal?: AbortSignal) {
     });
   } finally { URL.revokeObjectURL(objectUrl); }
 }
-export async function renderShareCard(input: ShareCardInput, signal?: AbortSignal) {
+export async function renderShareCard(input: ShareCardInput, signal?: AbortSignal): Promise<RenderedShareCard> {
   abort(signal);
   if (document.fonts) await document.fonts.ready;
   await yieldExport(signal);
@@ -120,18 +130,107 @@ export async function renderShareCard(input: ShareCardInput, signal?: AbortSigna
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The card could not be exported.")), "image/png"));
   abort(signal);
   completed = true;
-  return { canvas, blob, file: new File([blob], `sakura-${input.lines.length ? "lyrics" : "song"}.png`, { type: "image/png" }) };
+  return { key: shareCardKey(input), canvas, blob, file: new File([blob], `sakura-${input.lines.length ? "lyrics" : "song"}.png`, { type: "image/png" }) };
   } finally { if (!completed) { canvas.width = 0;canvas.height = 0; } }
 }
 
-export interface ShareVideoOptions { seconds: number; startSeconds: number; signal: AbortSignal; onProgress: (progress: number) => void; cardBlob?: Blob }
-
-/** Load video encoders only when the listener chooses a clip. */
-export async function videoExportMime(layout: ShareCardInput["layout"] = "portrait") {
-  return (await import("./shareVideo")).videoExportMime(layout);
+export interface ShareVideoOptions {
+  seconds: number;
+  startSeconds: number;
+  signal: AbortSignal;
+  onProgress: (progress: number) => void;
+  card?: RenderedShareCard;
+  audio?: ShareAudioPreparation;
+  accountId?: string | null;
+  /** Compatibility for the older lazy video module, which remains buildable. */
+  cardBlob?: Blob;
 }
 
+/** Check the actual browser encoder at our exported dimensions. */
+const codecProbes = new Map<ShareCardInput["layout"], Promise<string | null>>();
+export async function videoExportMime(layout: ShareCardInput["layout"] = "portrait") {
+  if (!globalThis.isSecureContext || typeof VideoEncoder === "undefined" || typeof AudioEncoder === "undefined") return null;
+  let probe = codecProbes.get(layout);
+  if (!probe) {
+    probe = import("mediabunny").then(async ({ getFirstEncodableVideoCodec, getFirstEncodableAudioCodec, Quality }) => {
+      const quality = new Quality("high");
+      const [video, audio] = await Promise.all([
+        getFirstEncodableVideoCodec(["vp8", "vp9"], { width: 1080, height: layout === "square" ? 1080 : 1350, quality, frameRate: 24 }),
+        getFirstEncodableAudioCodec(["opus"], { numberOfChannels: 2, sampleRate: 48000, quality }),
+      ]);
+      return video && audio ? `video/webm;codecs=${video},opus` : null;
+    }).catch(error => { codecProbes.delete(layout); throw error; });
+    codecProbes.set(layout, probe);
+  }
+  return probe;
+}
+/** Deterministic offline frames and the exact selected recording, with backpressure. */
 export async function renderShareVideo(input: ShareCardInput, options: ShareVideoOptions) {
   abort(options.signal);
-  return (await import("./shareVideo")).renderShareVideo(input, options);
+  if (!Number.isFinite(options.seconds) || options.seconds <= 0 || options.seconds > 12 || !Number.isFinite(options.startSeconds) || options.startSeconds < 0) throw new Error("Choose a clip between one and twelve seconds.");
+  if (!input.track.audioUrl) throw new Error("Let this recording load before preparing a clip.");
+  const ownAudio = !options.audio;
+  const audioPreparation = options.audio || new ShareAudioPreparation();
+  const preparationController = new AbortController();
+  const preparationSignal = AbortSignal.any([options.signal, preparationController.signal]);
+  let card: RenderedShareCard, decoded: AudioBuffer, mimeType: string | null;
+  try {
+    [mimeType, card, decoded] = await Promise.all([
+      videoExportMime(input.layout),
+      options.card?.key === shareCardKey(input) ? Promise.resolve(options.card) : renderShareCard(input, preparationSignal),
+      audioPreparation.prepare(input.track, options.accountId, preparationSignal),
+    ]);
+  } catch (error) {
+    preparationController.abort();
+    throw error;
+  } finally { if (ownAudio) audioPreparation.clear(); }
+  abort(options.signal);
+  if (!mimeType) throw new Error("Video export is not supported here. Save the PNG card instead.");
+  const { Output, BufferTarget, WebMOutputFormat, CanvasSource, AudioBufferSource, Quality, getFirstEncodableAudioCodec } = await import("mediabunny");
+  options.onProgress(.05);
+  abort(options.signal);
+  if (options.startSeconds >= decoded.duration) throw new Error("There is no audio at this clip position. Choose an earlier moment.");
+  const startFrame = Math.max(0, Math.min(Math.floor(options.startSeconds * decoded.sampleRate), decoded.length - 1));
+  const frameCount = Math.min(Math.round(options.seconds * decoded.sampleRate), decoded.length - startFrame);
+  if (frameCount < 1) throw new Error("There is no audio at this clip position.");
+  const clip = new AudioBuffer({ numberOfChannels: decoded.numberOfChannels, length: frameCount, sampleRate: decoded.sampleRate });
+  for (let channel = 0; channel < decoded.numberOfChannels; channel++) clip.copyToChannel(decoded.getChannelData(channel).subarray(startFrame, startFrame + frameCount), channel);
+  const quality = new Quality("high");
+  const audioCodec = await getFirstEncodableAudioCodec(["opus"], { numberOfChannels: clip.numberOfChannels, sampleRate: clip.sampleRate, quality });
+  if (!audioCodec) throw new Error("This browser cannot encode the recording's audio. Save the PNG card instead.");
+  const canvas = document.createElement("canvas");canvas.width = card.canvas.width;canvas.height = card.canvas.height;
+  const context = canvas.getContext("2d");if (!context) throw new Error("Video canvas is unavailable.");
+  const output = new Output({ format: new WebMOutputFormat(), target: new BufferTarget() });
+  const video = new CanvasSource(canvas, { codec: mimeType.includes("vp9") ? "vp9" : "vp8", quality });
+  const audio = new AudioBufferSource({ codec: audioCodec, quality });
+  output.addVideoTrack(video, { frameRate: 24 });output.addAudioTrack(audio);
+  const cancel = () => { void output.cancel().catch(() => {}); };
+  options.signal.addEventListener("abort", cancel, { once: true });
+  let audioWork: Promise<void> | undefined;
+  try {
+    abort(options.signal);await output.start();
+    const duration = frameCount / decoded.sampleRate;
+    const frames = Math.ceil(duration * 24);
+    // Encode the bounded clip alongside video. Each source respects its own
+    // backpressure, without allocating/copying another AudioBuffer per frame.
+    audioWork = audio.add(clip);
+    void audioWork.catch(() => {});
+    for (let index = 0; index < frames; index++) {
+      abort(options.signal);
+      const time = index / 24;
+      context.drawImage(card.canvas, 0, 0);context.save();context.globalAlpha = .14;
+      botanical(context, 835 + Math.sin(time / duration * Math.PI * 2) * 16, 52, 1.5, input.colorMode === "dark" ? "#e4e9df" : "#446b57");context.restore();
+      await video.add(time, Math.min(1 / 24, duration - time));
+      options.onProgress(.05 + (index + 1) / frames * .9);
+      // Yield even when native encoding resolves quickly so Cancel and painting work.
+      if (index % 3 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+    video.close();await audioWork;audio.close();abort(options.signal);await output.finalize();abort(options.signal);
+    const bytes = output.target.buffer;
+    if (!bytes?.byteLength) throw new Error("Video export produced no frames.");
+    const blob = new Blob([bytes], { type: mimeType });options.onProgress(1);
+    return { blob, file: new File([blob], "sakura-lyric-card.webm", { type: mimeType }) };
+  } catch (error) {
+    await output.cancel().catch(() => {});abort(options.signal);throw error;
+  } finally { options.signal.removeEventListener("abort", cancel);canvas.width = 0;canvas.height = 0; }
 }

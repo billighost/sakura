@@ -134,6 +134,7 @@ export class MediaAudioEngine {
     element.addEventListener("playing", this.recover);
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.recover);
     if (typeof window !== "undefined") window.addEventListener("pageshow", this.recover);
+    if (typeof navigator !== "undefined") navigator.mediaDevices?.addEventListener("devicechange", this.recover);
   }
   get initialized() { return this.context !== null; }
   get currentMode() { return this.mode; }
@@ -212,6 +213,7 @@ export class MediaAudioEngine {
     this.element.removeEventListener("play", this.recover); this.element.removeEventListener("playing", this.recover);
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.recover);
     if (typeof window !== "undefined") window.removeEventListener("pageshow", this.recover);
+    if (typeof navigator !== "undefined") navigator.mediaDevices?.removeEventListener("devicechange", this.recover);
     this.context?.removeEventListener("statechange", this.recover);
     for (const branch of this.branches) { if (branch.timer) clearTimeout(branch.timer); branch.graph.dispose(); branch.fader.disconnect(); }
     this.branches.clear(); this.source?.disconnect(); this.master?.disconnect(); this.element.volume = this.volume; void this.context?.close().catch(() => {}); this.context = null; this.source = null; this.master = null;

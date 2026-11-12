@@ -38,7 +38,7 @@ export function getRebuildServices(): RebuildServices {
   const workerSecret = process.env.WORKER_SECRET?.trim();
   const transport = new SourceAudioTransport({
     allowedCdnOrigins: (process.env.SAKURA_REBUILD_AUDIO_ORIGINS ?? "https://res.cloudinary.com").split(",").map((value) => value.trim()).filter(Boolean),
-    worker: workerUrl && workerSecret ? { url: workerUrl, secret: workerSecret, chatScope: process.env.TELEGRAM_BOT_USERNAME?.trim() || "musicshuntersbot" } : undefined,
+    worker: workerUrl && workerSecret ? { url: workerUrl, secret: workerSecret, chatScope: process.env.TELEGRAM_BOT_USERNAME?.trim() || "musicshuntersbot", allowedChatScopes:(process.env.TELEGRAM_FALLBACK_BOTS??"").split(",").map(value=>value.trim()).filter(Boolean) } : undefined,
   });
   const existing = new RecordingResolver(repository,providers,(asset) => transport.directPlaybackUrl(asset));
   const ingestor = new RecordingIngestor(transaction,providers);

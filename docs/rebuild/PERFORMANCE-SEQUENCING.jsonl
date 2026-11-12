@@ -1,0 +1,2 @@
+{"synthetic":true,"metric":"full-sequencing-cpu","count":600,"iterations":5,"previous":{"medianMs":27.38,"minMs":25.57,"maxMs":42.06},"current":{"medianMs":7.17,"minMs":6.55,"maxMs":14.55},"medianSpeedup":3.82}
+{"synthetic":true,"metric":"full-sequencing-cpu","count":2500,"iterations":5,"previous":{"medianMs":456.16,"minMs":452.42,"maxMs":636.46},"current":{"medianMs":28.03,"minMs":17.56,"maxMs":76.47},"medianSpeedup":16.27}

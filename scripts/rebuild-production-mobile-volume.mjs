@@ -21,6 +21,8 @@ const tracks=['Production volume first song','Production volume second song'].ma
  return {id,recordingId:id,title,artists:['Synthetic volume artist'],durationMs:90000,albumTitle:'Production audio verification',coverUrl:null,versionLabel:'Original recording',reference:{provider:'deezer',id:String(i+97)},references:[{provider:'deezer',id:String(i+97)}],readyPlayback:{kind:'stream',delivery:'cdn',assetId,sizeBytes:wav.length,sha256:sha,mimeType:'audio/wav',durationMs:90000,url:`https://res.cloudinary.com/production-volume-fixture/video/upload/v1/sakura/v2/audio/${id}/${sha}.wav`,fallbackUrl:`/api/v2/recordings/${id}/audio?assetId=${assetId}`}};
 });
 const settings={theme:'light',audioQuality:'high',audioTechnology:'none',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.37,shuffle:false,repeat:'off'};
+let settingsRevision=0;
+const settingsFieldRevisions=Object.fromEntries(Object.keys(settings).map(key=>[key,0]));
 const report={scope:'Production pages with synthetic account APIs and real generated tone; no temporary routes or database writes',limitation:'Chromium with iPhone UA, native touch and simulated fixed HTMLMediaElement.volume; physical iOS Safari is not certified',checks:[],measurements:[],mediaRequests:[],apiTimeline:[],unexpectedMutations:[],pageErrors:[]};
 let browser,page,session=null,listeningDelayMs=0;
 try{
@@ -48,15 +50,28 @@ try{
   if(['/api/v2/profile','/api/v2/settings','/api/v2/listening-session','/api/v2/recordings/resolve'].includes(path))report.apiTimeline.push({at:Date.now(),path,method:request.method(),requestRevision:request.method()==='PUT'?request.postDataJSON().revision:undefined,remoteRevision:session?.revision});
   if(request.headers()['x-sakura-account']&&request.headers()['x-sakura-account']!==account.id)return route.fulfill({status:401,json:{error:'Account changed'}});
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return audio(route);
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
-  if(path==='/api/v2/settings'){if(request.method()==='PATCH')Object.assign(settings,request.postDataJSON());return route.fulfill({json:settings});}
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/settings'){
+   if(request.method()==='PATCH'){
+    const {expectedRevision,...patch}=request.postDataJSON();
+    if(expectedRevision!==undefined&&expectedRevision!==settingsRevision)return route.fulfill({status:409,json:{error:'Your settings changed on another device.'}});
+    Object.assign(settings,patch);settingsRevision++;
+    for(const key of Object.keys(patch))settingsFieldRevisions[key]=settingsRevision;
+   }
+   return route.fulfill({json:{...settings,revision:settingsRevision,fieldRevisions:settingsFieldRevisions}});
+  }
   if(path==='/api/v2/home')return route.fulfill({json:{featured:tracks,mixes:[],recent:[],needsOnboarding:false}});
+  if(path==='/api/v2/feed'||path==='/api/v2/feed/hero'){
+   const items=tracks.map(track=>({track,lane:'similar',reason:'Production audio fixture'}));
+   return route.fulfill({json:path.endsWith('/hero')?{item:items[0],refreshAt:Date.now()+600000}:{items,sections:[],nextCursor:null,personalized:true,totalCandidates:items.length,generatedAt:new Date().toISOString()}});
+  }
   if(path==='/api/v2/listening-session'){
    if(request.method()==='PUT'){const data=request.postDataJSON();if((session?.revision||0)!==data.revision)return route.fulfill({json:{accepted:false,session,serverTime:Date.now()}});session={state:data.state,revision:data.revision+1,deviceId:data.deviceId,updatedAt:Date.now()};return route.fulfill({json:{accepted:true,session,serverTime:Date.now()}});}
    if(listeningDelayMs)await new Promise(resolve=>setTimeout(resolve,listeningDelayMs));report.apiTimeline.push({at:Date.now(),path,method:'GET response',remoteRevision:session?.revision});return route.fulfill({json:{session,serverTime:Date.now()}});
   }
   if(path==='/api/v2/recordings/resolve'){const track=tracks.find(t=>t.reference.id===request.postDataJSON().reference.id)||tracks[0];return route.fulfill({json:{status:'resolved',recording:{...track,metadata:{title:track.title,artists:track.artists,artistsComplete:true,durationMs:track.durationMs,albumTitle:track.albumTitle}},playback:track.readyPlayback}});}
   if(path==='/api/v2/lyrics')return route.fulfill({json:{status:'not-found',lines:[]}});
+  if(path==='/api/v2/smart-queue')return route.fulfill({json:{tracks:[]}});
   if(/^\/api\/v2\/recordings\/[^/]+$/.test(path))return route.fulfill({json:{recording:tracks.find(t=>t.id===path.split('/').at(-1))||tracks[0]}});
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
   if(!['GET','HEAD'].includes(request.method())){report.unexpectedMutations.push({path,method:request.method()});return route.fulfill({status:503,json:{error:'Unexpected fixture mutation'}});}
@@ -71,6 +86,18 @@ try{
  async function audible(){await expect.poll(async()=>{const a=(await snapshot()).audio[0];return a&&a.context==='running'&&!a.paused&&a.time>.15&&a.output>.0001;}).toBeTruthy();return(await snapshot()).audio[0];}
  async function measure(name,a,volume){await expect.poll(async()=>{a=(await snapshot()).audio[0];return a?.context==='running'&&Math.abs(a.gain-volume)<.001&&Math.abs(a.output/a.input-volume)<.02;}, {message:`${name} reaches the saved audible level`}).toBe(true);assert.equal(a.elementVolume,1);report.measurements.push({name,volume,inputRms:a.input,outputRms:a.output,ratio:a.output/a.input,src:a.src});}
  async function touchVolume(slider,fraction){await slider.scrollIntoViewIfNeeded();const box=await slider.boundingBox();assert.ok(box);await page.touchscreen.tap(box.x+box.width*fraction,box.y+box.height/2);return Number(await slider.inputValue());}
+ async function closePlayer(){
+  const sheet=page.locator('dialog[open][data-dialog-appearance="player"]');
+  const handle=sheet.locator('[data-dialog-swipe-handle]');
+  await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox();assert.ok(box);
+  const touch=await context.newCDPSession(page),x=box.x+box.width*.5,y=box.y+box.height*.12;
+  try{
+   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1}]});
+   for(let step=1;step<=8;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+step*20,id:1}]});
+   await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  }finally{await touch.detach();}
+  await expect(sheet).toHaveCount(0);
+ }
 
  await page.goto(base+'/track/'+tracks[0].id,{waitUntil:'domcontentloaded',timeout:90000});await page.getByRole('heading',{name:tracks[0].title,exact:true}).waitFor();assert.equal((await snapshot()).contexts.length,0);
  await page.getByRole('button',{name:'Play song',exact:true}).tap();let a=await audible();assert.ok(a.src.startsWith(base+tracks[0].readyPlayback.fallbackUrl));await measure('First Play with saved None volume',a,.37);report.checks.push('Production /track first tap starts real same-origin audio with saved .37 gain despite fixed element volume');
@@ -78,14 +105,14 @@ try{
  const playerVolume=dialog.getByRole('slider',{name:'Volume',exact:true});const quiet=await touchVolume(playerVolume,.22);assert.ok(quiet>.1&&quiet<.3);await expect.poll(()=>settings.volume).toBe(quiet);a=await audible();await measure('Fullscreen native touch volume',a,quiet);report.checks.push('Actual fullscreen botanical volume responds to native touch and saves the audible level');
  await dialog.getByRole('button',{name:'Mute audio',exact:true}).tap();await expect.poll(async()=>(await snapshot()).audio[0].output).toBeLessThan(.00001);assert.ok((await snapshot()).audio[0].input>.001);await dialog.getByRole('button',{name:'Unmute audio',exact:true}).tap();a=await audible();await measure('Unmute restores preceding level',a,quiet);report.checks.push('Mute silences output while media continues; unmute restores the preceding audible level');
  await dialog.getByRole('button',{name:'Pause',exact:true}).tap();await expect.poll(async()=>(await snapshot()).audio[0].paused).toBe(true);await page.evaluate(()=>window.productionVolumeGraph.contexts[0].suspend());await dialog.getByRole('button',{name:'Play',exact:true}).tap();a=await audible();assert.equal(a.context,'running');await measure('Resume after context suspension',a,quiet);report.checks.push('Actual player resumes paused audio and its suspended Web Audio context');
- await dialog.getByRole('button',{name:'Close',exact:true}).tap();await page.getByRole('link',{name:'Your listening profile',exact:true}).tap();await page.locator('a[href="/settings"]:visible').tap();await page.getByRole('heading',{name:'Just the way you like it.',exact:true}).waitFor();
+ await closePlayer();await page.locator('header a[href="/profile"]:visible').first().click();await expect(page).toHaveURL(base+'/profile');await page.locator('a[href^="/settings"]:visible').first().click();await page.getByRole('heading',{name:'Just the way you like it.',exact:true}).waitFor();
  const saved=await touchVolume(page.getByRole('slider',{name:'Player volume',exact:true}),.61);assert.ok(saved>.5&&saved<.7);await expect.poll(()=>settings.volume).toBe(saved);a=await audible();await measure('Settings native Player volume',a,saved);assert.equal((await snapshot()).audio.length,1);report.checks.push('Native touch on production Settings Player volume changes real gain without rebuilding the media source');
  await page.getByRole('link',{name:'Home',exact:true}).last().tap();await page.getByRole('link',{name:tracks[1].title,exact:true}).first().tap();await page.getByRole('heading',{name:tracks[1].title,exact:true}).waitFor();await page.getByRole('button',{name:'Play song',exact:true}).tap();a=await audible();assert.ok(a.src.startsWith(base+tracks[1].readyPlayback.fallbackUrl));assert.equal((await snapshot()).audio.length,1);await measure('Second /track song with saved level',a,saved);report.checks.push('Playing a second production /track song keeps one media source, compatible routing and saved volume');
  const restored=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v2/listening-session'&&response.request().method()==='GET');await page.reload({waitUntil:'domcontentloaded'});await restored;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.getByRole('heading',{name:tracks[1].title,exact:true}).waitFor();await expect.poll(()=>page.evaluate(accountId=>JSON.parse(localStorage.getItem('sakura-v2-listening:'+accountId)||'null')?.pending,account.id)).toBe(false);assert.equal((await snapshot()).contexts.length,0);assert.equal((await snapshot()).cachedVolume,saved);await page.getByRole('button',{name:'Play song',exact:true}).tap();a=await audible();await measure('Reload first audible note at saved level',a,saved);report.checks.push('Reload restores local/account volume before the first audible note and does not autoplay after session bootstrap settles');
  await page.getByRole('button',{name:'Open now playing',exact:true}).tap();dialog=page.getByRole('dialog');await expect(dialog.getByRole('slider',{name:'Volume',exact:true})).toHaveValue(String(saved));
- await dialog.getByRole('button',{name:'Close',exact:true}).tap();listeningDelayMs=1200;report.quickPlayStartedAt=Date.now();const delayedResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v2/listening-session'&&response.request().method()==='GET');await page.reload({waitUntil:'domcontentloaded'});await page.getByRole('heading',{name:tracks[1].title,exact:true}).waitFor();report.quickPlayTappedAt=Date.now();await page.getByRole('button',{name:'Play song',exact:true}).tap();await audible();await delayedResponse;report.quickPlayResponseAt=Date.now();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));a=await audible();await measure('Quick Play survives delayed session response',a,saved);assert.ok(report.quickPlayTappedAt<report.quickPlayResponseAt);report.quickPlaySnapshot=await snapshot();report.checks.push('Quick Play as the cached song page paints stays audible after a deliberately delayed session response');
+ await closePlayer();listeningDelayMs=1200;report.quickPlayStartedAt=Date.now();const delayedResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v2/listening-session'&&response.request().method()==='GET');await page.reload({waitUntil:'domcontentloaded'});await page.getByRole('heading',{name:tracks[1].title,exact:true}).waitFor();report.quickPlayTappedAt=Date.now();await page.getByRole('button',{name:'Play song',exact:true}).tap();await audible();await delayedResponse;report.quickPlayResponseAt=Date.now();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));a=await audible();await measure('Quick Play survives delayed session response',a,saved);assert.ok(report.quickPlayTappedAt<report.quickPlayResponseAt);report.quickPlaySnapshot=await snapshot();report.checks.push('Quick Play as the cached song page paints stays audible after a deliberately delayed session response');
  await page.getByRole('button',{name:'Open now playing',exact:true}).tap();
- assert.ok(report.mediaRequests.length>0);assert.ok(report.mediaRequests.every(url=>url.startsWith(base+'/api/v2/recordings/')));assert.deepEqual(report.unexpectedMutations,[]);assert.deepEqual(report.pageErrors,[]);
+ assert.ok(report.mediaRequests.length>0);assert.ok(report.mediaRequests.every(url=>url.startsWith(base+'/api/v2/recordings/')||tracks.some(track=>url===track.readyPlayback.url)),'All active audio and speculative prewarming use intercepted fixture sources');assert.deepEqual(report.unexpectedMutations,[]);assert.deepEqual(report.pageErrors,[]);
  await fs.mkdir('.local',{recursive:true});await page.screenshot({path:'.local/production-iphone-volume.png'});
 }catch(error){report.error=String(error);report.failureSnapshot=await page?.evaluate(()=>({path:location.pathname,contexts:window.productionVolumeGraph?.contexts.map(c=>c.state),sources:window.productionVolumeGraph?.sources.map(s=>({src:s.media.src,time:s.media.currentTime,paused:s.media.paused,error:s.media.error?.message})),masters:window.productionVolumeGraph?.masters.map(m=>m.gain.gain.value)})).catch(()=>null);process.exitCode=1;}
 finally{await browser?.close();await fs.mkdir('.local',{recursive:true});await fs.writeFile('.local/production-iphone-volume-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify({checks:report.checks,error:report.error||null,pageErrors:report.pageErrors,report:'.local/production-iphone-volume-report.json'}));}

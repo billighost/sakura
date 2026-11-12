@@ -3,7 +3,13 @@ import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNod
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useOffline } from "next/offline";
+import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 import { useMusic } from "./MusicContext";
+import { loadResource } from "./resources";
+import { allowSpeculativePrefetch, createRouteShellPrefetch, PrefetchQueue, routePrefetchTargets, type PrefetchConnection } from "./prefetchPolicy";
+import { feedTasteKey, feedViewKey } from "./feedIdentity";
+import { prefetchPersonalizedFeed } from "./PersonalizedFeed";
+import { prefetchHeroRecommendation } from "./useHeroRecommendation";
 import { MusicScreens } from "./MusicScreens";
 import {enterOfflineShell,installOfflineNavigation,localRouteSnapshot,musicRoute,rememberMusicRoute,subscribeLocalRoute} from "./offlineNavigation";
 import { Blossom } from "./Brand";
@@ -14,25 +20,53 @@ const BloomPage=dynamic(()=>import("../bloom/BloomPage").then(module=>module.Blo
 export function OfflineNavigationController(){
  const pathname=usePathname(),router=useRouter();
  const music=useMusic(),frameworkOffline=useOffline();
+ const current=useRef(music),prefetch=useRef<PrefetchQueue|null>(null);
+ useLayoutEffect(()=>{current.current=music;},[music]);
+ const accountId=music.account?.id,tasteKey=feedTasteKey(music.settings);
  useEffect(()=>installOfflineNavigation(()=>music.offline||frameworkOffline),[music.offline,frameworkOffline]);
  useEffect(()=>{if(music.offline||frameworkOffline||!navigator.onLine)enterOfflineShell();},[music.offline,frameworkOffline]);
  useEffect(()=>{
-  if(music.booting||!music.account?.id||music.offline||frameworkOffline)return;
-  const connection=(navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string;addEventListener?:typeof window.addEventListener;removeEventListener?:typeof window.removeEventListener}}).connection;
-  const canWarm=()=>navigator.onLine&&document.visibilityState==="visible"&&!connection?.saveData&&!/^(slow-)?2g$/.test(connection?.effectiveType||"");
-  const pending:string[]=[];
-  for(const href of ["/home","/discover","/search","/library","/profile","/liked","/library/downloaded"])if(href!==location.pathname)pending.push(href);
+  if(!accountId||music.booting||music.offline||frameworkOffline)return;
+  const connection=(navigator as Navigator&{connection?:PrefetchConnection&{addEventListener?:typeof window.addEventListener;removeEventListener?:typeof window.removeEventListener}}).connection;
+  const canWarm=()=>allowSpeculativePrefetch({online:navigator.onLine&&!current.current.offline&&!frameworkOffline,visible:document.visibilityState!=="hidden",playback:current.current.preparingTrack?"resolving":current.current.status,connection});
+  const queue=new PrefetchQueue(canWarm);
+  prefetch.current=queue;
+  // Installed Next 16.4 requires kind when options include onInvalidate.
+  const warmShell=createRouteShellPrefetch(queue,(href,options)=>router.prefetch(href,{...options,kind:PrefetchKind.AUTO}),location.origin);
+  const warm=(href:string,priority=0)=>{
+   warmShell(href,priority+2);
+   const targets=routePrefetchTargets(href,location.origin);
+   for(const path of targets.paths)queue.enqueue(accountId+":"+path,async signal=>{signal.throwIfAborted();await loadResource(accountId,path);},priority);
+   if(targets.surface){
+    const surface=targets.surface,settings=current.current.settings,key=feedViewKey(accountId,surface,"balanced",settings);
+    queue.enqueue("feed:"+key,signal=>prefetchPersonalizedFeed(accountId,surface,settings,signal),priority+1);
+    queue.enqueue("hero:"+key,signal=>prefetchHeroRecommendation(accountId,surface,settings,signal),priority);
+   }
+  };
+  const intent=(event:Event)=>{
+   const anchor=event.target instanceof Element?event.target.closest<HTMLAnchorElement>("a[href]"):null;
+   if(!anchor||anchor.hasAttribute("download")||anchor.target&&anchor.target!=="_self")return;
+   warm(anchor.href,10);
+  };
+  const dataRoutes=new Set(["/home","/discover","/library","/bloom"]);
+  const pending=["/home","/discover","/search","/library","/profile","/liked","/library/downloaded","/bloom"]
+   .filter(href=>href!==location.pathname);
   let stopped=false,timer:ReturnType<typeof setTimeout>|undefined,idle:number|undefined;
   const cancel=()=>{if(timer!==undefined)clearTimeout(timer);if(idle!==undefined)window.cancelIdleCallback(idle);timer=undefined;idle=undefined;};
   const schedule=()=>{
    cancel();if(stopped||!pending.length||!canWarm())return;
-   // Warm one route in idle time after startup rather than requesting seven
-   // routes while the visible page is still loading.
-   timer=setTimeout(()=>{timer=undefined;const warm=()=>{idle=undefined;if(stopped||!canWarm())return;const href=pending.shift();if(href)router.prefetch(href);schedule();};if(typeof window.requestIdleCallback==="function")idle=window.requestIdleCallback(warm,{timeout:10000});else warm();},2000);
+   // Preserve the mobile loading budget: warm one shell (and, where useful,
+   // its read-only data) in idle time instead of starting every route at once.
+   timer=setTimeout(()=>{timer=undefined;const run=()=>{idle=undefined;if(stopped||!canWarm())return;const href=pending.shift();if(href){if(dataRoutes.has(href))warm(href);else warmShell(href);}schedule();};if(typeof window.requestIdleCallback==="function")idle=window.requestIdleCallback(run,{timeout:10000});else run();},2000);
   };
-  schedule();document.addEventListener("visibilitychange",schedule);window.addEventListener("online",schedule);connection?.addEventListener?.("change",schedule);
-  return()=>{stopped=true;cancel();document.removeEventListener("visibilitychange",schedule);window.removeEventListener("online",schedule);connection?.removeEventListener?.("change",schedule);};
- },[router,music.booting,music.account?.id,music.offline,frameworkOffline]);
+  const resume=()=>{queue.resume();schedule();};
+  schedule();
+  document.addEventListener("pointerover",intent);document.addEventListener("focusin",intent);document.addEventListener("pointerdown",intent);
+  document.addEventListener("visibilitychange",resume);window.addEventListener("online",resume);
+  connection?.addEventListener?.("change",resume);
+  return()=>{stopped=true;cancel();queue.dispose();if(prefetch.current===queue)prefetch.current=null;document.removeEventListener("pointerover",intent);document.removeEventListener("focusin",intent);document.removeEventListener("pointerdown",intent);document.removeEventListener("visibilitychange",resume);window.removeEventListener("online",resume);connection?.removeEventListener?.("change",resume);};
+ },[accountId,music.booting,music.offline,frameworkOffline,tasteKey,router]);
+ useEffect(()=>{prefetch.current?.resume();},[music.status,music.offline,music.preparingTrack]);
  useEffect(()=>{rememberMusicRoute(pathname);const controlled=()=>rememberMusicRoute(location.pathname);navigator.serviceWorker?.addEventListener("controllerchange",controlled);return()=>navigator.serviceWorker?.removeEventListener("controllerchange",controlled);},[pathname]);
  return null;
 }

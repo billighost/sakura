@@ -34,7 +34,7 @@ async function view(name,now,getItems,{width=320,dark=false,reduced=true}={}){
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{...defaults,theme:dark?'dark':'light',reducedMotion:reduced}});
   if(path==='/api/v2/bloom/shelf'){shelfReads++;return route.fulfill({json:{items:getItems(currentNow)}});}
   if(path==='/api/v2/bloom')return route.fulfill({json:{items:getItems(currentNow),schedule:{timeZone:'Africa/Lagos'}}});

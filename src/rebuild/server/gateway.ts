@@ -26,7 +26,9 @@ export interface AudioTransport {
 }
 export interface SourceTransportOptions {
   allowedCdnOrigins: readonly string[];
-  worker?: { url: string; secret: string; chatScope: string };
+  worker?: { url: string; secret: string; chatScope: string; allowedChatScopes?: readonly string[] };
+  /** Rolling deployments can opt out while verifying the document-tag protocol. */
+  localV2Signing?: boolean;
   headerTimeoutMs?: number;
 }
 
@@ -54,18 +56,34 @@ export class SourceAudioTransport implements AudioTransport {
     try { return safeUrl(asset.locator.url, this.origins); } catch { return undefined; }
   }
   async signedPlaybackUrl(asset: StoredAudioAsset): Promise<string | undefined> {
-    const running=this.signing.get(asset.assetId);if(running)return running;
-    const work=this.mintSignedPlaybackUrl(asset).finally(()=>this.signing.delete(asset.assetId));this.signing.set(asset.assetId,work);return work;
+    const key=JSON.stringify([asset.assetId,asset.locator,asset.sizeBytes,asset.mimeType]);
+    const running=this.signing.get(key);if(running)return running;
+    const work=this.mintSignedPlaybackUrl(asset,key).finally(()=>this.signing.delete(key));this.signing.set(key,work);return work;
   }
-  private async mintSignedPlaybackUrl(asset:StoredAudioAsset):Promise<string|undefined>{
+  private async mintSignedPlaybackUrl(asset:StoredAudioAsset,key:string):Promise<string|undefined>{
     if(asset.locator.kind==="https")return this.directPlaybackUrl(asset);
     const worker=this.options.worker;if(!worker)return undefined;
-    const cached=this.signed.get(asset.assetId);if(cached&&cached.expires>Date.now()+60000)return cached.url;
+    const cached=this.signed.get(key);if(cached&&cached.expires>Date.now()+60000)return cached.url;
     const scoped=asset.locator.protocol==="v2";
     const documentTag=workerDocumentTag(asset);
     if(scoped&&!documentTag)return undefined;
     if(!scoped&&worker.chatScope.toLowerCase()!==asset.locator.chatScope.toLowerCase())return undefined;
     try{
+      const base=new URL(worker.url);
+      if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash)return undefined;
+      const scope=asset.locator.chatScope.toLowerCase();
+      const scopes=new Set([worker.chatScope,...worker.allowedChatScopes??[]].map(value=>value.toLowerCase()));
+      if(scoped&&this.options.localV2Signing!==false&&worker.secret.length>=24){
+        if(!documentTag||!scopes.has(scope)||!/^[a-z0-9_]{3,64}$/.test(scope)||!/^[1-9]\d{0,14}$/.test(asset.locator.messageId)
+          ||asset.state!=="ready"||asset.candidate.audioKind!=="full"||!asset.verifiedAt||!Number.isFinite(Date.parse(asset.verifiedAt))
+          ||!Number.isSafeInteger(asset.sizeBytes)||asset.sizeBytes<=0||!supportedAudioMime(asset.mimeType))return undefined;
+        const expiry=Math.floor(Date.now()/1000)+1800;
+        const signature=createHmac("sha256",worker.secret).update(JSON.stringify([scope,asset.locator.messageId,expiry,documentTag])).digest("hex");
+        const url=new URL(`/v2/audio/${scope}/${asset.locator.messageId}`,base);
+        url.search=new URLSearchParams({exp:String(expiry),sig:signature,documentTag}).toString();
+        if(this.signed.size>=1000)this.signed.delete(this.signed.keys().next().value!);
+        this.signed.set(key,{url:url.toString(),expires:expiry*1000});return url.toString();
+      }
       const response=await fetchAudioHeaders(new URL(scoped?"/v2/sign-audio":"/sign-audio",worker.url).toString(),{method:"POST",headerTimeoutMs:5000,redirect:"error",
         headers:{Authorization:`Bearer ${worker.secret}`,"Content-Type":"application/json"},body:JSON.stringify({messageId:asset.locator.messageId,chatScope:asset.locator.chatScope,ttlSeconds:1800,...(documentTag?{documentTag}:{})})},this.fetcher);
       if(!response.ok){await response.body?.cancel();return undefined;}
@@ -81,7 +99,7 @@ export class SourceAudioTransport implements AudioTransport {
         if(!timingSafeEqual(Buffer.from(signature,"hex"),expected))return undefined;
       }
       if(this.signed.size>=1000)this.signed.delete(this.signed.keys().next().value!);
-      this.signed.set(asset.assetId,{url:url.toString(),expires});return url.toString();
+      this.signed.set(key,{url:url.toString(),expires});return url.toString();
     }catch{return undefined;}
   }
   async open(asset: StoredAudioAsset, range: string | null, signal?: AbortSignal): Promise<Response> {

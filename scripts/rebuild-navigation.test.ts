@@ -31,7 +31,7 @@ test("music routes keep an instant loading shell and page-local transition",()=>
  const layout=read("src/app/(music)/layout.tsx"),loading=read("src/app/(music)/loading.tsx"),ux=read("src/rebuild/app/NavigationUX.tsx"),css=read("src/rebuild/app/ink.module.css");
  assert.match(layout,/RouteTransition/);
  assert.match(loading,/MusicRouteLoading/);
- assert.match(ux,/router\.prefetch\("\/home"\)|for\(const href of \["\/home"/);
+ assert.match(ux,/router\.prefetch\("\/home"\)|for\(const href of \["\/home"|const pending=\["\/home"/);
  assert.match(css,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.routeTransition/);
 });
 

@@ -66,6 +66,17 @@ test("successful publication remains accepted when indexing is rate limited and 
   const result=await publishLyrics(identity,{format:"plain",text:"words",publishToken:"prefix:1"},{fetch:async()=>++calls===1?new Response(null,{status:201}):Response.json({name:"RateLimitExceeded"},{status:429,headers:{"Retry-After":"60"}})});
   assert.equal(result.published,true);assert.equal(result.track,undefined);assert.equal(calls,2);
 });
+
+test("short publication acknowledgement returns the accepted upload without provider index readbacks", async () => {
+  const urls: string[] = [];
+  const result = await publishLyrics(identity, { format: "plain", text: "words", publishToken: "prefix:1" }, {
+    readback: false,
+    fetch: async url => { urls.push(String(url)); return new Response(null, { status: 201 }); },
+  });
+  assert.equal(result.published, true);
+  assert.equal(result.track, undefined);
+  assert.deepEqual(urls, ["https://lrclib.net/api/publish"]);
+});
 test("publication readback finds submitted lyrics when title search precedes signature indexing",async()=>{
   const candidate={id:33,trackName:identity.title,artistName:identity.artist,albumName:identity.album,duration:180,plainLyrics:"words"},calls:string[]=[];
   const result=await publishLyrics(identity,{format:"plain",text:"words",publishToken:"prefix:1"},{fetch:async url=>{

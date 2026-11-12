@@ -1,6 +1,7 @@
 /** Real story UI with private preparation, delayed commits and explicit gates.
  * All account and product API calls are intercepted; no listener is changed. */
 import 'dotenv/config';
+import {bloomAudioFixture} from './fixtures/bloom-audio.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {encode} from 'next-auth/jwt';
@@ -31,6 +32,7 @@ async function room(variant){
  const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',serviceWorkers:'block'});
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>sessionStorage.setItem('sakura-ink-opening','1'));
+ const preparedAudio=bloomAudioFixture([card]);
  const page=await context.newPage();page.on('pageerror',error=>report.errors.push(error.message));
  const revealed=new Set(),writes=[],images=[];let completed=false,prepares=0,completions=0;
  const preparedGate=gate(),revealGate=gate(),completeGate=gate();
@@ -39,8 +41,9 @@ async function room(variant){
  const recap=()=>({...skeleton,completed,chapters:chapters.map(chapter=>discloseBloomChapter(chapter,revealed.has(chapter.id))),listening:discloseBloomListening(listening,new Set(chapters.filter(chapter=>revealed.has(chapter.id)).flatMap(chapter=>[chapter.kind,chapter.id])),completed)});
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
+  if(await preparedAudio(route))return;
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,reducedMotion:true,bloomPerformance:'1',onboarded:true,openingAnimation:0}});
   if(path==='/api/v2/image'){images.push(url.searchParams.get('url'));return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#7c9186"/><circle cx="285" cy="120" r="66" fill="#e6c49e"/></svg>'});}
   if(path.endsWith('/prepare')){prepares++;await preparedGate.promise;if(variant==='retry'&&prepares===1)return route.fulfill({status:503,json:{error:'Synthetic preparation interruption'}});return route.fulfill({json:{story:recap(),chapters,listening}});}
@@ -61,8 +64,9 @@ async function room(variant){
  });
  await page.goto(`${base}/bloom/${skeleton.id}`,{waitUntil:'domcontentloaded',timeout:120000});
  const dialog=page.locator('dialog[open]');await dialog.locator('[data-bloom-action="begin"]').waitFor();
- assert.equal(prepares,0,'merely opening a story does not stage hidden facts');assert.deepEqual(writes,[]);
- await dialog.locator('[data-bloom-action="begin"]').click();
+ await expect.poll(()=>prepares).toBe(1);assert.deepEqual(writes,[]);
+ if(variant==='delayed')await expect(dialog.locator('[data-bloom-action="begin"]')).toBeDisabled();
+ else if(variant!=='retry')await dialog.locator('[data-bloom-action="begin"]').click();
  return {context,page,dialog,writes,images,preparedGate,revealGate,completeGate,counts:()=>({prepares,completions,completed,confirmed:revealed.size})};
 }
 
@@ -71,6 +75,7 @@ try{
  await expect.poll(()=>delayed.counts().prepares).toBe(1);
  assert.equal(await delayed.dialog.locator('[aria-current="step"]').count(),0);
  delayed.preparedGate.release();
+ await delayed.dialog.locator('[data-bloom-action="begin"]').click();
  await expect(delayed.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label','Chapter 1: Your listening time.');
  await expect.poll(()=>delayed.writes.length).toBe(1);assert.equal(delayed.counts().confirmed,0);
  await expect(delayed.dialog.locator('nav button').nth(1)).toBeDisabled();
@@ -96,12 +101,13 @@ try{
  delayed.completeGate.release();await expect.poll(()=>delayed.counts().completed).toBe(true);
  await expect(delayed.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label','Chapter 1: Your listening time.');
  await expect(delayed.dialog.locator('[data-bloom-action="save"]')).toHaveCount(0);
- report.checks.push('Private preparation starts only at Enter; staged Next/finale paint during delayed real commits; double Next advances once; all artwork warms; completion cannot rewind replay');
+ report.checks.push('Private assets prepare before Enter; staged Next/finale paint during delayed real commits; double Next advances once; all artwork warms; completion cannot rewind replay');
  await delayed.context.close();
 
  const retry=await room('retry');
  await expect(retry.dialog.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
  await retry.dialog.getByRole('button',{name:'Reconnect',exact:true}).click();
+ if(await retry.dialog.locator('[data-bloom-action="begin"]').count())await retry.dialog.locator('[data-bloom-action="begin"]').click();
  await expect(retry.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label','Chapter 1: Your listening time.');
  for(let index=1;index<chapters.length;index++){await retry.dialog.locator('[data-bloom-action="next"]').click();await expect(retry.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label',`Chapter ${index+1}: ${chapters[index].title}`);}
  await retry.dialog.locator('[data-bloom-action="next"]').click();await expect(retry.dialog.locator('[data-bloom-action="save"]')).toBeVisible();

@@ -41,8 +41,9 @@ export function bloomHighlightStart(raw:Record<string,unknown>,rawDurationMs:num
 }
 
 /** Recap sound accompanies a chapter without replacing the listener's queue. */
-export function useBloomAudio(){
+export function useBloomAudio(preparedPlayback?:(recording:Record<string,unknown>)=>PreparedBloomAudio|undefined){
  const music=useMusic(),latest=useRef(music);
+ const preparedSource=useRef(preparedPlayback);useEffect(()=>{preparedSource.current=preparedPlayback;},[preparedPlayback]);
  const active=useRef<BloomVoice|null>(null),pending=useRef<BloomVoice|null>(null),outgoing=useRef<BloomVoice|null>(null),paused=useRef(false);
  const returning=useRef<{accountId:string;entryId:string|null;trackId:string;resume:boolean;choiceVersion?:number}|null>(null);
  const [message,setMessage]=useState("");
@@ -107,8 +108,9 @@ export function useBloomAudio(){
   setMessage("Loading this chapter's song...");
   void(async()=>{try{
    await unlocked;if(!current())return;
-   const track=musicTrack(raw),prepare=(p as typeof p&{preparePlaybackAudio?:(track:MusicTrack,signal:AbortSignal)=>Promise<PreparedBloomAudio>}).preparePlaybackAudio;let prepared:PreparedBloomAudio;
-   if(prepare)prepared=await prepare(track,request.signal);
+   const track=musicTrack(raw),cached=preparedSource.current?.(raw),prepare=(p as typeof p&{preparePlaybackAudio?:(track:MusicTrack,signal:AbortSignal)=>Promise<PreparedBloomAudio>}).preparePlaybackAudio;let prepared:PreparedBloomAudio;
+   if(cached)prepared=cached;
+   else if(prepare)prepared=await prepare(track,request.signal);
    else{let recordingId=track.id,url:string,fallbackUrl:string|undefined,release=()=>{};const local=await localRead<OfflineAudio>(accountId,"audio:"+track.id).catch(()=>undefined);if(!current())return;const ready=readyPlaybackFor(track);
     if(validOfflineAudio(local)&&local.track.id===track.id){url=URL.createObjectURL(local.blob);let released=false;release=()=>{if(released)return;released=true;URL.revokeObjectURL(url);};}
     else if(navigator.onLine===false)throw new Error("This chapter's song is not saved on this device. Continue your story, or reconnect to play it.");

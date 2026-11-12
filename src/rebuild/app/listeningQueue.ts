@@ -47,3 +47,25 @@ export function nextUpcoming(entries: readonly QueueEntry[], currentId: string |
   if (!upcoming.length) return undefined;
   return upcoming[shuffle ? Math.min(upcoming.length - 1, Math.floor(random() * upcoming.length)) : 0];
 }
+
+/** Repeat belongs to the listener's queue: the selected now-playing occurrence
+ * and the contiguous "Added by you" entries that follow it. Automatic
+ * continuation remains outside this cycle. */
+export function userRepeatQueue(entries: readonly QueueEntry[], anchorId: string | null): QueueEntry[] {
+  const anchor = entries.findIndex(entry => entry.entryId === anchorId);
+  if (anchor < 0) return [];
+  const cycle = [entries[anchor]];
+  for (let index = anchor + 1; index < entries.length && entries[index].priority === "manual"; index++) cycle.push(entries[index]);
+  return cycle;
+}
+
+export function nextUserRepeat(entries: readonly QueueEntry[], currentId: string | null, anchorId: string | null, eligible: (entry: QueueEntry) => boolean = () => true): QueueEntry | undefined {
+  const cycle = userRepeatQueue(entries, anchorId);
+  if (!cycle.length) return;
+  const current = cycle.findIndex(entry => entry.entryId === currentId);
+  const start = current >= 0 ? current : cycle.length - 1;
+  for (let offset = 1; offset <= cycle.length; offset++) {
+    const candidate = cycle[(start + offset) % cycle.length];
+    if (eligible(candidate)) return candidate;
+  }
+}

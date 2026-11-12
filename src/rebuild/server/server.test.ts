@@ -416,7 +416,7 @@ test("document-bound worker playback accepts only a signed URL for its exact val
  const worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary",protocol:"v2" as const,documentId:"123"}},secret="generated-signing-secret";
  const expectedTag='"'+createHash("sha256").update(JSON.stringify(["primary","42","123",10,"audio/mpeg"])).digest("hex")+'"';
  for(const mode of ["unbound","wrong-tag","wrong-signature","valid"]){
-  let calls=0,requestedTag:unknown;const transport=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:"https://worker.example.test",secret,chatScope:"primary"}},(async(_url,init)=>{
+  let calls=0,requestedTag:unknown;const transport=new SourceAudioTransport({allowedCdnOrigins:[],localV2Signing:false,worker:{url:"https://worker.example.test",secret,chatScope:"primary"}},(async(_url,init)=>{
    calls++;const body=JSON.parse(String(init?.body));requestedTag=body.documentTag;
    const expiresAt=Math.floor(Date.now()/1000)+1800,tag=mode==="wrong-tag"?'"'+"f".repeat(64)+'"':expectedTag;
    const payload=mode==="unbound"?["primary","42",expiresAt]:["primary","42",expiresAt,tag];
@@ -429,6 +429,32 @@ test("document-bound worker playback accepts only a signed URL for its exact val
   if(mode==="valid"){assert.equal(new URL(url!).searchParams.get("documentTag"),expectedTag);assert.equal(await transport.signedPlaybackUrl(worker),url);assert.equal(calls,1);}
   else assert.equal(url,undefined);
  }
+});
+
+test("verified v2 worker targets sign locally with document-bound credentials and configured scopes",async()=>{
+ const secret="local-signing-secret-for-performance-test",worker={...source,locator:{kind:"telegram-worker" as const,messageId:"42",chatScope:"primary",protocol:"v2" as const,documentId:"123"}};
+ let calls=0;const transport=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:"https://worker.example.test",secret,chatScope:"primary",allowedChatScopes:["fallback"]}},(async()=>{calls++;throw new Error("Ready playback must not fetch the worker");})as typeof fetch);
+ const url=new URL((await transport.signedPlaybackUrl(worker))!),tag='"'+createHash("sha256").update(JSON.stringify(["primary","42","123",10,"audio/mpeg"])).digest("hex")+'"';
+ assert.equal(url.origin,"https://worker.example.test");assert.equal(url.pathname,"/v2/audio/primary/42");assert.equal(url.searchParams.get("documentTag"),tag);
+ assert.equal(url.searchParams.get("sig"),createHmac("sha256",secret).update(JSON.stringify(["primary","42",Number(url.searchParams.get("exp")),tag])).digest("hex"));
+ assert.equal(calls,0);assert.ok(!url.href.includes(secret));assert.equal(await transport.signedPlaybackUrl({...worker,locator:{...worker.locator,chatScope:"unconfigured"}}),undefined);
+ assert.equal(await transport.signedPlaybackUrl({...worker,locator:{...worker.locator,documentId:undefined}}),undefined);
+ const changed=new URL((await transport.signedPlaybackUrl({...worker,locator:{...worker.locator,documentId:"124"}}))!);assert.notEqual(changed.searchParams.get("documentTag"),tag);assert.notEqual(changed.searchParams.get("sig"),url.searchParams.get("sig"));
+ for(const origin of ["http://worker.example.test","https://user:password@worker.example.test","https://worker.example.test?untrusted=1"]){
+  const invalid=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:origin,secret,chatScope:"primary"}});assert.equal(await invalid.signedPlaybackUrl(worker),undefined);
+ }
+});
+
+test("ready resolution reuses selected asset evidence without exposing it or crossing accounts",async()=>{
+ class Repository extends MemoryRepository {lookups=0;override async findAudio(id:string,asset:string){this.lookups++;return super.findAudio(id,asset);}}
+ const repository=new Repository();repository.assets=[{...source,sha256:"a".repeat(64),ownerAccountId:accountId}];
+ const result=await new RecordingResolver(repository,[]).resolve({reference},accountId),transport=new SourceAudioTransport({allowedCdnOrigins:["https://cdn.example.test"]});
+ const promotion={configured:true,needsPreparation(){return false;}} as unknown as AudioPromotions;
+ const jobs=new AudioResolutionJobs(async()=>[],repository,{} as RecordingIngestor,{} as WorkerAudioDiscovery,{} as RecordingResolver,undefined,promotion);
+ assert.equal(await jobs.needsPreparation(result,accountId),false);await new PlaybackTargets(repository,transport).decorate(result,accountId);assert.equal(repository.lookups,0);
+ assert.ok(!JSON.stringify(result).includes("ownerAccountId"));
+ await new PlaybackTargets(repository,transport).decorate(JSON.parse(JSON.stringify(result)),accountId);assert.equal(repository.lookups,1);
+ await new PlaybackTargets(repository,transport).decorate(result,otherId);assert.equal(repository.lookups,2);
 });
 
 function ingestionDatabase(){

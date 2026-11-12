@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMusic } from "./MusicContext";
 import { SearchField, TrackList } from "./Elements";
 import { CollectionToolbar, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
@@ -19,11 +19,12 @@ export function TrackCollection({ tracks, room, label, firstSortLabel = "Origina
  sticky?: boolean;
 }) {
  const music = useMusic();
+ const {effectiveId,track:currentTrack,queue,downloads}=music;
  const [presentation, setPresentation] = useRoomPresentation(music.account?.id, room);
  const {layout,sort,direction}=presentation;
  const [query,setQuery]=useState("");
- const unique = [...new Map(tracks.map(track => [music.effectiveId(track), track])).values()];
- const ordered = sortRoomTracks(unique.filter(track=>collectionTrackMatches(track,query)), sort, direction);
+ const unique = useMemo(() => [...new Map(tracks.map(track => [effectiveId(track), track])).values()], [tracks, effectiveId, currentTrack, queue, downloads]);
+ const ordered = useMemo(() => sortRoomTracks(unique.filter(track=>collectionTrackMatches(track,query)), sort, direction), [unique, query, sort, direction]);
 
  return <section aria-label={label}>
   {searchable&&<StickySearch enabled={sticky} label={label+" search"}>

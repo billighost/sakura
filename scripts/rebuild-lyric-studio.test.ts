@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lyricStudioError, lyricStudioLines, lrcTimestamp, readStudioDraft, recoverStudioTiming, stampStudioLine, timedStudioText } from "../src/rebuild/player/lyricStudio";
+import { isSyncedLyricText, lyricStudioError, lyricStudioLines, lrcTimestamp, readStudioDraft, recoverStudioTiming, stampStudioLine, timedStudioText } from "../src/rebuild/player/lyricStudio";
 import { parseTimedLyrics } from "../src/rebuild/lyrics/parse";
 
 test("tap timing records ordered media time and rejects skipped lines or backwards seeks", () => {
@@ -22,6 +22,12 @@ test("preview and capture preserve text identity without adding invented timings
   assert.deepEqual(lyricStudioLines(" First\r\n\r\n Second ", "plain"), ["First", "Second"]);
   assert.deepEqual(lyricStudioLines("[00:01]First\n[00:03]Second", "lrc"), ["First", "Second"]);
   assert.equal(timedStudioText(["First", "Second"], [1, null]), "[00:01.00]First");
+});
+test("complete pasted LRC is recognized as already synced while partial or plain lyrics are not", () => {
+  assert.equal(isSyncedLyricText("[ar:Artist]\n[00:01.00]First\n[00:03.25]Second"), true);
+  assert.equal(isSyncedLyricText("[00:01.00]<00:01.10>First <00:01.50>line"), true);
+  assert.equal(isSyncedLyricText("[00:01.00]First\nSecond"), false);
+  assert.equal(isSyncedLyricText("First\nSecond"), false);
 });
 test("client validation refuses partially parsed LRC and timestamps outside the recording", () => {
   assert.match(lyricStudioError("[00:12]First\nSecond", "lrc", 30000)!, /every lyric line/);

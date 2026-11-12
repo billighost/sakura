@@ -66,7 +66,7 @@ const proxy=createServer(async(request,response)=>{
    const chunks=[];let length=0;for await(const chunk of request){length+=chunk.length;assert.ok(length<1024*1024);chunks.push(chunk);}const text=Buffer.concat(chunks).toString('utf8'),input=text?JSON.parse(text):{};
    if(/\/recordings\/[^/]+\/audio$/.test(path)){await bytes(request,response,scenario==='restored-download'?20000:scenario==='slow-progressive'?(request.headers.range?.startsWith('bytes=0-')?14000:4500):0,scenario==='slow-progressive');return;}
    if(path==='/api/auth/session'){json(response,{user:account});return;}
-   if(path==='/api/v2/profile'){json(response,{profile:account,stats:{},topArtists:[]});return;}
+   if(path==='/api/v2/library/state'){json(response,{favoriteStates:{}});return;}if((path==='/api/v2/bootstrap'||path==='/api/v2/profile')){json(response,{profile:account,stats:{},topArtists:[]});return;}
    if(path==='/api/v2/settings'){json(response,settings);return;}
    if(path==='/api/v2/library'){json(response,{recordings:scenario==='lyrics-change'?[track,nextTrack]:[scenario==='slow-progressive'?{...track,readyPlayback:ready}:track],playlists:[]});return;}
    if(path==='/api/v2/listening-session'){

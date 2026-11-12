@@ -1,6 +1,9 @@
 import { parseTimedLyrics, type TimedLyric } from "../lyrics/parse";
 
 export type LyricFormat = "plain" | "lrc";
+export function isSyncedLyricText(text: string): boolean {
+  return Boolean(text.trim()) && !lyricStudioError(text, "lrc", 0);
+}
 export function lyricStudioLines(text: string, format: LyricFormat): string[] {
   if (format === "lrc" && !lyricStudioError(text, format, 0)) return parseTimedLyrics(text).map(line => line.text.trim()).filter(Boolean);
   // A partial imported LRC can be repaired by tap timing. Keep its unstamped

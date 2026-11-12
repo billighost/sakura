@@ -73,7 +73,7 @@ export async function solvePublishChallenge(prefix: string, target: string, sign
   throw new Error("Challenge could not be solved");
 }
 
-export async function publishLyrics(identity: LyricIdentity, value: unknown, options:{fetch?:typeof fetch;signal?:AbortSignal}={}) {
+export async function publishLyrics(identity: LyricIdentity, value: unknown, options:{fetch?:typeof fetch;signal?:AbortSignal;readback?:boolean}={}) {
   const payload=parseLyricSubmission(value,identity), fetcher=options.fetch||fetch;
   const signal=options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(50_000)]):AbortSignal.timeout(50_000);
   const headers=publishHeaders,input=value&&typeof value==="object"?value as Record<string,unknown>:{};
@@ -89,6 +89,9 @@ export async function publishLyrics(identity: LyricIdentity, value: unknown, opt
   }
   const response=await fetcher("https://lrclib.net/api/publish",{method:"POST",headers:{...headers,"X-Publish-Token":token},body:JSON.stringify(payload),signal,cache:"no-store"});
   if(response.status!==201)throw await upstreamPublishError(response);
+  // The accepted upload is final. API clients can refresh the read endpoint
+  // separately, without holding the successful response open for indexing.
+  if(options.readback===false)return {published:true as const,track:undefined as LrcLibTrack|undefined};
   // Publishing already succeeded. A delayed read must never suggest resubmitting.
   let track:LrcLibTrack|undefined;
   try {

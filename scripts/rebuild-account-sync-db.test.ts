@@ -6,8 +6,9 @@ import {after,before,test} from "node:test";
 import {getRebuildPool,readAccountById} from "../src/rebuild/data/db";
 import {getSession,putSession} from "../src/rebuild/data/session";
 import {getSettings,patchSettings} from "../src/rebuild/data/settings";
-import {createPlaylist,listPlaylists,getPlaylist,mutatePlaylistTracks,updatePlaylist} from "../src/rebuild/data/collections";
+import {createPlaylist,listPlaylists,getPlaylist,mutatePlaylistTracks,updatePlaylist,setFavorite,getFavoriteStates} from "../src/rebuild/data/collections";
 import {recordHistory,getHistory} from "../src/rebuild/data/history";
+import {getProfile} from "../src/rebuild/data/product";
 
 const accounts=[randomUUID(),randomUUID()],deviceA=randomUUID(),deviceB=randomUUID(),schema="sakura_sync_test_"+randomUUID().replaceAll("-","");
 const journal=`.local/${schema}.json`;
@@ -114,4 +115,14 @@ test("two devices deliver history chunks exactly once and retain account ownersh
  assert.equal(history.events.length,1);assert.equal(history.events[0].audibleMs,6500);
  assert.equal((await getHistory(accounts[1],new URL("http://localhost/api"))).events.length,0);
  await assert.rejects(()=>recordHistory(accounts[0],{...chunk,msPlayed:4500}),{status:409});
+});
+
+test("batched account projections preserve measured analytics and exact unlike tombstones",async()=>{
+ const recordingId=(await scoped.query('SELECT id FROM sakura_v2."Recording" ORDER BY id LIMIT 1')).rows[0].id;
+ const like=await setFavorite(accounts[0],{recordingId,liked:true,operationId:randomUUID(),baseRevision:0});
+ await setFavorite(accounts[0],{recordingId,liked:false,operationId:randomUUID(),baseRevision:like.revision});
+ const states=await getFavoriteStates(accounts[0]);assert.deepEqual(states[recordingId],{liked:false,revision:2});
+ assert.equal((await getFavoriteStates(accounts[1]))[recordingId],undefined);
+ const profile=await getProfile(accounts[0]);assert.equal(profile.profile.id,accounts[0]);assert.equal(profile.stats.audibleMs,6500);assert.equal(profile.stats.playCount,1);assert.equal(profile.stats.uniqueRecordings,1);assert.equal(profile.stats.liked,0);
+ assert.equal(profile.insights.topSongs[0].id,recordingId);assert.equal(profile.insights.topSongs[0].audibleMs,6500);assert.equal(profile.insights.finishedEvents,1);
 });

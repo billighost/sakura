@@ -7,6 +7,11 @@
     "build": "node scripts/run-next.mjs build",
     "start": "node scripts/run-next.mjs start",
     "lint": "eslint",
+    "test:top-songs": "node --import tsx --test scripts/rebuild-top-songs.test.ts scripts/rebuild-track-sorting.test.ts scripts/rebuild-collection-presentation.test.ts",
+    "test:top-songs:browser": "node scripts/rebuild-top-songs-browser.mjs",
+    "test:performance": "node scripts/rebuild-api-inventory.mjs --check && node --import tsx --test --test-concurrency=1 scripts/rebuild-performance.test.ts scripts/rebuild-personalization-sequence.test.ts scripts/rebuild-catalog-entities-performance.test.ts scripts/rebuild-provider-performance.test.ts scripts/rebuild-prefetch.test.ts scripts/rebuild-media-cache.test.ts scripts/rebuild-redis-cache.test.ts scripts/rebuild-public-reading-redis.test.ts scripts/rebuild-lyric-search-performance.test.ts scripts/rebuild-bloom-preparation.test.ts scripts/rebuild-audio-preparation.test.ts scripts/rebuild-image-cache.test.ts",
+    "benchmark:performance": "node --import tsx scripts/rebuild-personalization-benchmark.ts",
+    "setup:redis": "node scripts/rebuild-upstash-setup.mjs --name sakura-cache --region eu-central-1 --create",
     "test:lyrics": "node --import tsx --test scripts/rebuild-lyrics.test.ts scripts/rebuild-lyrics-interactions.test.ts scripts/rebuild-whisper-sync.test.ts scripts/rebuild-hosted-sync.test.ts scripts/rebuild-lyric-studio.test.ts scripts/rebuild-lyric-publish.test.ts",
     "test:lyrics:browser": "node --import tsx scripts/rebuild-lyrics-interactions-browser.mjs && node scripts/rebuild-auto-sync-browser.mjs",
     "migrate": "node scripts/rebuild-migrate.mjs --apply",
@@ -53,6 +58,7 @@
     "test:performance:browser": "node scripts/rebuild-loading-performance-browser.mjs && node scripts/rebuild-scroll-performance-browser.mjs && node scripts/rebuild-bloom-performance-browser.mjs && node --import tsx scripts/rebuild-loading-offline-browser.mjs"
   },
   "dependencies": {
+    "@upstash/redis": "^1.41.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "es-hangul": "^2.4.0",

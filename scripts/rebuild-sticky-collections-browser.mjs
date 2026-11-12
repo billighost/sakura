@@ -28,7 +28,7 @@ try{
   const settings={theme:'light',audioTechnology:'none',audioQuality:'balanced',privateSession:true,reducedMotion:false,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],volume:.4,shuffle:false,repeat:'off',bloomPerformance:'auto'};
   await context.route('**/api/**',async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
-   if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:Object.fromEntries(tracks.map(track=>[track.id,{liked:true,revision:1}]))}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
    if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
    if(path==='/api/v2/settings'){if(request.method()==='PATCH')Object.assign(settings,request.postDataJSON());return route.fulfill({json:settings});}
    if(path==='/api/v2/library')return route.fulfill({json:{recordings:tracks,tracks,likedRecordingIds:tracks.map(track=>track.id),playlists:[{id:collectionId,name:'Small hours',trackCount:tracks.length}],nextCursor:null}});

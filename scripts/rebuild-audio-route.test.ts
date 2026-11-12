@@ -17,6 +17,7 @@ function handlerModule(path:string,accountRead:()=>Promise<null>){
  const exports:Record<string,Handler>={};let bodyReads=0,serviceReads=0;
  const compiled=ts.transpileModule(readFileSync(path,"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
  const dependency=(name:string)=>{
+  if(name==="@/rebuild/server/performance")return{withApiTiming:async(_route:string,_request:Request,operation:()=>Promise<Response>)=>operation()};
   if(name==="@/rebuild/auth")return{requireRebuildAccount:accountRead};
   if(name==="@/rebuild/server/runtime")return{getRebuildServices(){serviceReads++;throw new Error("An unauthenticated route must not reach recording services");}};
   if(name==="@/rebuild/server/input")return{readResolveInput(){bodyReads++;throw new Error("An unauthenticated route must not read a recording mutation");},isUuid:()=>true};

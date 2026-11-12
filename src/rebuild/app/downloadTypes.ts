@@ -12,6 +12,7 @@ export interface PartialDownloadRecord {
  fingerprint?:DownloadFingerprint;mimeType?:string;error?:string;refreshSource?:boolean;
 }
 export interface DownloadChunk {offset:number;blob:Blob;sha256:string}
+export interface PreparedFullAudio {audio:OfflineAudio;release:()=>void}
 /** Every implementation must atomically publish complete audio and delete its partials. */
 export interface DownloadStorage {
  list():Promise<PartialDownloadRecord[]>;
@@ -27,6 +28,9 @@ export interface DownloadStorage {
  clear(id:string,includeReady?:boolean):Promise<void>;
  /** Check requested flags and delete automatic cache in one transaction. */
  clearAutomatic(id:string):Promise<boolean>;
+ /** Expiring read pins protect a prepared experience from another tab's eviction. */
+ pinAutomatic?(id:string,owner:string,expiresAt:number):Promise<void>;
+ releaseAutomaticPin?(id:string,owner:string):Promise<void>;
  /** Atomic expiring lease is the fallback on browsers without Web Locks. */
  lease(id:string,owner:string,expiresAt:number):Promise<boolean>;
  release(id:string,owner:string):Promise<void>;

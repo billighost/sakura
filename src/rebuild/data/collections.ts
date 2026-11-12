@@ -2,7 +2,6 @@ import { getRebuildPool,inTransaction,inIdempotentTransaction } from "./db";
 import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
 import { ProductError,encodeCursor,ids,integer,object,pageInput,text,uuid } from "./validation";
 import {randomUUID} from "node:crypto";
-import { collectionDate } from "../core/collectionDate";
 import type {PoolClient} from "pg";
 
 export async function listPlaylists(accountId:string,sql:Pick<PoolClient,"query">=getRebuildPool()) {
@@ -63,11 +62,15 @@ export async function setFavorite(accountId:string,value:unknown) {
   const liked=input.liked,operationId=input.operationId===undefined?undefined:uuid(input.operationId,"favorite operation ID"),baseRevision=input.baseRevision===undefined?undefined:integer(input.baseRevision,"favorite base revision",0,Number.MAX_SAFE_INTEGER);
   return inIdempotentTransaction(async client=>{
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[`sakura-v2-history:${accountId}`]);
-    const current=(await client.query(`SELECT EXISTS(SELECT 1 FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid) AS liked`,[accountId,recordingId])).rows[0];
-    const choice=(await client.query(`SELECT revision FROM sakura_v2."FavoriteChoice" WHERE account_id=$1::uuid AND recording_id=$2::uuid`,[accountId,recordingId])).rows[0];
-    const revision=Number(choice?.revision??(current.liked?1:0));
+    const current=(await client.query(`SELECT
+      EXISTS(SELECT 1 FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid) AS liked,
+      (SELECT revision FROM sakura_v2."FavoriteChoice" WHERE account_id=$1::uuid AND recording_id=$2::uuid) AS revision,
+      (SELECT jsonb_build_object('recording_id',recording_id,'liked',liked,'conflict',conflict)
+        FROM sakura_v2."FavoriteOperationReceipt" WHERE account_id=$1::uuid AND operation_id=$3::uuid) AS receipt`,
+      [accountId,recordingId,operationId??null])).rows[0];
+    const revision=Number(current.revision??(current.liked?1:0));
     if(operationId){
-      const previous=(await client.query(`SELECT recording_id,liked,conflict FROM sakura_v2."FavoriteOperationReceipt" WHERE account_id=$1::uuid AND operation_id=$2::uuid`,[accountId,operationId])).rows[0];
+      const previous=current.receipt;
       if(previous){
         if(previous.recording_id!==recordingId||previous.liked!==liked)throw new ProductError(409,"Favorite operation belongs to another choice");
         return {recordingId,liked:Boolean(current.liked),revision,operationId,accepted:true,duplicate:true,conflict:previous.conflict===true};
@@ -120,12 +123,10 @@ export async function getPlaylist(accountId:string,rawId:string) {
   const playlist=(await pool.query(`SELECT id,name,description,cover_url AS "coverUrl",revision,created_at AS "createdAt",updated_at AS "updatedAt"
     FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid`,[accountId,id])).rows[0];
   if(!playlist)throw new ProductError(404,"Playlist not found");
-  const membership=(await pool.query(`SELECT recording_id AS id,added_at AS "addedAt" FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows;
-  const dates=new Map(membership.map(row=>[row.id,collectionDate(row.addedAt)]));
-  const recordings=(await cardsForIds(accountId,membership.map(row=>row.id))).map(recording=>{
-    const addedAt=dates.get(recording.id);
-    return {...recording,...(addedAt?{addedAt}:{})};
-  });
+  const rows=await pool.query(`${CARD_SELECT.replace('FROM sakura_v2."Recording" r',',pr.added_at AS "addedAt" FROM sakura_v2."Recording" r')}
+    JOIN sakura_v2."PlaylistRecording" pr ON pr.recording_id=r.id AND pr.playlist_id=$2::uuid
+    WHERE ${VERIFIED} ORDER BY pr.position`,[accountId,id]);
+  const recordings=rows.rows.map(card);
   const coverUrls=[playlist.coverUrl,...recordings.map(recording=>recording.coverUrl)].filter((url,index,all)=>typeof url==="string"&&url&&all.indexOf(url)===index).slice(0,4);
   return {...playlist,hasCustomCover:Boolean(playlist.coverUrl),coverUrl:coverUrls[0]||null,coverUrls,revision:Number(playlist.revision),recordings,tracks:recordings,trackCount:recordings.length,
     durationMs:recordings.reduce((sum,r)=>sum+(r.durationMs||0),0)};

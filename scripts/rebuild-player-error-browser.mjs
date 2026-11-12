@@ -27,7 +27,7 @@ try{
   await context.route('**/api/**',async route=>{
    const request=route.request(),path=new URL(request.url()).pathname,method=request.method();
    if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
-   if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
    if(path==='/api/v2/settings')return route.fulfill({json:{theme,audioQuality:'data-saver',audioTechnology:'none',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],volume:.3,shuffle:false,repeat:'off'}});
    if(path==='/api/v2/home')return route.fulfill({json:{featured:[track],mixes:[],recent:[]}});
    if(path==='/api/v2/library')return route.fulfill({json:{recordings:[track],playlists:[]}});

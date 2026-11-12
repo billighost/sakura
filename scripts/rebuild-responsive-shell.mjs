@@ -71,7 +71,7 @@ async function openHome(viewport, withTrack = false, openingSeen = true) {
   page.setDefaultTimeout(60_000);
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.route("**/api/v2/profile", (route) =>
+  await page.route("**/api/v2/{profile,bootstrap}", (route) =>
     route.fulfill({
       json: {
         profile: {
@@ -86,6 +86,7 @@ async function openHome(viewport, withTrack = false, openingSeen = true) {
       },
     }),
   );
+  await page.route("**/api/v2/library/state", route => route.fulfill({json:{favoriteStates:{}}}));
   await page.route("**/api/v2/settings", (route) =>
     route.fulfill({
       json: {

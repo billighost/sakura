@@ -91,15 +91,18 @@ export function selectLyricsCandidate(identity: LyricIdentity, candidates: reado
 export function lyricCacheKey(identity: LyricIdentity) {
   const digest = createHash("sha256").update(JSON.stringify({
     title: normalize(identity.title), artist: normalize(identity.artist), album: normalize(identity.album || ""),
-    artists: unique(identity.artists || []).map(normalize).sort(), duration: identity.durationSeconds ?? null, language: identity.language ?? null,
-    alternateTitles: identity.alternateTitles || [], versionLabel: identity.versionLabel || "",
+    artists: unique([identity.artist, ...(identity.artists || [])]).map(normalize).sort(), duration: identity.durationSeconds ?? null, language: identity.language ?? null,
+    alternateTitles: unique(identity.alternateTitles || []).map(normalize).sort(),
+    versionLabel: /^(?:original(?: recording)?|studio(?: recording)?)$/i.test(identity.versionLabel?.trim() || "") ? "" : identity.versionLabel || "",
   })).digest("hex");
   return `lyrics:verified-v3:${identity.recordingId || "adhoc"}:${digest}`;
 }
 
 /** Exact lookup stays fast; every remaining alias/search can independently recover a failed lookup. */
 export async function fetchLrcLibLyrics(identity: LyricIdentity, options: LyricProviderOptions = {}): Promise<LyricMatch> {
-  const transport = createLyricTransport(options, "LRCLib");
+  const searches = new AbortController();
+  const signal = options.signal ? AbortSignal.any([options.signal, searches.signal]) : searches.signal;
+  const transport = createLyricTransport({ ...options, signal }, "LRCLib");
   const variants = lyricIdentityVariants(identity);
   const pairs = unique(variants.titles.slice(0, 4).flatMap(title => variants.artists.slice(0, 8).map(artist => `${title}\0${artist}`))).slice(0, 16).map(value => value.split("\0") as [string, string]);
   const candidates: LrcLibTrack[] = [];
@@ -135,14 +138,32 @@ export async function fetchLrcLibLyrics(identity: LyricIdentity, options: LyricP
     // Provider artist spelling can differ even when its returned metadata verifies.
     ...variants.titles.slice(0, 4).map(title => `https://lrclib.net/api/search?${new URLSearchParams({ track_name: title })}`),
   ]);
-  for (let index = 0; index < urls.length; index++) {
-    const responses = [await load(urls[index])];
-    for (const data of responses) if (Array.isArray(data)) candidates.push(...data as LrcLibTrack[]); else if (data) candidates.push(data as LrcLibTrack);
-    const match = selectLyricsCandidate(identity, candidates);
-    if (match.status === "matched" && (match.track.instrumental||match.track.syncedLyrics&&parseTimedLyrics(match.track.syncedLyrics).some(line=>line.text.trim()))) return match;
-    if (transport.signal.aborted) break;
-  }
-  const selected = selectLyricsCandidate(identity, candidates);
+  // Two searches can independently recover slow aliases. A verified synced
+  // result returns immediately and cancels its sibling, respecting rate limits.
+  const selected = await new Promise<LyricMatch>((resolve, reject) => {
+    let index = 0, remaining = Math.min(2, urls.length), finished = false;
+    const finish = (value: LyricMatch) => { if (finished) return; finished = true; resolve(value); searches.abort(); };
+    if (!remaining) { finish(selectLyricsCandidate(identity, candidates)); return; }
+    const work = async () => {
+      try {
+        while (!finished && index < urls.length && !transport.signal.aborted) {
+          const data = await load(urls[index++]);
+          if (finished) return;
+          if (Array.isArray(data)) candidates.push(...data as LrcLibTrack[]); else if (data) candidates.push(data as LrcLibTrack);
+          const match = selectLyricsCandidate(identity, candidates);
+          if (match.status === "matched" && (match.track.instrumental || match.track.syncedLyrics && parseTimedLyrics(match.track.syncedLyrics).some(line => line.text.trim()))) {
+            finish(match); return;
+          }
+        }
+      } catch (error) {
+        if (!finished && options.signal?.aborted) { finished = true; reject(error); searches.abort(); }
+        else if (!finished) failures.push({ status: "unavailable", reason: "LRCLib search could not be reached" });
+      } finally {
+        if (--remaining === 0 && !finished) finish(selectLyricsCandidate(identity, candidates));
+      }
+    };
+    for (let worker = 0; worker < Math.min(2, urls.length); worker++) void work();
+  });
   // A completed empty request cannot prove absence while another lookup failed.
   if (selected.status === "missing" && failures.length) return {
     status: "unavailable", reason: failures[0].reason,

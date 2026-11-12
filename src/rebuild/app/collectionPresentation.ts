@@ -10,7 +10,7 @@ export interface StoredRoomPresentation extends RoomPresentation { savedAt:numbe
 
 export const DEFAULT_ROOM_PRESENTATION:RoomPresentation={layout:"list",sort:"kept",direction:"asc"};
 const layouts=new Set<RoomLayout>(["list","cards","compact"]);
-const sorts=new Set<RoomSort>(["kept","title","artist","duration","added"]);
+const sorts=new Set<RoomSort>(["kept","title","artist","duration","added","plays","album","recent"]);
 const directions=new Set<RoomSortDirection>(["asc","desc"]);
 const memoryStorage=new Map<string,string>();
 const writes=new Map<string,Promise<void>>();

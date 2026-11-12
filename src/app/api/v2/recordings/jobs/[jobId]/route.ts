@@ -1,9 +1,11 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { after } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { getRebuildServices } from "@/rebuild/server/runtime";
 import { isUuid } from "@/rebuild/server/input";
 export const maxDuration = 120;
 export async function GET(request: Request,context: { params: Promise<{ jobId: string }> }) {
+  return withApiTiming("/api/v2/recordings/jobs/[jobId]", request, async () => {
   try {
     const account = await requireRebuildAccount();
     if (!account) return Response.json({ error: "Unauthorized" },{ status: 401,headers:{"Cache-Control":"private, no-store"} });
@@ -15,4 +17,6 @@ export async function GET(request: Request,context: { params: Promise<{ jobId: s
     if (result.status === "pending") after(() => services.jobs.process(jobId));
     return Response.json(result,{ status: result.status === "pending" ? 202 : result.status === "review" ? 409 : 200,headers: { "Cache-Control": "private, no-store" } });
   } catch { return Response.json({ status: "unavailable",reason: "backend-unavailable",retryable: true },{ status: 503,headers:{"Cache-Control":"private, no-store"} }); }
+
+  });
 }

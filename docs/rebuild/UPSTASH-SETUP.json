@@ -1,0 +1,33 @@
+{
+  "databaseId": "d9263926-dc31-4151-b1b8-692783bc13b0",
+  "databaseName": "sakura-cache",
+  "region": "eu-central-1",
+  "plan": "free",
+  "appOrigin": "https://sakuraplayer.vercel.app",
+  "observedFunctionRegion": "fra1",
+  "environmentFile": ".env.local",
+  "credentialVariables": [
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN"
+  ],
+  "created": true,
+  "connected": true,
+  "pingMs": 2420,
+  "verifiedAt": "2026-11-11T22:20:50.441Z",
+  "deploymentEnvironmentConfigured": true,
+  "deploymentProject": "sakuraplayer",
+  "deploymentEnvironments": [
+    "production",
+    "preview"
+  ],
+  "deploymentVariables": [
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "SAKURA_REDIS_NAMESPACE",
+    "SAKURA_REDIS_TIMEOUT_MS"
+  ],
+  "productionNamespace": "sakura:public:v1",
+  "previewNamespace": "sakura:preview:public:v1",
+  "deploymentEnvironmentVerifiedAt": "2026-11-12T01:13:27.830Z",
+  "applicationDeployed": false
+}

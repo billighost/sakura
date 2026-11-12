@@ -56,33 +56,43 @@ export async function getListeningInsights(accountId:string,timeZone:string,sql?
 }
 async function readListeningInsights(accountId:string,timeZone:string,pool:Queryable) {
   const now=new Date(),firstDay=localCalendarDays(timeZone,now)[0];
-  const days=await pool.query(`SELECT (c.occurred_at AT TIME ZONE $2)::date::text AS date,SUM(c.audible_ms)::text AS "audibleMs"
+  // Independent aggregates share one PostgreSQL round trip and one snapshot.
+  const projection=(await pool.query(`WITH days AS (
+    SELECT (c.occurred_at AT TIME ZONE $2)::date::text AS date,SUM(c.audible_ms)::text AS "audibleMs"
       FROM sakura_v2."ListeningChunk" c WHERE c.account_id=$1::uuid AND
       (c.occurred_at AT TIME ZONE $2)::date>=$3::date
-      GROUP BY 1 ORDER BY 1`,[accountId,timeZone,firstDay]);
-  const hours=await pool.query(`SELECT EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $2)::integer AS hour,
+      GROUP BY 1
+    ), hours AS (
+    SELECT EXTRACT(HOUR FROM c.occurred_at AT TIME ZONE $2)::integer AS hour,
       tags.name,SUM(c.audible_ms::double precision/COALESCE(tags.tag_count,1)) AS "audibleMs"
       FROM sakura_v2."ListeningChunk" c JOIN sakura_v2."ListeningEventLedger" l ON l.account_id=c.account_id AND l.event_id=c.event_id
-      JOIN sakura_v2."Recording" r ON r.id=l.recording_id ${GENRE_JOIN} WHERE c.account_id=$1::uuid AND c.audible_ms>0 AND c.occurred_at IS NOT NULL GROUP BY 1,2`,[accountId,timeZone]);
-  const genreRows=await pool.query(`SELECT tags.name,SUM(s.audible_ms::double precision/COALESCE(tags.tag_count,1)) AS "audibleMs"
+      JOIN sakura_v2."Recording" r ON r.id=l.recording_id ${GENRE_JOIN} WHERE c.account_id=$1::uuid AND c.audible_ms>0 AND c.occurred_at IS NOT NULL GROUP BY 1,2
+    ), genres AS (
+    SELECT tags.name,SUM(s.audible_ms::double precision/COALESCE(tags.tag_count,1)) AS "audibleMs"
       FROM sakura_v2."ListeningRecordingSummary" s JOIN sakura_v2."Recording" r ON r.id=s.recording_id
-      ${GENRE_JOIN} WHERE s.account_id=$1::uuid AND s.audible_ms>0 GROUP BY 1`,[accountId]);
-  const totalRows=await pool.query(`SELECT COUNT(*) FILTER(WHERE l.audible_ms>0)::integer AS events,
+      ${GENRE_JOIN} WHERE s.account_id=$1::uuid AND s.audible_ms>0 GROUP BY 1
+    ), totals AS (
+    SELECT COUNT(*) FILTER(WHERE l.audible_ms>0)::integer AS events,
       COUNT(*) FILTER(WHERE l.finished AND l.audible_ms>0)::integer AS finished,
       COUNT(*) FILTER(WHERE l.finished AND l.completed AND l.audible_ms>0)::integer AS completed,
       COUNT(*) FILTER(WHERE l.finished AND l.skipped AND l.audible_ms>0)::integer AS skipped,
       COUNT(DISTINCT l.recording_id) FILTER(WHERE l.audible_ms>0)::integer AS "uniqueRecordings",
       (SELECT COUNT(DISTINCT (c.occurred_at AT TIME ZONE $2)::date)::integer
         FROM sakura_v2."ListeningChunk" c WHERE c.account_id=$1::uuid AND c.audible_ms>0) AS "activeDays"
-      FROM sakura_v2."ListeningEventLedger" l WHERE l.account_id=$1::uuid`,[accountId,timeZone]);
+      FROM sakura_v2."ListeningEventLedger" l WHERE l.account_id=$1::uuid
+    ) SELECT COALESCE((SELECT jsonb_agg(days ORDER BY date) FROM days),'[]'::jsonb) AS days,
+      COALESCE((SELECT jsonb_agg(hours) FROM hours),'[]'::jsonb) AS hours,
+      COALESCE((SELECT jsonb_agg(genres) FROM genres),'[]'::jsonb) AS genres,
+      (SELECT to_jsonb(totals) FROM totals) AS totals`,[accountId,timeZone,firstDay])).rows[0];
+  const days=projection.days as Array<{date:string;audibleMs:string}>,hours=projection.hours as Array<{hour:number;name:string|null;audibleMs:number}>,genreRows=projection.genres as Array<{name:string|null;audibleMs:number}>;
   const evidenceRows=await getListeningEvidence(accountId,timeZone,pool);
   const taste=await getTaste(accountId,pool);
-  const totals=totalRows.rows[0] as InsightTotals;
-  const base=buildListeningInsights(days.rows.map(row=>({date:row.date,audibleMs:positive(row.audibleMs)})),
-    hours.rows.map(row=>({hour:Number(row.hour),name:row.name,audibleMs:positive(row.audibleMs)})),
-    genreRows.rows.filter(row=>row.name).map(row=>({name:row.name,audibleMs:positive(row.audibleMs)})),totals,timeZone,now);
+  const totals=projection.totals as InsightTotals;
+  const base=buildListeningInsights(days.map(row=>({date:row.date,audibleMs:positive(row.audibleMs)})),
+    hours.map(row=>({hour:Number(row.hour),name:row.name,audibleMs:positive(row.audibleMs)})),
+    genreRows.flatMap(row=>row.name?[{name:row.name,audibleMs:positive(row.audibleMs)}]:[]),totals,timeZone,now);
   const evidence=evidenceRows;
-  const topCards=await cardsForIds(accountId,evidence.filter(row=>row.audibleMs>0).slice(0,8).map(row=>row.recordingId),pool);
+  const topCards=await cardsForIds(accountId,evidence.filter(row=>row.audibleMs>0).slice(0,50).map(row=>row.recordingId),pool);
   const byId=new Map(evidence.map(row=>[row.recordingId,row]));
-  return {...base,untaggedAudibleMs:genreRows.rows.filter(row=>!row.name).reduce((sum,row)=>sum+positive(row.audibleMs),0),topSongs:topCards.map(track=>({...track,audibleMs:byId.get(track.id)?.audibleMs||0,playCount:byId.get(track.id)?.playCount||0})),tasteEvidence:evidence,tasteFeedback:taste.feedback};
+  return {...base,untaggedAudibleMs:genreRows.filter(row=>!row.name).reduce((sum,row)=>sum+positive(row.audibleMs),0),topSongs:topCards.map(track=>({...track,audibleMs:byId.get(track.id)?.audibleMs||0,playCount:byId.get(track.id)?.playCount||0,lastPlayedAt:byId.get(track.id)?.lastPlayedAt||null})),tasteEvidence:evidence,tasteFeedback:taste.feedback};
 }

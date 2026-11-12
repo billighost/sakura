@@ -9,8 +9,10 @@ import type {BloomSnapshot} from "../src/rebuild/bloom/snapshot";
 
 type Stored={account_id:string;recap_id:string;time_zone:string;period_start:string;period_end:string;snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at:Date};
 const stored=new Map<string,Stored>(),timeZones=new Map<string,string>();
+const operations:string[]=[],datedListening=new Map<string,Date[]>();
 const key=(account:string,id:string)=>`${account}|${id}`;
 const query=async(statement:string,args:unknown[]=[])=>{
+ operations.push(statement);
  const result=(rows:unknown[])=>({rows,rowCount:rows.length});
  if(["BEGIN","COMMIT","ROLLBACK"].includes(statement)||statement.includes("pg_advisory_xact_lock"))return result([]);
  const account=String(args[0]),id=String(args[1]);
@@ -23,6 +25,7 @@ const query=async(statement:string,args:unknown[]=[])=>{
   {hour:13,date:"2026-10-10",context:"custom-value",audible_ms:"15000"},
  ]);
  if(statement.includes('FROM sakura_v2."Recording" r'))return result([]);
+ if(statement.includes("FROM unnest("))return result((args[1] as string[]).map((recap_id,index)=>({recap_id,present:(datedListening.get(account)||[]).some(date=>date>=new Date((args[2] as string[])[index])&&date<new Date((args[3] as string[])[index]))})));
  if(statement.includes("SELECT EXISTS("))return result([{present:false}]);
  if(statement.startsWith('INSERT INTO sakura_v2."BloomRecap"')){
   const row:Stored={account_id:account,recap_id:id,time_zone:String(args[2]),period_start:String(args[3]),period_end:String(args[4]),snapshot:JSON.parse(String(args[5])),revealed_chapters:[],completed_at:null,created_at:new Date("2026-11-07T10:00:00Z")};
@@ -37,7 +40,10 @@ const query=async(statement:string,args:unknown[]=[])=>{
  if(statement.includes('FROM sakura_v2."BloomRecap"')){
   const rows=[...stored.values()].filter(row=>row.account_id===account);
   if(statement.includes("recap_id LIKE 'yearly-%'"))return result(rows.filter(row=>row.recap_id.startsWith("yearly-")&&row.completed_at&&(args[1]===null||row.recap_id===`yearly-${args[1]}`)).map(row=>structuredClone(row)));
-  if(statement.includes("recap_id=ANY"))return result(rows.filter(row=>(args[1] as string[]).includes(row.recap_id)).map(row=>({recap_id:row.recap_id,time_zone:row.time_zone,world_id:row.snapshot.worldId,version:String(row.snapshot.version),chapter_count:row.snapshot.chapters.length,completed_at:row.completed_at,experience:row.snapshot.experience,listening:undefined})));
+  if(statement.includes("recap_id=ANY")){
+   const matched=rows.filter(row=>(args[1] as string[]).includes(row.recap_id));
+   return result(statement.includes("jsonb_array_length")?matched.map(row=>({recap_id:row.recap_id,time_zone:row.time_zone,world_id:row.snapshot.worldId,version:String(row.snapshot.version),chapter_count:row.snapshot.chapters.length,completed_at:row.completed_at,experience:row.snapshot.experience,listening:undefined})):matched.map(row=>structuredClone(row)));
+  }
   const row=stored.get(key(account,id));return result(row?[structuredClone(row)]:[]);
  }
  throw new Error(`Unexpected fixture operation: ${statement.slice(0,100)}`);
@@ -55,6 +61,45 @@ function fixture(account:string,recapId=id,version=4){
 }
 
 describe("Bloom service persistence and reveal contracts without network",()=>{
+ it("uses one transaction and the saved timezone for warm preparation and skips duplicate receipt writes",async()=>{
+  fixture("lean");timeZones.set("lean","Invalid/Zone");
+  let start=operations.length;
+  const prepared=await prepareBloom("lean",id,now);
+  let calls=operations.slice(start);
+  assert.equal(prepared.story.timeZone,"Africa/Lagos");
+  assert.equal(calls.filter(statement=>statement==="BEGIN").length,1);
+  assert.equal(calls.filter(statement=>statement.includes('FROM sakura_v2."BloomRecap"')).length,1);
+  assert.equal(calls.some(statement=>statement.includes('FROM sakura_v2."AccountPreferences"')),false);
+  await revealBloom("lean",id,"listening-time",now);
+  start=operations.length;
+  const repeated=await revealBloom("lean",id,"listening-time",now);
+  calls=operations.slice(start);
+  assert.equal(repeated.chapters[0].revealed,true);
+  assert.equal(calls.filter(statement=>statement==="BEGIN").length,1);
+  assert.equal(calls.some(statement=>statement.startsWith('UPDATE sakura_v2."BloomRecap"')),false);
+  await revealBloom("lean",id,"song-count",now);
+  const completed=await completeBloom("lean",id,now);
+  start=operations.length;
+  assert.deepEqual(await completeBloom("lean",id,new Date("2026-11-08T12:00:00Z")),completed);
+  assert.equal(operations.slice(start).some(statement=>statement.startsWith('UPDATE sakura_v2."BloomRecap"')),false);
+ });
+ it("batches unsaved shelf checks with each period's actual local dates and batches gallery recap reads",async()=>{
+  const account="batch",at=new Date("2026-11-02T12:00:00Z");
+  timeZones.set(account,"Pacific/Honolulu");
+  datedListening.set(account,[new Date("2026-10-28T12:00:00Z")]);
+  let start=operations.length;
+  const shelf=await listBloomShelf(account,at);
+  const calls=operations.slice(start);
+  assert.equal(calls.filter(statement=>statement.includes("FROM unnest(")).length,1);
+  assert.equal(shelf.items.find(item=>item.id==="weekly-2026-10-26")?.status,"available");
+  assert.equal(shelf.items.find(item=>item.id==="monthly-2026-10")?.status,"available");
+  assert.equal(shelf.items.find(item=>item.id==="yearly-2025")?.status,"empty");
+  assert.equal(shelf.items.find(item=>item.id==="monthly-2026-11")?.status,"locked");
+  start=operations.length;
+  await listBloom(account,"monthly",at);
+  assert.equal(operations.slice(start).filter(statement=>statement.includes('FROM sakura_v2."BloomRecap"')).length,1);
+  assert.equal(stored.has(key(account,"monthly-2026-10")),false,"Browsing cannot freeze a new snapshot before late listening sync");
+ });
  it("stages immutable story facts without revealing, completing, or exposing them in the normal view",async()=>{
   const saved=fixture("prepare");const before=await getBloom("prepare",id,now);
   const prepared=await prepareBloom("prepare",id,now);

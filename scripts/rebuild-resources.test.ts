@@ -7,6 +7,12 @@ import {responseIssue,userMessage,UserFacingError} from "../src/rebuild/app/erro
 import {settingsFields} from "../src/rebuild/app/preferences";
 import {preferencesPatch,DEFAULT_SETTINGS} from "../src/rebuild/data/validation";
 import {canonicalResourcePath,durableCatalogResource,resourceIsFresh} from "../src/rebuild/app/resourcePolicy";
+import {readFileSync} from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+import * as react from "react";
+import * as errors from "../src/rebuild/app/errors";
+import * as policy from "../src/rebuild/app/resourcePolicy";
 
 test("catalog identities outlive a time limit while evolving personal resources refresh",()=>{
  const stamp=1700000000000,monthLater=stamp+31*86400000;
@@ -70,6 +76,38 @@ test("expired recaps discard cached data and keep their own recovery issue",asyn
  assert.match(snapshot.error.issue.title,/season has passed/);
  userMessage(new UserFacingError(responseIssue(503,null,"download")),"download");
  assert.match(resourceSnapshot(account,path).error!.issue.title,/season has passed/);clearResources(account);
+});
+
+test("unavailable and session responses stay authoritative when deleting their saved response fails",async t=>{
+ const disk=new Map<string,unknown>(),markers=new Map<string,string>();
+ let deletionGate:Promise<void>=Promise.resolve(),deletionStarted=()=>{};
+ const exports={},context=vm.createContext({module:{exports},exports,Date,AbortController,DOMException,
+  localStorage:{getItem:(key:string)=>markers.get(key)||null,setItem:(key:string,value:string)=>markers.set(key,value)},
+  require(name:string){if(name==="react")return react;if(name==="./errors")return errors;if(name==="./resourcePolicy")return policy;if(name==="./offline")return {
+   localRead:async(account:string,name:string)=>disk.get(account+":"+name),
+   localWrite:async(account:string,name:string,value:unknown)=>{disk.set(account+":"+name,value);},
+   localDelete:async()=>{deletionStarted();await deletionGate;throw new DOMException("Deletion denied","SecurityError");},
+  };throw new Error("Unexpected fixture dependency: "+name);},
+ });
+ const code=ts.transpileModule(readFileSync(new URL("../src/rebuild/app/resources.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInContext(code,context);
+ const api=vm.runInContext("module.exports",context) as {loadResource:typeof loadResource;resourceSnapshot:typeof resourceSnapshot;clearResources:typeof clearResources};
+ let status=200;t.mock.method(globalThis,"fetch",async()=>Response.json(status===200?{private:"saved story"}:{error:"Unavailable"},{status}));
+ for(const terminalStatus of [404,410,401]){
+  const account="resource-delete-failure-"+terminalStatus,path="/api/v2/bloom/story";
+  status=200;await api.loadResource(account,path);
+  let releaseDeletion!:()=>void;deletionGate=new Promise(resolve=>releaseDeletion=resolve);
+  const started=new Promise<void>(resolve=>deletionStarted=resolve);
+  status=terminalStatus;const pending=api.loadResource(account,path,true);await started;
+  const revoked=api.resourceSnapshot(account,path);assert.equal(revoked.data,undefined);assert.equal(revoked.error?.status,terminalStatus);
+  releaseDeletion();await assert.doesNotReject(pending);
+  assert.ok(disk.has(account+":resource:"+path),"The simulated disk deletion failed");
+  // A navigation after its in-memory entry was cleared still rejects the old
+  // persisted response, even while the origin cannot supply a replacement.
+  api.clearResources(account);status=503;await api.loadResource(account,path);
+  assert.equal(api.resourceSnapshot(account,path).data,undefined,"Revoked saved data must not reappear after a transient origin failure");
+  api.clearResources(account);
+ }
 });
 test("clearing an account prevents a late response from repopulating its cache",async t=>{
  const account="resource-account-clear",path="/api/v2/private";let release!:(response:Response)=>void,started!:()=>void;

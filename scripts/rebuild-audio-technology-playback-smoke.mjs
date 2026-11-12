@@ -40,7 +40,7 @@ async function createCase(initialMode='none'){
  await page.route('**/api/**',route=>{
   const path=new URL(route.request().url()).pathname;apiRequests.push({path,method:route.request().method(),account:current});
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return serveAudio(route);
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:accounts[current],stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:accounts[current],stats:{},topArtists:[]}});
   if(path==='/api/v2/settings'){
    if(route.request().method()==='PATCH'){const body=route.request().postDataJSON();patches.push({account:current,accountHeader:route.request().headers()['x-sakura-account'],body});if(body.audioTechnology)modes[current]=body.audioTechnology;}
    return route.fulfill({json:{theme:'light',audioTechnology:modes[current],audioQuality:'high',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4}});
@@ -77,7 +77,7 @@ try{
   report.cases.push({name:'Volume and mute apply after processing',passed:true,quiet:s,muted});
   await fixture.select('none');await fixture.page.locator('a[href="/home"]').first().click();await fixture.page.getByRole('button',{name:'Find my soundtrack',exact:true}).click();await fixture.page.getByRole('button',{name:'Next song',exact:true}).first().click();await expect.poll(async()=>(await fixture.snapshot()).src).toContain(tracks[1].readyPlayback.fallbackUrl);s=await fixture.expectAudible();assert.equal(s.contexts,1);assert.equal(s.mediaError,null);
   report.cases.push({name:'Next song remains safe after engine initialization',passed:true,snapshot:s});
-  await fixture.navigateSettings();await fixture.select('warmth');fixture.setAccount('B');await fixture.page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>fixture.apiRequests.filter(item=>item.path==='/api/v2/profile'&&item.account==='B').length).toBeGreaterThan(0);await expect(fixture.page.locator('input[type="radio"][value="none"]')).toBeChecked();s=await fixture.snapshot();assert.ok(s.paused);assert.equal(fixture.patches.filter(item=>item.account==='B').length,0,'A settings never PATCH into B');
+  await fixture.navigateSettings();await fixture.select('warmth');fixture.setAccount('B');await fixture.page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>fixture.apiRequests.filter(item=>(item.path==='/api/v2/bootstrap'||item.path==='/api/v2/profile')&&item.account==='B').length).toBeGreaterThan(0);await expect(fixture.page.locator('input[type="radio"][value="none"]')).toBeChecked();s=await fixture.snapshot();assert.ok(s.paused);assert.equal(fixture.patches.filter(item=>item.account==='B').length,0,'A settings never PATCH into B');
   report.cases.push({name:'Account switch pauses and restores B bypass without A patches',passed:true,snapshot:s});
   assert.deepEqual(fixture.errors,[]);assert.ok(fixture.patches.every(item=>item.accountHeader===accounts[item.account].id));assert.equal(fixture.apiRequests.filter(item=>item.path.includes('/resolve')).length,0,'ready pointers bypass resolver');
   report.accountPatches=fixture.patches;report.mediaRequests=fixture.mediaRequests;report.pageErrors=fixture.errors;

@@ -6,6 +6,8 @@ import { readMetadataJson, SpotifyCatalogProvider, spotifyCatalogTrack } from ".
 import { assessAudioCandidate } from "../core/matching";
 import { groupArtistCards } from "../data/artistSelection";
 import type { ProviderReference } from "../core/types";
+import { ProviderFlight } from "./provider-flight";
+import {getSharedPublicCache,setSharedPublicCache,publicCatalogMetadata} from "./redisCache";
 
 type Row = Record<string, unknown>;
 export type CatalogSearchKind = "tracks" | "artists" | "albums";
@@ -37,19 +39,43 @@ export function catalogTrack(raw: unknown): CatalogRecording | null {
 
 export class DeezerCatalogService {
   private cache = new Map<string, { expires: number; value: unknown }>();
-  constructor(private readonly fetcher: typeof fetch = fetch,private readonly spotify?:SpotifyCatalogProvider) {}
+  private readonly reads = new ProviderFlight<unknown>();
+  private readonly sharedCacheEnabled:boolean;
+  constructor(private readonly fetcher: typeof fetch = fetch,private readonly spotify?:SpotifyCatalogProvider) {
+    // Injected transports serve fixtures/private test environments; they must
+    // never publish synthetic data to a configured production Redis cache.
+    this.sharedCacheEnabled=fetcher===fetch;
+  }
   private async get(path: string, signal?: AbortSignal): Promise<unknown> {
+    signal?.throwIfAborted();
     const cached = this.cache.get(path);
     if (cached && cached.expires > Date.now()) return structuredClone(cached.value);
-    const response = await fetchAudioHeaders(`https://api.deezer.com${path}`, { signal, headerTimeoutMs: 6000, headers: { "User-Agent": "Sakura/2.0 (https://github.com/billighost/sakura)" } }, this.fetcher);
-    if (!response.ok) { await response.body?.cancel(); throw new Error("Catalogue provider is unavailable"); }
-    const value = await readMetadataJson(response);
-    if (row(value).error) throw new Error("Catalogue provider returned an error");
-    if (this.cache.size >= 400) this.cache.delete(this.cache.keys().next().value!);
-    this.cache.set(path, { value: structuredClone(value), expires: Date.now() + 5 * 60 * 1000 });
-    return value;
+    if(cached)this.cache.delete(path);
+    const value=await this.reads.run(path,signal,async sharedSignal=>{
+      const shared=this.sharedCacheEnabled?await getSharedPublicCache<unknown>("provider_deezer",`metadata:${path}`):undefined;
+      sharedSignal.throwIfAborted();
+      if(shared&&typeof shared==="object"&&!Array.isArray(shared)&&!row(shared).error){
+        if(this.cache.size>=400)this.cache.delete(this.cache.keys().next().value!);
+        // A short L1 lease avoids extending a nearly expired shared entry by
+        // another full five minutes on each newly started server instance.
+        this.cache.set(path,{value:structuredClone(shared),expires:Date.now()+30000});
+        return shared;
+      }
+      const response = await fetchAudioHeaders(`https://api.deezer.com${path}`, { signal:sharedSignal, headerTimeoutMs: 6000, headers: { "User-Agent": "Sakura/2.0 (https://github.com/billighost/sakura)" } }, this.fetcher);
+      if (!response.ok) { await response.body?.cancel(); throw new Error("Catalogue provider is unavailable"); }
+      const result = await readMetadataJson(response);
+      sharedSignal.throwIfAborted();
+      if (row(result).error) throw new Error("Catalogue provider returned an error");
+      if (this.cache.size >= 400) this.cache.delete(this.cache.keys().next().value!);
+      this.cache.set(path, { value: structuredClone(result), expires: Date.now() + 5 * 60 * 1000 });
+      if(this.sharedCacheEnabled)await setSharedPublicCache("provider_deezer",`metadata:${path}`,publicCatalogMetadata(result),300);
+      sharedSignal.throwIfAborted();
+      return result;
+    });
+    return structuredClone(value);
   }
   async search(query: string, signal?: AbortSignal, page: CatalogSearchPage = {}) {
+    signal?.throwIfAborted();
     const clean = query.trim().slice(0, 200);
     const cursor=Number.isInteger(page.cursor)&&Number(page.cursor)>=0&&Number(page.cursor)<=MAX_SEARCH_PAGE?Number(page.cursor):0;
     const requested=page.kind?[page.kind] as CatalogSearchKind[]:["tracks","artists","albums"] as CatalogSearchKind[];
@@ -67,6 +93,7 @@ export class DeezerCatalogService {
       requested.includes("albums")?this.get(deezerPath("albums"), signal):Promise.resolve(null),
       this.spotify?this.spotify.getMetadata(`/search?q=${encodeURIComponent(clean)}&type=${spotifyTypes}&limit=${spotifyLimit}&offset=${spotifyOffset}`,signal):Promise.resolve(null),
     ]);
+    signal?.throwIfAborted();
     const payload=(index:number)=>results[index].status==="fulfilled"?row(results[index].value):{};
     const data = (index: number) => Array.isArray(payload(index).data) ? payload(index).data as unknown[] : [];
     const spotify=results[3].status==="fulfilled"?row(results[3].value):{};
@@ -95,16 +122,20 @@ export class DeezerCatalogService {
     return {query:clean,tracks,artists:groupArtistCards(artists),albums,totals,nextCursors};
   }
   async detail(kind: "artist" | "album" | "playlist", id: string, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     if(id.startsWith("spotify:"))return this.spotifyDetail(kind,id.slice(8),signal);
     if(id.startsWith("deezer:"))id=id.slice(7);
     if (!/^[1-9]\d{0,17}$/.test(id)) throw new Error("Invalid catalogue ID");
-    const entity = row(await this.get(`/${kind}/${id}`, signal));
-    const tracksPayload = kind === "artist" ? await this.get(`/artist/${id}/top?limit=50`, signal) : entity.tracks;
+    const [entityPayload,artistTracks,artistAlbums]=kind==="artist"?await Promise.all([
+      this.get(`/artist/${id}`,signal),this.get(`/artist/${id}/top?limit=50`,signal),this.get(`/artist/${id}/albums?limit=24`,signal),
+    ]):[await this.get(`/${kind}/${id}`,signal),undefined,undefined];
+    const entity = row(entityPayload);
+    const tracksPayload = kind === "artist" ? artistTracks : entity.tracks;
     const tracks = (Array.isArray(row(tracksPayload).data) ? row(tracksPayload).data as unknown[] : []).map((raw) => {
       const item = row(raw);
       return catalogTrack(kind === "album" ? { ...item, album: { id: entity.id, title: entity.title, cover_xl: entity.cover_xl, cover_big: entity.cover_big }, artist: item.artist ?? entity.artist } : item);
     }).filter((track): track is CatalogRecording => !!track);
-    const albums = kind === "artist" ? row(await this.get(`/artist/${id}/albums?limit=24`, signal)).data : undefined;
+    const albums = kind === "artist" ? row(artistAlbums).data : undefined;
     return { kind, reference: { provider: "deezer", id }, title: String(entity.name ?? entity.title ?? ""), name: String(entity.name ?? entity.title ?? ""),
       imageUrl: artwork(entity.picture_xl ?? entity.picture_big ?? entity.cover_xl ?? entity.cover_big ?? entity.picture_medium), coverUrl: artwork(entity.cover_xl ?? entity.cover_big ?? entity.picture_xl ?? entity.picture_big),
       description: typeof entity.description === "string" ? entity.description : "", artist: row(entity.artist).name ? String(row(entity.artist).name) : undefined,
@@ -117,6 +148,7 @@ export class DeezerCatalogService {
     const provider=this.spotify,entity=row(await provider.getMetadata(`/${kind}s/${id}`,signal));
     if(!entity.id)throw new Error("Spotify collection was not found.");
     const optional=kind==="artist"?await Promise.allSettled([provider.getMetadata(`/artists/${id}/top-tracks?market=NG`,signal),provider.getMetadata(`/artists/${id}/albums?include_groups=album,single&limit=10`,signal)]):[];
+    signal?.throwIfAborted();
     const trackData=kind==="artist"?row(optional[0].status==="fulfilled"?optional[0].value:null).tracks:row(entity.tracks).items;
     const tracks=(Array.isArray(trackData)?trackData:[]).flatMap(raw=>{
       try{return[spotifyCatalogTrack(kind==="album"?{...row(raw),album:entity}:raw)];}catch{return[];}
@@ -127,6 +159,7 @@ export class DeezerCatalogService {
     if(kind==="album"&&typeof artist.id==="string"){
       try{const fullArtist=row(await provider.getMetadata(`/artists/${artist.id}`,signal));artistImageUrl=artwork(row(Array.isArray(fullArtist.images)?fullArtist.images[0]:null).url);}catch{/* Core album remains useful when optional artist enrichment fails. */}
     }
+    signal?.throwIfAborted();
     const imageUrl=artwork(row(Array.isArray(entity.images)?entity.images[0]:null).url);
     return {kind,reference:{provider:"spotify",id},title:String(entity.name??""),name:String(entity.name??""),imageUrl,coverUrl:imageUrl,description:"",artist:typeof artist.name==="string"?artist.name:undefined,
       artistReference:typeof artist.id==="string"?{provider:"spotify",id:artist.id}:undefined,releaseDate:typeof entity.release_date==="string"?entity.release_date:undefined,

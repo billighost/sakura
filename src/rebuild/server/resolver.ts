@@ -4,6 +4,7 @@ import type { CanonicalRecording, RecordingMetadata, ProviderReference, Recordin
 import type { CatalogProvider, CatalogRecording, RecordingRepository, ResolveRecordingInput, ResolveRecordingResult, ReviewCandidate, StoredAudioAsset } from "./contracts";
 import { supportedAudioMime } from "./input";
 import { CatalogMetadataAliases,withVerifiedCatalogAliases } from "./metadata-aliases";
+import { rememberResolvedAsset } from "./resolved-asset";
 
 function reviewCandidate(metadata: RecordingMetadata, reasons: readonly string[], extras: { reference?: ProviderReference; assetId?: string } = {}): ReviewCandidate {
   return { title: metadata.title, artists: metadata.artists, durationMs: metadata.durationMs ?? null, reasons, ...extras };
@@ -80,8 +81,8 @@ export class RecordingResolver {
     const selected = assets.find((asset) => asset.candidate.candidateId === selection.candidate.candidateId)!;
     const gatewayUrl=`/api/v2/recordings/${encodeURIComponent(recording.recordingId)}/audio?assetId=${encodeURIComponent(selected.assetId)}`;
     const playbackUrl=this.directPlaybackUrl?.(selected)??gatewayUrl;
-    return { status: "resolved", recording,
+    return rememberResolvedAsset({ status: "resolved", recording,
       playback: { kind: "stream", assetId: selected.assetId, url:playbackUrl,...(playbackUrl!==gatewayUrl?{fallbackUrl:gatewayUrl}:{}),
-        mimeType: selected.mimeType, sizeBytes: selected.sizeBytes, durationMs: recording.metadata.durationMs ?? null,...(selected.sha256?{sha256:selected.sha256}:{}),...(selected.locator.kind==="https"?{delivery:"cdn" as const}:{}) } };
+        mimeType: selected.mimeType, sizeBytes: selected.sizeBytes, durationMs: recording.metadata.durationMs ?? null,...(selected.sha256?{sha256:selected.sha256}:{}),...(selected.locator.kind==="https"?{delivery:"cdn" as const}:{}) } }, selected);
   }
 }

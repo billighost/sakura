@@ -8,6 +8,7 @@ import { canAutoSync } from "../src/rebuild/lyrics/autoSync";
 import { LyricAlignmentError, WHISPER_SYNC_ENGINE } from "../src/rebuild/lyrics/whisperSync";
 import { ProductError, uuid } from "../src/rebuild/data/validation";
 import type { TimedLyric } from "../src/rebuild/lyrics/parse";
+import { recordingLyricIdentity } from "../src/rebuild/lyrics/recordingIdentity";
 
 const secret = "test-only-hosted-sync-signing-key-32-bytes";
 const accountId = "11111111-1111-4111-8111-111111111111";
@@ -218,11 +219,13 @@ function routeFixture(options: RouteFixtureOptions = {}) {
   const exports: { POST?: (request: Request) => Promise<Response> } = {};
   const compiled = ts.transpileModule(readFileSync("src/app/api/v2/lyrics/sync/route.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const dependency = (name: string) => {
+    if (name === "@/rebuild/server/performance") return { withApiTiming: async (_route: string, _request: Request, operation: () => Promise<Response>) => operation() };
     if (name === "next/server") return { NextResponse: { json: Response.json } };
     if (name === "@/rebuild/auth") return { requireRebuildAccount: async () => options.account === undefined ? { id: accountId } : options.account };
     if (name === "@/rebuild/data/catalog") return { cardsForIds: async (...args: unknown[]) => { calls.push({ kind: "cards", args }); return options.track === null ? [] : [options.track || defaultTrack]; } };
     if (name === "@/rebuild/data/validation") return { ProductError, uuid };
     if (name === "@/rebuild/lyrics/autoSync") return { canAutoSync };
+    if (name === "@/rebuild/lyrics/recordingIdentity") return { recordingLyricIdentity };
     if (name === "@/rebuild/lyrics/whisperSync") return { LyricAlignmentError };
     if (name === "@/rebuild/lyrics/service") return { resolveVerifiedLyrics: async (...args: unknown[]) => { calls.push({ kind: "lyrics", args }); return { status: "matched", track: { plainLyrics: options.plain ?? source.map(line => line.text).join("\n"), instrumental: options.instrumental || false } }; } };
     if (name === "@/rebuild/lyrics/hostedSync") return { HostedSyncError, createHostedSync: () => ({

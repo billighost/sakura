@@ -18,7 +18,7 @@ await page.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');}
 await page.route('**/api/**',route=>{
  const path=new URL(route.request().url()).pathname;
  if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
- if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+ if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account}});
  if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,reducedMotion:true,onboarded:true,seedArtists:[],seedGenres:[],revision:7}});
  if(path==='/api/v2/library')return route.fulfill({json:{recordings:[]}});
  if(path==='/api/v2/bloom/'+id){detailRequests++;return expired?route.fulfill({status:410,json:{error:'This Bloom window has closed'}}):route.fulfill({json:recap});}

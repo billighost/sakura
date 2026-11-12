@@ -1,15 +1,18 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { getRebuildPool } from "@/rebuild/data/db";
 import { parseTimedLyrics } from "@/rebuild/lyrics/parse";
 import { resolveVerifiedLyrics } from "@/rebuild/lyrics/service";
+import { recordingLyricIdentity } from "@/rebuild/lyrics/recordingIdentity";
 import { parseShareInput, ShareInputError, verifyLyricSelection } from "@/rebuild/player/shareInput";
 import { getRebuildServices } from "@/rebuild/server/runtime";
 import { sameRequestOrigin } from "@/rebuild/requestOrigin";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function POST(request: NextRequest) {
+  return withApiTiming("/api/v2/shares", request, async () => {
   try {
     if (!sameRequestOrigin(request)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
     const account = await requireRebuildAccount();
@@ -37,8 +40,8 @@ export async function POST(request: NextRequest) {
     const albumTitle = typeof metadata.albumTitle === "string" ? metadata.albumTitle : typeof recording.provenance?.catalog?.albumTitle === "string" ? recording.provenance.catalog.albumTitle : null;
     let lines = input.kind === "lyric" ? input.lines : [];
     if (input.kind === "lyric") {
-      const resolved = await resolveVerifiedLyrics({ recordingId: recording.id, title, artist: artists[0] || "", album: albumTitle || undefined, durationSeconds: typeof metadata.durationMs === "number" ? metadata.durationMs / 1000 : undefined,
-        language: lines.some((line) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) ? "ja" : undefined });
+      const resolved = await resolveVerifiedLyrics(recordingLyricIdentity({ id: recording.id, metadata, title, artists, albumTitle,
+        language: typeof metadata.language === "string" ? metadata.language : lines.some((line) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) ? "ja" : undefined }));
       if (resolved.status !== "matched") return NextResponse.json({ error: "These lyrics could not be verified for this recording." }, { status: 409 });
       const source = resolved.track.syncedLyrics ? parseTimedLyrics(resolved.track.syncedLyrics) : (resolved.track.plainLyrics || "").split(/\r?\n/).map((text) => ({ text, start: 0 }));
       if (!verifyLyricSelection(lines, source)) return NextResponse.json({ error: "Choose neighbouring lines from this recording's current lyrics." }, { status: 409 });
@@ -55,4 +58,6 @@ export async function POST(request: NextRequest) {
     console.error("[v2/shares] create failed", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Your share could not be saved. Please try again." }, { status: 503 });
   }
+
+  });
 }

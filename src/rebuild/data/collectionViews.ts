@@ -2,9 +2,9 @@ import { getRebuildPool, inTransaction } from "./db";
 import { object, ProductError, text } from "./validation";
 
 const layouts=new Set(["list","cards","compact"]);
-const sorts=new Set(["kept","title","artist","duration","added"]);
+const sorts=new Set(["kept","title","artist","duration","added","plays","album","recent"]);
 const directions=new Set(["asc","desc"]);
-export interface CollectionView {layout:"list"|"cards"|"compact";sort:"kept"|"title"|"artist"|"duration"|"added";direction:"asc"|"desc";updatedAt:string}
+export interface CollectionView {layout:"list"|"cards"|"compact";sort:"kept"|"title"|"artist"|"duration"|"added"|"plays"|"album"|"recent";direction:"asc"|"desc";updatedAt:string}
 
 export function collectionRoom(value:unknown){return text(value,"collection room",180);}
 export function collectionView(value:unknown):Omit<CollectionView,"updatedAt"> {

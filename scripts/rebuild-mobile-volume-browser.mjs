@@ -50,7 +50,7 @@ try{
  await context.route('**/api/**',route=>{
   const path=new URL(route.request().url()).pathname;
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return audio(route);
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account}});
   if(path==='/api/v2/settings'){if(route.request().method()==='PATCH'){const body=route.request().postDataJSON();patches.push(body);Object.assign(settings,body);}return route.fulfill({json:settings});}
   if(path==='/api/v2/home')return route.fulfill({json:{featured:tracks,mixes:[],recent:[],needsOnboarding:false}});
   if(path==='/api/v2/listening-session'){if(route.request().method()==='PUT'){const data=route.request().postDataJSON();if((session?.revision||0)!==data.revision)return route.fulfill({json:{accepted:false,session,serverTime:Date.now()}});session={state:data.state,revision:data.revision+1,deviceId:data.deviceId,updatedAt:Date.now()};return route.fulfill({json:{accepted:true,session,serverTime:Date.now()}});}return route.fulfill({json:{session,serverTime:Date.now()}});}

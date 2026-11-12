@@ -4,12 +4,22 @@ export type BloomPeriod = "weekly" | "monthly" | "yearly";
 export type BloomStatus = "locked" | "available" | "expired" | "empty";
 export const DEFAULT_BLOOM_TIME_ZONE = "Africa/Lagos";
 const DAY = 86400000;
+const formatters=new Map<string,Intl.DateTimeFormat>();
+function formatter(timeZone:string){
+  const cached=formatters.get(timeZone);
+  if(cached){formatters.delete(timeZone);formatters.set(timeZone,cached);return cached;}
+  const created=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  formatters.set(timeZone,created);
+  // Account supplied zones must not grow a long-lived server/browser cache.
+  if(formatters.size>64)formatters.delete(formatters.keys().next().value!);
+  return created;
+}
 export function validTimeZone(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 80) return false;
-  try { new Intl.DateTimeFormat("en", {timeZone:value}).format(0); return true; } catch { return false; }
+  try { formatter(value).format(0); return true; } catch { return false; }
 }
 function parts(value:Date, timeZone:string) {
-  const entries=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(value);
+  const entries=formatter(timeZone).formatToParts(value);
   const values=Object.fromEntries(entries.filter(p=>p.type!=="literal").map(p=>[p.type,Number(p.value)]));
   return {year:values.year,month:values.month,day:values.day,hour:values.hour,minute:values.minute,second:values.second};
 }

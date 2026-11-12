@@ -66,3 +66,8 @@ test-mb.js
 /test-results/
 /playwright-report/
 /.mesh/*.db
+
+# local verification output
+/.download-verification.log
+/.hosted-sync-verification.log
+/.performance-full-test.log

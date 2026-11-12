@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { after } from "next/server";
 import { InputError } from "@/rebuild/server/contracts";
@@ -7,6 +8,7 @@ import { getRebuildServices } from "@/rebuild/server/runtime";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  return withApiTiming("/api/v2/recordings/resolve", request, async () => {
   try {
     const account = await requireRebuildAccount();
     if (!account) return Response.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
@@ -22,4 +24,6 @@ export async function POST(request: Request) {
     if (request.signal.aborted) return new Response(null, { status: 499 });
     return Response.json({ status: "unavailable", reason: "backend-unavailable", retryable: true }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
   }
+
+  });
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import {useCallback,useEffect,useRef,useState} from "react";
-import {musicTrack,type MusicTrack} from "./types";
-import {requestJson} from "./errors";
+import {musicTrack,type MusicTrack,type UserSettings} from "./types";
+import {recommendationJson} from "./recommendationTransport";
+import {feedViewKey} from "./feedIdentity";
 import {HERO_REFRESH_MS} from "../recommendations/hero";
 import {clearRecommendationCache,readRecommendationCache,recommendationCacheValid,recommendationCacheVersion,writeRecommendationCache} from "./recommendationCache";
 
@@ -17,6 +18,26 @@ function parseHero(raw:Record<string,unknown>):HeroState {
   lane:(["familiar","similar","explore","fresh"].includes(String(value.lane))?value.lane:"similar") as HeroRecommendation["lane"]}:null;
  const now=Date.now(),at=Number(raw.refreshAt);
  return {item,ready:true,refreshAt:Number.isFinite(at)?Math.max(now+1000,Math.min(now+HERO_REFRESH_MS,at)):now+HERO_REFRESH_MS};
+}
+
+/** Warm the hero's existing account/taste cache, independently of feed pages. */
+export async function prefetchHeroRecommendation(accountId:string,surface:"home"|"discover",settings:UserSettings,signal:AbortSignal,mode:"balanced"|"familiar"|"explore"="balanced"){
+ signal.throwIfAborted();
+ if(typeof navigator!=="undefined"&&navigator.onLine===false)return;
+ const cacheKey=feedViewKey(accountId,surface,mode,settings),version=recommendationCacheVersion(accountId),present=visitedHeroes.get(cacheKey);
+ if(present&&recommendationCacheValid(accountId,present.savedAt)&&present.state.refreshAt>Date.now())return;
+ const saved=await readRecommendationCache<HeroState>(accountId,"hero:"+cacheKey);
+ signal.throwIfAborted();
+ if(saved?.data.ready&&saved.data.refreshAt>Date.now()){
+  if(recommendationCacheVersion(accountId)===version)visitedHeroes.set(cacheKey,{state:saved.data,savedAt:saved.savedAt});
+  return;
+ }
+ const raw=await recommendationJson(accountId,"/api/v2/feed/hero?"+new URLSearchParams({surface,mode}),signal,{identity:cacheKey});
+ signal.throwIfAborted();
+ if(recommendationCacheVersion(accountId)!==version)return;
+ const state=parseHero(raw);visitedHeroes.set(cacheKey,{state,savedAt:Math.max(Date.now(),version+1)});
+ while(visitedHeroes.size>8)visitedHeroes.delete(visitedHeroes.keys().next().value!);
+ await writeRecommendationCache(accountId,"hero:"+cacheKey,state,version);
 }
 
 /** Refresh only the hero, preserving the listener's feed order and scroll position. */
@@ -37,7 +58,7 @@ export function useHeroRecommendation({accountId,cacheKey,surface,mode,hold}:{
    if(!force&&stateRef.current.refreshAt>Date.now()){schedule(stateRef.current.refreshAt);return;}
    const controller=new AbortController(),cacheVersion=recommendationCacheVersion(accountId);request.current=controller;
    try{
-    const raw=await requestJson<Record<string,unknown>>("/api/v2/feed/hero?"+new URLSearchParams({surface,mode}),{signal:controller.signal},{accountId,context:"page"});
+    const raw=await recommendationJson(accountId,"/api/v2/feed/hero?"+new URLSearchParams({surface,mode}),controller.signal,{identity:cacheKey,force});
     if(!active||controller.signal.aborted||recommendationCacheVersion(accountId)!==cacheVersion)return;
     const next=parseHero(raw);visitedHeroes.set(cacheKey,{state:next,savedAt:Math.max(Date.now(),cacheVersion+1)});
     void writeRecommendationCache(accountId,"hero:"+cacheKey,next,cacheVersion);

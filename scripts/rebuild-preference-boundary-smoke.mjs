@@ -6,7 +6,7 @@ const accounts={A:{id:'90000000-0000-4000-8000-000000000011',username:'review_a'
 const fixture=JSON.parse(await readFile('.local/rebuild-test-account.json','utf8'));await context.addCookies(fixture.cookie.split('; ').map(value=>{const i=value.indexOf('=');return{name:value.slice(0,i),value:value.slice(i+1),url:'http://127.0.0.1:3002'};}));
 await page.addInitScript(()=>sessionStorage.setItem('sakura-ink-opening','1'));
 await page.route('**/api/**',route=>{const path=new URL(route.request().url()).pathname;
- if(path==='/api/v2/profile'){profileReads.push(current);return route.fulfill({json:{profile:accounts[current]}});}
+ if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile')){profileReads.push(current);return route.fulfill({json:{profile:accounts[current]}});}
  if(path==='/api/v2/settings'){if(route.request().method()==='PATCH'){const body=route.request().postDataJSON();patches.push({account:current,accountHeader:route.request().headers()['x-sakura-account'],body});return current==='A'?route.fulfill({status:503,json:{error:'Synthetic offline save'}}):route.fulfill({json:{...body,revision:9}});}return route.fulfill({json:{theme:'dark',privateSession:false,reducedMotion:true,onboarded:true,seedArtists:[],seedGenres:[],revision:7}});}
  if(path==='/api/v2/library')return route.fulfill({json:{recordings:[]}});
  if(path==='/api/v2/bloom')return route.fulfill({json:{items:[],schedule:{timeZone:'Africa/Lagos'}}});

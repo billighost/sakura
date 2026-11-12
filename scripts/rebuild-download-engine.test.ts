@@ -34,6 +34,68 @@ function setup(options:{data?:Uint8Array;storage?:MemoryStorage;delay?:number;li
 async function until(condition:()=>boolean,timeout=2000){const end=Date.now()+timeout;while(!condition()){if(Date.now()>end)throw new Error("Condition did not become true");await new Promise(resolve=>setTimeout(resolve,5));}}
 async function withoutWebLocks(operation:()=>Promise<void>){const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator");Object.defineProperty(globalThis,"navigator",{value:{onLine:true},configurable:true});try{await operation();}finally{if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}}
 
+test("full experience preparation verifies all bytes and survives playback or prefix joins",async()=>{
+ const f=setup({delay:12});const controller=new AbortController();
+ try{const pending=f.manager.prepareFull(track("1"),controller.signal);await until(()=>f.rangeStarts.length>0);assert.equal(f.storage.audio.has("1"),false);await f.manager.ensureChunk("1",0);void f.manager.enqueue(track("1"),{mode:"prefix",requested:false}).catch(()=>{});await f.manager.prepare("1");const prepared=await pending;assert.equal(prepared.audio.blob.size,f.data.length);assert.equal(prepared.audio.sha256,sha(f.data));assert.equal(prepared.audio.requested,false);assert.equal(f.snapshot["1"].status,"ready");assert.equal(f.requests,8);prepared.release();prepared.release();}finally{controller.abort();f.manager.dispose();}
+});
+
+test("canceling one full-preparation consumer retains another and an explicit download",async()=>{
+ const f=setup({delay:20}),first=new AbortController(),second=new AbortController();
+ try{const a=f.manager.prepareFull(track("1"),first.signal),b=f.manager.prepareFull(track("1"),second.signal);await until(()=>f.requests>0);const explicit=f.manager.enqueue(track("1"));first.abort();await assert.rejects(a,{name:"AbortError"});const prepared=await b;await explicit;assert.equal(prepared.audio.requested,true);assert.equal(f.requests,8);prepared.release();assert.equal(f.snapshot["1"].requested,true);}finally{first.abort();second.abort();f.manager.dispose();}
+});
+
+test("prepared full experiences pin automatic cache until their final consumer releases",async()=>{
+ const f=setup(),controller=new AbortController(),leases:Array<{audio:OfflineAudio;release:()=>void}>=[];
+ try{for(let value=1;value<=14;value++)leases.push(await f.manager.prepareFull(track(String(value)),controller.signal));assert.equal(f.storage.audio.size,14);f.manager.setPriorities([]);await new Promise(resolve=>setTimeout(resolve,20));assert.equal(f.storage.audio.size,14);leases[0].release();leases[1].release();await until(()=>f.storage.audio.size<=12);for(const value of leases.slice(2))assert.equal(f.storage.audio.has(value.audio.track.id),true);}finally{controller.abort();for(const lease of leases)lease.release();f.manager.dispose();}
+});
+
+test("automatic cache returns to its budget after delayed storage unpin commits",async()=>{
+ let finishUnpin:()=>void=()=>{},waitingUnpins=0;
+ const unpinGate=new Promise<void>(resolve=>{finishUnpin=resolve;});
+ class DelayedPinStorage extends MemoryStorage {
+  pins=new Map<string,Set<string>>();
+  async pinAutomatic(id:string,owner:string){const owners=this.pins.get(id)||new Set<string>();owners.add(owner);this.pins.set(id,owners);}
+  async releaseAutomaticPin(id:string,owner:string){waitingUnpins++;await unpinGate;this.pins.get(id)?.delete(owner);}
+  async clearAutomatic(id:string){if(this.pins.get(id)?.size)return false;return super.clearAutomatic(id);}
+ }
+ const storage=new DelayedPinStorage(),f=setup({storage}),controller=new AbortController(),leases:Array<{audio:OfflineAudio;release:()=>void}>=[];
+ try{
+  for(let value=1;value<=14;value++)leases.push(await f.manager.prepareFull(track(String(value)),controller.signal));
+  leases[0].release();leases[1].release();await until(()=>waitingUnpins===2);
+  f.manager.setPriorities([]);await new Promise(resolve=>setTimeout(resolve,25));assert.equal(storage.audio.size,14);
+  finishUnpin();await until(()=>storage.audio.size===12);
+  for(const lease of leases.slice(2))assert.equal(storage.audio.has(lease.audio.track.id),true);
+ }finally{finishUnpin();controller.abort();for(const lease of leases)lease.release();f.manager.dispose();}
+});
+
+test("full preparation rebuilds a cache evicted by another tab before its pin was acquired",async()=>{
+ const f=setup(),controller=new AbortController();
+ try{const old=await f.manager.prepareFull(track("1"),controller.signal);old.release();f.storage.audio.delete("1");const before=f.requests,prepared=await f.manager.prepareFull(track("1"),controller.signal);assert.equal(prepared.audio.sha256,sha(f.data));assert.equal(f.requests-before,8);assert.equal(prepared.audio.requested,false);prepared.release();}finally{controller.abort();f.manager.dispose();}
+});
+
+test("full preparation preserves a paused requested download and dispose cancels pending consumers",async()=>{
+ const f=setup({delay:30}),controller=new AbortController();
+ try{const explicit=f.manager.enqueue(track("1"));await until(()=>f.requests>0);await f.manager.pause("1");await explicit;const before=f.requests;await assert.rejects(f.manager.prepareFull(track("1"),controller.signal),/not finished saving/);assert.equal(f.snapshot["1"].status,"paused");assert.equal(f.requests,before);const pending=f.manager.prepareFull(track("2"),controller.signal);await until(()=>f.snapshot["2"]!==undefined);f.manager.dispose();await assert.rejects(pending,{name:"AbortError"});}finally{controller.abort();f.manager.dispose();}
+});
+
+test("automatic experience pins follow canonical aliases and late pin writes release after cancellation",async()=>{
+ class PinStorage extends MemoryStorage {pins=new Map<string,number>();async pinAutomatic(id:string,owner:string,expiresAt:number){await new Promise(resolve=>setTimeout(resolve,10));this.pins.set(id+":"+owner,expiresAt);}async releaseAutomaticPin(id:string,owner:string){this.pins.delete(id+":"+owner);}}
+ const storage=new PinStorage(),f=setup({storage,resolve:async song=>({track:{...song,id:"canonical"},url:"https://cdn.example/canonical",assetId:"asset-canonical",sizeBytes:32768,sha256:sha(bytes())})}),controller=new AbortController();
+ try{const prepared=await f.manager.prepareFull(track("1"),controller.signal);assert.equal(prepared.audio.track.id,"canonical");assert.ok([...storage.pins.keys()].every(key=>key.startsWith("canonical:")));controller.abort();await until(()=>storage.pins.size===0);const late=new AbortController(),pending=f.manager.prepareFull(track("2"),late.signal);late.abort();await assert.rejects(pending,{name:"AbortError"});await new Promise(resolve=>setTimeout(resolve,40));assert.equal(storage.pins.size,0);}finally{controller.abort();f.manager.dispose();}
+});
+
+test("canceling while a canonical preparation pin is being written stops speculative full work",async()=>{
+ let entered=false,finish:()=>void=()=>{};const gate=new Promise<void>(resolve=>{finish=resolve;});
+ class PinStorage extends MemoryStorage {pins=new Map<string,number>();async pinAutomatic(id:string,owner:string,expiresAt:number){if(id==="canonical"){entered=true;await gate;}this.pins.set(id+":"+owner,expiresAt);}async releaseAutomaticPin(id:string,owner:string){this.pins.delete(id+":"+owner);}}
+ const storage=new PinStorage(),f=setup({storage,resolve:async song=>({track:{...song,id:"canonical"},url:"https://cdn.example/canonical",assetId:"asset-canonical",sizeBytes:32768,sha256:sha(bytes())})}),controller=new AbortController();
+ try{const pending=f.manager.prepareFull(track("1"),controller.signal);await until(()=>entered);controller.abort();await assert.rejects(pending,{name:"AbortError"});finish();await until(()=>storage.pins.size===0);await new Promise(resolve=>setTimeout(resolve,30));assert.equal(f.requests,0);assert.equal(f.storage.audio.size,0);}finally{finish();controller.abort();f.manager.dispose();}
+});
+
+test("resume warming uses the persisted chunk size, bounds estimates and skips complete audio",async()=>{
+ const f=setup({delay:20}),controller=new AbortController();
+ try{f.manager.setPriorities([],"1");void f.manager.enqueue(track("1"),{mode:"playback",requested:false}).catch(()=>{});await f.manager.ensureChunk("1",0);await f.manager.warmPlaybackPosition("1",120000,240000,controller.signal);assert.ok(f.rangeStarts.includes(16384));await f.manager.warmPlaybackPosition("1",999999,240000,controller.signal);assert.ok(f.rangeStarts.includes(28672));const before=f.requests;await f.manager.warmPlaybackPosition("1",Number.NaN,240000,controller.signal);await f.manager.warmPlaybackPosition("1",120000,0,controller.signal);assert.equal(f.requests,before);await f.manager.enqueue(track("1"));const complete=f.requests;await f.manager.warmPlaybackPosition("1",120000,240000,controller.signal);assert.equal(f.requests,complete);controller.abort();await assert.rejects(f.manager.warmPlaybackPosition("1",120000,240000,controller.signal),{name:"AbortError"});}finally{controller.abort();f.manager.dispose();}
+});
+
 test("the first verified playback chunk has a persisted audio format before its reader wakes",async()=>{
  class PlaybackStorage extends MemoryStorage {
   formats:Array<string|undefined>=[];

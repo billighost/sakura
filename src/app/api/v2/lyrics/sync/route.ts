@@ -1,9 +1,11 @@
+import { withApiTiming } from "@/rebuild/server/performance";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { cardsForIds } from "@/rebuild/data/catalog";
 import { ProductError, uuid } from "@/rebuild/data/validation";
 import { createHostedSync, HostedSyncError } from "@/rebuild/lyrics/hostedSync";
 import { resolveVerifiedLyrics } from "@/rebuild/lyrics/service";
+import { recordingLyricIdentity } from "@/rebuild/lyrics/recordingIdentity";
 import { LyricAlignmentError } from "@/rebuild/lyrics/whisperSync";
 import { canAutoSync } from "@/rebuild/lyrics/autoSync";
 import type { TimedLyric } from "@/rebuild/lyrics/parse";
@@ -11,6 +13,7 @@ import type { TimedLyric } from "@/rebuild/lyrics/parse";
 export const maxDuration = 60;
 const starts = new Map<string, number>();
 export async function POST(request: NextRequest) {
+  return withApiTiming("/api/v2/lyrics/sync", request, async () => {
   const headers = { "Cache-Control": "private, no-store" };
   try {
     const account = await requireRebuildAccount();
@@ -29,8 +32,7 @@ export async function POST(request: NextRequest) {
     const track = (await cardsForIds(account.id, [recordingId]))[0], audio = track?.readyPlayback;
     if (!track || !audio) throw new HostedSyncError("Play a recording with an existing verified full audio file before using auto sync.", 409);
     if (!canAutoSync(supplied, typeof track.metadata.language === "string" ? track.metadata.language : undefined)) throw new HostedSyncError("Auto sync currently supports English lyrics.", 422);
-    const source = await resolveVerifiedLyrics({ recordingId, title: track.title, artist: track.artists[0] || "", artists: track.artists, album: track.albumTitle || undefined,
-      durationSeconds: track.durationMs ? track.durationMs / 1000 : undefined, versionLabel: (track.metadata.version as { labels?: string[] } | undefined)?.labels?.join(" ") }, true);
+    const source = await resolveVerifiedLyrics(recordingLyricIdentity({ ...track, recordingId }), true);
     if (source.status !== "matched" || source.track.instrumental || !source.track.plainLyrics
       || JSON.stringify(source.track.plainLyrics.split(/\r?\n/)) !== JSON.stringify(supplied.map(line => line.text)))
       throw new HostedSyncError("The plain lyrics changed or could not be verified. Refresh them before auto syncing.", 409);
@@ -46,4 +48,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof LyricAlignmentError) return NextResponse.json({ error: error.message,reason:"lyrics-sync-uncertain" }, { status: 422, headers });
     return NextResponse.json({ error: "The free auto-sync worker is temporarily unavailable. Your plain lyrics have been kept.",reason:"lyrics-sync-unavailable" }, { status: 503, headers });
   }
+
+  });
 }

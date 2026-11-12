@@ -34,7 +34,7 @@ try{
   const profile=()=>({profile:account,stats:{audibleMs:0,playCount:0,uniqueRecordings:0,completedCount:0,skippedCount:0,liked:0,playlists:0},topArtists:[],onboarding:{seedArtists:settings.seedArtists,seedGenres:[],initialTasteGenres:settings.initialTasteProfile?.genres.map(genre=>genre.name)||[]},insights:{days:[],hours:[],genres:[],completionRate:0,skipRate:0,finishedEvents:0,activeDays:0,confidence:{level:'starting',label:'Your recommendations start here.',evidence:'Chosen artists guide your first recommendations.'},topSongs:[],timeZone:'Africa/Lagos'}});
   await context.route('**/api/**',async route=>{
    const request=route.request(),url=new URL(request.url()),path=url.pathname,method=request.method(),body=method==='GET'?undefined:request.postDataJSON();requests.push({path,method,body});
-   if(path==='/api/v2/profile')return route.fulfill({json:profile()});
+   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:profile()});
    if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
    if(path==='/api/v2/settings'){
     if(method==='PATCH'){

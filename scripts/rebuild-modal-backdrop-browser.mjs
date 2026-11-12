@@ -20,7 +20,7 @@ try{
   await context.addInitScript(()=>sessionStorage.setItem('sakura-ink-opening','1'));
   await context.route('**/api/**',async route=>{
    const path=new URL(route.request().url()).pathname;
-   if(path==='/api/v2/profile')return route.fulfill({json:{profile:account}});
+   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account}});
    if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',openingAnimation:0,reducedMotion:false,onboarded:true,privateSession:true,seedArtists:[],seedGenres:[],audioTechnology:'none',volume:.8}});
    if(path==='/api/v2/library')return route.fulfill({json:{recordings:[track],playlists:[]}});
    if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});

@@ -38,6 +38,7 @@
 .compact .cover>.art,.compact .cover>.play{width:37px;height:37px;border-radius:8px 2px 8px 2px}
 .compact .info>a:first-child{font-size:12px}
 .compact .details{display:none}
+.compact .details.withDetail{display:flex}
 .compact .artists{font-size:9px}
 .compact .vine{left:78px;bottom:2px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:24px 20px}

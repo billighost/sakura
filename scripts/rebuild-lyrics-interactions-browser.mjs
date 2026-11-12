@@ -44,7 +44,7 @@ async function room(theme,width,sharedSettings,height=900){
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return serveAudio(route);
-  if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
   if(path==='/api/v2/settings'){
    if(request.method()==='PATCH'){counts.patches++;const patch=request.postDataJSON();delete patch.expectedRevision;Object.assign(settings,patch);settings.revision++;for(const key of Object.keys(patch))settings.fieldRevisions[key]=settings.revision;}
