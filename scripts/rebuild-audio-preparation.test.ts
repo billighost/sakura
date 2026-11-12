@@ -9,7 +9,7 @@ import type { StoredAudioAsset } from "../src/rebuild/server/contracts";
 const moduleUrl = (source:string) => "data:text/javascript;base64," + Buffer.from(source).toString("base64");
 
 test("locally minted audio URLs pass the deployed worker authenticator and immutable document checks",async()=>{
- const {authorized,audioHeaders}=await import("../worker/cloudflare/src/http.mjs");
+ const {authorized,audioHeaders}=await import(new URL("../worker/cloudflare/src/http.mjs",import.meta.url).href);
  const secret="fixture-local-worker-signature-secret",asset:StoredAudioAsset={assetId:"22222222-2222-4222-8222-222222222222",recordingId:"11111111-1111-4111-8111-111111111111",candidate:{candidateId:"22222222-2222-4222-8222-222222222222",metadata:{title:"Song",artists:["Artist"],durationMs:240000},audioKind:"full",references:[]},locator:{kind:"telegram-worker",protocol:"v2",messageId:"42",chatScope:"primary",documentId:"123"},state:"ready",verifiedAt:"2026-11-07T00:00:00Z",mimeType:"audio/mpeg",sizeBytes:4096,ownerAccountId:null};
  let requests=0;const transport=new SourceAudioTransport({allowedCdnOrigins:[],worker:{url:"https://worker.example.test",secret,chatScope:"primary"}},(async()=>{requests++;throw new Error("No signing request allowed");})as typeof fetch);
  const url=(await transport.signedPlaybackUrl(asset))!,request=new Request(url,{headers:{Range:"bytes=0-511"}}),audio={chatScope:"primary",messageId:"42",fileId:"123",size:4096,mimeType:"audio/mpeg"};
