@@ -98,6 +98,14 @@ function pronunciationTokens(tokens: kuromoji.IpadicFeatures[]) {
       token.surface_form += continuation.surface_form;
       token.reading += tokenReading(continuation) || continuation.reading || continuation.surface_form;
     }
+    // IPADIC splits the volitional auxiliary: でしょ + う and 行こ + う.
+    // Its vowel extends the previous syllable, so a word space would break it.
+    const volitional = tokens[index + 1];
+    if (tokens[index].conjugated_form?.startsWith("未然") && volitional?.surface_form === "う" && volitional.pos === "助動詞") {
+      token.surface_form += volitional.surface_form;
+      token.reading = (tokenReading(token) || token.reading || tokens[index].surface_form) + "ウ";
+      index++;
+    }
     result.push(token);
   }
   return result;

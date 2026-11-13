@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import {chromium,expect as baseExpect} from '@playwright/test';
 import {encode} from 'next-auth/jwt';
 import 'dotenv/config';
+import {fixtureReadingEngine} from './fixtures/reading-engine.mjs';
 const expect=baseExpect.configure({timeout:30000}),base=process.env.SAKURA_TEST_URL||'http://localhost:3012';
 const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;assert.ok(secret);
 const directory='src/app/lyrics-policy-check',file=directory+'/page.tsx';assert.equal(await fs.stat(file).then(()=>true,()=>false),false);
@@ -15,7 +16,7 @@ const counts={plain:0,missing:0,readings:0,blocked:0},queries=[],checks=[],error
 page.on('pageerror',error=>errors.push(error.message));
 await context.route('**/api/v2/**',async route=>{
  const url=new URL(route.request().url());
- if(url.pathname==='/api/v2/readings'){counts.readings++;const input=route.request().postDataJSON();return route.fulfill({json:{engine:'ja-ipadic-hepburn-v1',lines:input.lines.map(line=>({...line,romanized:'saved guide',readingEngine:'ja-ipadic-hepburn-v1'}))}});}
+ if(url.pathname==='/api/v2/readings'){counts.readings++;const input=route.request().postDataJSON(),engine=fixtureReadingEngine(input.language);return route.fulfill({json:{engine,lines:input.lines.map(line=>({...line,romanized:'saved guide',readingEngine:engine}))}});}
  if(url.pathname!=='/api/v2/lyrics')return route.fulfill({json:{}});
  if(block){counts.blocked++;return route.abort('internetdisconnected');}
  const second=url.searchParams.get('title')==='Second cache fixture';queries.push({second,refresh:url.searchParams.get('refresh')});

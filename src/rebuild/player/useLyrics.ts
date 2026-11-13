@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
 import { lyricReadingLanguage, readingEngine, type ReadingLanguage } from "../lyrics/language";
+import { lyricReadingEnabled } from "../app/readingPreferences";
 import { VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
 import { readJsonResponse, requestJson,responseIssue, userMessage, UserFacingError,type UserIssue } from "../app/errors";
 import { LyricFlights } from "./lyricFlight";
@@ -289,7 +290,7 @@ export async function prefetchPreferredReadings(track: LyricInput, preferences: 
   const source = await prefetchLyrics(track, signal);
   signal.throwIfAborted();
   const language = source?.readingLanguage || (source?.hasJapanese ? "ja" : null);
-  if (!source || !language || !(language === "ja" ? preferences.japaneseReading : preferences.lyricReading)) return source;
+  if (!source || !language || !lyricReadingEnabled(preferences)) return source;
   return prepareReadings(track, language, signal, accountId);
 }
 

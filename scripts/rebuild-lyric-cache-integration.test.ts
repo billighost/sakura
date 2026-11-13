@@ -52,6 +52,41 @@ test("preferred preparation makes no pronunciation request when disabled and reu
   } finally { globalThis.fetch = original; }
 });
 
+test("one saved reading preference prepares Japanese, Chinese and Korean songs and preserves lyric timing", async () => {
+  const original = globalThis.fetch;
+  const originals = {
+    ja: [{ text: "君の声", start: 1, end: 3, words: [{ text: "君", start: 1, end: 2 }] }],
+    zh: [{ text: "甜蜜蜜", start: 2, end: 5 }],
+    ko: [{ text: "보고 싶다", start: 3, end: 7 }],
+  };
+  const requested: string[] = [];
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("/api/v2/lyrics?")) {
+      const language = new URL(String(url), "https://sakura.test").searchParams.get("language") as keyof typeof originals;
+      return Response.json({ ...source, lines: originals[language] });
+    }
+    const body = JSON.parse(String(options?.body));
+    requested.push(body.language);
+    return Response.json({ engine: readingEngine(body.language), lines: body.lines.map((line: object) => ({ ...line, romanized: "saved pronunciation", readingEngine: readingEngine(body.language), readingReviewNeeded: false })) });
+  };
+  try {
+    const signal = new AbortController().signal;
+    for (const language of ["ja", "zh", "ko"] as const) {
+      const song = { ...track("shared-preference-" + language), language };
+      const disabled = await prefetchPreferredReadings(song, { japaneseReading: false, lyricReading: false }, signal, "fixture-account");
+      assert.equal(disabled?.lines[0].romanized, undefined);
+      const data = await prefetchPreferredReadings(song, { japaneseReading: true }, signal, "fixture-account");
+      assert.equal(data?.readingLanguage, language);
+      assert.equal(data?.lines[0].romanized, "saved pronunciation");
+      assert.deepEqual(data?.lines.map(({ romanized, readingEngine, readingReviewNeeded, ...line }) => {
+        void romanized; void readingEngine; void readingReviewNeeded; return line;
+      }), originals[language]);
+      await prefetchPreferredReadings(song, { lyricReading: true }, signal, "fixture-account");
+    }
+    assert.deepEqual(requested, ["ja", "zh", "ko"], "either legacy enabled flag applies across languages and completed readings are reused");
+  } finally { globalThis.fetch = original; }
+});
+
 test("departing one reading owner preserves another; a departed last owner cannot save late readings", async () => {
   const original = globalThis.fetch; let complete!: (response: Response) => void, shared: AbortSignal | null | undefined, body: { language: string; lines: object[] };
   globalThis.fetch = async (url, options) => {

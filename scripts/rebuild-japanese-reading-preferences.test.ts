@@ -5,6 +5,7 @@ import { cachedPreferences, preferenceFieldRevisions, readPreferenceDraft, rebas
 import { DEFAULT_SETTINGS, preferencesPatch, ProductError } from "../src/rebuild/data/validation";
 import { miniLyricCue } from "../src/rebuild/player/miniLyric";
 import type { UserSettings } from "../src/rebuild/app/types";
+import { lyricReadingEnabled, lyricReadingPatch } from "../src/rebuild/app/readingPreferences";
 
 test("Japanese reading is a validated account preference that accepts an explicit disable", () => {
   assert.equal(DEFAULT_SETTINGS.japaneseReading, false);
@@ -16,6 +17,48 @@ test("Japanese reading is a validated account preference that accepts an explici
     assert.throws(() => preferencesPatch({ japaneseReading }), error => error instanceof ProductError && error.status === 400);
     assert.deepEqual(settingsFields({ japaneseReading }), {});
   }
+});
+
+test("the shared reading preference carries forward either legacy language choice", () => {
+  assert.equal(DEFAULT_SETTINGS.lyricReading, false);
+  assert.equal(lyricReadingEnabled({}), false);
+  assert.equal(lyricReadingEnabled({ japaneseReading: true, lyricReading: false }), true);
+  assert.equal(lyricReadingEnabled({ japaneseReading: false, lyricReading: true }), true);
+  for (const enabled of [true, false]) {
+    const patch = lyricReadingPatch(enabled);
+    assert.deepEqual(preferencesPatch(patch), patch);
+    assert.equal(lyricReadingEnabled(settingsFields(patch)), enabled);
+  }
+  for (const lyricReading of ["true", 1, null, [], {}]) {
+    assert.throws(() => preferencesPatch({ lyricReading }), error => error instanceof ProductError && error.status === 400);
+    assert.deepEqual(settingsFields({ lyricReading }), {});
+  }
+});
+
+test("a global disable survives local reload and offline reconciliation after a legacy enable", async t => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage"), values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+    get length() { return values.size; },
+    key: (index: number) => [...values.keys()][index] || null,
+    getItem: (key: string) => values.get(key) || null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  } });
+  t.after(() => { if (original) Object.defineProperty(globalThis, "localStorage", original); else Reflect.deleteProperty(globalThis, "localStorage"); });
+  const account = randomUUID(), another = randomUUID();
+  const legacy: UserSettings = { ...DEFAULT_SETTINGS, japaneseReading: true, seedArtists: [], seedGenres: [], seedArtistSelections: [], onboarded: true };
+  await writePreferenceDraft(account, legacy, false);
+  assert.equal(lyricReadingEnabled(cachedPreferences(account)), true);
+  const disabled = lyricReadingPatch(false);
+  await writePreferenceDraft(account, { ...legacy, ...disabled }, true, disabled, { baseSettings: legacy });
+  const restored = await readPreferenceDraft(account);
+  assert.equal(lyricReadingEnabled(cachedPreferences(account)), false);
+  assert.equal(lyricReadingEnabled(restored!.settings), false);
+  assert.deepEqual(restored?.pendingPatch, disabled);
+  assert.equal(lyricReadingEnabled(cachedPreferences(another)), false);
+  assert.deepEqual(rebasePreferences(restored!.pendingPatch!, legacy, legacy), { pending: { japaneseReading: false }, conflicts: [] });
+  const enabled = lyricReadingPatch(true);
+  assert.deepEqual(rebasePreferences(disabled, enabled, enabled), { pending: disabled, conflicts: [] });
 });
 
 test("reading preferences survive reloads without crossing account boundaries and retain disable intents", async t => {

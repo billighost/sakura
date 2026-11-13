@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {chromium,expect as baseExpect} from '@playwright/test';
 import {encode} from 'next-auth/jwt';
 import 'dotenv/config';
+import {fixtureReadingEngine} from './fixtures/reading-engine.mjs';
 
 const expect=baseExpect.configure({timeout:30000}),base=process.env.SAKURA_TEST_URL||'http://localhost:3023';
 const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;
@@ -24,7 +25,7 @@ await context.route('**/api/v2/**',async route=>{
  const url=new URL(route.request().url());
  if(blockProvider){counts.blocked++;return route.abort('internetdisconnected');}
  if(url.pathname==='/api/v2/lyrics'){counts.lyrics++;return route.fulfill({json:{lines,timing:'plain',provider:'cache fixture',providerTrackId:401,schemaVersion:'verified-lyrics-v3'}});}
- if(url.pathname==='/api/v2/readings'){counts.readings++;const {language,lines:source}=route.request().postDataJSON(),engine=language==='ja'?'ja-ipadic-hepburn-v1':`multilingual-reading-v1:${language}`;return route.fulfill({json:{engine,lines:source.map((line,index)=>({...line,romanized:language==='ja'?['kimi no koe','kaze ni nosete'][index]:['jūn de shēng','fēng'][index],readingEngine:engine,readingReviewNeeded:false}))}});}
+ if(url.pathname==='/api/v2/readings'){counts.readings++;const {language,lines:source}=route.request().postDataJSON(),engine=fixtureReadingEngine(language);return route.fulfill({json:{engine,lines:source.map((line,index)=>({...line,romanized:language==='ja'?['kimi no koe','kaze ni nosete'][index]:['jūn de shēng','fēng'][index],readingEngine:engine,readingReviewNeeded:false}))}});}
  counts.resources++;return route.fulfill({json:{saved:true,path:url.pathname}});
 });
 async function probe(){try{return await page.evaluate(()=>({data:window.cacheProbe?.data,secondary:window.cacheProbe?.secondary,loading:window.cacheProbe?.loading,error:window.cacheProbe?.error}));}catch(error){if(/Execution context was destroyed|Cannot find context/.test(error.message))return {data:null,secondary:null,loading:true,error:null};throw error;}}

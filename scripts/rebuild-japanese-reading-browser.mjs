@@ -16,25 +16,30 @@ const samples=8000*40,wav=Buffer.alloc(44+samples*2);
 wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(samples*2,40);
 for(let i=0;i<samples;i++)wav.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*330/8000)*800),44+i*2);
 const sha=createHash('sha256').update(wav).digest('hex');
-const tracks=['君の声','未来の光','花の記憶'].map((title,index)=>{
+const transliterationOnly=process.argv.includes('--transliteration');
+const japaneseVersion=(await fs.readFile('src/rebuild/lyrics/versions.ts','utf8')).match(/JAPANESE_READING_VERSION\s*=\s*["']([^"']+)/)[1];
+const multilingualVersion=(await fs.readFile('src/rebuild/lyrics/language.ts','utf8')).match(/READING_VERSION\s*=\s*["']([^"']+)/)[1];
+const fixtureReadingEngine=language=>language==='ja'?japaneseVersion:`${multilingualVersion}:${language}`;
+const tracks=(transliterationOnly?['君の声','甜蜜蜜','봄날']:['君の声','未来の光','花の記憶']).map((title,index)=>{
  const id=`95000000-0000-4000-8000-${String(index+401).padStart(12,'0')}`,assetId=`96000000-0000-4000-8000-${String(index+401).padStart(12,'0')}`;
  return {id,title,artists:['Sakura fixture'],artistId:null,albumId:null,albumTitle:'A handwritten song',durationMs:40000,coverUrl:`/reading-cover-${index}.svg`,versionLabel:'Original recording',reference:{provider:'deezer',id:String(index+401)},references:[{provider:'deezer',id:String(index+401)}],readyPlayback:{kind:'stream',delivery:'cdn',assetId,sha256:sha,sizeBytes:wav.length,mimeType:'audio/wav',durationMs:40000,url:`https://res.cloudinary.com/reading-fixture/video/upload/v1/sakura/v2/audio/${id}/${sha}.wav`,fallbackUrl:`/api/v2/recordings/${id}/audio?assetId=${assetId}`}};
 });
 const sourceLines=tracks.map(track=>[{text:track.title,start:0,end:30},{text:'風に乗せて',start:30,end:40}]);
-const readings={'君の声':'kimi no koe','未来の光':'mirai no hikari','花の記憶':'hana no kioku','風に乗せて':'kaze ni nosete'};
+if(transliterationOnly){sourceLines[1][1].text='你笑得甜蜜蜜';sourceLines[2][1].text='보고 싶다';}
+const readings={'君の声':'kimi no koe','未来の光':'mirai no hikari','花の記憶':'hana no kioku','風に乗せて':'kaze ni nosete','甜蜜蜜':'tián mì mì','你笑得甜蜜蜜':'nǐ xiào de tián mì mì','봄날':'bomnal','보고 싶다':'bogo sipda'};
 const desktopHeaderOnly=process.argv.includes('--desktop-header');
 const viewportOnly=process.argv.includes('--viewport')||desktopHeaderOnly;
 const miniArtworkOnly=process.argv.includes('--mini-artwork');
-const output=miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
+const output=transliterationOnly?'.local/transliteration':miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
 const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[]};
 let browser,latestPage;
 
 async function room(theme,width,sharedSettings,height=900){
  const context=await browser.newContext({viewport:{width,height},isMobile:width<700,hasTouch:width<700,colorScheme:theme,serviceWorkers:'block'});
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
- await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.readingFixtureAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;});
+ await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.readingFixtureAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;document.addEventListener('DOMContentLoaded',()=>{const style=document.createElement('style');style.textContent='nextjs-portal{display:none!important}';document.head.append(style);},{once:true});});
  const settings=sharedSettings||{theme,audioTechnology:'none',japaneseReading:false,audioQuality:'balanced',privateSession:true,reducedMotion:false,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.4,shuffle:false,repeat:'off',revision:1,fieldRevisions:{}};
- const counts={readings:0,lyrics:0,patches:0};
+ const counts={readings:0,lyrics:0,patches:0,languages:[]};
  let session=null;
  const serveAudio=route=>{const match=route.request().headers().range?.match(/bytes=(\d+)-(\d*)/);if(!match)return route.fulfill({body:wav,contentType:'audio/wav',headers:{'Accept-Ranges':'bytes','Content-Length':String(wav.length)}});const start=Number(match[1]),end=match[2]?Math.min(wav.length-1,Number(match[2])):wav.length-1;return route.fulfill({status:206,body:wav.subarray(start,end+1),contentType:'audio/wav',headers:{'Content-Range':`bytes ${start}-${end}/${wav.length}`,'Accept-Ranges':'bytes'}});};
  await context.route('https://res.cloudinary.com/reading-fixture/**',serveAudio);
@@ -42,7 +47,7 @@ async function room(theme,width,sharedSettings,height=900){
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return serveAudio(route);
-  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:Object.fromEntries(tracks.map(track=>[track.id,{liked:true,revision:1}]))}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
   if(path==='/api/v2/settings'){
    if(request.method()==='PATCH'){counts.patches++;const patch=request.postDataJSON();delete patch.expectedRevision;Object.assign(settings,patch);settings.revision++;for(const key of Object.keys(patch))settings.fieldRevisions[key]=settings.revision;}
@@ -56,7 +61,7 @@ async function room(theme,width,sharedSettings,height=900){
   }
   if(path==='/api/v2/recordings/resolve'){const track=tracks.find(item=>item.reference.id===request.postDataJSON().reference.id)||tracks[0];return route.fulfill({json:{status:'resolved',recording:{...track,recordingId:track.id,metadata:{title:track.title,artists:track.artists,artistsComplete:true,durationMs:track.durationMs,albumTitle:track.albumTitle}},playback:track.readyPlayback}});}
   if(path==='/api/v2/lyrics'){counts.lyrics++;const index=Math.max(0,tracks.findIndex(track=>track.title===url.searchParams.get('title')));return route.fulfill({json:{status:'matched',lines:sourceLines[index],timing:'synced',provider:'synthetic Japanese fixture',providerTrackId:401+index,schemaVersion:'verified-lyrics-v3'}});}
-  if(path==='/api/v2/readings'){counts.readings++;const data=request.postDataJSON();return route.fulfill({json:{engine:'ja-ipadic-hepburn-v1',lines:data.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:false,readingEngine:'ja-ipadic-hepburn-v1'}))}});}
+  if(path==='/api/v2/readings'){counts.readings++;const data=request.postDataJSON(),engine=fixtureReadingEngine(data.language);counts.languages.push(data.language);return route.fulfill({json:{engine,lines:data.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:transliterationOnly,readingEngine:engine}))}});}
   if(/^\/api\/v2\/recordings\/[^/]+$/.test(path))return route.fulfill({json:{recording:tracks.find(track=>track.id===path.split('/').at(-1))||tracks[0]}});
   return route.fulfill({json:{items:[],recordings:[],schedule:{timeZone:'Africa/Lagos'}}});
  });
@@ -154,7 +159,7 @@ async function testRoom(theme,width,full){
    await expect(readingToggle).toHaveAttribute('aria-pressed','false');
    const readingResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v2/readings');
    const body=pendingReading.request().postDataJSON();
-   await pendingReading.fulfill({json:{engine:'ja-ipadic-hepburn-v1',lines:body.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:false,readingEngine:'ja-ipadic-hepburn-v1'}))}});
+   await pendingReading.fulfill({json:{engine:fixtureReadingEngine('ja'),lines:body.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:false,readingEngine:fixtureReadingEngine('ja')}))}});
    await (await readingResponse).finished();
    await context.unroute('**/api/v2/readings',holdReading);
    await expect(readingToggle).toHaveAttribute('aria-pressed','false');
@@ -269,10 +274,80 @@ async function testViewport(theme,width,height,longTitle=false){
  finally{tracks[0].title=originalTitle;await context.close();}
 }
 
+async function testGlobalTransliteration(theme,width){
+ const {context,page,settings,counts}=await room(theme,width);
+ try{
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded',timeout:90000});
+  await page.getByRole('button',{name:'Play 君の声',exact:true}).click();
+  let dialog=await openPlayer(page);await pausePlayer(dialog);
+  const japanese=dialog.getByRole('button',{name:'Japanese reading guide',exact:true});
+  await expect(japanese).toHaveAttribute('aria-pressed','false');
+  await japanese.click();
+  await expect(dialog.locator('[data-player-reading]')).toHaveText('kimi no koe');
+  await expect.poll(()=>settings.lyricReading===true&&settings.japaneseReading===true).toBe(true);
+  await dialog.getByRole('button',{name:'Next song',exact:true}).click();
+  await expect(dialog.getByRole('heading',{name:'甜蜜蜜',exact:true})).toBeVisible();await pausePlayer(dialog);
+  await expect(dialog.getByRole('button',{name:'Chinese Pinyin',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(dialog.locator('[data-player-reading]')).toHaveText('tián mì mì');
+  assert.ok(counts.languages.includes('ja')&&counts.languages.includes('zh'),'The next song auto-detects Chinese and shares the saved global choice.');
+  assert.ok(counts.languages.every(language=>['ja','zh','ko'].includes(language)),'Reading preparation stays within this three-song queue.');
+  await dialog.getByRole('button',{name:'Open lyrics',exact:true}).click();
+  const words=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(words).toHaveAttribute('data-dialog-phase','open');
+  await expect(words.getByText('tián mì mì',{exact:true})).toBeVisible();
+  await expect(words.getByText(/reading needs review/i)).toHaveCount(0);
+  await words.getByRole('button',{name:'Chinese Pinyin',exact:true}).click();
+  await expect(words.getByText('tián mì mì',{exact:true})).toHaveCount(0);
+  await expect.poll(()=>settings.lyricReading===false&&settings.japaneseReading===false).toBe(true);
+  await page.keyboard.press('Escape');await expect(words).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+  await page.goto(base+'/settings',{waitUntil:'domcontentloaded'});
+  let globalSwitch=page.getByRole('button',{name:'Enable transliteration',exact:true});
+  await expect(globalSwitch).toHaveAttribute('aria-pressed','false');await globalSwitch.click();
+  await expect(globalSwitch).toHaveAttribute('aria-pressed','true');
+  await expect.poll(()=>settings.lyricReading===true&&settings.japaneseReading===true).toBe(true);
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Play 봄날',exact:true}).click();dialog=await openPlayer(page);await pausePlayer(dialog);
+  await expect(dialog.getByRole('button',{name:'Korean romanization',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(dialog.locator('[data-player-reading]')).toHaveText('bomnal');
+  const beforeReloadReadings=counts.readings;
+  await page.screenshot({path:`${output}/player-${theme}-${width}.png`,animations:'disabled'});
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Play 甜蜜蜜',exact:true}).click();dialog=await openPlayer(page);await pausePlayer(dialog);
+  await expect(dialog.locator('[data-player-reading]')).toHaveText('tián mì mì');
+  assert.equal(counts.readings,beforeReloadReadings,'Reload reuses the completed persisted reading guides.');
+  const secondDevice=await room(theme,width,settings);
+  try{
+   await secondDevice.page.goto(base+'/liked',{waitUntil:'domcontentloaded'});
+   await secondDevice.page.getByRole('button',{name:'Play 君の声',exact:true}).click();
+   const remote=await openPlayer(secondDevice.page);await pausePlayer(remote);
+   await expect(remote.locator('[data-player-reading]')).toHaveText('kimi no koe');
+   assert.equal(secondDevice.counts.patches,0,'A fresh device inherits the account preference without making a settings mutation.');
+  }finally{await secondDevice.context.close();}
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+  await page.goto(base+'/settings',{waitUntil:'domcontentloaded'});
+  globalSwitch=page.getByRole('button',{name:'Enable transliteration',exact:true});
+  await expect(globalSwitch).toHaveAttribute('aria-pressed','true');await globalSwitch.click();
+  await expect.poll(()=>settings.lyricReading===false&&settings.japaneseReading===false).toBe(true);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('button',{name:'Enable transliteration',exact:true})).toHaveAttribute('aria-pressed','false');
+  const beforeDisabledSongs=counts.readings;
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});
+  for(const [index,label] of ['Japanese reading guide','Chinese Pinyin','Korean romanization'].entries()){
+   await page.getByRole('button',{name:`Play ${tracks[index].title}`,exact:true}).click();dialog=await openPlayer(page);await pausePlayer(dialog);
+   await expect(dialog.getByRole('button',{name:label,exact:true})).toHaveAttribute('aria-pressed','false');
+   await expect(dialog.locator('[data-player-reading]')).toHaveCount(0);
+   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+  }
+  assert.equal(counts.readings,beforeDisabledSongs,'A saved disable prepares no new readings while switching languages.');
+  report.checks.push(`${theme}/${width}: Japanese enable automatically follows Chinese and Korean songs; full lyrics and Settings share one saved choice; review labels removed; reload and fresh device restore it; global disable stays off for every language.`);
+ }catch(error){report.pageState={url:page.url(),text:(await page.locator('body').innerText()).slice(0,6000)};await page.screenshot({path:output+'/failure.png'}).catch(()=>{});throw error;}finally{await context.close();}
+}
+
 try{
  await fs.mkdir(output,{recursive:true});
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- if(miniArtworkOnly)for(const theme of ['light','dark'])for(const width of [1440,390])await testMiniArtwork(theme,width);
+ if(transliterationOnly){await testGlobalTransliteration('light',1440);await testGlobalTransliteration('dark',390);}
+ else if(miniArtworkOnly)for(const theme of ['light','dark'])for(const width of [1440,390])await testMiniArtwork(theme,width);
  else if(desktopHeaderOnly)await testViewport('dark',1440,900);
  else if(viewportOnly){
   for(const theme of ['light','dark'])for(const [width,height] of [[320,568],[375,667],[390,844],[430,932],[667,375]])await testViewport(theme,width,height);

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMusicActions, useMusicView } from "../app/musicView";
 import { userMessage } from "../app/errors";
+import { lyricReadingEnabled, lyricReadingPatch } from "../app/readingPreferences";
 import { READING_LABELS, readingEngine, type ReadingLanguage } from "../lyrics/language";
 import { lyricInputKey, type useLyrics } from "./useLyrics";
 
@@ -9,7 +10,7 @@ import { lyricInputKey, type useLyrics } from "./useLyrics";
 export function useJapaneseReading(lyrics: ReturnType<typeof useLyrics>) {
   const music = { ...useMusicView(), ...useMusicActions() };
   const language=lyrics.data?.readingLanguage||(lyrics.data?.hasJapanese?"ja":null);
-  const enabled = (language==="ja"?music.settings.japaneseReading:music.settings.lyricReading) === true;
+  const enabled = lyricReadingEnabled(music.settings);
   const [retryVersion, setRetryVersion] = useState(0);
   const [state, setState] = useState<{ key: string; busy: boolean; error: string | null }>({ key: "", busy: false, error: null });
   const key = useMemo(() => music.track && language && lyrics.data
@@ -49,8 +50,9 @@ export function useJapaneseReading(lyrics: ReturnType<typeof useLyrics>) {
 
   function toggle() {
     const next = !enabled;
-    void music.updateSettings(language==="ja"?{japaneseReading:next}:{lyricReading:next}).catch(error => music.reportError(error, "save", () => {
-      void music.updateSettings(language==="ja"?{japaneseReading:next}:{lyricReading:next}).catch(failure => music.reportError(failure, "save"));
+    const patch = lyricReadingPatch(next);
+    void music.updateSettings(patch).catch(error => music.reportError(error, "save", () => {
+      void music.updateSettings(patch).catch(failure => music.reportError(failure, "save"));
     }));
   }
   return {

@@ -14,3 +14,28 @@
 @media(any-pointer:coarse){.ribbonTrack,.compact .ribbonTrack,.volumeBranch,.gardenSlider{height:48px}.ribbonTrack input,.volumeBranch input,.gardenSlider>input{min-height:48px}.volume>button{min-height:48px;min-width:48px}}
 
 .deviceVolume{font:11px var(--font-inter,Arial,sans-serif);line-height:1.35}.volumeCompact .deviceVolume{font-size:10px}
+
+.volume>.muteButton{position:relative;flex-shrink:0;gap:6px;border:1px solid transparent;border-radius:19px 7px 19px 7px;padding:4px 8px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .25s ease,border-color .25s ease,color .25s ease,box-shadow .25s ease}
+.volume>.muteButton:hover{background:color-mix(in srgb,var(--ink-petal,#bc8293) 8%,transparent);color:var(--ink-accent,#547059)}
+.volume>.muteButton:active{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink-petal,#bc8293) 24%,transparent)}
+.volume>.muteButton:focus-visible{border-radius:19px 7px 19px 7px;outline:2px solid var(--ink-accent,#547059);outline-offset:3px}
+.volumeCompact>.muteButton{padding:0}
+.volumeMark{display:block;flex-shrink:0;overflow:visible}
+.volumeSpeaker{transition:fill .3s ease}
+.volumeWaves{opacity:1;transform-origin:22px 18px;transition:opacity .18s ease,transform .35s ease}
+.volumeQuietStroke{stroke-dasharray:1;stroke-dashoffset:1;opacity:0;transition:stroke-dashoffset .42s cubic-bezier(.2,.7,.2,1),opacity .18s ease}
+.volumePetals{opacity:0;transform-origin:18px 18px;transform:rotate(-12deg) scale(.8);transition:opacity .25s ease,transform .5s cubic-bezier(.2,.8,.2,1)}
+.volume[data-muted=true]>.muteButton{color:var(--ink-accent,#547059);border-color:color-mix(in srgb,var(--ink-petal,#bc8293) 50%,var(--ink-line,#dedcd4));background:linear-gradient(135deg,color-mix(in srgb,var(--ink-petal,#bc8293) 18%,var(--ink-bg,#faf7ef)),color-mix(in srgb,var(--ink-petal,#bc8293) 5%,var(--ink-bg,#faf7ef)));box-shadow:0 2px 7px color-mix(in srgb,var(--ink-text,#273b34) 5%,transparent)}
+.volume[data-muted=true] .volumeSpeaker{fill:color-mix(in srgb,var(--ink-petal,#bc8293) 12%,transparent)}
+.volume[data-muted=true] .volumeWaves{opacity:0;transform:translateX(-2px) scale(.8)}
+.volume[data-muted=true] .volumeQuietStroke{stroke-dashoffset:0;opacity:1}
+.volume[data-muted=true] .volumePetals{opacity:1;transform:rotate(0) scale(1)}
+.volume[data-muted=true] .volumePetals>path:not(.volumeQuietStem){transform-box:fill-box;transform-origin:center;animation:petalSettles .55s cubic-bezier(.2,.8,.2,1) both}
+.volume[data-muted=true] .volumePetals>path:nth-child(2){animation-delay:.06s}
+.deviceVolume{min-inline-size:104px;transition:color .25s ease}
+.volumeValue{min-inline-size:34px}
+.volume[data-muted=true] .deviceVolume,.volume[data-muted=true] .volumeValue{color:var(--ink-accent,#547059)}
+@keyframes petalSettles{0%{transform:translateY(-3px) rotate(-15deg) scale(.7)}65%{transform:translateY(1px) rotate(5deg) scale(1.03)}100%{transform:none}}
+:global([data-reduced-motion]) .volume *, :global([data-reduced-motion]) .volume *::before, :global([data-reduced-motion]) .volume *::after{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.volume *,.volume *::before,.volume *::after{animation:none!important;transition:none!important}}
+@media(forced-colors:active){.volume[data-muted=true]>.muteButton{border-color:Highlight;box-shadow:none}.volume[data-muted=true] .volumeQuietStroke{stroke:ButtonText}.volumePetals{display:none}}

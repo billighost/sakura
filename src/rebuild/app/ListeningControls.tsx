@@ -1,8 +1,7 @@
 "use client";
-import { useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { needsMediaVolumeGain } from "../audio/engine";
 import { Blossom } from "./Brand";
-import { Icon } from "./Icon";
 import s from "./listening-controls.module.css";
 function clock(ms:number){const seconds=Math.floor(Math.max(0,ms)/1000);return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;}
 export function PlaybackRibbon({positionMs,durationMs,onSeek,disabled=false,compact=false,label="Playback position"}:{positionMs:number;durationMs:number;onSeek:(ms:number)=>void;disabled?:boolean;compact?:boolean;label?:string}){
@@ -17,11 +16,25 @@ export function PlaybackRibbon({positionMs,durationMs,onSeek,disabled=false,comp
 const subscribeVolumeDevice=()=>()=>{};
 const fixedNativeVolume=()=>typeof navigator!=="undefined"&&needsMediaVolumeGain();
 const serverNativeVolume=()=>false;
+function VolumeMark(){
+ return <svg className={s.volumeMark} width="30" height="30" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+  <path className={s.volumeSpeaker} d="M7.5 14h4.5l6-5v18l-6-5H7.5Z"/>
+  <g className={s.volumeWaves}><path d="M22 13a8 8 0 0 1 0 10"/><path d="M26 9.5a13 13 0 0 1 0 17"/></g>
+  <path className={s.volumeQuietStroke} pathLength="1" d="M8.5 28Q18.5 18 28.5 8"/>
+  <g className={s.volumePetals} stroke="var(--ink-petal,#bc8293)" strokeWidth=".65" fill="var(--ink-petal,#bc8293)">
+   <path d="M5 8C1 6 1 2 4 2c1 0 1 1 2 1 1-1 3 0 3 1 0 2-2 3-4 4Z"/>
+   <path d="M29 31c0-4 3-7 5-5 1 1 0 2 0 2 1 1 0 3-1 3-2 1-3 0-4 0Z"/>
+   <path className={s.volumeQuietStem} d="M5 29q7 4 15 3" fill="none"/>
+  </g>
+ </svg>;
+}
 export function VolumeControl({value,onChange,compact=false,label="Volume",nativePlayback=false}:{value:number;onChange:(value:number)=>void;compact?:boolean;label?:string;nativePlayback?:boolean}){
  const fixedVolume=useSyncExternalStore(subscribeVolumeDevice,fixedNativeVolume,serverNativeVolume),deviceVolume=nativePlayback&&fixedVolume;
- const last=useRef(.8);const bounded=Math.max(0,Math.min(1,value));const percent=Math.round(bounded*100);
+ const last=useRef(.8);const bounded=Math.max(0,Math.min(1,value));const percent=Math.round(bounded*100),muted=bounded===0;
+ // Every visible surface follows slider/settings changes before restoring sound.
+ useEffect(()=>{if(bounded>0)last.current=bounded;},[bounded]);
  function mute(){if(bounded>0){last.current=bounded;onChange(0);}else onChange(last.current||.8);}
- return <div className={`${s.volume} ${compact?s.volumeCompact:""}`}><button type="button" aria-label={bounded>0?"Mute audio":"Unmute audio"} title={bounded>0?"Mute":"Unmute"} onClick={mute}><Icon name="volume" size={18}/>{!compact&&<span>{label}</span>}</button>{deviceVolume?<span className={s.deviceVolume}>Use device volume</span>:<><div className={s.volumeBranch}><svg viewBox="0 0 150 38" aria-hidden="true"><path className={s.stem} d="M5 28Q60 27 143 10"/>{Array.from({length:10},(_,i)=><ellipse key={i} cx={16+i*13} cy={i%2?25-i*.8:17-i*.8} rx={3+i*.35} ry={5+i*.4} transform={`rotate(${i%2?50:-45} ${16+i*13} ${i%2?25-i*.8:17-i*.8})`} className={bounded>=(i+1)/10?s.litPetal:s.quietPetal}/>)}</svg><input aria-label={label} aria-valuetext={percent===0?"Muted":`${percent} percent`} type="range" min={0} max={1} step={.01} value={bounded} onChange={e=>onChange(Number(e.target.value))}/></div><span className={s.volumeValue} aria-hidden="true">{percent===0?"quiet":percent+"%"}</span></>}</div>;
+ return <div className={`${s.volume} ${compact?s.volumeCompact:""}`} data-muted={muted} data-device-volume={deviceVolume||undefined}><button type="button" className={s.muteButton} aria-label={muted?"Unmute audio":"Mute audio"} aria-pressed={muted} title={muted?"Unmute · bring the sound back":"Mute · let the sound rest"} onClick={mute}><VolumeMark/>{!compact&&<span>{label}</span>}</button>{deviceVolume?<span className={s.deviceVolume}>{muted?"Muted":"Use device volume"}</span>:<><div className={s.volumeBranch}><svg viewBox="0 0 150 38" aria-hidden="true"><path className={s.stem} d="M5 28Q60 27 143 10"/>{Array.from({length:10},(_,i)=><ellipse key={i} cx={16+i*13} cy={i%2?25-i*.8:17-i*.8} rx={3+i*.35} ry={5+i*.4} transform={`rotate(${i%2?50:-45} ${16+i*13} ${i%2?25-i*.8:17-i*.8})`} className={bounded>=(i+1)/10?s.litPetal:s.quietPetal}/>)}</svg><input aria-label={label} aria-valuetext={muted?"Muted":`${percent} percent`} type="range" min={0} max={1} step={.01} value={bounded} onChange={e=>onChange(Number(e.target.value))}/></div><span className={s.volumeValue} aria-hidden="true">{muted?"muted":percent+"%"}</span></>}</div>;
 }
 export function GardenSlider({value,onChange,label,min=0,max=1,step=.05,valueText}:{value:number;onChange:(value:number)=>void;label:string;min?:number;max?:number;step?:number;valueText?:string}){
  const bounded=Math.max(min,Math.min(max,value)),percent=(bounded-min)/Math.max(.001,max-min)*100;

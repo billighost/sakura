@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {chromium,expect as expectBase} from '@playwright/test';
 import {build} from 'esbuild';
 import path from 'node:path';
+import {fixtureReadingEngine} from './fixtures/reading-engine.mjs';
 const base=process.env.SAKURA_TEST_URL||'http://localhost:3012',expect=expectBase.configure({timeout:30000});
 let fixture=await fs.readFile('scripts/fixtures/resource-cache-room.tsx','utf8');fixture=fixture.replace('retry:()=>void;','publish:(lyrics:PlayerLyrics)=>Promise<void>;retry:()=>void;').replace('retry:first.retry,','publish:first.applyPublishedLyrics,retry:first.retry,');
 fixture+='\nimport {createRoot} from "react-dom/client"; createRoot(document.getElementById("cache-root")!).render(<ResourceCacheRoom/>);';
@@ -33,7 +34,7 @@ async function room(timing='plain',malformed=false){
    };
   }
  });
- await context.route('**/api/v2/**',async route=>{const url=new URL(route.request().url());if(url.pathname==='/api/v2/readings'){const input=route.request().postDataJSON(),engine=input.language==='ja'?'ja-ipadic-hepburn-v1':`multilingual-reading-v1:${input.language}`;return route.fulfill({json:{engine,lines:input.lines.map(line=>({...line,romanized:'review guide',readingEngine:engine}))}});}if(url.pathname!=='/api/v2/lyrics')return route.fulfill({json:{}});calls++;if(blocked)return route.abort('internetdisconnected');if(wrong)return wrong==='json'?route.fulfill({status:404,json:{error:'Proxy route unavailable'}}):route.fulfill({status:404,contentType:'text/html',body:'<html><h1>Proxy route unavailable</h1></html>'});return route.fulfill({json:{schemaVersion:'verified-lyrics-v3',provider:'review fixture',providerTrackId:1,timing,lines:oldLines}});});
+ await context.route('**/api/v2/**',async route=>{const url=new URL(route.request().url());if(url.pathname==='/api/v2/readings'){const input=route.request().postDataJSON(),engine=fixtureReadingEngine(input.language);return route.fulfill({json:{engine,lines:input.lines.map(line=>({...line,romanized:'review guide',readingEngine:engine}))}});}if(url.pathname!=='/api/v2/lyrics')return route.fulfill({json:{}});calls++;if(blocked)return route.abort('internetdisconnected');if(wrong)return wrong==='json'?route.fulfill({status:404,json:{error:'Proxy route unavailable'}}):route.fulfill({status:404,contentType:'text/html',body:'<html><h1>Proxy route unavailable</h1></html>'});return route.fulfill({json:{schemaVersion:'verified-lyrics-v3',provider:'review fixture',providerTrackId:1,timing,lines:oldLines}});});
  const load=async()=>{await page.goto(base+'/cache-review',{waitUntil:'domcontentloaded',timeout:90000});await expect(page.locator('[data-cache-state]')).toBeVisible();};
  const data=()=>page.evaluate(()=>window.cacheProbe?.data);
  return {context,page,load,data,calls:()=>calls,good:()=>{wrong=false;},block:()=>{blocked=true;}};
@@ -97,10 +98,16 @@ try{
     try{await window.cacheProbe.read('zh');return {error:null};}catch(error){return {error:error.message};}
    });
    await fs.writeFile('.local/cache-review-legacy-guides-report.json',JSON.stringify({verifiedAt:new Date().toISOString(),...reading},null,2));
-   assert.equal(reading.error,null);await expect.poll(async()=>(await r.data())?.lines[0].romanized).toBe('legacy zh guide');
+   assert.match(reading.error,/Reconnect once/);assert.equal((await r.data()).lines[0].romanized,undefined);
+   await r.page.evaluate(async()=>{
+    localStorage.removeItem('review-offline');Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>true});
+    await window.cacheProbe.read('zh');
+   });
+   await expect.poll(async()=>(await r.data())?.lines[0].romanized).toBe('review guide');
+   assert.equal((await r.data()).timing,'synced');assert.equal(r.calls(),1);
    await r.page.evaluate(published=>window.cacheProbe.publish(published),published);
    await r.load();await expect.poll(async()=>(await r.data())?.lines[0].text).toBe('New published words');assert.equal(r.calls(),1);
-   results.push({passed:'Multiple historical keys preserve synced lyrics and completed guides over plain or malformed copies, while a newer deliberate publication stays authoritative'});
+   results.push({passed:'Multiple historical keys preserve synced lyrics over plain or malformed copies; obsolete readings regenerate after reconnecting and a newer deliberate publication stays authoritative'});
   }finally{await r.context.close();}
  }
  await fs.writeFile('.local/cache-review-verified-report.json',JSON.stringify({verifiedAt:new Date().toISOString(),results},null,2));console.log(JSON.stringify(results,null,2));

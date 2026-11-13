@@ -1,0 +1,620 @@
+{
+  "checkedAt": "2026-11-13T17:40:40.917Z",
+  "scope": "Read-only live Deezer/LRCLIB original lyric captures and independently chosen short song excerpts; no audio/account/publication requests.",
+  "limits": {
+    "maximumRequests": 24,
+    "maximumBytes": 4194304,
+    "maximumResponseBytes": 1048576,
+    "totalTimeoutMs": 180000
+  },
+  "traffic": {
+    "newRequests": 2,
+    "newBytes": 188508,
+    "requests": [
+      {
+        "id": "catalogue:tian-mi-mi",
+        "url": "https://api.deezer.com/search?q=%E7%94%9C%E8%9C%9C%E8%9C%9C+Teresa+Teng&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:31:05.638Z",
+        "bytes": 10842
+      },
+      {
+        "id": "catalogue:moon-heart",
+        "url": "https://api.deezer.com/search?q=%E6%9C%88%E4%BA%AE%E4%BB%A3%E8%A1%A8%E6%88%91%E7%9A%84%E5%BF%83+Teresa+Teng&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:14.771Z",
+        "bytes": 17936
+      },
+      {
+        "id": "tian-mi-mi",
+        "url": "https://lrclib.net/api/search?track_name=%E7%94%9C%E8%9C%9C%E8%9C%9C&artist_name=%E9%82%93%E4%B8%BD%E5%90%9B",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:31:05.728Z",
+        "bytes": 97858
+      },
+      {
+        "id": "moon-heart",
+        "url": "https://lrclib.net/api/search?track_name=%E6%9C%88%E4%BA%AE%E4%BB%A3%E8%A1%A8%E6%88%91%E7%9A%84%E5%BF%83&artist_name=%E9%82%93%E4%B8%BD%E5%90%9B",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:18.980Z",
+        "bytes": 92085
+      },
+      {
+        "id": "catalogue:world-this-big",
+        "url": "https://api.deezer.com/search?q=%E4%B8%96%E7%95%8C%E8%BF%99%E4%B9%88%E5%A4%A7%E8%BF%98%E6%98%AF%E9%81%87%E8%A7%81%E4%BD%A0+Cheng+Xiang&limit=10",
+        "status": 200,
+        "bytes": 2280,
+        "capturedAt": "2026-11-13T17:40:38.166Z"
+      },
+      {
+        "id": "catalogue:yoru-ni-kakeru",
+        "url": "https://api.deezer.com/search?q=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B+YOASOBI&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:19.632Z",
+        "bytes": 24011
+      },
+      {
+        "id": "yoru-ni-kakeru",
+        "url": "https://lrclib.net/api/search?track_name=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist_name=YOASOBI",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:31:05.968Z",
+        "bytes": 243870
+      },
+      {
+        "id": "catalogue:lemon",
+        "url": "https://api.deezer.com/search?q=Lemon+Kenshi+Yonezu&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:18.984Z",
+        "bytes": 21504
+      },
+      {
+        "id": "lemon",
+        "url": "https://lrclib.net/api/search?track_name=Lemon&artist_name=Kenshi+Yonezu",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:38.602Z",
+        "bytes": 207751
+      },
+      {
+        "id": "catalogue:spring-day",
+        "url": "https://api.deezer.com/search?q=Spring+Day+BTS&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:19.976Z",
+        "bytes": 21309
+      },
+      {
+        "id": "spring-day",
+        "url": "https://lrclib.net/api/search?track_name=Spring+Day&artist_name=BTS",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:31:05.992Z",
+        "bytes": 329459
+      },
+      {
+        "id": "catalogue:gruppa-krovi",
+        "url": "https://api.deezer.com/search?q=Gruppa+Krovi+Kino&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:21.419Z",
+        "bytes": 2306
+      },
+      {
+        "id": "world-this-big",
+        "url": "https://lrclib.net/api/search?track_name=%E4%B8%96%E7%95%8C%E8%BF%99%E4%B9%88%E5%A4%A7%E8%BF%98%E6%98%AF%E9%81%87%E8%A7%81%E4%BD%A0&artist_name=%E7%A8%8B%E5%93%8D",
+        "status": 200,
+        "bytes": 186228,
+        "capturedAt": "2026-11-13T17:40:40.691Z"
+      },
+      {
+        "id": "gruppa-krovi",
+        "url": "https://lrclib.net/api/search?track_name=%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0+%D0%BA%D1%80%D0%BE%D0%B2%D0%B8&artist_name=%D0%9A%D0%B8%D0%BD%D0%BE",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:39.566Z",
+        "bytes": 161546
+      },
+      {
+        "id": "catalogue:chervona-ruta",
+        "url": "https://api.deezer.com/search?q=Chervona+Ruta+Sofia+Rotaru&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:21.737Z",
+        "bytes": 21
+      },
+      {
+        "id": "chervona-ruta",
+        "url": "https://lrclib.net/api/search?track_name=%D0%A7%D0%B5%D1%80%D0%B2%D0%BE%D0%BD%D0%B0+%D1%80%D1%83%D1%82%D0%B0&artist_name=%D0%A1%D0%BE%D1%84%D1%96%D1%8F+%D0%A0%D0%BE%D1%82%D0%B0%D1%80%D1%83",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:39.002Z",
+        "bytes": 43515
+      },
+      {
+        "id": "catalogue:dodeka",
+        "url": "https://api.deezer.com/search?q=Dodeka+Anna+Vissi&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:21.950Z",
+        "bytes": 12759
+      },
+      {
+        "id": "catalogue:tum-hi-ho",
+        "url": "https://api.deezer.com/search?q=Tum+Hi+Ho+Arijit+Singh&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:22.223Z",
+        "bytes": 21895
+      },
+      {
+        "id": "dodeka",
+        "url": "https://lrclib.net/api/search?track_name=Dodeka&artist_name=Anna+Vissi",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:39.600Z",
+        "bytes": 113230
+      },
+      {
+        "id": "tum-hi-ho",
+        "url": "https://lrclib.net/api/search?track_name=Tum+Hi+Ho&artist_name=Arijit+Singh",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:39.931Z",
+        "bytes": 118104
+      },
+      {
+        "id": "catalogue:tamally-maak",
+        "url": "https://api.deezer.com/search?q=Tamally+Maak+Amr+Diab&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:37:22.272Z",
+        "bytes": 21160
+      },
+      {
+        "id": "tamally-maak",
+        "url": "https://lrclib.net/api/search?track_name=Tamally+Maak&artist_name=Amr+Diab",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T17:35:40.017Z",
+        "bytes": 209189
+      }
+    ]
+  },
+  "summary": {
+    "songs": 11,
+    "excerptChecksPassed": 11,
+    "liveMatched": 9,
+    "liveExcerptChecksPassed": 9,
+    "correctnessFailures": []
+  },
+  "cases": [
+    {
+      "id": "tian-mi-mi",
+      "title": "甜蜜蜜",
+      "artist": "邓丽君",
+      "language": "zh",
+      "engine": "multilingual-reading-v2:zh",
+      "independentExcerpt": {
+        "text": "甜蜜蜜你笑得甜蜜蜜",
+        "expected": "tián mì mì nǐ xiào de tián mì mì",
+        "actual": "tián mì mì nǐ xiào de tián mì mì",
+        "mode": "pinyin",
+        "correct": true,
+        "languageDetected": "zh",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 7295422,
+        "title": "甜蜜蜜",
+        "artist": "鄧麗君",
+        "durationSeconds": 212
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 7977130,
+        "providerTitle": "甜蜜蜜",
+        "providerArtist": "邓丽君",
+        "durationSeconds": 208,
+        "timing": "synced",
+        "lines": 34,
+        "languageDetected": "zh",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "88d565c257f5761d135a3901c36181a09b173644081590cabe5d9cca1abbb9df",
+        "capturedAt": "2026-11-13T17:31:05.728Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "moon-heart",
+      "title": "月亮代表我的心",
+      "artist": "鄧麗君",
+      "language": "zh",
+      "engine": "multilingual-reading-v2:zh",
+      "independentExcerpt": {
+        "text": "你問我愛你有多深",
+        "expected": "nǐ wèn wǒ ài nǐ yǒu duō shēn",
+        "actual": "nǐ wèn wǒ ài nǐ yǒu duō shēn",
+        "mode": "pinyin",
+        "correct": true,
+        "languageDetected": "zh",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 10496619,
+        "title": "月亮代表我的心",
+        "artist": "Teresa Teng",
+        "durationSeconds": 208
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 32207615,
+        "providerTitle": "月亮代表我的心",
+        "providerArtist": "邓丽君",
+        "durationSeconds": 208,
+        "timing": "synced",
+        "lines": 28,
+        "languageDetected": "zh",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "7c8a82910ff9cc8dfc4b39b602077418eb800050211519804d1dd1ac9a708060",
+        "capturedAt": "2026-11-13T17:35:18.980Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "world-this-big",
+      "title": "世界這麼大還是遇見你",
+      "artist": "程響",
+      "language": "zh",
+      "engine": "multilingual-reading-v2:zh",
+      "independentExcerpt": {
+        "text": "世界這麼大還是遇見你",
+        "expected": "shì jiè zhè me dà hái shì yù jiàn nǐ",
+        "actual": "shì jiè zhè me dà hái shì yù jiàn nǐ",
+        "mode": "pinyin",
+        "correct": true,
+        "languageDetected": "zh",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 967860842,
+        "title": "世界这么大还是遇见你",
+        "artist": "程响",
+        "durationSeconds": 237
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 6652336,
+        "providerTitle": "世界这么大还是遇见你",
+        "providerArtist": "程响",
+        "durationSeconds": 237,
+        "timing": "synced",
+        "lines": 48,
+        "languageDetected": "zh",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "40379e3932691da408e23fe5e152f1e51f79e4031d30a80ef8875843fe035dd4",
+        "capturedAt": "2026-11-13T17:40:40.691Z",
+        "replayedCapture": false,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "yoru-ni-kakeru",
+      "title": "夜に駆ける",
+      "artist": "YOASOBI",
+      "language": "ja",
+      "engine": "ja-ipadic-hepburn-v2",
+      "independentExcerpt": {
+        "text": "沈むように溶けてゆくように",
+        "expected": "shizumu you ni tokete yuku you ni",
+        "actual": "shizumu you ni toke te yuku you ni",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "ja",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 824731152,
+        "title": "夜に駆ける",
+        "artist": "YOASOBI",
+        "durationSeconds": 261
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 959121,
+        "providerTitle": "夜に駆ける",
+        "providerArtist": "YOASOBI",
+        "durationSeconds": 259,
+        "timing": "plain",
+        "lines": 69,
+        "languageDetected": "ja",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "06b0b5ed6682b3bc3be6e6951b118cdf60af7b1a54cc9d385df07f2c44c32437",
+        "capturedAt": "2026-11-13T17:31:05.968Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "lemon",
+      "title": "Lemon",
+      "artist": "米津玄師",
+      "language": "ja",
+      "engine": "ja-ipadic-hepburn-v2",
+      "independentExcerpt": {
+        "text": "夢ならばどれほどよかったでしょう",
+        "expected": "yume naraba dorehodo yokatta deshou",
+        "actual": "yume nara ba dorehodo yokatta deshou",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "ja",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 1355376732,
+        "title": "Lemon",
+        "artist": "Kenshi Yonezu",
+        "durationSeconds": 256
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 65910,
+        "providerTitle": "Lemon",
+        "providerArtist": "Kenshi Yonezu",
+        "durationSeconds": 256,
+        "timing": "synced",
+        "lines": 37,
+        "languageDetected": "ja",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "31de614742ede83f8c4d691cb0159b4ce9d29a580a27c758fce0f2dfa7cfbb81",
+        "capturedAt": "2026-11-13T17:35:38.602Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "spring-day",
+      "title": "Spring Day",
+      "artist": "BTS",
+      "language": "ko",
+      "engine": "multilingual-reading-v2:ko",
+      "independentExcerpt": {
+        "text": "보고 싶다",
+        "expected": "bogo sipda",
+        "actual": "bogo sipda",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "ko",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 1783253587,
+        "title": "Spring Day",
+        "artist": "BTS",
+        "durationSeconds": 274
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 942431,
+        "providerTitle": "Spring Day",
+        "providerArtist": "BTS",
+        "durationSeconds": 274,
+        "timing": "synced",
+        "lines": 51,
+        "languageDetected": "ko",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "d3be858339f39c5c171369dedf911473697acd999fcd6fefb7de5567c81c46a9",
+        "capturedAt": "2026-11-13T17:31:05.992Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "gruppa-krovi",
+      "title": "Группа крови",
+      "artist": "Кино",
+      "language": "ru",
+      "engine": "multilingual-reading-v2:ru",
+      "independentExcerpt": {
+        "text": "Группа крови на рукаве",
+        "expected": "gruppa krovi na rukave",
+        "actual": "Gruppa krovi na rukave",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "ru",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 448260732,
+        "title": "Группа крови",
+        "artist": "Кино",
+        "durationSeconds": 284
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 1023396,
+        "providerTitle": "Группа крови",
+        "providerArtist": "Кино",
+        "durationSeconds": 284,
+        "timing": "synced",
+        "lines": 27,
+        "languageDetected": "ru",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "3686bd3ab4ed0a5a1af9ed898f46e894e10146a64b508efa3401928231306024",
+        "capturedAt": "2026-11-13T17:35:39.566Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "chervona-ruta",
+      "title": "Червона рута",
+      "artist": "Софія Ротару",
+      "language": "uk",
+      "engine": "multilingual-reading-v2:uk",
+      "independentExcerpt": {
+        "text": "Червону руту не шукай вечорами",
+        "expected": "chervonu rutu ne shukai vechoramy",
+        "actual": "Chervonu rutu ne shukai vechoramy",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "uk",
+        "hintRequired": true
+      },
+      "live": {
+        "status": "unavailable",
+        "reason": "Multiple editions have different durations; recording metadata is required",
+        "candidates": 6,
+        "sourceScriptCandidates": 6,
+        "capturedAt": "2026-11-13T17:35:39.002Z",
+        "replayedCapture": true
+      }
+    },
+    {
+      "id": "dodeka",
+      "title": "Δώδεκα",
+      "artist": "Άννα Βίσση",
+      "language": "el",
+      "engine": "multilingual-reading-v2:el",
+      "independentExcerpt": {
+        "text": "Δώδεκα κι ούτε ένα τηλεφώνημα",
+        "expected": "dodeka ki oute ena tilefonima",
+        "actual": "Dodeka ki oute ena tilefonima",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "el",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 64500675,
+        "title": "Dodeka",
+        "artist": "Anna Vissi",
+        "durationSeconds": 321
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 13087697,
+        "providerTitle": "Dodeka",
+        "providerArtist": "Anna Vissi",
+        "durationSeconds": 322,
+        "timing": "synced",
+        "lines": 53,
+        "languageDetected": "el",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "ba3e267f9ec60ef1da0e16a87875b039bc12d5960b4ec86d963e76a21ecaddb4",
+        "capturedAt": "2026-11-13T17:35:39.600Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "tum-hi-ho",
+      "title": "Tum Hi Ho",
+      "artist": "Arijit Singh",
+      "language": "hi",
+      "engine": "multilingual-reading-v2:hi",
+      "independentExcerpt": {
+        "text": "हम तेरे बिन अब रह नहीं सकते",
+        "expected": "ham tere bin ab rah nahin sakte",
+        "actual": "ham tere bin ab rah nahīn sakte",
+        "mode": "pronunciation",
+        "correct": true,
+        "languageDetected": "hi",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 3191972361,
+        "title": "Tum Hi Ho",
+        "artist": "Arijit Singh",
+        "durationSeconds": 261
+      },
+      "live": {
+        "status": "unavailable",
+        "reason": "No verified title, artist, language and duration match",
+        "candidates": 20,
+        "sourceScriptCandidates": 0,
+        "capturedAt": "2026-11-13T17:35:39.931Z",
+        "replayedCapture": true
+      }
+    },
+    {
+      "id": "tamally-maak",
+      "title": "Tamally Maak",
+      "artist": "Amr Diab",
+      "language": "ar",
+      "engine": "multilingual-reading-v2:ar",
+      "independentExcerpt": {
+        "text": "تملي معاك",
+        "expected": "tmly mʿāk",
+        "actual": "tmly mʿāk",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "ar",
+        "hintRequired": false
+      },
+      "catalogue": {
+        "provider": "deezer",
+        "id": 81102882,
+        "title": "Tamally Maak",
+        "artist": "Amr Diab",
+        "durationSeconds": 271
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 19004212,
+        "providerTitle": "Tamally Maak",
+        "providerArtist": "Amr Diab",
+        "durationSeconds": 272,
+        "timing": "synced",
+        "lines": 32,
+        "languageDetected": "ar",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "791076e3f897eba97007703bdbd0bbd19879b712fb5f15673d927908fa40edb8",
+        "capturedAt": "2026-11-13T17:35:40.017Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    }
+  ],
+  "limitations": [
+    "A live response proves provider text was processed, not that every word of a full song has a manually reviewed reading.",
+    "Short excerpt pronunciation expectations are independent of the engine; Hindi/Greek/Cyrillic word spacing and macrons normalize for comparison.",
+    "Unvowelled Arabic checks script transliteration only; unwritten vowels and dialect cannot be recovered from consonants.",
+    "Cyrillic alone cannot always distinguish Ukrainian from Russian; the Ukrainian excerpt requires a verified language hint.",
+    "Mandarin Pinyin does not supply Cantonese readings or all singer-specific poetic pronunciations.",
+    "Provider matches use known title/artist aliases and edition gates; externally matched Deezer recordings additionally supply the duration gate."
+  ]
+}
