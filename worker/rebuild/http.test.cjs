@@ -8,13 +8,13 @@ class DocumentAttributeAudio{constructor(value){Object.assign(this,value);}}
 class InputDocumentFileLocation{constructor(value){Object.assign(this,value);}}
 const api={Document,DocumentAttributeAudio,InputDocumentFileLocation};
 
-function fixture(measure=false){
- const bytes=Buffer.alloc(5000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
- const state={fileId:123,downloads:0,handler:null};
+function fixture(measure=false,size=5000){
+ const bytes=Buffer.alloc(size);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ const state={fileId:123,downloads:0,handler:null,requests:[]};
  class TelegramWorkerClient{
   constructor(){
    this.botQueue={depth:0,run:operation=>operation()};
-   this.client={async getEntity(){return"primary";},async getMessages(){return[{id:42,media:{document:new Document({id:state.fileId,accessHash:456,fileReference:Buffer.from("generated"),dcId:1,size:bytes.length,mimeType:"audio/mpeg",attributes:[new DocumentAttributeAudio({title:"Generated track",performer:"Generated artist",duration:191})]})}}];},async *iterDownload(options){state.downloads++;yield bytes.subarray(options.offset);}};
+   this.client={async getEntity(){return"primary";},async getMessages(){return[{id:42,media:{document:new Document({id:state.fileId,accessHash:456,fileReference:Buffer.from("generated"),dcId:1,size:bytes.length,mimeType:"audio/mpeg",attributes:[new DocumentAttributeAudio({title:"Generated track",performer:"Generated artist",duration:191})]})}}];},async *iterDownload(options){state.downloads++;state.requests.push({offset:options.offset,length:options.requestSize});for(let chunk=0;chunk<options.limit;chunk++){const offset=options.offset+chunk*options.requestSize,part=bytes.subarray(offset,offset+options.requestSize);if(!part.length)return;yield part;}}};
   }
   queueFor(){return this.botQueue;}
   async _ensureConnected(){}
@@ -75,4 +75,18 @@ test("actual scoped signed HTTP rejects document tag tampering and conflicting c
  }
  assert.equal((await request("GET",signed.path,{"if-match":"\"other-file\""})).status,412);assert.equal(state.downloads,0);
  assert.equal((await request("POST","/v2/sign-audio",bearer,{chatScope:"primary",messageId:"42",documentTag:"invalid"})).status,400);
+});
+
+test("signed worker playback hint streams later ranges early while ordinary downloads keep bulk requests",async()=>{
+ const {state,bytes,request,bearer,tag}=fixture(false,800000);
+ const signed=JSON.parse((await request("POST","/v2/sign-audio",bearer,{chatScope:"primary",messageId:"42",documentTag:tag})).bytes.toString());
+ const range="bytes=262144-524287",expected=bytes.subarray(262144,524288);
+ const normal=await request("GET",signed.path,{range});assert.equal(normal.status,206);assert.deepEqual(normal.bytes,expected);
+ assert.deepEqual(state.requests,[{offset:262144,length:262144}]);state.requests.length=0;
+ const playing=await request("GET",signed.path,{range,"x-sakura-playback":"1"});assert.equal(playing.status,206);assert.deepEqual(playing.bytes,expected);
+ assert.deepEqual(state.requests,[{offset:262144,length:32768},{offset:294912,length:32768},{offset:327680,length:65536},{offset:393216,length:65536},{offset:458752,length:65536}]);state.requests.length=0;
+ await request("GET",signed.path,{range,"x-sakura-playback":"true"});assert.deepEqual(state.requests,[{offset:262144,length:262144}]);state.requests.length=0;
+ const native=await request("GET",signed.path,{range,"sec-fetch-dest":"audio"});assert.equal(native.status,206);assert.deepEqual(native.bytes,expected);assert.equal(state.requests[0].length,32768);
+ const options=await request("OPTIONS",signed.path,{"access-control-request-headers":"X-Sakura-Playback"});
+ assert.equal(options.status,204);assert.match(options.headers["Access-Control-Allow-Headers"],/X-Sakura-Playback/);
 });

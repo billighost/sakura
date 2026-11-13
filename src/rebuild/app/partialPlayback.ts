@@ -10,8 +10,9 @@ interface AudioBridge {
  sha256:string;
  fallbackUrl:string;
  mimeType?:string;
+ nativeOpening?:boolean;
 }
-interface BridgeLease {url:string;expiresAt:number;ensureChunk?:(offset:number,signal:AbortSignal)=>Promise<unknown>}
+interface BridgeLease {url:string;expiresAt:number;ensureChunk?:(offset:number,signal:AbortSignal,opening?:boolean)=>Promise<unknown>}
 const leases=new Map<string,BridgeLease>();
 const requests=new Map<string,{controller:AbortController;token:string}>();
 let listening=false;
@@ -31,13 +32,13 @@ function listenForChunks(){
  listening=true;
  navigator.serviceWorker.addEventListener("controllerchange",()=>{bridgeEpoch++;for(const request of requests.values())request.controller.abort();requests.clear();leases.clear();});
  navigator.serviceWorker.addEventListener("message",event=>{
-  const data=event.data as {type?:string;token?:string;requestId?:string;offset?:number};
+  const data=event.data as {type?:string;token?:string;requestId?:string;offset?:number;opening?:boolean};
   if(data.type==="sakura-audio-cancel"&&data.requestId){requests.get(data.requestId)?.controller.abort();return;}
   if(data.type!=="sakura-audio-chunk"||!data.token||!data.requestId||!event.ports[0])return;
   const port=event.ports[0],lease=leases.get(data.token);
   if(!lease?.ensureChunk||typeof data.offset!=="number"||!Number.isSafeInteger(data.offset)||data.offset<0){port.postMessage({status:"unavailable"});port.close();return;}
   const controller=new AbortController();requests.set(data.requestId,{controller,token:data.token});
-  void lease.ensureChunk(data.offset!,controller.signal).then(chunk=>port.postMessage({status:chunk===undefined?"unavailable":"ready"}),error=>port.postMessage({status:chunkFailureStatus(error)})).finally(()=>{requests.delete(data.requestId!);port.close();});
+  void lease.ensureChunk(data.offset!,controller.signal,data.opening===true).then(chunk=>port.postMessage({status:chunk===undefined?"unavailable":"ready"}),error=>port.postMessage({status:chunkFailureStatus(error)})).finally(()=>{requests.delete(data.requestId!);port.close();});
  });
 }
 
@@ -52,7 +53,7 @@ function releaseLease(token:string){
 }
 
 /** A private, client-bound media URL joins saved chunks to their exact source. */
-export async function partialPlaybackUrl(accountId:string,source:DownloadSource,ensureChunk?:(offset:number,signal:AbortSignal)=>Promise<unknown>):Promise<string|undefined>{
+export async function partialPlaybackUrl(accountId:string,source:DownloadSource,ensureChunk?:(offset:number,signal:AbortSignal,opening?:boolean)=>Promise<unknown>):Promise<string|undefined>{
  if(typeof navigator==="undefined"||!("serviceWorker" in navigator)||!navigator.serviceWorker.controller||!uuid.test(accountId)||!uuid.test(source.track.id)||!uuid.test(source.assetId)||!Number.isSafeInteger(source.sizeBytes)||source.sizeBytes<=0||source.sizeBytes>120*1024*1024||!source.sha256||!/^[a-f0-9]{64}$/i.test(source.sha256)||!source.fallbackUrl)return;
  let fallback:URL;
  try{fallback=new URL(source.fallbackUrl,location.origin);if(fallback.origin!==location.origin||fallback.pathname!=="/api/v2/recordings/"+source.track.id+"/audio"||fallback.searchParams.get("assetId")!==source.assetId||fallback.username||fallback.password||fallback.hash)return;}catch{return;}
@@ -63,7 +64,7 @@ export async function partialPlaybackUrl(accountId:string,source:DownloadSource,
  listenForChunks();
  const epoch=bridgeEpoch;
  const token=crypto.randomUUID(),url="/_sakura/audio/"+token;
- const bridge:AudioBridge={accountId,recordingId:source.track.id,assetId:source.assetId,sizeBytes:source.sizeBytes,sha256:source.sha256.toLowerCase(),fallbackUrl:fallback.pathname+fallback.search,mimeType:source.mimeType||source.track.readyPlayback?.mimeType};
+ const bridge:AudioBridge={accountId,recordingId:source.track.id,assetId:source.assetId,sizeBytes:source.sizeBytes,sha256:source.sha256.toLowerCase(),fallbackUrl:fallback.pathname+fallback.search,mimeType:source.mimeType||source.track.readyPlayback?.mimeType,nativeOpening:true};
  const supported=await new Promise<boolean>(resolve=>{
   const channel=new MessageChannel();
   const timer=setTimeout(()=>{channel.port1.close();resolve(false);},1500);

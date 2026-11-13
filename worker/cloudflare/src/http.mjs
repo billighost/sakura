@@ -5,7 +5,7 @@ import streaming from '../../rebuild/core/streaming.js';
 export const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Range, If-Range, If-Match, Authorization, Content-Type',
+  'Access-Control-Allow-Headers': 'Range, If-Range, If-Match, Authorization, Content-Type, X-Sakura-Playback',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, ETag, X-Audio-Size, Retry-After',
   'Access-Control-Max-Age': '86400'
 };
@@ -48,5 +48,6 @@ export function audioHeaders(request, audio) {
   const start = range.status === 'range' ? range.start : 0, end = range.status === 'range' ? range.end : audio.size - 1;
   headers['Content-Length'] = String(end - start + 1);
   if (range.status === 'range') headers['Content-Range'] = `bytes ${start}-${end}/${audio.size}`;
-  return { start, length: end - start + 1, headers, status: range.status === 'range' ? 206 : 200 };
+  return { start, length: end - start + 1, headers, status: range.status === 'range' ? 206 : 200,
+    playback: request.method === 'GET' && (request.headers.get('X-Sakura-Playback') === '1' || request.headers.get('Sec-Fetch-Dest') === 'audio') };
 }

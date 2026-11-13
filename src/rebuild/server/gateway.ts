@@ -22,7 +22,7 @@ async function waitForSource<T>(work:Promise<T>,signal?:AbortSignal):Promise<T>{
 
 export interface AudioTransport {
   /** Only a repository-resolved asset may reach a transport. No client URL input. */
-  open(asset: StoredAudioAsset, range: string | null, signal?: AbortSignal): Promise<Response>;
+  open(asset: StoredAudioAsset, range: string | null, signal?: AbortSignal, options?: { playback?: boolean }): Promise<Response>;
 }
 export interface SourceTransportOptions {
   allowedCdnOrigins: readonly string[];
@@ -102,7 +102,7 @@ export class SourceAudioTransport implements AudioTransport {
       this.signed.set(key,{url:url.toString(),expires});return url.toString();
     }catch{return undefined;}
   }
-  async open(asset: StoredAudioAsset, range: string | null, signal?: AbortSignal): Promise<Response> {
+  async open(asset: StoredAudioAsset, range: string | null, signal?: AbortSignal, options?: { playback?: boolean }): Promise<Response> {
     if (asset.locator.kind === "https") {
       let url = safeUrl(asset.locator.url, this.origins);
       for (let redirect = 0; redirect <= 3; redirect++) {
@@ -152,7 +152,7 @@ export class SourceAudioTransport implements AudioTransport {
     signal?.throwIfAborted();
     const documentTag=workerDocumentTag(asset);
     return fetchAudioHeaders(new URL(scoped?`/v2/audio/${asset.locator.chatScope}/${asset.locator.messageId}`:`/audio/${asset.locator.messageId}`, base).toString(), {
-      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(documentTag?{"If-Match":documentTag}:{}), ...(range ? { Range: range,...(documentTag?{"If-Range":documentTag}:{}) } : {}) },
+      signal, headerTimeoutMs: this.options.headerTimeoutMs ?? 8000, redirect: "error", headers: { ...headers, "Accept-Encoding": "identity", ...(options?.playback?{"X-Sakura-Playback":"1"}:{}), ...(documentTag?{"If-Match":documentTag}:{}), ...(range ? { Range: range,...(documentTag?{"If-Range":documentTag}:{}) } : {}) },
     }, this.fetcher);
   }
 }
@@ -200,7 +200,7 @@ function validAudioResponse(response:Response,asset:StoredAudioAsset,range:Retur
 /** Auth is handled by the route; this gateway repeats asset ownership and identity checks. */
 export class RecordingAudioGateway {
   constructor(private readonly repository: RecordingRepository, private readonly transport: AudioTransport) {}
-  async serve(input: { recordingId: string; assetId: string; accountId: string; range?: string | null; ifRange?: string | null; method?: "GET" | "HEAD"; signal?: AbortSignal }): Promise<Response> {
+  async serve(input: { recordingId: string; assetId: string; accountId: string; range?: string | null; ifRange?: string | null; method?: "GET" | "HEAD"; signal?: AbortSignal; playback?: boolean }): Promise<Response> {
     if (!isUuid(input.recordingId) || !isUuid(input.assetId) || !isUuid(input.accountId)) return jsonError(400, "invalid-recording-reference");
     if (!this.repository.initialized) return jsonError(503, "backend-not-initialized");
     input.signal?.throwIfAborted();
@@ -241,7 +241,7 @@ export class RecordingAudioGateway {
       const sourceRange=range.status === "range" ? `bytes=${range.start}-${range.end}` : null;
       const open=async(candidate:StoredAudioAsset)=>{
         input.signal?.throwIfAborted();
-        const response=await this.transport.open(candidate,sourceRange,input.signal);
+        const response=await this.transport.open(candidate,sourceRange,input.signal,input.playback?{playback:true}:undefined);
         if(input.signal?.aborted){await response.body?.cancel(input.signal.reason).catch(()=>{});input.signal.throwIfAborted();}
         return response;
       };

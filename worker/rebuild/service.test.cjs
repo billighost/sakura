@@ -58,6 +58,96 @@ test("scoped worker trims a suffix stream from Telegram's aligned byte offset",a
  assert.deepEqual(Buffer.concat(parts),bytes.subarray(9990));
 });
 
+for(const length of [256*1024,2*1024*1024+17])test(`GramJS emits the opening 32 KiB of a ${length}-byte response while later bytes are pending`,async()=>{
+ const {Api}=require("telegram"),{iterDownload}=require("telegram/client/downloads"),bigInt=require("big-integer");
+ const bytes=Buffer.alloc(2*1024*1024+17);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ let release;const pending=new Promise(resolve=>{release=resolve;}),requests=[];
+ const sender={dcId:1},client={_log:{info(){},debug(){},warn(){}},
+  async getEntity(){return"peer";},async getMessages(){return[message("Finesse","Bruno Mars",191,bytes.length)];},
+  async getSender(){return sender;},async invokeWithSender(request){
+   assert.ok(request instanceof Api.upload.GetFile);
+   const offset=request.offset.toJSNumber();requests.push({offset,length:request.limit});
+   if(offset)await pending;
+   return new Api.upload.File({bytes:bytes.subarray(offset,offset+request.limit)});
+  },iterDownload(options){return iterDownload(this,options);}};
+ const backend=service(client,{bigInt,api:{...api,InputDocumentFileLocation:Api.InputDocumentFileLocation}});
+ const stream=await backend.stream("primary","42",0,length),iterator=stream[Symbol.asyncIterator](),parts=[];
+ try{
+  const first=await iterator.next();assert.equal(first.done,false);assert.equal(first.value.length,32*1024);parts.push(first.value);
+  assert.deepEqual(first.value,bytes.subarray(0,32*1024));assert.deepEqual(requests[0],{offset:0,length:32*1024});
+ }finally{release();}
+ for(let next=await iterator.next();!next.done;next=await iterator.next())parts.push(next.value);
+ assert.deepEqual(Buffer.concat(parts),bytes.subarray(0,length));
+ let offset=0;for(const request of requests){assert.equal(request.offset,offset,"No already-emitted opening bytes are downloaded again");offset+=request.length;}
+ assert.deepEqual(requests.slice(0,4),[{offset:0,length:32768},{offset:32768,length:32768},{offset:65536,length:65536},{offset:131072,length:131072}]);
+ if(length>512*1024)assert.deepEqual(requests[5],{offset:512*1024,length:512*1024},"Bulk transfer keeps the large request size");
+});
+
+test("opening-prefix interruption resumes exact bytes and keeps the document retry bound",async()=>{
+ const bytes=Buffer.alloc(800000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ let reads=0,attempts=0;const offsets=[],sleeps=[];
+ const backend=service({async getEntity(){return"peer";},async getMessages(){reads++;return[message("Finesse","Bruno Mars",191,bytes.length)];},
+  async *iterDownload(options){
+   offsets.push(options.offset);if(++attempts===2)throw Object.assign(new Error("Interrupted"),{code:"ECONNRESET"});
+   for(let chunk=0;chunk<options.limit;chunk++){
+    const offset=options.offset+chunk*options.requestSize,part=bytes.subarray(offset,offset+options.requestSize);if(!part.length)return;yield part;
+   }
+  }},{sleep:async ms=>{sleeps.push(ms);},api:{...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}}});
+ const parts=[];for await(const chunk of await backend.stream("primary","42",0,bytes.length))parts.push(chunk);
+ assert.deepEqual(Buffer.concat(parts),bytes);assert.deepEqual(offsets.slice(0,3),[0,32768,32768]);assert.equal(reads,2);assert.deepEqual(sleeps,[400]);
+});
+
+for(const {start,length,playback} of [...[159628,334168,75074].map(start=>({start,length:128*1024,playback:false})),{start:256*1024,length:256*1024,playback:true},{start:256*1024,length:1024*1024,playback:true}])test(`GramJS streams opening audio at ${start} before completing its ${length}-byte playback window`,async()=>{
+ const {Api}=require("telegram"),{iterDownload}=require("telegram/client/downloads"),bigInt=require("big-integer");
+ const bytes=Buffer.alloc(2*1024*1024+17);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ const deliveredPrefix=playback&&length>512*1024?576*1024:32*1024;
+ const requests=[],sender={dcId:1};let release;
+ const pending=new Promise(resolve=>{release=resolve;}),client={_log:{info(){},debug(){},warn(){}},
+  async getEntity(){return"peer";},async getMessages(){return[message("Finesse","Bruno Mars",191,bytes.length)];},
+  async getSender(){return sender;},async invokeWithSender(request){
+   assert.ok(request instanceof Api.upload.GetFile);const offset=request.offset.toJSNumber();requests.push({offset,length:request.limit});
+   if(offset>=start+deliveredPrefix)await pending;
+   return new Api.upload.File({bytes:bytes.subarray(offset,offset+request.limit)});
+  },iterDownload(options){return iterDownload(this,options);}};
+ const backend=service(client,{bigInt,api:{...api,InputDocumentFileLocation:Api.InputDocumentFileLocation}});
+ const stream=await backend.stream("primary","42",start,length,undefined,{playback}),iterator=stream[Symbol.asyncIterator](),parts=[];let received=0;
+ try{
+  while(received<deliveredPrefix){const next=await iterator.next();assert.equal(next.done,false);parts.push(next.value);received+=next.value.length;}
+  assert.ok(received<length,"Earlier audio arrives while the window's later RPCs are held");
+  assert.deepEqual(Buffer.concat(parts),bytes.subarray(start,start+received));assert.ok(requests[0].length<=32*1024);
+ }finally{release();}
+ for(let next=await iterator.next();!next.done;next=await iterator.next())parts.push(next.value);
+ assert.deepEqual(Buffer.concat(parts),bytes.subarray(start,start+length));
+ let offset=Math.floor(start/4096)*4096;for(const request of requests){assert.equal(request.offset,offset,"GramJS must not refetch previous media blocks to trim the tag offset");offset+=request.length;}
+ if(playback)assert.ok(requests.every(request=>request.length<=64*1024),"Playback RPCs stay bounded after the opening instead of growing back to full chunks");
+});
+
+test("ordinary later 256 KiB durable chunks keep the single bulk request",async()=>{
+ const bytes=Buffer.alloc(800000,7),requests=[];
+ const backend=service({async getEntity(){return"peer";},async getMessages(){return[message("Finesse","Bruno Mars",191,bytes.length)];},
+  async *iterDownload(options){requests.push({offset:options.offset,requestSize:options.requestSize,limit:options.limit});yield bytes.subarray(options.offset,options.offset+options.requestSize);}
+ },{api:{...api,InputDocumentFileLocation:class{constructor(value){Object.assign(this,value);}}}});
+ const parts=[];for await(const part of await backend.stream("primary","42",256*1024,256*1024))parts.push(part);
+ assert.deepEqual(Buffer.concat(parts),bytes.subarray(256*1024,512*1024));assert.deepEqual(requests,[{offset:256*1024,requestSize:256*1024,limit:1}]);
+});
+
+test("GramJS sparse-window interruption resumes after the trimmed ID3 offset without replaying audio",async()=>{
+ const {Api}=require("telegram"),{iterDownload}=require("telegram/client/downloads"),bigInt=require("big-integer");
+ const bytes=Buffer.alloc(800000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
+ const start=334168,length=128*1024,requests=[],sleeps=[],sender={dcId:1};let reads=0;
+ const client={_log:{info(){},debug(){},warn(){}},async getEntity(){return"peer";},
+  async getMessages(){reads++;return[message("Finesse","Bruno Mars",191,bytes.length)];},async getSender(){return sender;},
+  async invokeWithSender(request){
+   const offset=request.offset.toJSNumber();requests.push(offset);
+   if(requests.length===2)throw Object.assign(new Error("Interrupted"),{code:"ECONNRESET"});
+   return new Api.upload.File({bytes:bytes.subarray(offset,offset+request.limit)});
+  },iterDownload(options){return iterDownload(this,options);}};
+ const backend=service(client,{bigInt,sleep:async ms=>{sleeps.push(ms);},api:{...api,InputDocumentFileLocation:Api.InputDocumentFileLocation}});
+ const parts=[];for await(const part of await backend.stream("primary","42",start,length))parts.push(part);
+ assert.deepEqual(Buffer.concat(parts),bytes.subarray(start,start+length));assert.deepEqual(requests.slice(0,3),[331776,335872,335872]);
+ assert.equal(reads,2);assert.deepEqual(sleeps,[400]);
+});
+
 test("scoped worker HEAD returns verified size without opening an audio transfer",async()=>{
  const backend=service({async getEntity(){return"peer";},async getMessages(){return[message()];},iterDownload(){throw new Error("HEAD must not transfer audio");}});
  let status,headers,ended=false;

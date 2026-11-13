@@ -60,6 +60,17 @@ test('exact ranges, HEAD, suffix, unsatisfiable offsets, stale If-Range and docu
  p=audioHeaders(new Request(url,{headers:{Range:'bytes=0-1','If-Range':'"old"'}}),audio);assert.equal(p.status,200);assert.equal(p.length,8192);
  p=audioHeaders(new Request(url,{headers:{'If-Match':'"old"'}}),audio);assert.equal(p.response.status,412);
 });
+
+test('Cloudflare prepares the playback hint only for exact GET requests and permits its signed-media preflight',()=>{
+ const url='https://fixture/v2/audio/fixturebot/12';
+ const playing=audioHeaders(new Request(url,{headers:{Range:'bytes=4096-5000','X-Sakura-Playback':'1'}}),audio);
+ assert.equal(playing.playback,true);assert.equal(playing.start,4096);assert.equal(playing.length,905);
+ assert.match(playing.headers['Access-Control-Allow-Headers'],/X-Sakura-Playback/);
+ assert.equal(audioHeaders(new Request(url,{headers:{'X-Sakura-Playback':'true'}}),audio).playback,false);
+ assert.equal(audioHeaders(new Request(url,{method:'HEAD',headers:{'X-Sakura-Playback':'1'}}),audio).playback,false);
+ assert.equal(audioHeaders(new Request(url,{headers:{'Sec-Fetch-Dest':'audio'}}),audio).playback,true);
+ assert.equal(audioHeaders(new Request(url,{headers:{'Sec-Fetch-Dest':'empty'}}),audio).playback,false);
+});
 test('session snapshots preserve separate media keys and main DC state across restart',async()=>{
  const session=new DurableSession();session.setDC(2,'149.154.167.51',80);
  const main=new authKeys.AuthKey(),media=new authKeys.AuthKey();await main.setKey(Buffer.alloc(256,1));await media.setKey(Buffer.alloc(256,2));

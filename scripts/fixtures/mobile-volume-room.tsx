@@ -21,7 +21,8 @@ export default function MobileVolumeRoom(){
   <button onClick={()=>bloom.close()}>Close chapter</button>
   <button onClick={()=>void music.updateSettings({audioTechnology:"night"})}>Use night sound</button>
   <button onClick={()=>void music.updateSettings({audioTechnology:"none"})}>Use original sound</button>
-  <VolumeControl label="Verification volume" value={music.volume} onChange={music.setVolume}/>
+  <VolumeControl label="Verification volume" value={music.volume} onChange={music.setVolume} nativePlayback={music.settings.audioTechnology==="none"}/>
+  <VolumeControl label="Chapter volume" value={music.volume} onChange={music.setVolume}/>
   <p role="status">{bloom.message}</p>
  </div>;
 }

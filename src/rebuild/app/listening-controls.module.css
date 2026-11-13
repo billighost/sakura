@@ -12,3 +12,5 @@
 @media(forced-colors:active){.gardenSlider>input,.ribbonTrack input,.volumeBranch input{opacity:1}}
 .compact .ribbonTrack{height:44px}.compact .times{margin-top:-6px}.ribbonTrack input,.volumeBranch input,.gardenSlider>input{min-height:44px;touch-action:pan-y;user-select:none;-webkit-user-select:none}.volume>button{min-width:44px;justify-content:center}.ribbonTrack:has(input:focus-visible),.volumeBranch:has(input:focus-visible),.gardenSlider:has(input:focus-visible){outline:1px solid color-mix(in srgb,var(--ink-accent) 65%,transparent);outline-offset:2px;border-radius:16px 4px 16px 4px}.litPetal{transition:fill .35s ease}
 @media(any-pointer:coarse){.ribbonTrack,.compact .ribbonTrack,.volumeBranch,.gardenSlider{height:48px}.ribbonTrack input,.volumeBranch input,.gardenSlider>input{min-height:48px}.volume>button{min-height:48px;min-width:48px}}
+
+.deviceVolume{font:11px var(--font-inter,Arial,sans-serif);line-height:1.35}.volumeCompact .deviceVolume{font-size:10px}

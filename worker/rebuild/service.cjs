@@ -4,7 +4,7 @@ const {createHash}=require("node:crypto");
 const {assessAudioCandidate,verifiedRecordingAliases}=require("./core/matching.js");
 const {normalizeMetadataText,normalizedRecording,parseRecordingTitle,referenceKey,isRecordingProofReference}=require("./core/identity.js");
 const {parseByteRange}=require("./core/streaming.js");
-const CHUNK=512*1024,ALIGN=4096,MAX_AUDIO=120*1024*1024;
+const CHUNK=512*1024,OPENING_CHUNK=32*1024,PLAYBACK_CHUNK=64*1024,ALIGN=4096,MAX_AUDIO=120*1024*1024;
 const AUDIO_MIMES=new Set(["audio/mpeg","audio/mp3","audio/mp4","audio/aac","audio/flac","audio/x-flac","audio/ogg","audio/opus","audio/wav","audio/x-wav","audio/webm"]);
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const sourceId=reference=>reference?.provider==="deezer"?/^[1-9]\d{0,17}$/.test(String(reference.id)):reference?.provider==="spotify"&&/^[A-Za-z0-9]{22}$/.test(String(reference.id));
@@ -201,7 +201,7 @@ class RebuildAudioService {
   const flight=(async()=>{if(this.ensureConnected)await this.ensureConnected();const peer=await this.peer(scope),messages=await this.telegram().getMessages(peer,{ids:[Number(messageId)]});const audio=this.audio(messages[0],scope);if(!audio){this.forgetSource(scope,messageId);throw new Error("Source audio not found");}if(/…|\.{3}/u.test([audio.metadata.title,...audio.metadata.artists].join(" ")))await this.recover(audio);return this.documents.get(key);})().catch(error=>{if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error)))this.onFatal?.(error);throw error;});
   this.documentFlights.set(key,flight);try{return await flight;}finally{if(this.documentFlights.get(key)===flight)this.documentFlights.delete(key);}
  }
- async stream(bot,messageId,start,length,expectedAudio){
+ async stream(bot,messageId,start,length,expectedAudio,options={}){
   let cached=await this.info(bot,messageId);const original={...cached.audio};
   // A forced refresh can replace the cached document after serve validated it.
   // Bind the opening document to that snapshot before sending its headers.
@@ -214,16 +214,27 @@ class RebuildAudioService {
     const position=start+sent,aligned=Math.floor(position/ALIGN)*ALIGN;let skip=position-aligned;
     // Tiny probes and parallel client chunks should not each fetch 512 KiB.
     // Telegram accepts power-of-two request sizes in 4 KiB granularity.
-    const requestSize=Math.min(CHUNK,2**Math.ceil(Math.log2(Math.max(ALIGN,skip+length-sent))));
-    const chunks=Math.max(1,Math.ceil((skip+length-sent)/requestSize));
+    // Sparse playback windows after an embedded artwork tag also need early
+    // bytes. Ordinary later 256 KiB download chunks retain one bulk transfer.
+    const openingPrefix=(options.playback===true||start===0||length<=128*1024||length>CHUNK)&&length>OPENING_CHUNK&&sent<CHUNK;
+    // A native media GET commonly asks for the entire remaining file. Deliver
+    // its opening bytes before waiting for a 512 KiB RPC. Grow at aligned
+    // offsets so GramJS does not fetch two large blocks to trim a small prefix.
+    const requestSize=Math.min(options.playback===true?PLAYBACK_CHUNK:CHUNK,2**Math.ceil(Math.log2(Math.max(ALIGN,skip+length-sent))),
+     openingPrefix?Math.min(Math.max(OPENING_CHUNK,2**Math.floor(Math.log2(Math.max(1,sent)))),aligned?aligned&-aligned:OPENING_CHUNK):CHUNK);
+    const phaseLength=openingPrefix?Math.min(length-sent,requestSize-skip):length-sent;
+    const chunks=openingPrefix?1:Math.max(1,Math.ceil((skip+length-sent)/requestSize));
+    let phaseSent=0;
     let download;
     try{
      download=self.telegram().iterDownload({file:new self.api.InputDocumentFileLocation({id:cached.document.id,accessHash:cached.document.accessHash,fileReference:cached.document.fileReference,thumbSize:""}),dcId:cached.document.dcId,fileSize:self.bigInt(original.size),offset:self.bigInt(aligned),limit:chunks,requestSize,chunkSize:requestSize});
      for await(const raw of download){
       if(stream.destroyed)return;
       let part=Buffer.from(raw);if(skip){const trim=Math.min(skip,part.length);part=part.subarray(trim);skip-=trim;}
-      if(!part.length)continue;part=part.subarray(0,length-sent);sent+=part.length;self.metrics?.count("transfer_bytes",part.length);yield part;if(sent===length)return;
+      if(!part.length)continue;part=part.subarray(0,phaseLength-phaseSent);sent+=part.length;phaseSent+=part.length;self.metrics?.count("transfer_bytes",part.length);yield part;if(sent===length)return;
+      if(openingPrefix&&phaseSent===phaseLength)break;
      }
+     if(openingPrefix&&phaseSent===phaseLength)continue;
      throw new Error("Source stream was truncated");
     }catch(error){
      if(/AUTH_KEY_DUPLICATED/.test(String(error?.errorMessage||error?.message||error))){self.onFatal?.(error);throw error;}
@@ -258,7 +269,7 @@ class RebuildAudioService {
   if(range.status==="unsatisfiable"){res.writeHead(416,{...headers,"Content-Range":`bytes */${audio.size}`});res.end();return;}
   const start=range.status==="range"?range.start:0,end=range.status==="range"?range.end:audio.size-1,length=end-start+1;
   if(req.method==="HEAD"){res.writeHead(200,{...headers,"Content-Length":String(length)});res.end();return;}
-  const stream=await this.stream(bot,messageId,start,length,audio);
+  const stream=await this.stream(bot,messageId,start,length,audio,{playback:req.headers["x-sakura-playback"]==="1"||req.headers["sec-fetch-dest"]==="audio"});
   if(res.destroyed||req.aborted){stream.destroy();return;}
   const close=()=>stream.destroy();res.on("close",close);
   stream.on("error",()=>res.destroy());stream.on("close",()=>res.removeListener("close",close));

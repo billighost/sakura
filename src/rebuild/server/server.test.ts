@@ -344,6 +344,23 @@ test("source fetch forwards the exact range with manual redirects and cancellati
   assert.equal(await response.text(), "234");
 });
 
+test("active playback hint reaches only the verified worker media GET and does not alter CDN requests",async()=>{
+ const requests:Array<{url:string;headers:Headers}>=[],workerAsset:StoredAudioAsset={...source,locator:{kind:"telegram-worker",protocol:"v2",documentId:"123",messageId:"42",chatScope:"primary"}};
+ const transport=new SourceAudioTransport({allowedCdnOrigins:["https://cdn.example.test"],worker:{url:"https://worker.example.test",secret:"synthetic-secret-for-playback-tests",chatScope:"primary"}},(async(url,init)=>{
+  const address=String(url);requests.push({url:address,headers:new Headers(init?.headers)});
+  if(address.endsWith("/audio-info"))return Response.json({fileId:"123",size:10,mimeType:"audio/mpeg",metadata:canonical.metadata});
+  return audioResponse(new Headers(init?.headers).get("Range"));
+ }) as typeof fetch);
+ const repository=new MemoryRepository();repository.assets=[workerAsset];const playback=new RecordingAudioGateway(repository,transport);
+ const response=await playback.serve({...gatewayInput,range:"bytes=2-4",playback:true});assert.equal(response.status,206);assert.equal(await response.text(),"234");
+ assert.equal(requests[0].headers.has("X-Sakura-Playback"),false,"Metadata preflight remains separate from streaming");
+ const media=requests[1];assert.equal(media.url,"https://worker.example.test/v2/audio/primary/42");assert.equal(media.headers.get("X-Sakura-Playback"),"1");assert.equal(media.headers.get("Range"),"bytes=2-4");
+ assert.match(media.headers.get("If-Match")!,/^"[a-f0-9]{64}"$/);assert.equal(media.headers.get("If-Range"),media.headers.get("If-Match"));
+ await (await playback.serve({...gatewayInput,range:"bytes=2-4"})).text();assert.equal(requests.at(-1)!.headers.has("X-Sakura-Playback"),false,"Manual full-download ranges retain bulk delivery");
+ await (await transport.open(source,"bytes=2-4",undefined,{playback:true})).text();assert.equal(requests.at(-1)!.url,source.locator.kind==="https"?source.locator.url:"");
+ assert.equal(requests.at(-1)!.headers.has("X-Sakura-Playback"),false,"Direct CDN requests never receive the custom hint");
+});
+
 test("worker transport inspects existing audio metadata then streams, with no bot/download calls", async () => {
   const calls: string[] = [];
   const workerAsset = { ...source, locator: { kind: "telegram-worker" as const, messageId: "42", chatScope: "musicshuntersbot" } };

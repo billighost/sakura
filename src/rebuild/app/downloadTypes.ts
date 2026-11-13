@@ -9,6 +9,9 @@ export interface PartialDownloadRecord {
  version:1;recordingId:string;track:MusicTrack;status:DownloadEntry["status"];
  mode:"full"|"prefix"|"playback";requested:boolean;priority:number;chunkBytes:number;createdAt:number;updatedAt:number;
  playbackOffset?:number;
+ /** Playback may omit a validated leading ID3 tag; saved bytes remain original. */
+ audioStartBytes?:number;
+ audioOpeningEndBytes?:number;
  fingerprint?:DownloadFingerprint;mimeType?:string;error?:string;refreshSource?:boolean;
  /** Metadata for first paint; restored chunk bytes are validated lazily. */
  downloadedBytes?:number;cachedSeconds?:number;
@@ -23,6 +26,10 @@ export interface DownloadStorage {
  chunks(id:string):Promise<DownloadChunk[]>;
  chunk?(id:string,offset:number):Promise<DownloadChunk|undefined>;
  putChunk(id:string,chunk:DownloadChunk):Promise<void>;
+ /** A bounded opening prefix is separate from complete resumable chunks. */
+ openingChunk?(id:string,offset?:number):Promise<DownloadChunk|undefined>;
+ putOpeningChunk?(id:string,chunk:DownloadChunk):Promise<void>;
+ clearPlaybackFragments?(id:string,start:number,end:number):Promise<void>;
  ready(id:string):Promise<OfflineAudio|undefined>;
  allReady():Promise<OfflineAudio[]>;
  allReadyMetadata?():Promise<OfflineAudioMetadata[]>;

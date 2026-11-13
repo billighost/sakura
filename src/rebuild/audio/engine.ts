@@ -106,9 +106,16 @@ interface PlaybackSessionHost { audioSession?: { type: string } }
  * when the installed app goes into the background. Unsupported browsers keep
  * their native media behavior. Claim playback before creating an audio graph. */
 export function configurePlaybackAudioSession(host: PlaybackSessionHost | undefined = typeof navigator === "undefined" ? undefined : navigator as PlaybackSessionHost): boolean {
-  try { if (!host?.audioSession) return false; host.audioSession.type = "playback"; return host.audioSession.type === "playback"; } catch { return false; }
+  try {
+    const session = host?.audioSession;
+    if (!session) return false;
+    // A session claim is a routing request. Repeated media/lifecycle events
+    // must not ask Safari to reconfigure an already active playback route.
+    if (session.type !== "playback") session.type = "playback";
+    return session.type === "playback";
+  } catch { return false; }
 }
-/** iOS keeps HTMLMediaElement.volume fixed; a dry Web Audio gain controls listening level. */
+/** iOS keeps HTMLMediaElement.volume fixed; native playback uses the device's listening level. */
 export function needsMediaVolumeGain(device: Pick<Navigator, "userAgent" | "platform" | "maxTouchPoints"> = navigator) {
   return /iPad|iPhone|iPod/i.test(device.userAgent) || device.platform === "MacIntel" && device.maxTouchPoints > 1;
 }
@@ -121,23 +128,50 @@ export class MediaAudioEngine {
   private branches = new Set<Branch>();
   private mode: AudioTechnology = "none";
   private closed = false;
-  private readonly recover = () => {
-    if (this.closed || this.element.paused || this.element.ended) return;
+  private outputRecovery: Promise<void> | null = null;
+  private suspendingOutput = false;
+  private readonly recover = (event?: Event) => {
+    if (this.closed || this.suspendingOutput || this.outputRecovery && event?.type === "statechange" || this.element.paused || this.element.ended) return;
     configurePlaybackAudioSession();
     // A suspended/interrupted graph is silent even while the native media
     // element continues to advance. Recover the existing graph, never reload
     // the recording or override a deliberate pause.
     void this.resume().catch(() => {});
   };
+  private readonly recoverOutput = () => {
+    const context = this.context;
+    if (this.closed || !context || context.state === "closed" || this.outputRecovery || this.element.paused || this.element.ended) return;
+    configurePlaybackAudioSession();
+    // Bluetooth/output changes can leave a running Web Audio route using the
+    // preceding device's render state. Resume alone does nothing in that state.
+    // Reset the output once per device event burst without touching the media
+    // source, its playback rate, or position. Native playback needs no reset.
+    const resetRunningOutput = context.state === "running";
+    this.suspendingOutput = resetRunningOutput;
+    const recovery = (async () => {
+      try {
+        if (resetRunningOutput) await context.suspend();
+        this.suspendingOutput = false;
+        if (!this.closed && this.context === context && !this.element.paused && !this.element.ended) await this.resume();
+      } finally { this.suspendingOutput = false; }
+    })();
+    this.outputRecovery = recovery;
+    void recovery.catch(() => {}).finally(() => { if (this.outputRecovery === recovery) this.outputRecovery = null; });
+  };
   readonly requiresVolumeGraph: boolean;
+  readonly nativeVolumeFixed: boolean;
   constructor(private readonly element: HTMLMediaElement, options: { requiresVolumeGraph?: boolean } = {}) {
     this.volume = element.volume;
-    this.requiresVolumeGraph = options.requiresVolumeGraph ?? needsMediaVolumeGain();
+    // None must remain native on iPhone/iPad too. A dry Web Audio graph still
+    // uses WebKit's render/output clock and can suffer Bluetooth rate changes.
+    // Companion crossfades can explicitly opt into a volume graph.
+    this.requiresVolumeGraph = options.requiresVolumeGraph ?? false;
+    this.nativeVolumeFixed = typeof navigator !== "undefined" && needsMediaVolumeGain();
     element.addEventListener("play", this.recover);
     element.addEventListener("playing", this.recover);
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.recover);
     if (typeof window !== "undefined") window.addEventListener("pageshow", this.recover);
-    if (typeof navigator !== "undefined") navigator.mediaDevices?.addEventListener("devicechange", this.recover);
+    if (typeof navigator !== "undefined") navigator.mediaDevices?.addEventListener("devicechange", this.recoverOutput);
   }
   get initialized() { return this.context !== null; }
   get currentMode() { return this.mode; }
@@ -153,6 +187,9 @@ export class MediaAudioEngine {
   /** Listening volume belongs after dynamics, so changing volume doesn't change the sound. */
   setVolume(value: number) {
     this.volume = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+    // Native iOS ignores .volume, but supports .muted. Keep mute reliable
+    // without routing otherwise unprocessed music through Web Audio.
+    if (this.nativeVolumeFixed && !this.master) this.element.muted = this.volume === 0;
     if (!this.master || !this.context) { this.element.volume = this.volume; return; }
     const param = this.master.gain, now = this.context.currentTime;
     if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(now);
@@ -182,6 +219,9 @@ export class MediaAudioEngine {
       // Keep the requested level: on iOS the element getter always returns 1.
       this.master = this.context.createGain(); this.master.gain.value = this.volume; this.master.connect(this.context.destination);
       this.element.volume = 1;
+      // Native zero volume used .muted on fixed-volume Safari. Once gain owns
+      // that silence, restore the source so mute stays after the dynamics.
+      if (this.nativeVolumeFixed) this.element.muted = false;
       // Preserve dry playback immediately when media routing changes.
       const graph = createAudioGraph(this.context, this.source, "none"), fader = this.context.createGain();
       graph.output.connect(fader); fader.connect(this.master); this.branches.add({ graph, fader });
@@ -216,7 +256,7 @@ export class MediaAudioEngine {
     this.element.removeEventListener("play", this.recover); this.element.removeEventListener("playing", this.recover);
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.recover);
     if (typeof window !== "undefined") window.removeEventListener("pageshow", this.recover);
-    if (typeof navigator !== "undefined") navigator.mediaDevices?.removeEventListener("devicechange", this.recover);
+    if (typeof navigator !== "undefined") navigator.mediaDevices?.removeEventListener("devicechange", this.recoverOutput);
     this.context?.removeEventListener("statechange", this.recover);
     for (const branch of this.branches) { if (branch.timer) clearTimeout(branch.timer); branch.graph.dispose(); branch.fader.disconnect(); }
     this.branches.clear(); this.source?.disconnect(); this.master?.disconnect(); this.element.volume = this.volume; void this.context?.close().catch(() => {}); this.context = null; this.source = null; this.master = null;

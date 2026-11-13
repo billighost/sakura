@@ -185,7 +185,7 @@ export class TelegramOwner extends DurableObject {
         this.transfers++;
         this.metrics.maximum('peak_transfers', this.transfers);
         let nodeStream;
-        try { nodeStream = await this.rebuild.stream(audio[1], audio[2], prepared.start, prepared.length, info); }
+        try { nodeStream = await this.rebuild.stream(audio[1], audio[2], prepared.start, prepared.length, info, { playback: prepared.playback }); }
         catch (error) { this.transfers--; throw error; }
         const reader = Readable.toWeb(nodeStream).getReader(), metrics = this.metrics; let finished = false;
         const finish = () => { if (!finished) { finished = true; this.transfers--; this.lastUse = Date.now(); request.signal.removeEventListener('abort', abort); } };

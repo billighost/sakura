@@ -9,24 +9,27 @@ import ts from "typescript";
 const accountId="90000000-0000-4000-8000-000000000001",recordingId="80000000-0000-4000-8000-000000000001",assetId="81000000-0000-4000-8000-000000000001",token="82000000-0000-4000-8000-000000000001";
 const source=readFileSync(new URL("../public/sw.js",import.meta.url),"utf8");
 async function hash(bytes:Uint8Array){return Buffer.from(await webcrypto.subtle.digest("SHA-256",bytes)).toString("hex");}
-async function fixture(options:{ready?:boolean;manager?:boolean;managerStatus?:string}={}){
+async function fixture(options:{ready?:boolean;manager?:boolean;managerStatus?:string;audioStart?:number;legacy?:boolean}={}){
  const bytes=Uint8Array.from({length:590001},(_,index)=>(index*17+index%29)%256),sha256=await hash(bytes),entries=new Map<string,unknown>(),network:Array<{start:number;end:number}>=[],joined:number[]=[];
  const prefix=`account:${accountId}:`,fingerprint={assetId,sizeBytes:bytes.length,sha256};
- const bridge={accountId,recordingId,...fingerprint,fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`,mimeType:"audio/mpeg"};
- const record={version:1,recordingId,track:{id:recordingId},chunkBytes:262144,mimeType:"audio/mpeg",fingerprint};
+ const bridge={accountId,recordingId,...fingerprint,fallbackUrl:`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`,mimeType:"audio/mpeg",...options.legacy||options.audioStart===undefined?{}:{nativeOpening:true}};
+ const openingEnd=options.audioStart?Math.min(bytes.length,Math.ceil((options.audioStart+32768)/262144)*262144):0;
+ const record={version:1,recordingId,track:{id:recordingId},chunkBytes:262144,mimeType:"audio/mpeg",fingerprint,...options.audioStart?{audioStartBytes:options.audioStart,audioOpeningEndBytes:openingEnd}:{}};
  entries.set(prefix+"download:"+recordingId,record);
  async function save(offset:number){const data=bytes.slice(offset,offset+262144);entries.set(prefix+"chunk:"+recordingId+":"+offset,{offset,blob:new Blob([data],{type:"audio/mpeg"}),sha256:await hash(data)});}
+ async function saveOpening(offset:number){const data=bytes.slice(offset,Math.min(offset+32768,openingEnd));entries.set(prefix+"chunk-opening:"+recordingId+":"+offset,{offset,blob:new Blob([data],{type:"audio/mpeg"}),sha256:await hash(data)});}
  await save(0);
  if(options.ready)entries.set(prefix+"audio:"+recordingId,{track:{id:recordingId},blob:new Blob([bytes],{type:"audio/mpeg"}),sizeBytes:bytes.length,sha256});
-  const client={postMessage(data:{type:string;offset:number},ports:MessagePort[]){if(data.type!=="sakura-audio-chunk")return;void(async()=>{if(options.manager){joined.push(data.offset);await save(data.offset);ports[0].postMessage({status:"ready"});}else ports[0].postMessage({status:options.managerStatus||"unavailable"});ports[0].close();})();}};
+  const client={postMessage(data:{type:string;offset:number;opening?:boolean},ports:MessagePort[]){if(data.type!=="sakura-audio-chunk")return;void(async()=>{if(options.manager){joined.push(data.offset);if(options.audioStart&&data.opening&&data.offset>=options.audioStart&&data.offset<openingEnd&&(data.offset-options.audioStart)%32768===0)await saveOpening(data.offset);else await save(Math.floor(data.offset/262144)*262144);ports[0].postMessage({status:"ready"});}else ports[0].postMessage({status:options.managerStatus||"unavailable"});ports[0].close();})();}};
  const handlers=new Map<string,(event:unknown)=>void>();
  const context=vm.createContext({self:{location:{origin:"https://sakura.example"},clients:{get:async()=>client},addEventListener(name:string,handler:(event:unknown)=>void){handlers.set(name,handler);},skipWaiting(){},},indexedDB:{},crypto:webcrypto,Blob,Uint8Array,Response,Request,Headers,ReadableStream,AbortController,DOMException,MessageChannel,setTimeout,clearTimeout,URL,
   async fetch(_url:URL,init:RequestInit){const range=/^bytes=(\d+)-(\d+)$/.exec(new Headers(init.headers).get("Range")||"")!;const start=Number(range[1]),end=Number(range[2]);network.push({start,end});return new Response(bytes.slice(start,end+1),{status:206,headers:{"Content-Type":"audio/mpeg","Content-Range":`bytes ${start}-${end}/${bytes.length}`}});},
  });
  vm.runInContext(source,context);
  context.readFixtureEntry=async(key:string)=>entries.get(key);
- context.readFixtureAudioEntries=async(capability:{accountId:string;recordingId:string},offset:number)=>{const prefix=`account:${capability.accountId}:`;return {ready:entries.get(prefix+"audio:"+capability.recordingId),record:entries.get(prefix+"download:"+capability.recordingId),chunk:entries.get(prefix+"chunk:"+capability.recordingId+":"+offset)};};
- vm.runInContext("audioEntry=readFixtureEntry;localAudioEntries=readFixtureAudioEntries",context);
+ context.readFixtureAudioEntries=async(capability:{accountId:string;recordingId:string},offset:number)=>{const prefix=`account:${capability.accountId}:`;return {ready:entries.get(prefix+"audio:"+capability.recordingId),record:entries.get(prefix+"download:"+capability.recordingId),chunk:entries.get(prefix+"chunk:"+capability.recordingId+":"+offset),covering:entries.get(prefix+"chunk:"+capability.recordingId+":"+Math.floor(offset/262144)*262144),opening:entries.get(prefix+"chunk-opening:"+capability.recordingId+":"+offset)};};
+ context.saveFixtureCapability=async(key:string,capability:Record<string,unknown>)=>{const {streams,...saved}=capability;void streams;entries.set("audio-bridge:"+key,saved);};
+ vm.runInContext("audioEntry=readFixtureEntry;localAudioEntries=readFixtureAudioEntries;saveAudioCapability=saveFixtureCapability",context);
  const api=vm.runInContext("({parseAudioRange,validAudioBridge,audioFingerprintMatches,verifiedAudioChunk,serveDeviceAudio,revokeAudioCapability,audioCapabilities})",context);
  api.audioCapabilities.set(token,{...bridge,clientId:"owner-tab",expiresAt:Date.now()+60000});
  return {...api,context,handlers,bytes,entries,network,joined,bridge,prefix,save,async serve(range?:string,clientId="owner-tab",signal?:AbortSignal,method="GET"){return api.serveDeviceAudio(new Request(`https://sakura.example/_sakura/audio/${token}`,{method,headers:range?{Range:range}:{},signal}),clientId,token) as Promise<Response>;}};
@@ -42,6 +45,35 @@ test("progressive audio serves persisted prefix and fetches only missing aligned
 test("progressive playback joins manager chunk flights rather than creating duplicate fetches",async()=>{
  const f=await fixture({manager:true}),response=await f.serve();
  assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes);assert.deepEqual(f.joined,[262144,524288]);assert.deepEqual(f.network,[]);
+});
+
+test("a validated MP3 view streams four sparse audio fragments before its enclosing artwork chunk",async()=>{
+ const audioStart=334168,f=await fixture({manager:true,audioStart}),response=await f.serve("bytes=0-131071");
+ assert.equal(response.status,206);assert.equal(response.headers.get("Content-Range"),`bytes 0-131071/${f.bytes.length-audioStart}`);
+ assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(audioStart,audioStart+131072));
+ assert.deepEqual(f.joined,[audioStart,audioStart+32768,audioStart+65536,audioStart+98304]);assert.deepEqual(f.network,[]);
+ assert.equal(f.entries.has(f.prefix+"chunk:"+recordingId+":262144"),false);assert.equal((f.entries.get(f.prefix+"download:"+recordingId) as {fingerprint:{sha256:string}}).fingerprint.sha256,f.bridge.sha256);
+});
+
+test("virtual MP3 seek and suffix ranges retain original physical byte offsets",async()=>{
+ const audioStart=159628,f=await fixture({manager:true,audioStart});let response=await f.serve("bytes=100000-160000");
+ assert.equal(response.headers.get("Content-Range"),`bytes 100000-160000/${f.bytes.length-audioStart}`);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(audioStart+100000,audioStart+160001));
+ response=await f.serve("bytes=-301");assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(-301));
+});
+
+for(const [audioStart,lastOffset,lastSize]of [[159628,257932,4212],[334168,498008,26280],[75074,238914,23230]])test(`the ${audioStart}-byte MP3 view preserves bytes across its ${lastSize}-byte sparse tail`,async()=>{
+ const f=await fixture({manager:true,audioStart});f.entries.delete(f.prefix+"chunk:"+recordingId+":0");const openingEnd=lastOffset+lastSize,start=lastOffset-audioStart,end=openingEnd-audioStart+64,response=await f.serve(`bytes=${start}-${end}`);
+ assert.equal(response.status,206);assert.equal(response.headers.get("Content-Range"),`bytes ${start}-${end}/${f.bytes.length-audioStart}`);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(lastOffset,openingEnd+65));assert.equal((f.entries.get(f.prefix+"chunk-opening:"+recordingId+":"+lastOffset) as {blob:Blob}).blob.size,lastSize);assert.deepEqual(f.joined,[lastOffset,openingEnd]);assert.deepEqual(f.network,[]);
+});
+
+test("a new worker keeps an older page's audio capability in the original byte representation",async()=>{
+ const f=await fixture({manager:true,audioStart:334168,legacy:true}),response=await f.serve("bytes=0-999");assert.equal(response.headers.get("Content-Range"),`bytes 0-999/${f.bytes.length}`);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(0,1000));assert.deepEqual(f.joined,[]);assert.deepEqual(f.network,[]);
+});
+
+test("a worker restart preserves the MP3 view after full publication removes its partial manifest",async()=>{
+ const audioStart=75074,f=await fixture({manager:true,audioStart});let response=await f.serve("bytes=0-99");assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(audioStart,audioStart+100));
+ f.entries.set(f.prefix+"audio:"+recordingId,{track:{id:recordingId},blob:new Blob([f.bytes],{type:"audio/mpeg"}),sizeBytes:f.bytes.length,sha256:f.bridge.sha256});f.entries.delete(f.prefix+"download:"+recordingId);f.audioCapabilities.clear();
+ response=await f.serve("bytes=0-99");assert.equal(response.headers.get("Content-Range"),`bytes 0-99/${f.bytes.length-audioStart}`);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes.slice(audioStart,audioStart+100));assert.deepEqual(f.network,[]);
 });
 
 test("audio HEAD reports range metadata without loading or downloading a chunk",async()=>{

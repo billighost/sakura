@@ -8,7 +8,7 @@ import {localRead,deliverListen,validOfflineAudio,type OfflineAudio} from "../ap
 import {audibleIncrement,listeningOutcome} from "../app/listeningEvidence";
 import {requestJson} from "../app/errors";
 import type {ResolveRecordingResult} from "../server/contracts";
-import {MediaAudioEngine} from "../audio/engine";
+import {MediaAudioEngine,needsMediaVolumeGain} from "../audio/engine";
 
 interface Receipt {id:string;accountId:string;recordingId:string;sequence:number;ms:number;totalMs:number;last:number;wall:number;durationMs:number;terminal:boolean}
 interface PreparedBloomAudio {track:ReturnType<typeof musicTrack>;recordingId:string;url:string;fallbackUrl?:string;progressive?:boolean;release:()=>void}
@@ -102,7 +102,7 @@ export function useBloomAudio(preparedPlayback?:(recording:Record<string,unknown
   disposeVoice(pending.current,false);disposeVoice(outgoing.current,false);if(active.current){cancelFade(active.current);setLevel(active.current,1);}const request=new AbortController();
   // Unlock iOS audio during the Sound gesture, before storage/network awaits.
   const audio=new Audio();audio.preload="auto";
-  const sound=new MediaAudioEngine(audio),voice:BloomVoice={key:String(raw.recordingId||raw.id||"recording"),accountId,audio,engine:sound,controller:request,receipt:null,release:()=>{},level:active.current?0:1,disposed:false,ready:false,nativeSound:{muted:audio.muted,volume:audio.volume}};pending.current=voice;sound.setVolume(p.volume*voice.level);
+  const sound=new MediaAudioEngine(audio,{requiresVolumeGraph:needsMediaVolumeGain()}),voice:BloomVoice={key:String(raw.recordingId||raw.id||"recording"),accountId,audio,engine:sound,controller:request,receipt:null,release:()=>{},level:active.current?0:1,disposed:false,ready:false,nativeSound:{muted:audio.muted,volume:audio.volume}};pending.current=voice;sound.setVolume(p.volume*voice.level);
   const unlocked=sound.setMode("none");void unlocked.catch(()=>{});
   const current=()=>!voice.disposed&&!request.signal.aborted&&latest.current.account?.id===accountId&&(pending.current===voice||active.current===voice||outgoing.current===voice);
   setMessage("Loading this chapter's song...");

@@ -2,6 +2,11 @@ import {fetchAudioHeaders} from "../core/streaming";
 import {responseIssue,UserFacingError} from "./errors";
 
 const MAX_BYTES=120*1024*1024;
+export const OPENING_AUDIO_BYTES=32*1024;
+function playbackRangeHeaders(url:string,start:number,end:number,playback:boolean):Record<string,string>{
+ const headers:Record<string,string>={Range:`bytes=${start}-${end}`};if(!playback)return headers;
+ try{const origin=typeof location!=="undefined"?location.origin:"https://sakura.invalid",address=new URL(url,origin),gateway=address.origin===origin&&/^\/api\/v2\/recordings\/[a-f0-9-]{36}\/audio$/i.test(address.pathname),worker=address.protocol==="https:"&&/^\/v2\/audio\/[a-z0-9_]{3,64}\/[1-9]\d{0,14}$/.test(address.pathname)&&/^\d+$/.test(address.searchParams.get("exp")??"")&&/^[a-f0-9]{64}$/i.test(address.searchParams.get("sig")??"");if(gateway||worker)headers["X-Sakura-Playback"]="1";}catch{}return headers;
+}
 export class DownloadIntegrityError extends Error {
  name="DownloadIntegrityError";
  constructor(message:string,readonly retryAlternate=false){super(message);}
@@ -26,7 +31,7 @@ async function audioResponseError(response:Response,signal:AbortSignal,timeoutMs
 }
 
 /** A 200 response is a whole file, never a chunk at the requested offset. */
-export async function readAudioRange(response:Response,start:number,end:number,total:number,signal:AbortSignal,onProgress:(bytes:number)=>void=()=>{},idleTimeoutMs=15000,allowWhole=true,onMode:(whole:boolean)=>void=()=>{}):Promise<{blob:Blob;whole:boolean}> {
+export async function readAudioRange(response:Response,start:number,end:number,total:number,signal:AbortSignal,onProgress:(bytes:number)=>void=()=>{},idleTimeoutMs=15000,allowWhole=true,onMode:(whole:boolean)=>void=()=>{},onOpening?:(blob:Blob)=>Promise<void>|void,onFragment?:(offset:number,blob:Blob)=>Promise<void>|void,captureFragments:()=>boolean=()=>true):Promise<{blob:Blob;whole:boolean}> {
  if(signal.aborted){void response.body?.cancel().catch(()=>{});signal.throwIfAborted();}
  const rejectResponse=(message:string,retryAlternate=true):never=>{void response.body?.cancel().catch(()=>{});throw new DownloadIntegrityError(message,retryAlternate);};
  if(!Number.isSafeInteger(total)||total<=0||total>MAX_BYTES||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<start||end>=total)return rejectResponse("This audio file cannot be saved on this device.",false);
@@ -42,19 +47,25 @@ export async function readAudioRange(response:Response,start:number,end:number,t
  onMode(whole);
  if(wrongWholeOffset)return rejectResponse("This source cannot resume the requested part of this song.");
  if(whole&&!allowWhole&&end-start+1<total)return rejectResponse("This source cannot prepare a short audio range. Try saving the full song.");
- const reader=response.body.getReader(),parts:Uint8Array<ArrayBuffer>[]=[];let bytes=0;
+ const reader=response.body.getReader(),parts:Uint8Array<ArrayBuffer>[]=[];let bytes=0,openingPublished=false,fragmentPosition=0;
  try{while(true){signal.throwIfAborted();let timer:ReturnType<typeof setTimeout>|undefined;let abort:()=>void=()=>{};
    let chunk:ReadableStreamReadResult<Uint8Array>;
    try{chunk=await Promise.race([reader.read(),new Promise<never>((_resolve,reject)=>{abort=()=>{reject(signal.reason??new DOMException("Canceled","AbortError"));void reader.cancel().catch(()=>{});};signal.addEventListener("abort",abort,{once:true});if(signal.aborted){abort();return;}timer=setTimeout(()=>{reject(new Error("The connection paused. Your saved progress is safe; reconnect to continue."));void reader.cancel().catch(()=>{});},idleTimeoutMs);})]);}
    finally{if(timer)clearTimeout(timer);signal.removeEventListener("abort",abort);}
    signal.throwIfAborted();if(chunk.done)break;bytes+=chunk.value.length;if(bytes>expected)throw new DownloadIntegrityError("The source sent more bytes than this recording contains.",true);parts.push(new Uint8Array(chunk.value));onProgress(bytes);
+   // Keep the same range request running after its small opening becomes usable.
+   // A whole-file response retains the ordinary fallback/full-checksum path.
+   if(onOpening&&!openingPublished&&!whole&&start===0&&expected>OPENING_AUDIO_BYTES&&bytes>=OPENING_AUDIO_BYTES){openingPublished=true;await onOpening(new Blob(parts,{type:mime}).slice(0,OPENING_AUDIO_BYTES,mime));signal.throwIfAborted();}
+   if(onFragment&&!whole)while(bytes-fragmentPosition>=OPENING_AUDIO_BYTES&&captureFragments()){await onFragment(start+fragmentPosition,new Blob(parts,{type:mime}).slice(fragmentPosition,fragmentPosition+OPENING_AUDIO_BYTES,mime));fragmentPosition+=OPENING_AUDIO_BYTES;signal.throwIfAborted();}
   }
   if(bytes!==expected)throw new Error("The connection ended before this part of the song arrived.");
+  if(onFragment&&!whole)while(bytes-fragmentPosition>=OPENING_AUDIO_BYTES&&captureFragments()){await onFragment(start+fragmentPosition,new Blob(parts,{type:mime}).slice(fragmentPosition,fragmentPosition+OPENING_AUDIO_BYTES,mime));fragmentPosition+=OPENING_AUDIO_BYTES;signal.throwIfAborted();}
+  if(onFragment&&!whole&&captureFragments()&&fragmentPosition<bytes){await onFragment(start+fragmentPosition,new Blob(parts,{type:mime}).slice(fragmentPosition,bytes,mime));signal.throwIfAborted();}
   return {blob:new Blob(parts,{type:mime}),whole};
  }catch(error){void reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}
 }
 
-export async function fetchAudioRange(url:string,start:number,end:number,total:number,signal:AbortSignal,fetcher:typeof fetch=fetch,onProgress?:(bytes:number)=>void,timeoutMs=15000,allowWhole=true,onMode?:(whole:boolean)=>void){
- const response=await fetchAudioHeaders(url,{signal,headers:{Range:`bytes=${start}-${end}`},headerTimeoutMs:8000},fetcher);
- return readAudioRange(response,start,end,total,signal,onProgress,timeoutMs,allowWhole,onMode);
+export async function fetchAudioRange(url:string,start:number,end:number,total:number,signal:AbortSignal,fetcher:typeof fetch=fetch,onProgress?:(bytes:number)=>void,timeoutMs=15000,allowWhole=true,onMode?:(whole:boolean)=>void,onOpening?:(blob:Blob)=>Promise<void>|void,onFragment?:(offset:number,blob:Blob)=>Promise<void>|void,captureFragments?:()=>boolean,playback=false){
+ const response=await fetchAudioHeaders(url,{signal,headers:playbackRangeHeaders(url,start,end,playback),headerTimeoutMs:8000},fetcher);
+ return readAudioRange(response,start,end,total,signal,onProgress,timeoutMs,allowWhole,onMode,onOpening,onFragment,captureFragments);
 }

@@ -12,6 +12,7 @@ const resourceDurability=new Map();
 const documentFlights=new Map();
 const OFFLINE="/offline";
 const AUDIO_PREFIX="/_sakura/audio/";
+const OPENING_AUDIO_BYTES=32768;
 const audioCapabilities=new Map();
 const revokedAudioClients=new Set();
 const audioClientEpochs=new Map();
@@ -33,7 +34,7 @@ async function localAudioEntries(capability,offset){const db=await audioDb(),pre
  const ready=store.get(prefix+"audio:"+capability.recordingId);ready.onsuccess=()=>{result.ready=ready.result;
   const saved=ready.result;if(saved?.track?.id===capability.recordingId&&saved.sha256===capability.sha256&&saved.sizeBytes===capability.sizeBytes&&saved.blob instanceof Blob&&saved.blob.size===capability.sizeBytes&&saved.blob.type.startsWith("audio/"))return;
   const record=store.get(prefix+"download:"+capability.recordingId),chunk=store.get(prefix+"chunk:"+capability.recordingId+":"+offset);
-  record.onsuccess=()=>{result.record=record.result;};chunk.onsuccess=()=>{result.chunk=chunk.result;};
+  record.onsuccess=()=>{result.record=record.result;};chunk.onsuccess=()=>{result.chunk=chunk.result;if(!chunk.result){const opening=store.get(prefix+"chunk-opening:"+capability.recordingId+":"+offset);opening.onsuccess=()=>{result.opening=opening.result;};}if(offset%262144!==0||chunk.result?.blob?.size>32768){const covering=store.get(prefix+"chunk:"+capability.recordingId+":"+Math.floor(offset/262144)*262144);covering.onsuccess=()=>{result.covering=covering.result;};}};
  };
  tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("Audio storage read was interrupted."));
  });}
@@ -41,6 +42,7 @@ async function saveAudioCapability(token,capability){const db=await audioDb();re
 async function deleteAudioCapability(token){const db=await audioDb();return new Promise((resolve,reject)=>{const tx=db.transaction("entries","readwrite");tx.objectStore("entries").delete("audio-bridge:"+token);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function pruneAudioCapabilities(clientId){const db=await audioDb();return new Promise((resolve,reject)=>{const tx=db.transaction("entries","readwrite"),entries=[];const request=tx.objectStore("entries").openCursor(IDBKeyRange.bound("audio-bridge:","audio-bridge:\uffff"));request.onsuccess=()=>{const cursor=request.result;if(cursor){const saved=cursor.value;if(saved?.expiresAt<Date.now()||saved?.clientId===clientId)cursor.delete();else entries.push({key:cursor.key,issuedAt:saved.issuedAt||0});cursor.continue();}else{entries.sort((a,b)=>b.issuedAt-a.issuedAt);for(const entry of entries.slice(100))tx.objectStore("entries").delete(entry.key);}};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 function validAudioBridge(bridge){
+ if(bridge?.nativeOpening!==undefined&&typeof bridge.nativeOpening!=="boolean")return false;
  if(!bridge||!audioUuid.test(bridge.accountId)||!audioUuid.test(bridge.recordingId)||!audioUuid.test(bridge.assetId)||!Number.isSafeInteger(bridge.sizeBytes)||bridge.sizeBytes<=0||bridge.sizeBytes>120*1024*1024||typeof bridge.sha256!=="string"||!/^[a-f0-9]{64}$/i.test(bridge.sha256)||typeof bridge.fallbackUrl!=="string"||bridge.mimeType!==undefined&&(typeof bridge.mimeType!=="string"||!bridge.mimeType.startsWith("audio/")))return false;
  try{const url=new URL(bridge.fallbackUrl,self.location.origin);return url.origin===self.location.origin&&url.pathname==="/api/v2/recordings/"+bridge.recordingId+"/audio"&&url.searchParams.get("assetId")===bridge.assetId&&!url.username&&!url.password&&!url.hash;}catch{return false;}
 }
@@ -85,15 +87,17 @@ async function verifiedAudioChunk(chunk,offset,size){
  const data=await chunk.blob.arrayBuffer(),hash=await crypto.subtle.digest("SHA-256",data),sha=Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,"0")).join("");
  if(sha!==chunk.sha256.toLowerCase())return;return new Uint8Array(data);
 }
-async function localAudioChunk(capability,offset,size){
- const {ready,record,chunk}=await localAudioEntries(capability,offset);
+async function localAudioChunk(capability,offset,size,opening=false){
+ const {ready,record,chunk,covering,opening:prefix}=await localAudioEntries(capability,offset);
  if(ready?.track?.id===capability.recordingId&&ready.sha256===capability.sha256&&ready.sizeBytes===capability.sizeBytes&&ready.blob instanceof Blob&&ready.blob.size===capability.sizeBytes&&ready.blob.type.startsWith("audio/"))return {bytes:new Uint8Array(await ready.blob.slice(offset,offset+size).arrayBuffer()),mimeType:ready.blob.type};
  if(!audioFingerprintMatches(record,capability))return;
  const bytes=await verifiedAudioChunk(chunk,offset,size);
  if(bytes&&typeof record.mimeType==="string"&&record.mimeType.startsWith("audio/"))return {bytes,mimeType:record.mimeType};
+ if(opening){const bytes=await verifiedAudioChunk(prefix,offset,Math.min(size,OPENING_AUDIO_BYTES));if(bytes&&typeof record.mimeType==="string"&&record.mimeType.startsWith("audio/"))return {bytes,mimeType:record.mimeType};}
+ if(opening&&covering){const base=Math.floor(offset/262144)*262144,length=Math.min(262144,capability.sizeBytes-base),expected=Math.min(size,OPENING_AUDIO_BYTES);if(offset+expected<=base+length){const bytes=await verifiedAudioChunk(covering,base,length);if(bytes&&typeof record.mimeType==="string"&&record.mimeType.startsWith("audio/"))return {bytes:bytes.slice(offset-base),mimeType:record.mimeType};}}
 }
-async function askClientForChunk(capability,token,offset,signal){
- signal.throwIfAborted();const client=await self.clients.get(capability.clientId);if(!client)return "unavailable";
+async function askClientForChunk(capability,token,offset,signal,opening=false){
+ signal.throwIfAborted();const client=await self.clients.get(capability.clientId);signal.throwIfAborted();if(!client)return "unavailable";
  return new Promise((resolve,reject)=>{
   const channel=new MessageChannel(),requestId=crypto.randomUUID();let timer;
   const clean=()=>{clearTimeout(timer);signal.removeEventListener("abort",abort);channel.port1.close();};
@@ -101,47 +105,58 @@ async function askClientForChunk(capability,token,offset,signal){
   signal.addEventListener("abort",abort,{once:true});
   timer=setTimeout(()=>{client.postMessage({type:"sakura-audio-cancel",requestId});clean();resolve("unavailable");},18000);
   channel.port1.onmessage=event=>{clean();resolve(event.data?.status||"unavailable");};
-  client.postMessage({type:"sakura-audio-chunk",token,offset,requestId},[channel.port2]);
+  client.postMessage({type:"sakura-audio-chunk",token,offset,requestId,opening},[channel.port2]);
  });
 }
 async function remoteAudioChunk(capability,offset,size,signal){
  const controller=new AbortController(),abort=()=>controller.abort(signal.reason);signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();
  const timer=setTimeout(()=>controller.abort(new Error("Audio range timed out")),20000);
  try{
-  const response=await fetch(new URL(capability.fallbackUrl,self.location.origin),{credentials:"same-origin",cache:"no-store",redirect:"error",signal:controller.signal,headers:{Range:`bytes=${offset}-${offset+size-1}`,"X-Sakura-Account":capability.accountId}});
+  const response=await fetch(new URL(capability.fallbackUrl,self.location.origin),{credentials:"same-origin",cache:"no-store",redirect:"error",signal:controller.signal,headers:{Range:`bytes=${offset}-${offset+size-1}`,"X-Sakura-Account":capability.accountId,"X-Sakura-Playback":"1"}});
   const range=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range")||""),mimeType=(response.headers.get("Content-Type")||"").split(";")[0].trim().toLowerCase();
   if(response.status!==206||!range||Number(range[1])!==offset||Number(range[2])!==offset+size-1||Number(range[3])!==capability.sizeBytes||!mimeType.startsWith("audio/")||capability.mimeType&&mimeType!==capability.mimeType.toLowerCase()){await response.body?.cancel();throw new Error("The audio range did not match its verified source.");}
   const bytes=new Uint8Array(await response.arrayBuffer());if(bytes.byteLength!==size)throw new Error("The audio range ended early.");return {bytes,mimeType};
  }finally{clearTimeout(timer);signal.removeEventListener("abort",abort);}
 }
-async function loadAudioChunk(capability,token,offset,size,signal){
- signal.throwIfAborted();const local=await localAudioChunk(capability,offset,size).catch(()=>undefined);if(local)return local;
- const result=await askClientForChunk(capability,token,offset,signal);
- if(result==="ready"){const saved=await localAudioChunk(capability,offset,size).catch(()=>undefined);if(saved)return saved;throw new Error("The saved audio range did not match this recording.");}
+async function loadAudioChunk(capability,token,offset,size,signal,opening=false){
+ signal.throwIfAborted();const local=await localAudioChunk(capability,offset,size,opening).catch(()=>undefined);if(local)return local;
+ const result=await askClientForChunk(capability,token,offset,signal,opening);
+ if(result==="ready"){const saved=await localAudioChunk(capability,offset,size,opening).catch(()=>undefined);if(saved)return saved;throw new Error("The saved audio range did not match this recording.");}
  if(result==="invalid")throw new Error("The audio range did not match this verified recording.");
+ const completed=await localAudioChunk(capability,offset,size,opening).catch(()=>undefined);if(completed)return completed;
  // `failed` is retained as a transient result for compatibility with an older
  // page bundle during a rolling service-worker update. The gateway is scoped to
  // this exact recording and asset and validates every returned byte interval.
- return remoteAudioChunk(capability,offset,size,signal);
+ return remoteAudioChunk(capability,offset,opening?Math.min(size,OPENING_AUDIO_BYTES):size,signal);
 }
 async function serveDeviceAudio(request,clientId,token){
  const epoch=audioClientEpochs.get(clientId)||0;
  let capability=audioCapabilities.get(token);
  if(!capability&&!revokedAudioClients.has(clientId)&&audioUuid.test(token)){const saved=await audioEntry("audio-bridge:"+token).catch(()=>undefined);if(epoch===(audioClientEpochs.get(clientId)||0)&&!revokedAudioClients.has(clientId)&&validAudioBridge(saved)&&saved.clientId===clientId&&saved.expiresAt>Date.now()){capability={...saved,streams:new Set()};audioCapabilities.set(token,capability);}}
  if(epoch!==(audioClientEpochs.get(clientId)||0)||!capability||revokedAudioClients.has(clientId)||capability.clientId!==clientId||capability.expiresAt<Date.now())return new Response(null,{status:404,headers:{"Cache-Control":"private, no-store"}});
- const range=parseAudioRange(request.headers.get("Range"),capability.sizeBytes),headers=new Headers({"Accept-Ranges":"bytes","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",ETag:'"'+capability.sha256+'"'});
- if(!range){headers.set("Content-Range",`bytes */${capability.sizeBytes}`);return new Response(null,{status:416,headers});}
- headers.set("Content-Length",String(range.end-range.start+1));if(range.partial)headers.set("Content-Range",`bytes ${range.start}-${range.end}/${capability.sizeBytes}`);
+ // The manager validates the first MPEG frame before publishing this layout.
+ // This view omits tag artwork while every saved range and checksum continues
+ // to describe the original, immutable source file.
+ const layout=await localAudioEntries(capability,0).catch(()=>undefined),known=capability.nativeOpening===true?(audioFingerprintMatches(layout?.record,capability)?layout.record.audioStartBytes:capability.audioStartBytes):0;
+ const audioStart=Number.isSafeInteger(known)&&known>=0&&known<capability.sizeBytes&&known<=32*1024*1024?known:0,size=capability.sizeBytes-audioStart;
+ const knownEnd=capability.nativeOpening===true?(audioFingerprintMatches(layout?.record,capability)?layout.record.audioOpeningEndBytes:capability.audioOpeningEndBytes):undefined,openingEnd=Number.isSafeInteger(knownEnd)&&knownEnd>audioStart&&knownEnd<=Math.min(capability.sizeBytes,audioStart+294912)?knownEnd:audioStart;
+ if(epoch!==(audioClientEpochs.get(clientId)||0)||revokedAudioClients.has(clientId))return new Response(null,{status:404,headers:{"Cache-Control":"private, no-store"}});
+ if(audioStart>0&&(capability.audioStartBytes!==audioStart||capability.audioOpeningEndBytes!==openingEnd)){capability.audioStartBytes=audioStart;capability.audioOpeningEndBytes=openingEnd;audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{if(audioCapabilities.get(token)===capability&&epoch===(audioClientEpochs.get(clientId)||0))await saveAudioCapability(token,capability);}).catch(()=>{});await audioCapabilityWork;}
+ if(epoch!==(audioClientEpochs.get(clientId)||0)||revokedAudioClients.has(clientId))return new Response(null,{status:404,headers:{"Cache-Control":"private, no-store"}});
+ const range=parseAudioRange(request.headers.get("Range"),size),headers=new Headers({"Accept-Ranges":"bytes","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",ETag:'"'+capability.sha256+(audioStart?'-audio-'+audioStart:'')+'"'});
+ if(!range){headers.set("Content-Range",`bytes */${size}`);return new Response(null,{status:416,headers});}
+ headers.set("Content-Length",String(range.end-range.start+1));if(range.partial)headers.set("Content-Range",`bytes ${range.start}-${range.end}/${size}`);
  if(request.method==="HEAD"){headers.set("Content-Type",capability.mimeType||"audio/mpeg");return new Response(null,{status:range.partial?206:200,headers});}
  const controller=new AbortController(),abort=()=>controller.abort(request.signal.reason);request.signal.addEventListener("abort",abort,{once:true});if(request.signal.aborted)abort();
  capability.streams ||= new Set();capability.streams.add(controller);
  const cleanup=()=>{request.signal.removeEventListener("abort",abort);capability.streams.delete(controller);};
  try{
-  const offset=Math.floor(range.start/262144)*262144;
-  let prepared=await loadAudioChunk(capability,token,offset,Math.min(262144,capability.sizeBytes-offset),controller.signal),position=range.start;
+  const fragments=capability.nativeOpening===true;let position=range.start+audioStart,preparedOffset=position<openingEnd?audioStart+Math.floor((position-audioStart)/OPENING_AUDIO_BYTES)*OPENING_AUDIO_BYTES:Math.floor(position/(fragments?OPENING_AUDIO_BYTES:262144))*(fragments?OPENING_AUDIO_BYTES:262144);
+  const firstOpening=fragments||!audioStart&&range.start<OPENING_AUDIO_BYTES&&preparedOffset===0,firstSize=fragments?Math.min(OPENING_AUDIO_BYTES,position<openingEnd?openingEnd-preparedOffset:capability.sizeBytes-preparedOffset):262144;
+  let prepared=await loadAudioChunk(capability,token,preparedOffset,Math.min(firstSize,capability.sizeBytes-preparedOffset),controller.signal,firstOpening);
   headers.set("Content-Type",prepared.mimeType||capability.mimeType||"audio/mpeg");
   const body=new ReadableStream({
-   async pull(stream){try{controller.signal.throwIfAborted();if(position>range.end){cleanup();stream.close();return;}const aligned=Math.floor(position/262144)*262144,stop=Math.min(range.end+1,aligned+262144);if(!prepared)prepared=await loadAudioChunk(capability,token,aligned,Math.min(262144,capability.sizeBytes-aligned),controller.signal);stream.enqueue(prepared.bytes.slice(position-aligned,stop-aligned));prepared=undefined;position=stop;}catch(error){cleanup();controller.abort(error);stream.error(error);}},
+   async pull(stream){try{controller.signal.throwIfAborted();if(position>range.end+audioStart){cleanup();stream.close();return;}if(!prepared){const opening=position<openingEnd,width=fragments?OPENING_AUDIO_BYTES:262144;preparedOffset=opening?audioStart+Math.floor((position-audioStart)/OPENING_AUDIO_BYTES)*OPENING_AUDIO_BYTES:Math.floor(position/width)*width;prepared=await loadAudioChunk(capability,token,preparedOffset,Math.min(width,(opening?openingEnd:capability.sizeBytes)-preparedOffset),controller.signal,fragments||opening);}const stop=Math.min(range.end+audioStart+1,preparedOffset+prepared.bytes.byteLength);if(stop<=position)throw new Error("The audio range ended before playback could continue.");stream.enqueue(prepared.bytes.slice(position-preparedOffset,stop-preparedOffset));prepared=undefined;position=stop;}catch(error){cleanup();controller.abort(error);stream.error(error);}},
    cancel(reason){cleanup();controller.abort(reason);}
   });
   return new Response(body,{status:range.partial?206:200,headers});

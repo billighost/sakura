@@ -13,6 +13,11 @@ test("background playback claims a playback audio session where supported and to
   assert.equal(configurePlaybackAudioSession({}), false);
   const blocked = { audioSession: { get type() { return "auto"; }, set type(_: string) { throw new Error("unsupported"); } } };
   assert.equal(configurePlaybackAudioSession(blocked), false);
+  let type = "auto", claims = 0;
+  const routed = { audioSession: { get type() { return type; }, set type(value: string) { claims++; type = value; } } };
+  assert.equal(configurePlaybackAudioSession(routed), true);
+  assert.equal(configurePlaybackAudioSession(routed), true);
+  assert.equal(claims, 1, "Lifecycle callbacks must not reconfigure an already claimed audio session");
 });
 
 test("Fixed media volume detection covers iPhone and desktop-mode iPad", () => {
@@ -22,11 +27,85 @@ test("Fixed media volume detection covers iPhone and desktop-mode iPad", () => {
   assert.equal(needsMediaVolumeGain({ userAgent: "Android", platform: "Linux", maxTouchPoints: 5 }), false);
 });
 
-test("output-device changes recover the existing graph and respect pause, ending and disposal",async()=>{
+test("output-device changes leave native media untouched and respect pause, ending and disposal",async()=>{
  const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator"),devices=new EventTarget();Object.defineProperty(globalThis,"navigator",{value:{mediaDevices:devices},configurable:true});
  class Media extends EventTarget {volume=.5;paused=false;ended=false;src="https://audio.example/unchanged";}
  const media=new Media(),engine=new MediaAudioEngine(media as unknown as HTMLMediaElement,{requiresVolumeGraph:false});let resumes=0;engine.resume=async()=>{resumes++;};
- try{devices.dispatchEvent(new Event("devicechange"));await Promise.resolve();assert.equal(resumes,1);assert.equal(media.src,"https://audio.example/unchanged");media.paused=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);media.paused=false;media.ended=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);media.ended=false;engine.dispose();devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,1);}finally{engine.dispose();if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}
+ try{devices.dispatchEvent(new Event("devicechange"));await Promise.resolve();assert.equal(resumes,0);assert.equal(media.src,"https://audio.example/unchanged");media.paused=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,0);media.paused=false;media.ended=true;devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,0);media.ended=false;engine.dispose();devices.dispatchEvent(new Event("devicechange"));assert.equal(resumes,0);}finally{engine.dispose();if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}
+});
+
+function outputFixture() {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator"), devices = new EventTarget();
+  Object.defineProperty(globalThis, "navigator", { value: { mediaDevices: devices, userAgent: "iPhone", platform: "iPhone", maxTouchPoints: 5 }, configurable: true });
+  class Media extends EventTarget { volume = 1; muted = false; paused = false; ended = false; src = "https://audio.example/song"; currentTime = 31.25; playbackRate = 1; }
+  class Context extends EventTarget {
+    state = "running"; suspensions = 0; resumes = 0; suspendGate?: Promise<void>; resumeGates: Promise<void>[] = [];
+    async suspend() { this.suspensions++; await this.suspendGate; this.state = "suspended"; this.dispatchEvent(new Event("statechange")); }
+    async resume() { this.resumes++; await this.resumeGates.shift(); this.state = "running"; this.dispatchEvent(new Event("statechange")); }
+    async close() { this.state = "closed"; }
+  }
+  const media = new Media(), context = new Context(), engine = new MediaAudioEngine(media as unknown as HTMLMediaElement);
+  const internals = engine as unknown as { context: AudioContext; recover: () => void };
+  internals.context = context as unknown as AudioContext; context.addEventListener("statechange", internals.recover);
+  return { media, context, engine, change: () => devices.dispatchEvent(new Event("devicechange")),
+    dispose() { engine.dispose(); if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor); else Reflect.deleteProperty(globalThis, "navigator"); } };
+}
+async function drainAudioEvents() { for (let i = 0; i < 8; i++) await Promise.resolve(); }
+
+test("a running output route resets once per device burst without changing media clock or source", async () => {
+  const fixture = outputFixture(); let release!: () => void; fixture.context.suspendGate = new Promise(resolve => { release = resolve; });
+  try {
+    for (let i = 0; i < 12; i++) fixture.change();
+    assert.equal(fixture.context.suspensions, 1); assert.equal(fixture.context.resumes, 0);
+    release(); await drainAudioEvents();
+    assert.equal(fixture.context.resumes, 1); assert.equal(fixture.context.state, "running");
+    assert.equal(fixture.media.src, "https://audio.example/song"); assert.equal(fixture.media.currentTime, 31.25); assert.equal(fixture.media.playbackRate, 1);
+    fixture.media.dispatchEvent(new Event("playing")); await drainAudioEvents();
+    assert.equal(fixture.context.suspensions, 1, "Ordinary playback events must not reset a running route");
+  } finally { fixture.dispose(); }
+});
+
+test("output recovery never overrides pause, ending or disposal during a pending suspend", async () => {
+  for (const action of ["pause", "end", "dispose"] as const) {
+    const fixture = outputFixture(); let release!: () => void; fixture.context.suspendGate = new Promise(resolve => { release = resolve; });
+    try {
+      fixture.change(); if (action === "pause") fixture.media.paused = true; else if (action === "end") fixture.media.ended = true; else fixture.engine.dispose();
+      release(); await drainAudioEvents(); assert.equal(fixture.context.resumes, 0, action);
+      fixture.change(); await drainAudioEvents(); assert.equal(fixture.context.suspensions, 1, action);
+    } finally { fixture.dispose(); }
+  }
+});
+
+test("a foreground play can resume while a prior output resume is still pending", async () => {
+  const fixture = outputFixture(); let release!: () => void; fixture.context.resumeGates.push(new Promise(resolve => { release = resolve; }));
+  try {
+    fixture.change(); await drainAudioEvents(); assert.equal(fixture.context.resumes, 1); assert.equal(fixture.context.state, "suspended");
+    fixture.context.dispatchEvent(new Event("statechange")); await drainAudioEvents();
+    assert.equal(fixture.context.resumes, 1, "A late suspended-state callback must not repeat the output recovery's pending resume");
+    fixture.media.dispatchEvent(new Event("playing")); await drainAudioEvents();
+    assert.equal(fixture.context.resumes, 2); assert.equal(fixture.context.state, "running");
+    release(); await drainAudioEvents(); assert.equal(fixture.context.suspensions, 1);
+  } finally { release(); fixture.dispose(); }
+});
+
+test("a failed output reset releases its gate for the next device event", async () => {
+  const fixture = outputFixture();
+  try {
+    fixture.context.suspendGate = Promise.reject(new Error("device unavailable")); fixture.change(); await drainAudioEvents();
+    assert.equal(fixture.context.resumes, 0); fixture.context.suspendGate = undefined; fixture.change(); await drainAudioEvents();
+    assert.equal(fixture.context.suspensions, 2); assert.equal(fixture.context.resumes, 1); assert.equal(fixture.context.state, "running");
+  } finally { fixture.dispose(); }
+});
+
+test("None stays native by default on iPhone and native mute remains reliable", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { value: { userAgent: "iPhone", platform: "iPhone", maxTouchPoints: 5 }, configurable: true });
+  class Media extends EventTarget { get volume() { return 1; } set volume(_: number) {} muted = false; }
+  const media = new Media(), engine = new MediaAudioEngine(media as unknown as HTMLMediaElement);
+  try {
+    await engine.setMode("none"); assert.equal(engine.initialized, false); assert.equal(engine.requiresVolumeGraph, false); assert.equal(engine.nativeVolumeFixed, true);
+    engine.setVolume(0); assert.equal(media.muted, true); engine.setVolume(.3); assert.equal(media.muted, false); assert.equal(media.volume, 1);
+  } finally { engine.dispose(); if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor); else Reflect.deleteProperty(globalThis, "navigator"); }
 });
 
 function tone(amplitude = 0.1, channels = 2, seconds = 3, sampleRate = 48000): SampleBuffer {
@@ -106,16 +185,17 @@ test("iPhone fixed element volume still produces the saved level, mute and dry b
       const { MediaAudioEngine } = await import(engine);
       const media = new Audio("data:audio/wav;base64," + wav); media.loop = true;
       Object.defineProperty(media, "volume", { get: () => 1, set: () => {} });
+      Object.defineProperty(navigator, "userAgent", { value: "iPhone", configurable: true });
       const controller = new MediaAudioEngine(media, { requiresVolumeGraph: true });
-      controller.setVolume(0.3); const beforeGesture = controller.initialized;
-      await controller.setMode("none"); const source = controller.source;
-      const live: AudioContext = controller.context, meter = live.createAnalyser(); meter.fftSize = 2048;
-      controller.master.connect(meter); await media.play();
-      const rms = () => { const data = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(data); return Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length); };
+      controller.setVolume(0); const beforeGesture = controller.initialized, nativeMuted = media.muted;
+      await controller.setMode("none"); const source = controller.source, graphUnmuted = !media.muted; controller.setVolume(.3);
+      const live: AudioContext = controller.context, meter = live.createAnalyser(), inputMeter = live.createAnalyser(); meter.fftSize = inputMeter.fftSize = 2048;
+      controller.master.connect(meter); source.connect(inputMeter); await media.play();
+      const rms = (node: AnalyserNode = meter) => { const data = new Float32Array(node.fftSize); node.getFloatTimeDomainData(data); return Math.sqrt(data.reduce((sum, x) => sum + x * x, 0) / data.length); };
       const deadline = performance.now() + 5000;
       while ((media.currentTime < 0.6 || rms() < 0.001) && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 30));
       const saved = rms(); controller.setVolume(1); await new Promise(resolve => setTimeout(resolve, 200)); const full = rms();
-      controller.setVolume(0); await new Promise(resolve => setTimeout(resolve, 120)); const muted = rms();
+      controller.setVolume(0); await new Promise(resolve => setTimeout(resolve, 120)); const muted = rms(), unmutedSource = rms(inputMeter);
       controller.setVolume(0.3); await controller.setMode("night"); await new Promise(resolve => setTimeout(resolve, 150)); const enhanced = rms();
       await controller.setMode("none"); await new Promise(resolve => setTimeout(resolve, 150)); const restored = rms(), sameSource = controller.source === source, branches = controller.branches.size;
       await live.suspend(); await controller.setMode("none"); const resumed = live.state;
@@ -123,9 +203,10 @@ test("iPhone fixed element volume still produces the saved level, mute and dry b
       const direct = new MediaAudioEngine(new Audio(), { requiresVolumeGraph: false }); await direct.setMode("none"); const desktopDirect = !direct.initialized; direct.dispose();
       const incompatible = new MediaAudioEngine(new Audio("https://example.invalid/no-cors.mp3"), { requiresVolumeGraph: true });
       let rejectedUnsafe = false; try { await incompatible.setMode("none"); } catch { rejectedUnsafe = !incompatible.initialized; } incompatible.dispose();
-      return { beforeGesture, elementVolume: media.volume, savedRatio: saved / full, restoredRatio: restored / full, muted, enhanced, sameSource, branches, resumed, desktopDirect, rejectedUnsafe };
+      return { beforeGesture, nativeMuted, graphUnmuted, elementVolume: media.volume, savedRatio: saved / full, restoredRatio: restored / full, muted, unmutedSource, enhanced, sameSource, branches, resumed, desktopDirect, rejectedUnsafe };
     }, { engine, wav });
     assert.equal(result.beforeGesture, false); assert.equal(result.elementVolume, 1);
+    assert.equal(result.nativeMuted, true); assert.equal(result.graphUnmuted, true); assert.ok(result.unmutedSource > .01);
     assert.ok(Math.abs(result.savedRatio - 0.3) < 0.015, JSON.stringify(result));
     assert.ok(Math.abs(result.restoredRatio - 0.3) < 0.015, JSON.stringify(result));
     assert.ok(result.muted < 0.000001); assert.ok(result.enhanced > 0.001);
@@ -133,6 +214,47 @@ test("iPhone fixed element volume still produces the saved level, mute and dry b
     assert.equal(result.desktopDirect, true); assert.equal(result.rejectedUnsafe, true);
   } finally { await browser.close(); }
 });
+test("real browser preserves 44.1/48 kHz source pitch and finite waveform after output reset events", { timeout: 60000 }, async () => {
+  const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets });
+  const sources = [44100, 48000].map(sampleRate => ({ sampleRate, wav: Buffer.from(encodeAudioWav(tone(.1, 1, 6, sampleRate))).toString("base64") }));
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  try {
+    const page = await browser.newPage(); await page.evaluate("globalThis.__name = (fn) => fn");
+    const reports = await page.evaluate(async ({ engine, sources }) => {
+      const { MediaAudioEngine } = await import(engine), devices = new EventTarget();
+      Object.defineProperty(navigator, "mediaDevices", { value: devices, configurable: true });
+      const reports = [];
+      for (const source of sources) {
+        const media = new Audio("data:audio/wav;base64," + source.wav); media.loop = true;
+        const controller = new MediaAudioEngine(media); await controller.setMode("warmth");
+        const context: AudioContext = controller.context, meter = context.createAnalyser(); meter.fftSize = 8192; meter.smoothingTimeConstant = 0; controller.master.connect(meter);
+        function measure() {
+          const spectrum = new Float32Array(meter.frequencyBinCount), samples = new Float32Array(meter.fftSize); meter.getFloatFrequencyData(spectrum); meter.getFloatTimeDomainData(samples);
+          let peak = 1, sum = 0, maxJump = 0;
+          for (let i = 1; i < spectrum.length; i++) if (spectrum[i] > spectrum[peak]) peak = i;
+          for (let i = 0; i < samples.length; i++) { sum += samples[i] ** 2; if (i) maxJump = Math.max(maxJump, Math.abs(samples[i] - samples[i - 1])); }
+          return { hz: peak * context.sampleRate / meter.fftSize, binHz: context.sampleRate / meter.fftSize, rms: Math.sqrt(sum / samples.length), maxJump, finite: samples.every(Number.isFinite) };
+        }
+        await media.play(); const deadline = performance.now() + 5000;
+        while ((media.currentTime < .6 || measure().rms < .01) && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 30));
+        const before = measure(), url = media.src, position = media.currentTime;
+        for (let i = 0; i < 12; i++) devices.dispatchEvent(new Event("devicechange"));
+        await new Promise(resolve => setTimeout(resolve, 450)); const after = measure();
+        reports.push({ sampleRate: source.sampleRate, before, after, sameSource: url === media.src, progressed: media.currentTime > position, rate: media.playbackRate, contextState: context.state });
+        media.pause(); controller.dispose();
+      }
+      return reports;
+    }, { engine, sources });
+    for (const report of reports) {
+      assert.equal(report.sameSource, true); assert.equal(report.progressed, true); assert.equal(report.rate, 1); assert.equal(report.contextState, "running");
+      for (const measurement of [report.before, report.after]) {
+        assert.ok(Math.abs(measurement.hz - 1000) <= measurement.binHz, JSON.stringify(report));
+        assert.ok(measurement.finite); assert.ok(measurement.rms > .01); assert.ok(measurement.maxJump < .05, JSON.stringify(report));
+      }
+    }
+  } finally { await browser.close(); }
+});
+
 test("Actual browser renders preserve None, safe peaks, crossfeed mono and comparison timing", { timeout: 60000 }, async () => {
   const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets }), analysis = await browserModule("src/rebuild/audio/analysis.ts", { "./presets": presets });
   const session = await browserModule("src/rebuild/audio/analysisSession.ts", { "./analysis": analysis });

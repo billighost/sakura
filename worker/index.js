@@ -50,7 +50,7 @@ const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-  "Access-Control-Allow-Headers": "Range, If-Range, If-Match, Authorization",
+  "Access-Control-Allow-Headers": "Range, If-Range, If-Match, Authorization, X-Sakura-Playback",
   "Access-Control-Expose-Headers":
     "Content-Length, Content-Range, Accept-Ranges, X-Audio-Size, X-Audio-Duration",
   "Access-Control-Max-Age": "86400",
