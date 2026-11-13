@@ -20,7 +20,13 @@ function fixture(account:Promise<{id:string}|null>,publicShare:PublicShare|null=
  const link=({children,...props}:{children:React.ReactNode})=>React.createElement("a",props,children);
  const icon=()=>React.createElement("svg",{"aria-hidden":true});
  const shared=moduleFrom<typeof import("../src/rebuild/player/SharedSong")>("src/rebuild/player/SharedSong.tsx",{"react":React,"react/jsx-runtime":jsxRuntime,"next/link":{default:link},"../app/Icon":{Icon:icon},"./Primitives":{Artwork:()=>React.createElement("div"),PlayerIcon:icon},"./shared.module.css":{default:new Proxy({},{get:(_target,key)=>String(key)})}});
- const page=moduleFrom<{default:(props:{params:Promise<{slug:string}>})=>Promise<React.ReactElement>}>("src/app/s/[slug]/page.tsx",{"react":React,"react/jsx-runtime":jsxRuntime,"next/server":{connection:async()=>{}},"next/navigation":{notFound:()=>{throw new Error("NOT_FOUND");}},"@/rebuild/data/shares":{validShareSlug:(slug:string)=>/^[A-Za-z0-9_-]{16}$/.test(slug),readPublicShare:async()=>publicShare},"@/rebuild/auth":{requireRebuildAccount:()=>account},"@/rebuild/player/SharedSong":shared});
+ const page=moduleFrom<{default:(props:{params:Promise<{slug:string}>})=>Promise<React.ReactElement>}>("src/app/s/[slug]/page.tsx",{
+  "react":React,"react/jsx-runtime":jsxRuntime,"next/server":{connection:async()=>{}},"next/navigation":{notFound:()=>{throw new Error("NOT_FOUND");}},
+  "@/rebuild/data/shares":{validShareSlug:(slug:string)=>/^[A-Za-z0-9_-]{16}$/.test(slug)},
+  "@/rebuild/seo/public-data":{readShareForPage:async()=>publicShare},
+  "@/rebuild/seo/entity":{publicShareMetadata:(current:PublicShare)=>({title:current.payload.title})},
+  "@/rebuild/auth":{requireRebuildAccount:()=>account},"@/rebuild/player/SharedSong":shared,
+ });
  return {page:page.default,shared};
 }
 function stream(element:React.ReactNode){

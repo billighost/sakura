@@ -250,7 +250,7 @@ export function MusicProvider({children}:{children:ReactNode}){
   for(const [field,intent]of Object.entries(pendingPreferenceOperations.current)){if(intent.baseValue!==undefined)preferenceBase.current={...preferenceBase.current,[field]:intent.baseValue};if(intent.baseRevision!==undefined)preferenceBaseRevisions.current[field]=intent.baseRevision;}
  }
  async function persistPreferences(accountId:string){await writePreferenceDraft(accountId,runtime.current.settings,Object.keys(pendingPreferences.current).length>0,pendingPreferences.current,preferenceSyncMetadata());}
- function unconfirmedPreferences(){return new UserFacingError({kind:"connection",title:"Your preferences are saved on this device.",message:"Sakura has not confirmed this save. Your changes are kept here and will retry when the connection recovers.",action:"Save to account"});}
+ function unconfirmedPreferences(){return new UserFacingError({kind:"connection",title:"Your account preferences are unavailable.",message:"Sakura has not confirmed these preferences. Try again to load your account choices.",action:"Try again"});}
  async function refreshPreferenceBase(response:Record<string,unknown>,accountId:string){
   if(preferenceRevision(response)===undefined||!Object.keys(settingsFields(response.settings||response)).length)throw unconfirmedPreferences();
   const remote={...DEFAULT_SETTINGS,...fullSettings(response.settings||response)},fieldRevisions=preferenceFieldRevisions(response),rebased=rebasePreferences(pendingPreferences.current,preferenceBase.current,remote,{base:preferenceBaseRevisions.current,remote:fieldRevisions});
@@ -304,7 +304,15 @@ export function MusicProvider({children}:{children:ReactNode}){
    restorePreferenceMetadata(draft);
    pendingPreferences.current={...(draft?.pending?settingsFields(draft.pendingPatch||draft.settings):{}),...pendingPreferences.current,...preferenceOperationPatch()};
    await sendPreferenceChanges(accountId,response,signal);
-  });settingsQueue.current=operation.catch(()=>{});return operation;
+  });settingsQueue.current=operation.catch(()=>{});
+  try{await operation;}catch(error){
+   if(epoch!==accountGeneration.current||activeAccountId.current!==accountId)return;
+   if(["connection","offline","storage"].includes(userIssue(error).kind)){
+    const saved=await readPreferenceDraft(accountId).catch(()=>undefined);
+    if(epoch!==accountGeneration.current||activeAccountId.current!==accountId||saved)return;
+   }
+   throw error;
+  }
  }
  function applySettings(value:UserSettings){
   value={...DEFAULT_SETTINGS,...fullSettings(value)};setArtistChoiceVersion(artistChoiceKey(value));
@@ -805,7 +813,9 @@ export function MusicProvider({children}:{children:ReactNode}){
    await saved;if(epoch!==accountGeneration.current||runtime.current.account?.id!==accountId)return;
    await sendPreferenceChanges(accountId);
   });settingsQueue.current=operation.catch(()=>{});
-  try{await operation;}catch(error){if(epoch!==accountGeneration.current)return;if(locallySaved&&["connection","offline","storage"].includes(userIssue(error).kind))throw new UserFacingError({kind:"connection",title:"Preferences saved on this device.",message:"Your preferences are saved here. Reconnect to sync them with your account; we’ll keep your choices for your next visit.",action:"Save to account",href:"/library/downloaded",linkLabel:"Open downloads"});throw error;}
+  // A durable local choice is successful even while account sync is unavailable.
+  // Its pending journal remains intact and reconnecting retries it quietly.
+  try{await operation;}catch(error){if(epoch!==accountGeneration.current)return;if(locallySaved&&["connection","offline","storage"].includes(userIssue(error).kind))return;throw error;}
  }
  function managerFor(accountId:string){
   const previous=downloadManager.current;if(previous?.accountId===accountId)return previous;

@@ -121,6 +121,26 @@ export class DeezerCatalogService {
     const nextCursors={tracks:hasNext("tracks",0)?String(cursor+1):null,artists:hasNext("artists",1)?String(cursor+1):null,albums:hasNext("albums",2)?String(cursor+1):null};
     return {query:clean,tracks,artists:groupArtistCards(artists),albums,totals,nextCursors};
   }
+  /** One public metadata read for social previews; no top-song expansion or account writes. */
+  async summary(kind: "artist" | "album" | "playlist", rawId: string, signal?: AbortSignal) {
+    const spotify = rawId.startsWith("spotify:");
+    const id = rawId.replace(/^(?:deezer|spotify):/, "");
+    if (spotify ? !/^[A-Za-z0-9]{22}$/.test(id) : !/^[1-9]\d{0,17}$/.test(id)) throw new Error("Invalid catalogue ID");
+    if (spotify && !this.spotify) throw new Error("Spotify catalogue is unavailable");
+    const entity = row(spotify ? await this.spotify!.getMetadata(`/${kind}s/${id}`, signal) : await this.get(`/${kind}/${id}`, signal));
+    signal?.throwIfAborted();
+    if (String(entity.id) !== id) throw new Error("Catalogue ID does not match");
+    const title = String(entity.name ?? entity.title ?? "");
+    if (!title.trim()) throw new Error("Catalogue title is unavailable");
+    const artist = row(entity.artist).name || (Array.isArray(entity.artists) ? entity.artists.map(row).map(artist => artist.name).filter(Boolean).join(" · ") : undefined);
+    const images = Array.isArray(entity.images) ? entity.images : [];
+    const trackRows = row(entity.tracks).data;
+    const coverUrls = Array.isArray(trackRows) ? [...new Set(trackRows.map(row).map(track => artwork(row(track.album).cover_big)).filter((url): url is string => Boolean(url)))].slice(0, 4) : [];
+    return { title, artist: typeof artist === "string" ? artist : undefined,
+      imageUrl: artwork(entity.picture_xl ?? entity.picture_big ?? entity.cover_xl ?? entity.cover_big ?? row(images[0]).url),
+      releaseDate: typeof (entity.release_date ?? entity.releaseDate) === "string" ? String(entity.release_date ?? entity.releaseDate) : undefined,
+      genres: Array.isArray(entity.genres) ? entity.genres.filter((genre): genre is string => typeof genre === "string") : Array.isArray(row(entity.genres).data) ? (row(entity.genres).data as unknown[]).map(row).map(genre => String(genre.name || "")).filter(Boolean) : [], coverUrls };
+  }
   async detail(kind: "artist" | "album" | "playlist", id: string, signal?: AbortSignal) {
     signal?.throwIfAborted();
     if(id.startsWith("spotify:"))return this.spotifyDetail(kind,id.slice(8),signal);

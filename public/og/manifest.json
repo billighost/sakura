@@ -1,0 +1,425 @@
+{
+  "revision": "20261113-2",
+  "dimensions": {
+    "width": 1200,
+    "height": 630
+  },
+  "images": [
+    {
+      "page": "default",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "default.jpg",
+      "bytes": 60100,
+      "sha256": "7eba6d7ded8d42a484271582ca417282621cf62f0c8f7d34ab71d41f6166cb13"
+    },
+    {
+      "page": "default",
+      "direction": "c",
+      "format": "webp",
+      "file": "default.webp",
+      "bytes": 32614,
+      "sha256": "a1f7d61e4ef6495df05a2a71c2f5e235e4eded39e985bb4e37025e5cca1b89e2"
+    },
+    {
+      "page": "artist",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "artist.jpg",
+      "bytes": 56414,
+      "sha256": "32570bff9f3ad611e5aedca3fdbdef111f7c2e6a85ffe29e5c73c57c2cd20de9"
+    },
+    {
+      "page": "artist",
+      "direction": "b",
+      "format": "webp",
+      "file": "artist.webp",
+      "bytes": 33222,
+      "sha256": "4e91c7c385b95535023aa9dd35c81d06c4a1f8f62c2d4cd3bfde467de29c9ebc"
+    },
+    {
+      "page": "album",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "album.jpg",
+      "bytes": 53726,
+      "sha256": "e706df3b032bd49d09fd0057735708724dc5ad5418b526c6f9c529b7138c8cc3"
+    },
+    {
+      "page": "album",
+      "direction": "b",
+      "format": "webp",
+      "file": "album.webp",
+      "bytes": 30102,
+      "sha256": "9a0e4625076914dc42a28cea643d87b8680248501a0ac27750feec329d0cfcaa"
+    },
+    {
+      "page": "track",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "track.jpg",
+      "bytes": 57103,
+      "sha256": "b702c6a82d131e88bde03b3a663fd4d29ab9bf449d81d27a9deee9ada86624eb"
+    },
+    {
+      "page": "track",
+      "direction": "c",
+      "format": "webp",
+      "file": "track.webp",
+      "bytes": 30050,
+      "sha256": "f2e3df62d1e7228a0a324be328daf030484b3e0c71fcf8f02e4032f93a8a9774"
+    },
+    {
+      "page": "playlist",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "playlist.jpg",
+      "bytes": 50338,
+      "sha256": "b346ce316dc72dff450c32ce44b6433d51e4525d09c758d41668b694290582f2"
+    },
+    {
+      "page": "playlist",
+      "direction": "b",
+      "format": "webp",
+      "file": "playlist.webp",
+      "bytes": 28384,
+      "sha256": "1787a0fad9c3a35c7823af9faa8b14540f14be774165e11a4d7adcbb067928db"
+    },
+    {
+      "page": "mix",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "mix.jpg",
+      "bytes": 56024,
+      "sha256": "82bf0217f7cfe93b1e18ea041d57862882e4162fe94076f45cb094aeb7a66b38"
+    },
+    {
+      "page": "mix",
+      "direction": "b",
+      "format": "webp",
+      "file": "mix.webp",
+      "bytes": 31500,
+      "sha256": "384382f22f7dd04a65a7aa7ba97b094d2f53783804ed931ac8254afa7021ac88"
+    },
+    {
+      "page": "shared-track",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "shared-track.jpg",
+      "bytes": 58079,
+      "sha256": "b812ada99baf52509184937bb6a991b3330ae5627d7ed483c07499ccd56b0a23"
+    },
+    {
+      "page": "shared-track",
+      "direction": "c",
+      "format": "webp",
+      "file": "shared-track.webp",
+      "bytes": 30872,
+      "sha256": "0ca17e7f926f4e05ad824e0a7a78e7f855c37203dac217928a7494f1de5b6208"
+    },
+    {
+      "page": "lyric",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "lyric.jpg",
+      "bytes": 55561,
+      "sha256": "72137289d3b1b67fb50d2a5606b11d59b151de4b3ddbebecd8b3c00c8ec699f0"
+    },
+    {
+      "page": "lyric",
+      "direction": "c",
+      "format": "webp",
+      "file": "lyric.webp",
+      "bytes": 29346,
+      "sha256": "c19da75c9f379b4d2dbbfacbd50b493ed9e89d0beffaafc7c46da8bfb3f76e0b"
+    },
+    {
+      "page": "bloom",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "bloom.jpg",
+      "bytes": 63659,
+      "sha256": "c56c041307c94d1ffd67de1929c4e3057b6402d5812f6dabd02d44bfc45ba621"
+    },
+    {
+      "page": "bloom",
+      "direction": "b",
+      "format": "webp",
+      "file": "bloom.webp",
+      "bytes": 35800,
+      "sha256": "63d45042d54390001c4a49207c4eb1a4e3c36aa1bed168af898e9222d1a1682f"
+    },
+    {
+      "page": "bloom-story",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "bloom-story.jpg",
+      "bytes": 65564,
+      "sha256": "3b2844493c2178f4a370f16502e6919135d08d003a380f0b6c5fff8a6c82a2e7"
+    },
+    {
+      "page": "bloom-story",
+      "direction": "b",
+      "format": "webp",
+      "file": "bloom-story.webp",
+      "bytes": 37454,
+      "sha256": "e95fb063aca3154800009a3e88ccdd5397a7c5e8522ec71414563587361ea2af"
+    },
+    {
+      "page": "home",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "home.jpg",
+      "bytes": 61066,
+      "sha256": "4571d1151f5095ae623f7cf3521d4fe06901268b70a457e0833b3c23fe34cfdd"
+    },
+    {
+      "page": "home",
+      "direction": "b",
+      "format": "webp",
+      "file": "home.webp",
+      "bytes": 35902,
+      "sha256": "cc40fc0b5a083a1e144b8d50e73381806be2dea9abdfc697152e9cafba913e7d"
+    },
+    {
+      "page": "discover",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "discover.jpg",
+      "bytes": 59850,
+      "sha256": "83d2b8f00a1569eb0ed6716059a1ac7b8dc8ffa5184719fd63bbae27050c29d9"
+    },
+    {
+      "page": "discover",
+      "direction": "b",
+      "format": "webp",
+      "file": "discover.webp",
+      "bytes": 35202,
+      "sha256": "32d0cc326ba6ca590b3fbab69b262ea49f5909827764d6c4ce92feb43f632eab"
+    },
+    {
+      "page": "search",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "search.jpg",
+      "bytes": 63914,
+      "sha256": "e3cbcc79fd40351e671b01b7317d89a8680b089c42365d227e8e746b8af83b13"
+    },
+    {
+      "page": "search",
+      "direction": "b",
+      "format": "webp",
+      "file": "search.webp",
+      "bytes": 37742,
+      "sha256": "3eb3c4f4cfe666e06009d85f43357a48bdc659f77875ee39039694cf1b85b85c"
+    },
+    {
+      "page": "library",
+      "direction": "b",
+      "format": "jpeg",
+      "file": "library.jpg",
+      "bytes": 57636,
+      "sha256": "3358909dfba182acc1d9e8cdb76fba66a984b7c670e329577dd52b025581797f"
+    },
+    {
+      "page": "library",
+      "direction": "b",
+      "format": "webp",
+      "file": "library.webp",
+      "bytes": 33828,
+      "sha256": "b5c5eb4e94d7517673e0cd6ecb2aff00a5dbab72b7f2873c13627a0d83e183bc"
+    },
+    {
+      "page": "liked",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "liked.jpg",
+      "bytes": 63149,
+      "sha256": "ad04d7f8aa6dd39c4c86c36bed8a56eb0ab4c7a17148df690042ddd4b3b33a92"
+    },
+    {
+      "page": "liked",
+      "direction": "c",
+      "format": "webp",
+      "file": "liked.webp",
+      "bytes": 33066,
+      "sha256": "01a153c378568f5ac925768c4189c91318759f93494c3a854a83f81eafacd15b"
+    },
+    {
+      "page": "downloads",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "downloads.jpg",
+      "bytes": 64688,
+      "sha256": "24754560aec6f8c1b9f57f7a4bcc8032b1a4e178e39a9aec572760317dabf67d"
+    },
+    {
+      "page": "downloads",
+      "direction": "c",
+      "format": "webp",
+      "file": "downloads.webp",
+      "bytes": 33232,
+      "sha256": "361841877a19b3bd0d12d94d54c87e8540484ea89dcbc2c96d6d5e081ae2ab3f"
+    },
+    {
+      "page": "profile",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "profile.jpg",
+      "bytes": 60341,
+      "sha256": "ba81734ddfc643d9c1c7679937b28e2dca4c4700939973df8a8fcd4d1fde37aa"
+    },
+    {
+      "page": "profile",
+      "direction": "c",
+      "format": "webp",
+      "file": "profile.webp",
+      "bytes": 31724,
+      "sha256": "ad49674e099bb9ee951a9b13eb7280ebad8e8ec068ccbdfd17beb9bbd4ac44f6"
+    },
+    {
+      "page": "settings",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "settings.jpg",
+      "bytes": 61809,
+      "sha256": "22552a66161dfe629d3222d94b3ba9190d7972b051ff9737a9fbe5fdfb5995c5"
+    },
+    {
+      "page": "settings",
+      "direction": "c",
+      "format": "webp",
+      "file": "settings.webp",
+      "bytes": 32014,
+      "sha256": "a522086152ee4111d667f14182c125210f8f1a4c41e4c729ac3175ae0f5f0c02"
+    },
+    {
+      "page": "import",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "import.jpg",
+      "bytes": 64847,
+      "sha256": "aecf3b539f216d1e74c9a90b4838b7724f7de6682862aae0daeb618c2fc6eb87"
+    },
+    {
+      "page": "import",
+      "direction": "c",
+      "format": "webp",
+      "file": "import.webp",
+      "bytes": 33544,
+      "sha256": "710c59efec7ba450e3faf8ba34b43d8e7483c352a4bdd36b1c407b432e5670aa"
+    },
+    {
+      "page": "onboarding",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "onboarding.jpg",
+      "bytes": 61230,
+      "sha256": "bfdea76209faefb99eb89eaa607ed4ef3bfdf160b7c465006cb756c4961c4cf7"
+    },
+    {
+      "page": "onboarding",
+      "direction": "c",
+      "format": "webp",
+      "file": "onboarding.webp",
+      "bytes": 32246,
+      "sha256": "fab052005d43193912a07f2f30b818fd1a837eb1aaf8540bf407b61ed1dbec5b"
+    },
+    {
+      "page": "offline",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "offline.jpg",
+      "bytes": 62063,
+      "sha256": "2f907d2b39e6f4c099a7dd9eab4cc88a729abd786b4f9b1254abff70a3cba051"
+    },
+    {
+      "page": "offline",
+      "direction": "c",
+      "format": "webp",
+      "file": "offline.webp",
+      "bytes": 32250,
+      "sha256": "845dd94c479e6307b3f389e33ee5c17ed45e63596dac7fae1459259e3cccb9a0"
+    },
+    {
+      "page": "login",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "login.jpg",
+      "bytes": 60899,
+      "sha256": "135986a66b028c51aa18e7261941a9bfeba816a78b1a3f940a94e881d8d3c6d0"
+    },
+    {
+      "page": "login",
+      "direction": "c",
+      "format": "webp",
+      "file": "login.webp",
+      "bytes": 31464,
+      "sha256": "fd572301314f3bb47215a368c7ebc2f56f264cc99047e2a396a8e0de6b7c50ef"
+    },
+    {
+      "page": "register",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "register.jpg",
+      "bytes": 63031,
+      "sha256": "c402afae71c8879f86587808b189961ba00c7d9561b513086eeea8f7d0757ee1"
+    },
+    {
+      "page": "register",
+      "direction": "c",
+      "format": "webp",
+      "file": "register.webp",
+      "bytes": 32276,
+      "sha256": "5c69744842cc88ee63ba4ac73c0546089fd2666d56d84307f81e8935c370d4e6"
+    },
+    {
+      "page": "about",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "about.jpg",
+      "bytes": 63235,
+      "sha256": "f1f5b7342ca70c25efebf015774ef9e92412386066f0e7e15746700079b861de"
+    },
+    {
+      "page": "about",
+      "direction": "c",
+      "format": "webp",
+      "file": "about.webp",
+      "bytes": 34124,
+      "sha256": "289d26ecbb31a93815ba228b3ae4c8eb7289d8d02438dca718f1cb67fa875463"
+    },
+    {
+      "page": "privacy",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "privacy.jpg",
+      "bytes": 60991,
+      "sha256": "3fd7fbdc26778ec7e93d8acbc14ade9261158453eee01feafd75e6ba5256a032"
+    },
+    {
+      "page": "privacy",
+      "direction": "c",
+      "format": "webp",
+      "file": "privacy.webp",
+      "bytes": 31692,
+      "sha256": "d3a40ecf3483f48ca1e3dd15eba846666891b0f4409af72e3e82fddaa2b4b74e"
+    },
+    {
+      "page": "terms",
+      "direction": "c",
+      "format": "jpeg",
+      "file": "terms.jpg",
+      "bytes": 62589,
+      "sha256": "790f401a8ec9753f59275d7e0a34ef9f8f66a556bdfc4ce5abdc60491d97c480"
+    },
+    {
+      "page": "terms",
+      "direction": "c",
+      "format": "webp",
+      "file": "terms.webp",
+      "bytes": 32524,
+      "sha256": "daf0fbab913bccce497f15e74b084ed86752f66d03bbefc29bb25e70c6a7e0b0"
+    }
+  ]
+}

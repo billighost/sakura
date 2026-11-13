@@ -1,0 +1,127 @@
+{
+  "purpose": "Illustrative OG design previews; catalogue artwork belongs to its respective owners.",
+  "fonts": [
+    {
+      "family": "Fraunces",
+      "file": "fraunces-600-italic.ttf",
+      "url": "https://fonts.gstatic.com/s/fraunces/v38/6NVf8FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChJdt9vIVYX9G37lgd-sPEKsxx664UJf1iVSv7W.ttf",
+      "weight": 600,
+      "style": "italic",
+      "fallback": false
+    },
+    {
+      "family": "Fraunces",
+      "file": "fraunces-600-normal.ttf",
+      "url": "https://fonts.gstatic.com/s/fraunces/v38/6NUh8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7hzFUPJH58nhr1K03gg7S2nfgRYIcaRyjDg.ttf",
+      "weight": 600,
+      "style": "normal",
+      "fallback": false
+    },
+    {
+      "family": "Inter",
+      "file": "inter-400-normal.ttf",
+      "url": "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf",
+      "weight": 400,
+      "style": "normal",
+      "fallback": false
+    },
+    {
+      "family": "Inter",
+      "file": "inter-600-normal.ttf",
+      "url": "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf",
+      "weight": 600,
+      "style": "normal",
+      "fallback": false
+    },
+    {
+      "family": "Noto Sans JP",
+      "file": "notosansjp.ttf",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@5.2.8/files/noto-sans-jp-japanese-400-normal.woff",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans SC",
+      "file": "notosanssc.ttf",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc/files/noto-sans-sc-chinese-simplified-400-normal.woff",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans KR",
+      "file": "notosanskr.ttf",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr/files/noto-sans-kr-korean-400-normal.woff",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans Arabic",
+      "file": "notosansarabic.ttf",
+      "url": "https://fonts.gstatic.com/s/notosansarabic/v33/nwpxtLGrOAZMl5nJ_wfgRg3DrWFZWsnVBJ_sS6tlqHHFlhQ5l3sQWIHPqzCfyGyvuw.ttf",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans Devanagari",
+      "file": "notosansdevanagari.ttf",
+      "url": "https://fonts.gstatic.com/s/notosansdevanagari/v33/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3NaV_SNmI0b8QQCQmHn6B2OHjbL_08AlXQly-A.ttf",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans Thai",
+      "file": "notosansthai.ttf",
+      "url": "https://fonts.gstatic.com/s/notosansthai/v29/iJWnBXeUZi_OHPqn4wq6hQ2_hbJ1xyN9wd43SofNWcd1MKVQt_So_9CdU5RtpzE.ttf",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    },
+    {
+      "family": "Noto Sans Hebrew",
+      "file": "notosanshebrew.ttf",
+      "url": "https://fonts.gstatic.com/s/notosanshebrew/v50/or3HQ7v33eiDljA1IufXTtVf7V6RvEEdhQlk0LlGxCyaeNKYZC0sqk3xXGiXd4qtog.ttf",
+      "weight": 400,
+      "style": "normal",
+      "fallback": true
+    }
+  ],
+  "illustrations": [
+    {
+      "file": "ayra-portrait.jpg",
+      "title": "Ayra Starr",
+      "kind": "artist",
+      "providerId": "110616822",
+      "url": "https://cdn-images.dzcdn.net/images/artist/dbbf92fde4a28452a455f885b065008e/1000x1000-000000-80-0-0.jpg"
+    },
+    {
+      "file": "ayra-album.jpg",
+      "title": "The Year I Turned 21",
+      "kind": "album",
+      "providerId": "591361242",
+      "url": "https://cdn-images.dzcdn.net/images/cover/d096ea1c1019d1af67c0a2e434890e1e/1000x1000-000000-80-0-0.jpg"
+    },
+    {
+      "file": "rema-album.jpg",
+      "title": "HEIS",
+      "kind": "album",
+      "providerId": "611102372",
+      "url": "https://cdn-images.dzcdn.net/images/cover/4891a944de9418f059cabda0c7699160/1000x1000-000000-80-0-0.jpg"
+    },
+    {
+      "file": "burna-album.jpg",
+      "title": "Love, Damini",
+      "kind": "album",
+      "providerId": "317928987",
+      "url": "https://cdn-images.dzcdn.net/images/cover/db5eb0966610c92af8a685ea3032ef4d/1000x1000-000000-80-0-0.jpg"
+    }
+  ],
+  "bloom": {
+    "source": "public/bloom/covers/sakura-{light,dark}-960.webp",
+    "generator": "scripts/rebuild-bloom-covers.mjs"
+  }
+}

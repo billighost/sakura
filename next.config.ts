@@ -8,7 +8,7 @@ const config:NextConfig={
  cacheComponents:true,
  partialPrefetching:true,
  serverExternalPackages:["kuromoji"],
- outputFileTracingIncludes:{"/api/v2/readings":["./node_modules/kuromoji/dict/**/*"]},
+ outputFileTracingIncludes:{"/api/v2/readings":["./node_modules/kuromoji/dict/**/*"],"/og-preview/render":["./public/og-preview/fonts/**/*","./public/og-preview/artwork/*.jpg"],"/og/*/*":["./public/og-preview/fonts/**/*","./public/og-preview/artwork/*.jpg","./public/og/*"]},
  experimental:{useOffline:true},
 };
 export default config;
