@@ -8,5 +8,5 @@ export const OG_SELECTIONS: Readonly<Record<string, OgDirection>> = {
   profile: "c", settings: "c", import: "c", onboarding: "c", offline: "c",
   login: "c", register: "c", about: "c", privacy: "c", terms: "c",
 };
-export const OG_IMAGE_REVISION = "20261113-2";
+export const OG_IMAGE_REVISION = "20261113-3";
 export function ogDirectionFor(page: string): OgDirection { return OG_SELECTIONS[page] || OG_SELECTIONS.default; }

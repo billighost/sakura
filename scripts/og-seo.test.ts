@@ -53,6 +53,7 @@ test("fallbacks use brand copy rather than fabricated artist or account informat
 });
 
 test("canonical origins and public artwork references reject unsafe inputs", () => {
+  assert.equal(resolveSiteOrigin(), "https://sakuraplayer.vercel.app");
   assert.equal(resolveSiteOrigin("https://sakura.example/"), "https://sakura.example");
   assert.equal(resolveSiteOrigin("http://localhost:3000"), "http://localhost:3000");
   for (const value of ["http://sakura.example", "https://user:secret@sakura.example", "https://sakura.example/a", "https://sakura.example?q=1", "https://sakura.example#fragment"]) assert.throws(() => resolveSiteOrigin(value));

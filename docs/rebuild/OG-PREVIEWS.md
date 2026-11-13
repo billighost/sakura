@@ -14,7 +14,7 @@ Inter and Fraunces are bundled with their available character sets. Local Noto f
 
 The root layout supplies metadataBase, a fallback OG image, title and description, site name, locale, absolute image URLs, JPEG type, dimensions, alt text, Twitter large-image cards, and WebSite structured data. Every ordinary page has its selected image, description, and canonical URL. Existing icons and PWA metadata remain in place.
 
-The documented production origin is **https://sakura-orcin.vercel.app**. Set `SAKURA_SITE_URL` or `NEXT_PUBLIC_SITE_URL` when changing the primary domain; `VERCEL_PROJECT_PRODUCTION_URL` is also supported. Canonicals use this validated configuration rather than the incoming Host header.
+The production origin is **https://sakuraplayer.vercel.app**. Set `SAKURA_SITE_URL` or `NEXT_PUBLIC_SITE_URL` when changing the primary domain; `VERCEL_PROJECT_PRODUCTION_URL` is also supported. Canonicals use this validated configuration rather than the incoming Host header.
 
 Artist, album, song, playlist, and mix pages load real public preview fields and point to `/og/{kind}/{id}`. Shared song and lyric pages use `/og/share/{slug}` with the public share's real song information, artwork, and selected excerpt. Endpoints return JPEG by default; `?format=webp` returns WebP. Unknown kinds, invalid identifiers, and unsupported formats are rejected.
 
@@ -26,7 +26,7 @@ Every collection/share image request reads the authoritative record before image
 
 The proxy permits public preview HTML and images. Account data and actions remain protected by their APIs. Anonymous root visitors see a branded landing page; signed-in visitors continue to `/home`. Root, About, Privacy, and Terms are indexable and appear in the sitemap. Music/account/share pages have noindex metadata. Robots permits public pages and OG images without the old blanket block. The review gallery is noindex, nofollow.
 
-This Next.js installation's default HTML-limited bot list recognizes WhatsApp, Facebook sharing crawlers, and Twitterbot and puts their dynamic metadata in the HTML head. No custom expression replaces those defaults.
+The Next.js configuration extends the installed HTML-limited bot list with `Meta-ExternalFetcher` and `Meta-ExternalAgent`. WhatsApp, Facebook sharing crawlers, Twitterbot, and all other installed defaults remain included. These crawlers receive dynamic metadata in the initial HTML head; ordinary browsers retain streaming metadata.
 
 ## Gallery and regeneration
 
@@ -55,6 +55,8 @@ npm run test:seo
 # With a development or production server running:
 npm run test:seo:browser
 npm run test:og:browser
+# Read-only checks of actual advertised URLs on the production deployment:
+node --import tsx scripts/og-whatsapp-live.mjs https://sakuraplayer.vercel.app
 # Use SAKURA_TEST_URL to check another local/staging server.
 ```
 
@@ -62,4 +64,16 @@ Tests cover encoded images, choices, fallback copy, public-field boundaries, ren
 
 The removed preference notice stays silent after a durable device save when account sync is unavailable. Pending operations remain intact; reconnecting retries them, and only a valid server receipt acknowledges the save. Background synchronization after reloading saved preferences follows the same behavior. Storage failures that prevent a durable save, authentication errors, and genuine conflicts still report errors.
 
-The implementation is local until deployed. WhatsApp can retain previously fetched cards; verify a fresh deployed link or refreshed platform scrape after release.
+The approved OG implementation was first deployed from commit `381a8ac`. WhatsApp can retain previously fetched cards; verify a fresh link or refreshed platform scrape after each release.
+
+## WhatsApp Web diagnosis and fix
+
+The actual production site is `https://sakuraplayer.vercel.app`. Its website metadata was already in the initial HTML head, and its advertised image returned HTTP 200: a 60,100-byte sRGB JPEG at 1200 × 630. Gzip negotiation, anonymous access, and image HEAD requests also succeeded. The owner confirmed that pasting `https://sakuraplayer.vercel.app/?preview=wa-check-20261113` into WhatsApp Web produced the preview using that same image. This points to a cached preview for the original URL; the experiment demonstrates that the existing dimensions and image encoding work in WhatsApp Web.
+
+A separate crawler issue was reproduced on an artist page. `Meta-ExternalFetcher/1.1` received `og:image` at byte 164,160, after the head had closed. Next's installed bot defaults omit this user agent. The configuration now extends those defaults with Meta's newer fetcher and agent names, retaining the existing bots and ordinary browser streaming. See [Meta's crawler documentation](https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers) and [Next's metadata streaming documentation](https://nextjs.org/docs/app/api-reference/config/next-config-js/htmlLimitedBots).
+
+Image URL revision `20261113-3` gives all social images a fresh cache key while preserving the selected artwork, bytes, JPEG/WebP formats, and dimensions. [Meta's sharing guide](https://developers.facebook.com/documentation/sharing/webmasters) documents that image caches follow the image URL. The fallback origin and README were corrected from the stale `sakura-orcin` address; the actual production deployment already used its correct Vercel origin.
+
+The read-only `og-whatsapp-live.mjs` script checks the normal and fresh website links plus artist pages under desktop, WhatsApp, Facebook, newer Meta, and Twitter user agents. It inspects raw HTML without executing JavaScript and downloads the exact advertised image URL. It checks the public origin, current revision, dimensions, JPEG decoding, compact bytes, and root asset hash. The local browser suite only remaps production canonical URLs when explicitly testing a localhost server; production checks cannot hide a wrong image hostname.
+
+Before publication, all 15 focused tests, eight browser checks, 12 raw crawler cases, scoped lint, and the production build passed. Output tracing included all 48 fonts, 26 static JPEGs, 26 static WebPs, and Sharp dependencies. The newer Meta crawlers received artist metadata inside a 5.4 KB head, and the website image retained its exact selected asset hash.

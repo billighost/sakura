@@ -2,7 +2,7 @@
 
 A personal music PWA with offline playback, synced lyrics, playlists, personalized discovery, and illustrated listening stories. Its ink-and-paper interface includes light and dark themes and an opening of growing branches, blossoms, and a passing breeze.
 
-[Open Sakura](https://sakura-orcin.vercel.app) · [Contributing](CONTRIBUTING.md) · [Performance and verification](docs/rebuild/PERFORMANCE-OPTIMIZATION.md)
+[Open Sakura](https://sakuraplayer.vercel.app) · [Contributing](CONTRIBUTING.md) · [Performance and verification](docs/rebuild/PERFORMANCE-OPTIMIZATION.md)
 
 The production frontend is `src/rebuild/app` and `src/rebuild/player`. The replacement catalog, audio resolver, data APIs, and recommendation planner live under `src/rebuild`. The old application UI, player, catalog, downloads, and business logic have been removed.
 

@@ -1,4 +1,4 @@
-const documentedOrigin = "https://sakura-orcin.vercel.app";
+const documentedOrigin = "https://sakuraplayer.vercel.app";
 
 export function resolveSiteOrigin(value?: string) {
   if (!value?.trim()) return documentedOrigin;

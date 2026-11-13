@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS } from "../src/rebuild/data/validation.ts";
 loadEnv({ path: ".env.local", quiet: true });
 loadEnv({ path: ".env", quiet: true });
 const base = process.env.SAKURA_TEST_URL || "http://localhost:3000";
+const localServer = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(base).hostname);
 const output = resolve(".local/og-preview/seo");
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -24,7 +25,7 @@ function meta(html, name) {
   return decode(tag && /content="([^"]*)"/.exec(tag)?.[1]);
 }
 async function checkImage(path, filename, format = "jpeg") {
-  const response = await context.request.get(base + path, { headers: { "User-Agent": "WhatsApp/2.26" }, timeout: 90_000 });
+  const response = await context.request.get(new URL(path, base).href, { headers: { "User-Agent": "WhatsApp/2.26" }, timeout: 90_000 });
   assert.equal(response.status(), 200, path);
   assert.equal(response.headers()["content-type"]?.split(";")[0], "image/" + format);
   const bytes = await response.body();
@@ -55,7 +56,10 @@ async function checkPage(path, options = {}) {
   if (options.image) assert.equal(new URL(meta(head, "og:image")).pathname, options.image);
   if (options.fetchImage !== false) {
     const image = new URL(meta(head, "og:image"));
-    await checkImage(image.pathname + image.search, options.filename);
+    // Local servers intentionally use the configured production canonical.
+    // Deployed checks must fetch the advertised origin instead of hiding it.
+    if (!localServer) assert.equal(image.origin, new URL(base).origin, "OG image belongs to the deployed site");
+    await checkImage(localServer ? image.pathname + image.search : image.href, options.filename);
   }
   return { html, head, image: new URL(meta(head, "og:image")) };
 }
@@ -87,7 +91,7 @@ try {
     await checkPage(page.route, { indexable: page.visibility === "public", image: "/og/" + page.id + ".jpg" });
   }
   checks.push("All 18 ordinary URLs return anonymous WhatsApp metadata, correct canonicals, selected JPEGs, and indexing policy.");
-  for (const ua of ["facebookexternalhit/1.1", "Twitterbot/1.0"]) await checkPage("/artist/deezer%3A110616822", { ua, fetchImage: false });
+  for (const ua of ["facebookexternalhit/1.1", "Twitterbot/1.0", "Meta-ExternalFetcher/1.1", "meta-externalagent/1.1"]) await checkPage("/artist/deezer%3A110616822", { ua, fetchImage: false });
   checks.push("Meta and Twitter crawlers receive entity metadata inside the HTML head without a login redirect.");
   const artist = await checkPage("/artist/deezer%3A110616822", { title: "Ayra Starr · Sakura", image: "/og/artist/deezer%3A110616822", filename: "artist-live.jpg" });
   await checkImage(artist.image.pathname + artist.image.search + "&format=webp", "artist-live.webp", "webp");
