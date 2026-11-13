@@ -31,7 +31,7 @@ export function ids(value: unknown, limit = 200): string[] {
   return parsed;
 }
 export const DEFAULT_SETTINGS = {
-  theme: "system", audioQuality: "high", audioTechnology: "none", japaneseReading: false, lyricReading: false, privateSession: false, ...FEED_DEFAULTS,
+  theme: "system", audioQuality: "high", audioTechnology: "none", japaneseReading: true, lyricReading: true, privateSession: false, ...FEED_DEFAULTS,
   reducedMotion: false, openingAnimation: 1, bloomPerformance: "auto", explicitContent: true,
   timeZone: "Africa/Lagos", seedArtistSelections: [],volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15,
 } as const;

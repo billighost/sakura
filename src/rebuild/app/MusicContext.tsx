@@ -57,7 +57,7 @@ export interface MusicState {
  preparePlaybackAudio:(track:MusicTrack,signal:AbortSignal,options?:{complete?:boolean})=>Promise<PreparedPlaybackAudio>;
  modal:PlayerModal;shareTrack:MusicTrack|null;openModal:(modal:PlayerModal,subject?:MusicTrack)=>void;closeModal:()=>void;notify:(message:string)=>void;toast:string;notice:{issue:UserIssue;retry?:()=>void}|null;reportError:(error:unknown,context?:ErrorContext,retry?:()=>void)=>void;dismissNotice:()=>void;retryConnection:()=>void;logout:()=>Promise<void>;sleepMinutes:number|null;setSleepTimer:(minutes:number|null)=>void;
 }
-const DEFAULT_SETTINGS:UserSettings={theme:"system",audioQuality:"high",audioTechnology:"none",japaneseReading:false,lyricReading:false,privateSession:false,...FEED_DEFAULTS,reducedMotion:false,openingAnimation:1,bloomPerformance:"auto",seedArtists:[],seedGenres:[],onboarded:false,timeZone:"Africa/Lagos",explicitContent:true,volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15};
+const DEFAULT_SETTINGS:UserSettings={theme:"system",audioQuality:"high",audioTechnology:"none",japaneseReading:true,lyricReading:true,privateSession:false,...FEED_DEFAULTS,reducedMotion:false,openingAnimation:1,bloomPerformance:"auto",seedArtists:[],seedGenres:[],onboarded:false,timeZone:"Africa/Lagos",explicitContent:true,volume:.8,shuffle:false,repeat:"off",previewVolume:.8,previewLoop:true,sleepTimerMinutes:15};
 const Context=createContext<MusicState|null>(null);
 const ProgressContext=createContext<PlaybackProgressStore|null>(null);
 export function useMusic(){const value=useContext(Context);if(!value)throw new Error("MusicProvider is required.");return value;}

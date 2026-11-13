@@ -2,9 +2,10 @@ import type { UserSettings } from "./types";
 
 type ReadingPreferences = Pick<UserSettings, "japaneseReading" | "lyricReading">;
 
-/** Either legacy reading choice carries forward to the shared preference. */
+/** Readings start enabled; an explicit disable still survives saved preferences. */
 export function lyricReadingEnabled(settings: ReadingPreferences): boolean {
-  return settings.lyricReading === true || settings.japaneseReading === true;
+  return settings.lyricReading === true || settings.japaneseReading === true
+    || (settings.lyricReading !== false && settings.japaneseReading !== false);
 }
 
 /** Keep old clients compatible while every listening surface shares one switch. */
