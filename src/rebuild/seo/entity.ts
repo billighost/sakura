@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { io } from "next/cache";
 import type { PublicShare } from "../player/SharedSong";
 import type { OgPreviewPage } from "../og/catalog";
 import { cleanPreviewText, entityOgImagePath, makeShareMetadata, staticOgData, staticOgImagePath } from "./metadata";
@@ -12,6 +13,9 @@ export function entityOgData(kind: PublicEntityKind, preview: PublicEntityPrevie
   return { ...base, title: preview.title, subtitle, description, detail: preview.detail || base.detail, artwork: preview.artwork || (kind === "mix" ? preview.collage?.[0] : undefined), collage: preview.collage };
 }
 export async function entityPageMetadata(kind: PublicEntityKind, rawId: string): Promise<Metadata> {
+  // Cache hits read the clock too. Exclude these reads from the static shell
+  // while keeping public metadata available to prefetches.
+  await io();
   const id = decodedEntityId(rawId);
   const preview = await readPublicEntityPreview(kind, id);
   const data = preview ? entityOgData(kind, preview) : staticOgData(kind);
