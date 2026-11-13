@@ -11,10 +11,14 @@ import { feedTasteKey, feedViewKey } from "./feedIdentity";
 import { prefetchPersonalizedFeed } from "./PersonalizedFeed";
 import { prefetchHeroRecommendation } from "./useHeroRecommendation";
 import { MusicScreens } from "./MusicScreens";
+import {finishClientJourney} from "./clientPerformance";
 import {enterOfflineShell,installOfflineNavigation,localRouteSnapshot,musicRoute,rememberMusicRoute,subscribeLocalRoute} from "./offlineNavigation";
 import { Blossom } from "./Brand";
 import s from "./ink.module.css";
-const BloomPage=dynamic(()=>import("../bloom/BloomPage").then(module=>module.BloomPage),{loading:MusicRouteLoading});
+// Rendering and offline warmup must share this exact import site. Turbopack can
+// assign separate dynamic-import sites to different chunk groups.
+const loadBloomPage=()=>import("../bloom/BloomPage").then(module=>module.BloomPage);
+const BloomPage=dynamic(loadBloomPage,{loading:MusicRouteLoading});
 
 /** Keep navigation available while account restoration is still in progress. */
 export function OfflineNavigationController(){
@@ -36,7 +40,7 @@ export function OfflineNavigationController(){
   const warm=(href:string,priority=0)=>{
    warmShell(href,priority+2);
    const targets=routePrefetchTargets(href,location.origin);
-   for(const path of targets.paths)queue.enqueue(accountId+":"+path,async signal=>{signal.throwIfAborted();await loadResource(accountId,path);},priority);
+   for(const path of targets.paths)queue.enqueue(accountId+":"+path,signal=>loadResource(accountId,path,{signal,kind:"prefetch"}),priority);
    if(targets.surface){
     const surface=targets.surface,settings=current.current.settings,key=feedViewKey(accountId,surface,"balanced",settings);
     queue.enqueue("feed:"+key,signal=>prefetchPersonalizedFeed(accountId,surface,settings,signal),priority+1);
@@ -68,12 +72,23 @@ export function OfflineNavigationController(){
  },[accountId,music.booting,music.offline,frameworkOffline,tasteKey,router]);
  useEffect(()=>{prefetch.current?.resume();},[music.status,music.offline,music.preparingTrack]);
  useEffect(()=>{rememberMusicRoute(pathname);const controlled=()=>rememberMusicRoute(location.pathname);navigator.serviceWorker?.addEventListener("controllerchange",controlled);return()=>navigator.serviceWorker?.removeEventListener("controllerchange",controlled);},[pathname]);
+ useEffect(()=>{
+  if(music.offline||frameworkOffline||musicRoute(pathname)?.[0]!=="bloom")return;
+  const worker=navigator.serviceWorker;let stopped=false,warming=false;
+  const warm=()=>{
+   if(stopped||warming||!navigator.onLine||!worker?.controller||location.pathname!==pathname)return;
+   warming=true;void loadBloomPage().then(()=>{if(!stopped&&location.pathname===pathname)rememberMusicRoute(pathname);}).catch(()=>{}).finally(()=>{warming=false;});
+  };
+  warm();window.addEventListener("online",warm);worker?.addEventListener("controllerchange",warm);
+  return()=>{stopped=true;window.removeEventListener("online",warm);worker?.removeEventListener("controllerchange",warm);};
+ },[pathname,music.offline,frameworkOffline]);
  return null;
 }
 
 export function RouteTransition({children}:{children:ReactNode}){
  const pathname=usePathname(),element=useRef<HTMLDivElement>(null);
  const localPath=useSyncExternalStore(subscribeLocalRoute,localRouteSnapshot,()=>"");
+ useEffect(()=>{const frame=requestAnimationFrame(()=>finishClientJourney("navigation"));return()=>cancelAnimationFrame(frame);},[pathname,localPath]);
  useLayoutEffect(()=>{
   const node=element.current;
   if(!node)return;

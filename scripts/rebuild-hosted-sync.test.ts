@@ -9,6 +9,7 @@ import { LyricAlignmentError, WHISPER_SYNC_ENGINE } from "../src/rebuild/lyrics/
 import { ProductError, uuid } from "../src/rebuild/data/validation";
 import type { TimedLyric } from "../src/rebuild/lyrics/parse";
 import { recordingLyricIdentity } from "../src/rebuild/lyrics/recordingIdentity";
+import { SyncStartGate } from "../src/rebuild/lyrics/syncStartGate";
 
 const secret = "test-only-hosted-sync-signing-key-32-bytes";
 const accountId = "11111111-1111-4111-8111-111111111111";
@@ -199,7 +200,30 @@ test("multiline SSE data and heartbeat-only streams handle completed and pending
   assert.equal((await f.worker.poll(accountId, jobToken)).status, "complete");
   const idle = fixture(["event: heartbeat\ndata: null\n\n"]);
   const pending = await idle.worker.start(accountId, audio, source);
-  assert.deepEqual(await idle.worker.poll(accountId, pending.jobToken), { status: "pending" });
+  assert.deepEqual(await idle.worker.poll(accountId, pending.jobToken), { status: "pending", phase: "waiting", retryAfterMs: 5000 });
+});
+
+test("only explicit generating events mark a pending accepted job as running", async () => {
+  for (const [events, expected] of [
+    ["event: heartbeat\ndata: null\n\n", { status: "pending", phase: "waiting", retryAfterMs: 5000 }],
+    ["event: generating\ndata: []\n\nevent: heartbeat\ndata: null\n\n", { status: "pending", phase: "running", retryAfterMs: 2000 }],
+  ] as const) {
+    const f = fixture([events]), accepted = await f.worker.start(accountId, audio, source);
+    assert.equal(accepted.phase, "queued");
+    assert.deepEqual(await f.worker.poll(accountId, accepted.jobToken), expected);
+  }
+});
+
+test("start acknowledgements bound bytes and rejected worker bodies are released promptly", async () => {
+  for (const status of [200, 503]) {
+    let cancelled = false;
+    const worker = createHostedSync({ url: workerUrl, secret, fetch: async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { if (status === 200) controller.enqueue(new Uint8Array(32 * 1024 + 1)); },
+      cancel() { cancelled = true; return new Promise<void>(() => {}); },
+    }), { status }) });
+    await assert.rejects(worker.start(accountId, audio, source), status === 200 ? RangeError : HostedSyncError);
+    assert.equal(cancelled, true);
+  }
 });
 
 test("worker failures, malformed SSE and oversized streams return honest failures", async () => {
@@ -212,7 +236,7 @@ test("worker failures, malformed SSE and oversized streams return honest failure
   await assert.rejects(worker.start(accountId, audio, source), /asleep, busy|quota/);
 });
 
-type RouteFixtureOptions = { account?: { id: string } | null; track?: Record<string, unknown> | null; plain?: string; instrumental?: boolean; pollError?: Error };
+type RouteFixtureOptions = { account?: { id: string } | null; track?: Record<string, unknown> | null; plain?: string; instrumental?: boolean; pollError?: Error; startFailures?: number; beforeCards?: () => Promise<void> };
 function routeFixture(options: RouteFixtureOptions = {}) {
   const calls: { kind: string; args: unknown[] }[] = [];
   const defaultTrack = { title: "Song", artists: ["Artist"], albumTitle: "Album", durationMs: 30_000, metadata: { language: "en" }, readyPlayback: { url: audio.audioUrl, sha256: audioSha256, sizeBytes: audio.sizeBytes, durationMs: 30_000 } };
@@ -222,15 +246,16 @@ function routeFixture(options: RouteFixtureOptions = {}) {
     if (name === "@/rebuild/server/performance") return { withApiTiming: async (_route: string, _request: Request, operation: () => Promise<Response>) => operation() };
     if (name === "next/server") return { NextResponse: { json: Response.json } };
     if (name === "@/rebuild/auth") return { requireRebuildAccount: async () => options.account === undefined ? { id: accountId } : options.account };
-    if (name === "@/rebuild/data/catalog") return { cardsForIds: async (...args: unknown[]) => { calls.push({ kind: "cards", args }); return options.track === null ? [] : [options.track || defaultTrack]; } };
+    if (name === "@/rebuild/data/catalog") return { cardsForIds: async (...args: unknown[]) => { calls.push({ kind: "cards", args }); await options.beforeCards?.(); return options.track === null ? [] : [options.track || defaultTrack]; } };
     if (name === "@/rebuild/data/validation") return { ProductError, uuid };
     if (name === "@/rebuild/lyrics/autoSync") return { canAutoSync };
     if (name === "@/rebuild/lyrics/recordingIdentity") return { recordingLyricIdentity };
     if (name === "@/rebuild/lyrics/whisperSync") return { LyricAlignmentError };
+    if (name === "@/rebuild/lyrics/syncStartGate") return { SyncStartGate };
     if (name === "@/rebuild/lyrics/service") return { resolveVerifiedLyrics: async (...args: unknown[]) => { calls.push({ kind: "lyrics", args }); return { status: "matched", track: { plainLyrics: options.plain ?? source.map(line => line.text).join("\n"), instrumental: options.instrumental || false } }; } };
     if (name === "@/rebuild/lyrics/hostedSync") return { HostedSyncError, createHostedSync: () => ({
-      start: async (...args: unknown[]) => { verifiedSyncAudio(args[1] as VerifiedSyncAudio); calls.push({ kind: "start", args }); return { status: "pending", jobToken: "server-signed-job" }; },
-      poll: async (...args: unknown[]) => { calls.push({ kind: "poll", args }); if (options.pollError) throw options.pollError; return { status: "pending" }; },
+      start: async (...args: unknown[]) => { verifiedSyncAudio(args[1] as VerifiedSyncAudio); calls.push({ kind: "start", args }); if (options.startFailures) { options.startFailures--; throw new HostedSyncError("Worker unavailable"); } return { status: "pending", phase: "queued", retryAfterMs: 2000, jobToken: "server-signed-job" }; },
+      poll: async (...args: unknown[]) => { calls.push({ kind: "poll", args }); if (options.pollError) throw options.pollError; return { status: "pending", phase: "waiting", retryAfterMs: 5000 }; },
     }) };
     throw new Error("Unexpected sync route dependency: " + name);
   };
@@ -279,4 +304,43 @@ test("sync route polls in the current account without catalogue/acquisition work
   assert.deepEqual(f.calls.map(call => call.kind), ["poll"]);
   assert.equal(f.calls[0].args[0], accountId);
   assert.match((await response.json()).error, /plain lyrics kept/);
+});
+
+test("accepted and concurrently starting jobs reject duplicate starts before catalogue/provider work", async () => {
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const f = routeFixture({ beforeCards: () => held });
+  const first = f.post({ recordingId, lines: source });
+  await new Promise(resolve => setImmediate(resolve));
+  const duplicate = await f.post({ recordingId, lines: source });
+  assert.equal(duplicate.status, 429); assert.equal(duplicate.headers.get("Retry-After"), "1");
+  assert.deepEqual(f.calls.map(call => call.kind), ["cards"]);
+  release(); assert.equal((await first).status, 200);
+  const before = f.calls.length, cooled = await f.post({ recordingId, lines: source });
+  assert.equal(cooled.status, 429); assert.equal(f.calls.length, before);
+  assert.ok(Number(cooled.headers.get("Retry-After")) > 0);
+  assert.equal((await f.post({ recordingId, lines: [{ text: "words", start: 2 }] })).status, 400);
+  assert.equal(f.calls.length, before);
+});
+
+test("failed worker starts release the reservation and pending status retains compact retry hints", async () => {
+  const f = routeFixture({ startFailures: 1 });
+  assert.equal((await f.post({ recordingId, lines: source })).status, 503);
+  assert.equal((await f.post({ recordingId, lines: source })).status, 200);
+  assert.equal(f.calls.filter(call => call.kind === "start").length, 2);
+  const count = f.calls.length, poll = await f.post({ jobToken: "server-signed-job" });
+  assert.equal(poll.headers.get("Retry-After"), "5");
+  assert.deepEqual(await poll.json(), { status: "pending", phase: "waiting", retryAfterMs: 5000 });
+  assert.deepEqual(f.calls.slice(count).map(call => call.kind), ["poll"]);
+});
+
+test("hiding a stalled poll releases its read while a new stateless helper can resume the same accepted token", async () => {
+  const f = fixture(), pending = await f.worker.start(accountId, audio, source);
+  let cancelled = false;
+  const pausedWorker = createHostedSync({ url: workerUrl, secret, now: f.getTime, fetch: async () => new Response(new ReadableStream({ cancel() { cancelled = true; } })) });
+  const controller = new AbortController(), work = pausedWorker.poll(accountId, pending.jobToken, controller.signal);
+  const rejected = assert.rejects(work, { name: "AbortError" });
+  await new Promise(resolve => setImmediate(resolve)); controller.abort(); await rejected; assert.equal(cancelled, true);
+  const reloaded = createHostedSync({ url: workerUrl, secret, now: f.getTime, fetch: async () => streamedResponse([frame()]).response });
+  assert.equal((await reloaded.poll(accountId, pending.jobToken)).status, "complete");
 });

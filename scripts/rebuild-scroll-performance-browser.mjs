@@ -24,7 +24,8 @@ wav.writeUInt32LE(rate,24);wav.writeUInt32LE(rate*2,28);wav.writeUInt16LE(2,32);
 for(let i=0;i<samples;i++)wav.writeInt16LE(Math.round(Math.sin(i/rate*220*Math.PI*2)*200),44+i*2);
 const browser=engine==='webkit'?await webkit.launch({headless:true}):await chromium.launch({channel:'chrome',headless:true});
 const output='.local/scroll-performance';await fs.mkdir(output,{recursive:true});
-const report={engine,base,scope:'Actual Home route with 80 synthetic songs, intercepted APIs/audio and real local cover assets.',checks:[],errors:[]};
+const buildId=(await fs.readFile('.next/BUILD_ID','utf8')).trim();
+const report={buildId,engine,base,scope:'Actual Home route with 80 synthetic songs, intercepted APIs/audio and real local cover assets.',checks:[],errors:[]};
 
 try{
   for(const width of [390,320,1440]){
@@ -37,12 +38,14 @@ try{
       const request=route.request(),url=new URL(request.url()),path=url.pathname;
       if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
       if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,onboarded:true,openingAnimation:0,reducedMotion:false,volume:.1}});
-      if(path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{}}});
+      if(path==='/api/v2/bootstrap'||path==='/api/v2/profile')return route.fulfill({json:{profile:account,stats:{}}});
+      if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});
+      if(path==='/api/v2/taste')return route.fulfill({json:{feedback:[],tasteEvidence:[]}});
       if(path==='/api/v2/listening-session')return route.fulfill({json:{session:null,serverTime:Date.now()}});
       if(path==='/api/v2/feed/hero')return route.fulfill({json:{item:{track:tracks[0],reason:'Synthetic performance recommendation.',lane:'similar'},generatedAt:new Date().toISOString()}});
       if(path==='/api/v2/feed'){
         const offset=Number(url.searchParams.get('cursor'))||0;
-        return route.fulfill({json:{items:tracks.slice(offset,offset+12).map(track=>({track,lane:'similar',reason:'A synthetic recommendation for checking scroll stability.'})),sections:[],nextCursor:offset+12<tracks.length?String(offset+12):null,totalCandidates:tracks.length,personalized:true,generatedAt:new Date().toISOString()}});
+        return route.fulfill({json:{items:tracks.slice(offset,offset+12).map(track=>({track,lane:'similar',reason:'A synthetic recommendation for checking scroll stability.'})),sections:[],nextCursor:offset+12<tracks.length?String(offset+12):null,totalCandidates:tracks.length,personalized:true,generatedAt:new Date().toISOString(),...(url.searchParams.get('includeHero')==='1'?{hero:{item:{track:tracks[0],reason:'Synthetic performance recommendation.',lane:'similar'},generatedAt:new Date().toISOString(),refreshAt:Date.now()+600000}}:{})}});
       }
       if(path==='/api/v2/recordings/resolve'){
         const selected=tracks.find(track=>track.reference.id===request.postDataJSON().reference?.id)||tracks[0];

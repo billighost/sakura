@@ -4,6 +4,31 @@ import { measureApiStage } from "../server/performance";
 type AccountRow = { id:string;username:string;email:string;avatarUrl:string|null };
 const runtime = globalThis as unknown as { sakuraV2ProductPool?: Pool;sakuraV2AccountReads?:Map<string,Promise<AccountRow|null>> };
 const accountReads = runtime.sakuraV2AccountReads ||= new Map<string,Promise<AccountRow|null>>();
+const measuredQueries = new WeakMap<object, object>();
+
+/** Query text is inspected only to choose a fixed stage name. It and its
+ * parameters never enter telemetry. pg's callback overload is left untouched. */
+function measuredQueryable<T extends object>(target:T):T {
+  const existing=measuredQueries.get(target);if(existing)return existing as T;
+  const proxy=new Proxy(target,{get(value,key){
+    const member=Reflect.get(value,key);
+    if(key!=="query"||typeof member!=="function")return typeof member==="function"?member.bind(value):member;
+    return (...args:unknown[])=>{
+      const run=()=>Reflect.apply(member,value,args);
+      if(args.some(argument=>typeof argument==="function"))return run();
+      const statement=typeof args[0]==="string"?args[0]:(args[0] as QueryConfig|undefined)?.text||"";
+      if(/^\s*(?:BEGIN|COMMIT|ROLLBACK)\b/i.test(statement))return run();
+      return measureApiStage(/\bpg_advisory(?:_xact)?_lock(?:_shared)?\b/.test(statement)?"db_lock":"db_query",run);
+    };
+  }});
+  measuredQueries.set(target,proxy);return proxy;
+}
+
+/** Numeric pool pressure only; no connection configuration or identities. */
+export function rebuildPoolPressure(){
+  const pool=runtime.sakuraV2ProductPool;
+  return {total:pool?.totalCount||0,idle:pool?.idleCount||0,waiting:pool?.waitingCount||0};
+}
 
 function connectionFailure(error:unknown):boolean {
   if(!(error instanceof Error))return false;
@@ -14,7 +39,7 @@ function connectionFailure(error:unknown):boolean {
 
 /** A single server-only pool shared by the replacement product and audio services. */
 export function getRebuildPool(): Pool {
-  if (runtime.sakuraV2ProductPool) return runtime.sakuraV2ProductPool;
+  if (runtime.sakuraV2ProductPool) return measuredQueryable(runtime.sakuraV2ProductPool);
   const connectionString = process.env.SAKURA_REBUILD_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
   if (!connectionString) throw new Error("Database configuration is missing");
   const protocol = new URL(connectionString).protocol;
@@ -23,7 +48,7 @@ export function getRebuildPool(): Pool {
     connectionTimeoutMillis: 8000, statement_timeout: 15000, query_timeout: 20000 });
   pool.on("error", () => console.error("[Sakura v2] Database connection failed"));
   runtime.sakuraV2ProductPool = pool;
-  return pool;
+  return measuredQueryable(pool);
 }
 
 /** Only this fixed account SELECT is retried. Mutations and transactions never
@@ -53,7 +78,7 @@ export async function readAccountById(id:string):Promise<AccountRow|null> {
 }
 
 export async function inTransaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await measureApiStage("db_acquire",()=>getRebuildPool().connect());
+  const client = measuredQueryable(await measureApiStage("db_acquire",()=>getRebuildPool().connect()));
   let releaseError:Error|undefined;
   try {
     await measureApiStage("db_control",()=>client.query("BEGIN"));

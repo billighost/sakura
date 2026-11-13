@@ -5,12 +5,24 @@ import { Ownership, DRAIN_MS } from './src/ownership.mjs';
 import { authorized, signature, audioHeaders, tagOf } from './src/http.mjs';
 import { DurableSession } from './src/session.mjs';
 import authKeys from '../node_modules/telegram/crypto/AuthKey.js';
+import workerPerformance from '../rebuild/performance.cjs';
 
 const storage = () => {
  const rows = new Map(); let tail = Promise.resolve();
  const store = { get: async k => structuredClone(rows.get(k)), put: async (k,v) => rows.set(k, structuredClone(v)) };
  store.transaction = fn => { const work = tail.then(() => fn(store)); tail = work.catch(() => {}); return work; }; return store;
 };
+test('optional numeric telemetry retains every ownership fence before packet writes', async () => {
+ const metrics=workerPerformance.createWorkerPerformance(true),store=storage();let now=1000;
+ const owner=new Ownership(store,'old',()=>now,metrics);await owner.claim();
+ const written=[];
+ const Socket=socketClass(()=>({opened:Promise.resolve(),closed:Promise.resolve(),readable:new ReadableStream(),writable:new WritableStream({write(bytes){written.push([...bytes]);}}),close:async()=>{}}),()=>owner.fence(),new Set(),metrics);
+ const socket=new Socket();await socket.connect(80,'fixture');await socket.write(Uint8Array.of(1,2));
+ const replacement=new Ownership(store,'new',()=>now);await replacement.claim();
+ await assert.rejects(socket.write(Uint8Array.of(3)),/retired/);await socket.writes;
+ const result=metrics.snapshot();assert.deepEqual(written,[[1,2]]);assert.equal(result.counters.packet_bytes,2);assert.equal(result.stages.storage_fence.count,3);assert.equal(result.stages.socket_write.count,1);
+ assert.ok(!JSON.stringify(result).includes('fixture'));
+});
 test('replacement fences all old writes and waits for in-flight Telegram packets to drain', async () => {
  const store=storage(); let now=1000;
  const old=new Ownership(store,'old',()=>now); await old.claim(); await old.fence();

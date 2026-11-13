@@ -1,5 +1,5 @@
 "use client";
-import { memo, useCallback, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { memo, useMemo, useState, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "./Icon";
 import { TrackActions, type SongMenuAnchor } from "./TrackActions";
@@ -9,14 +9,15 @@ import { ArtistLinks } from "./ArtistLinks";
 import { RecoveryNotice } from "./RecoveryNotice";
 import { PlaybackRibbon, VolumeControl } from "./ListeningControls";
 import { Blossom } from "./Brand";
-import { useMusic, usePlaybackProgress } from "./MusicContext";
+import { usePlaybackProgress } from "./MusicContext";
 import type { MusicTrack, DownloadEntry } from "./types";
 import { useLyrics } from "../player/useLyrics";
 import { useJapaneseReading } from "../player/useJapaneseReading";
 import { useSongSwipe } from "./useSongSwipe";
-import { miniLyricCue } from "../player/miniLyric";
+import { useMiniLyricCue } from "../player/useLyricProgress";
 import { responsiveArtworkSources } from "../player/imageUrl";
-import { DownloadRemovalDialog } from "./DownloadRemovalDialog";
+import { DownloadRemovalModal } from "./DownloadRemovalModal";
+import { useDownloadEntry, useMusicActions, useMusicView, type MusicActions } from "./musicView";
 import s from "./ink.module.css";
 import t from "./track-presentation.module.css";
 export function IconButton({icon,label,onClick,active,disabled=false,shortcut}:{icon:IconName;label:string;onClick:()=>void;active?:boolean;disabled?:boolean;shortcut?:string}){return <button className={s.iconButton+" "+(active?s.active:"")} type="button" aria-label={label} aria-pressed={active} title={shortcut?label+" ("+shortcut+")":label} onClick={onClick} disabled={disabled}><Icon name={icon}/>{shortcut&&<span className={s.shortcutHint} aria-hidden="true">{shortcut}</span>}</button>;}
@@ -55,46 +56,64 @@ function trackDate(value:MusicTrack["addedAt"]){
  const date=new Date(value);
  return Number.isFinite(date.getTime())?date:null;
 }
-type TrackRowsProps = {
- tracks:MusicTrack[]; currentTrack:MusicTrack|null; status:string; downloads:Record<string,DownloadEntry>; liked:Set<string>;
- effectiveId:(track:MusicTrack)=>string; menuTrack?:MusicTrack; downloaded:boolean; dateLabel?:string; showVersion:boolean;
- trackDetail?:(song:MusicTrack)=>ReactNode;
- playTrack:(song:MusicTrack,list:MusicTrack[],current:boolean,engaged:boolean)=>void;
- likeTrack:(song:MusicTrack)=>void; downloadTrack:(song:MusicTrack)=>void;
- onMenu:(menu:{track:MusicTrack;anchor:SongMenuAnchor})=>void; onRemove:(song:MusicTrack)=>void;
+type TrackRowProps = {
+ song:MusicTrack; id:string; index:number; tracks:MusicTrack[]; current:boolean; playing:boolean; engaged:boolean; liked:boolean;
+ menuOpen:boolean; downloaded:boolean; dateLabel?:string; showVersion:boolean; trackDetail?:(song:MusicTrack)=>ReactNode;
+ actions:MusicActions; onMenu:(menu:{track:MusicTrack;anchor:SongMenuAnchor})=>void; onRemove:(song:MusicTrack)=>void;
 };
-const TrackRows=memo(function TrackRows({tracks,currentTrack,status,downloads,liked,effectiveId,menuTrack,downloaded,dateLabel,showVersion,trackDetail,playTrack,likeTrack,downloadTrack,onMenu,onRemove}:TrackRowsProps){
- return <>{tracks.map((song,i)=>{const id=effectiveId(song),addedDate=dateLabel?trackDate(song.addedAt):null;const current=!!currentTrack&&effectiveId(currentTrack)===id,playing=current&&status==="playing",engaged=current&&(playing||status==="buffering"||status==="resolving");const saved=downloads[id]?.requested===false?undefined:downloads[id],busy=saved?.status==="queued"||saved?.status==="resolving"||saved?.status==="downloading",progress=transferProgress(saved);return <SongGesture key={id} id={id} className={`${s.trackRow} ${t.row} ${current?t.current:""} ${playing?s.playingRow:""}`} onOptions={anchor=>onMenu({track:song,anchor})}>
-   <button className={`${s.trackCover} ${t.cover}`} aria-label={(engaged?"Pause ":"Play ")+song.title} onClick={()=>playTrack(song,tracks,current,engaged)}><span aria-hidden="true">{playing?<span className={s.equalizer}><i/><i/><i/></span>:String(i+1).padStart(2,"0")}</span><Artwork url={song.coverUrl} title={song.albumTitle||song.title} className={t.art}/><span className={`${s.coverPlay} ${t.play}`}><Icon name={engaged?"pause":"play"} size={15}/></span></button>
-   <div className={`${s.trackInfo} ${t.info}`}><Link href={"/track/"+encodeURIComponent(id)} dir="auto">{song.title}</Link><div className={t.credits} data-track-credits><ArtistLinks track={song} className={t.artists}/>{song.albumTitle&&<span className={t.inlineAlbum}><span aria-hidden="true" className={t.creditDot}>·</span><AlbumLink track={song}/></span>}</div><span className={`${t.details} ${trackDetail?t.withDetail:""}`}>{trackDetail?.(song)}{dateLabel&&addedDate&&<time dateTime={addedDate.toISOString()} title={dateLabel+" "+addedDate.toLocaleString()}>{dateLabel} {addedDate.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}</time>}{showVersion&&song.versionLabel!=="Original recording"&&<span className={t.version} title={song.versionLabel}>{song.versionLabel}</span>}{saved?.status==="ready"?<span className={t.saved}><Icon name="check"/>Offline</span>:saved&&<span className={t.transferText}>{transferLabel(saved)}</span>}</span></div>
-   <AlbumLink track={song} className={`${s.albumColumn} ${t.album}`}/><span className={`${s.duration} ${t.length}`}>{time(song.durationMs)}</span><div className={t.actions}>
-   <button className={`${s.iconButton} ${t.like} ${liked.has(id)?s.active:""}`} type="button" aria-label={(liked.has(id)?"Unlike ":"Like ")+song.title} aria-pressed={liked.has(id)} title={(liked.has(id)?"Unlike ":"Like ")+song.title} onClick={()=>likeTrack(song)}><Icon name="heart"/></button>
-   {downloaded?<IconButton icon="trash" label={"Remove "+song.title+" from this device"} onClick={()=>onRemove(song)}/>:<TrackDownload track={song} entry={saved} onDownload={()=>downloadTrack(song)}/>}
-   <button className={s.iconButton} type="button" aria-haspopup="menu" aria-expanded={menuTrack===song} aria-label={"More options for "+song.title} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onMenu({track:song,anchor:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}});}}><Icon name="more"/></button></div>
-   {busy&&<span className={t.vine} role="progressbar" aria-label={"Download progress for "+song.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress===null?undefined:Math.round(progress*100)} aria-valuetext={transferLabel(saved)}><svg viewBox="0 0 500 8" preserveAspectRatio="none" aria-hidden="true"><path className={t.vineTrack} d="M0 5Q70 1 130 4T250 4T370 3T500 4"/><path className={t.vineFill} d="M0 5Q70 1 130 4T250 4T370 3T500 4" pathLength="1" strokeDasharray="1" strokeDashoffset={progress===null ? .9 : 1-progress}/></svg></span>}
- </SongGesture>;})}</>;
+const TrackRow=memo(function TrackRow({song,id,index,tracks,current,playing,engaged,liked,menuOpen,downloaded,dateLabel,showVersion,trackDetail,actions,onMenu,onRemove}:TrackRowProps){
+ const entry=useDownloadEntry(id),saved=entry?.requested===false?undefined:entry;
+ const busy=saved?.status==="queued"||saved?.status==="resolving"||saved?.status==="downloading",progress=transferProgress(saved);
+ const addedDate=useMemo(()=>dateLabel?trackDate(song.addedAt):null,[dateLabel,song.addedAt]);
+ const addedLabel=useMemo(()=>addedDate?{iso:addedDate.toISOString(),title:dateLabel+" "+addedDate.toLocaleString(),text:dateLabel+" "+addedDate.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}:null,[addedDate,dateLabel]);
+ return <SongGesture id={id} className={`${s.trackRow} ${t.row} ${current?t.current:""} ${playing?s.playingRow:""}`} onOptions={anchor=>onMenu({track:song,anchor})}>
+  <button className={`${s.trackCover} ${t.cover}`} aria-label={(engaged?"Pause ":"Play ")+song.title} onClick={()=>current&&engaged?actions.togglePlay():actions.play(song,tracks)}><span aria-hidden="true">{playing?<span className={s.equalizer}><i/><i/><i/></span>:String(index+1).padStart(2,"0")}</span><Artwork url={song.coverUrl} title={song.albumTitle||song.title} className={t.art}/><span className={`${s.coverPlay} ${t.play}`}><Icon name={engaged?"pause":"play"} size={15}/></span></button>
+  <div className={`${s.trackInfo} ${t.info}`}><Link href={"/track/"+encodeURIComponent(id)} dir="auto">{song.title}</Link><div className={t.credits} data-track-credits><ArtistLinks track={song} className={t.artists}/>{song.albumTitle&&<span className={t.inlineAlbum}><span aria-hidden="true" className={t.creditDot}>·</span><AlbumLink track={song}/></span>}</div><span className={`${t.details} ${trackDetail?t.withDetail:""}`}>{trackDetail?.(song)}{addedLabel&&<time dateTime={addedLabel.iso} title={addedLabel.title}>{addedLabel.text}</time>}{showVersion&&song.versionLabel!=="Original recording"&&<span className={t.version} title={song.versionLabel}>{song.versionLabel}</span>}{saved?.status==="ready"?<span className={t.saved}><Icon name="check"/>Offline</span>:saved&&<span className={t.transferText}>{transferLabel(saved)}</span>}</span></div>
+  <AlbumLink track={song} className={`${s.albumColumn} ${t.album}`}/><span className={`${s.duration} ${t.length}`}>{time(song.durationMs)}</span><div className={t.actions}>
+   <button className={`${s.iconButton} ${t.like} ${liked?s.active:""}`} type="button" aria-label={(liked?"Unlike ":"Like ")+song.title} aria-pressed={liked} title={(liked?"Unlike ":"Like ")+song.title} onClick={()=>void actions.toggleLike(song)}><Icon name="heart"/></button>
+   {downloaded?<IconButton icon="trash" label={"Remove "+song.title+" from this device"} onClick={()=>onRemove(song)}/>:<TrackDownload track={song} entry={saved} onDownload={()=>actions.requestDownload(song)}/>}
+   <button className={s.iconButton} type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-label={"More options for "+song.title} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onMenu({track:song,anchor:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}});}}><Icon name="more"/></button>
+  </div>
+  {busy&&<span className={t.vine} role="progressbar" aria-label={"Download progress for "+song.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress===null?undefined:Math.round(progress*100)} aria-valuetext={transferLabel(saved)}><svg viewBox="0 0 500 8" preserveAspectRatio="none" aria-hidden="true"><path className={t.vineTrack} d="M0 5Q70 1 130 4T250 4T370 3T500 4"/><path className={t.vineFill} d="M0 5Q70 1 130 4T250 4T370 3T500 4" pathLength="1" strokeDasharray="1" strokeDashoffset={progress===null ? .9 : 1-progress}/></svg></span>}
+ </SongGesture>;
+});
+type TrackRowsProps = {
+ tracks:MusicTrack[]; currentId:string|null; status:string; liked:Set<string>; menuTrack?:MusicTrack;
+ downloaded:boolean; dateLabel?:string; showVersion:boolean; trackDetail?:(song:MusicTrack)=>ReactNode;
+ actions:MusicActions; onMenu:(menu:{track:MusicTrack;anchor:SongMenuAnchor})=>void; onRemove:(song:MusicTrack)=>void;
+};
+const TrackRows=memo(function TrackRows({tracks,currentId,status,liked,menuTrack,downloaded,dateLabel,showVersion,trackDetail,actions,onMenu,onRemove}:TrackRowsProps){
+ return <>{tracks.map((song,index)=>{const id=actions.effectiveId(song),current=id===currentId,playing=current&&status==="playing",engaged=current&&(playing||status==="buffering"||status==="resolving");return <TrackRow key={id} song={song} id={id} index={index} tracks={tracks} current={current} playing={playing} engaged={engaged} liked={liked.has(id)} menuOpen={menuTrack===song} downloaded={downloaded} dateLabel={dateLabel} showVersion={showVersion} trackDetail={trackDetail} actions={actions} onMenu={onMenu} onRemove={onRemove}/>;})}</>;
 });
 export function TrackList({tracks,showVersion=true,downloaded=false,layout="list",dateLabel,trackDetail}:{tracks:MusicTrack[];showVersion?:boolean;downloaded?:boolean;layout?:TrackLayout;dateLabel?:string;trackDetail?:(song:MusicTrack)=>ReactNode}){
- const p=useMusic(),controls=useRef(p);useLayoutEffect(()=>{controls.current=p;},[p]);
- const {effectiveId,track:currentTrack,status,downloads,liked,queue}=p;
- const playTrack=useCallback((song:MusicTrack,list:MusicTrack[],current:boolean,engaged:boolean)=>{if(current&&engaged)controls.current.togglePlay();else controls.current.play(song,list);},[]);
- const likeTrack=useCallback((song:MusicTrack)=>{void controls.current.toggleLike(song);},[]);
- const downloadTrack=useCallback((song:MusicTrack)=>controls.current.requestDownload(song),[]);
+ const view=useMusicView(),actions=useMusicActions();
  const [menu,setMenu]=useState<{track:MusicTrack;anchor:SongMenuAnchor}|null>(null),[removing,setRemoving]=useState<MusicTrack|null>(null);
- const unique=useMemo(()=>[...new Map(tracks.map(song=>[effectiveId(song),song])).values()],[tracks,effectiveId,currentTrack,queue,downloads]);
- return <div className={`${s.trackList} ${t[layout]}`} data-track-layout={layout}><TrackRows tracks={unique} currentTrack={currentTrack} status={status} downloads={downloads} liked={liked} effectiveId={effectiveId} menuTrack={menu?.track} downloaded={downloaded} dateLabel={dateLabel} showVersion={showVersion} trackDetail={trackDetail} playTrack={playTrack} likeTrack={likeTrack} downloadTrack={downloadTrack} onMenu={setMenu} onRemove={setRemoving}/>{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>} {removing&&<DownloadRemovalDialog track={removing} onClose={()=>setRemoving(null)} onRemove={()=>p.removeDownload(p.effectiveId(removing))}/>}</div>;
+ // The stable action reads mutable aliases; their revision invalidates this projection.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ const unique=useMemo(()=>[...new Map(tracks.map(song=>[actions.effectiveId(song),song])).values()],[tracks,actions,view.aliasesRevision]);
+ const currentId=view.track?actions.effectiveId(view.track):null;
+ return <div className={`${s.trackList} ${t[layout]}`} data-track-layout={layout}><TrackRows tracks={unique} currentId={currentId} status={view.status} liked={view.liked} menuTrack={menu?.track} downloaded={downloaded} dateLabel={dateLabel} showVersion={showVersion} trackDetail={trackDetail} actions={actions} onMenu={setMenu} onRemove={setRemoving}/>{!unique.length&&<Empty/>}{menu&&<TrackMenu track={menu.track} anchor={menu.anchor} onClose={()=>setMenu(null)}/>} {removing&&<DownloadRemovalModal track={removing} onClose={()=>setRemoving(null)} onRemove={()=>actions.removeDownload(actions.effectiveId(removing))}/>}</div>;
 }
 export function TrackMenu({track,onClose,anchor}:{track:MusicTrack;onClose:()=>void;anchor?:SongMenuAnchor}){return <TrackActions key={track.id} track={track} onClose={onClose} anchor={anchor}/>;}
+const MiniPlaybackTimeline=memo(function MiniPlaybackTimeline({durationMs}:{durationMs:number}){
+ const progress=usePlaybackProgress();
+ return <span className={t.miniTimeline} aria-hidden="true"><i style={{width:Math.min(100,Math.max(0,progress.positionMs/Math.max(1,progress.durationMs||durationMs)*100))+"%"}}/></span>;
+});
+const MiniPlaybackRibbon=memo(function MiniPlaybackRibbon({onSeek,disabled}:{onSeek:(ms:number)=>void;disabled:boolean}){
+ const progress=usePlaybackProgress();
+ return <PlaybackRibbon compact positionMs={progress.positionMs} durationMs={progress.durationMs} onSeek={onSeek} disabled={disabled}/>;
+});
 export function PlayerBar(){
- const p=useMusic(),progress=usePlaybackProgress();const lyrics=useLyrics(p.track);const reading=useJapaneseReading(lyrics);const swipe=useSongSwipe({onNext:p.next,onPrevious:p.previous,disabled:!p.track,reducedMotion:p.settings.reducedMotion});if(!p.track)return null;const active=p.status==="playing"||p.status==="buffering"||p.status==="resolving";
+ const view=useMusicView(),actions=useMusicActions(),p={...view,...actions};const lyrics=useLyrics(p.track);const reading=useJapaneseReading(lyrics);const swipe=useSongSwipe({onNext:p.next,onPrevious:p.previous,disabled:!p.track,reducedMotion:p.settings.reducedMotion});
+ const cue=useMiniLyricCue(lyrics.data?.lines,lyrics.data?.timing==="synced"&&p.status!=="resolving"&&p.status!=="error");
+ if(!p.track)return null;const active=p.status==="playing"||p.status==="buffering"||p.status==="resolving";
  // Artwork and caption are siblings: sharing a key retains old covers during
  // reconciliation. An occurrence identity also survives catalog resolution.
  const identity=p.currentEntryId||p.effectiveId(p.track);
- const cue=lyrics.data?.timing==="synced"&&p.status!=="resolving"&&p.status!=="error"?miniLyricCue(lyrics.data.lines,progress.positionMs):null;
  return <footer className={s.playerBar}>
-  <span className={t.miniTimeline} aria-hidden="true"><i style={{width:Math.min(100,Math.max(0,progress.positionMs/Math.max(1,progress.durationMs||p.track.durationMs)*100))+"%"}}/></span>
-  <div className={s.playerIdentityGroup} {...swipe.bind} style={swipe.style} data-song-swipe="mini" data-swipe-direction={swipe.direction||undefined} data-swiping={swipe.swiping||undefined}><button className={s.playerIdentity} onClick={()=>p.openModal("player")} aria-label="Open now playing" title="Open now playing (F). Swipe or drag to change songs"><Artwork key={`artwork:${identity}`} url={p.track.coverUrl} title={p.track.albumTitle||p.track.title} className={s.miniSleeve}/><span key={`caption:${identity}`} className={s.miniCaption}><b dir="auto">{p.track.title}</b>{p.preparingTrack?<small role="status">Getting {p.preparingTrack.title} ready?</small>:cue?<small className={t.miniWords} title={cue.text} data-mini-lyric><Icon name="lyrics"/><span key={identity+":"+cue.start} dir="auto">{cue.text}{reading.enabled&&cue.romanized&&<i className={s.miniReading} lang={reading.language ? reading.language+"-Latn" : undefined}>{cue.romanized}</i>}</span></small>:<small>{p.status==="resolving"?"Finding the exact recording…":p.status==="buffering"?"Getting the sound ready…":"Open your listening room"}</small>}</span></button><ArtistLinks track={p.track} className={s.playerCredits}/></div>
-  <div className={s.playerCenter}><div className={s.transport}><IconButton icon="shuffle" label={p.shuffle?"Turn shuffle off":"Turn shuffle on"} active={p.shuffle} onClick={()=>p.setShuffle(!p.shuffle)}/><IconButton icon="previous" label="Previous song" shortcut="Shift + Left" onClick={p.previous}/><button className={s.roundPlay} title={active?"Pause (Space)":"Play (Space)"} aria-label={active?"Pause":"Play"} onClick={p.togglePlay}><Icon name={active?"pause":"play"}/></button><IconButton icon="next" label="Next song" shortcut="Shift + Right" onClick={p.next}/><span className={s.repeatControl}><IconButton icon="repeat" label={p.repeat==="off"?"Repeat now playing and songs added by you":p.repeat==="all"?"Your added queue is repeating. Repeat this song instead":"Repeat this song is on. Turn repeat off"} active={p.repeat!=="off"} onClick={()=>p.setRepeat(p.repeat==="off"?"all":p.repeat==="all"?"one":"off")}/>{p.repeat==="one"&&<b aria-hidden="true">1</b>}</span></div><PlaybackRibbon compact positionMs={progress.positionMs} durationMs={progress.durationMs} onSeek={p.seek} disabled={p.status==="resolving"}/></div>
+  <MiniPlaybackTimeline durationMs={p.track.durationMs}/>
+  <div className={s.playerIdentityGroup} {...swipe.bind} style={swipe.style} data-song-swipe="mini" data-swipe-direction={swipe.direction||undefined} data-swiping={swipe.swiping||undefined}><button className={s.playerIdentity} onClick={()=>p.openModal("player")} aria-label="Open now playing" title="Open now playing (F). Swipe or drag to change songs"><Artwork key={`artwork:${identity}`} url={p.track.coverUrl} title={p.track.albumTitle||p.track.title} className={s.miniSleeve}/><span key={`caption:${identity}`} className={s.miniCaption}><b dir="auto">{p.track.title}</b>{p.preparingTrack?<small role="status">Getting {p.preparingTrack.title} ready…</small>:cue?<small className={t.miniWords} title={cue.text} data-mini-lyric><Icon name="lyrics"/><span key={identity+":"+cue.start} dir="auto">{cue.text}{reading.enabled&&cue.romanized&&<i className={s.miniReading} lang={reading.language ? reading.language+"-Latn" : undefined}>{cue.romanized}</i>}</span></small>:<small>{p.status==="resolving"?"Finding the exact recording…":p.status==="buffering"?"Getting the sound ready…":"Open your listening room"}</small>}</span></button><ArtistLinks track={p.track} className={s.playerCredits}/></div>
+  <div className={s.playerCenter}><div className={s.transport}><IconButton icon="shuffle" label={p.shuffle?"Turn shuffle off":"Turn shuffle on"} active={p.shuffle} onClick={()=>p.setShuffle(!p.shuffle)}/><IconButton icon="previous" label="Previous song" shortcut="Shift + Left" onClick={p.previous}/><button className={s.roundPlay} title={active?"Pause (Space)":"Play (Space)"} aria-label={active?"Pause":"Play"} onClick={p.togglePlay}><Icon name={active?"pause":"play"}/></button><IconButton icon="next" label="Next song" shortcut="Shift + Right" onClick={p.next}/><span className={s.repeatControl}><IconButton icon="repeat" label={p.repeat==="off"?"Repeat now playing and songs added by you":p.repeat==="all"?"Your added queue is repeating. Repeat this song instead":"Repeat this song is on. Turn repeat off"} active={p.repeat!=="off"} onClick={()=>p.setRepeat(p.repeat==="off"?"all":p.repeat==="all"?"one":"off")}/>{p.repeat==="one"&&<b aria-hidden="true">1</b>}</span></div><MiniPlaybackRibbon onSeek={p.seek} disabled={p.status==="resolving"}/></div>
   <div className={s.playerTools}><IconButton icon="lyrics" label="Open lyrics" shortcut="L" onClick={()=>p.openModal("lyrics")}/><IconButton icon="queue" label="Open queue" shortcut="Q" onClick={()=>p.openModal("queue")}/><VolumeControl compact value={p.volume} onChange={p.setVolume}/></div><div className={s.mobileTransport}><IconButton icon="queue" label="Open queue" shortcut="Q" onClick={()=>p.openModal("queue")}/><IconButton icon={active?"pause":"play"} label={active?"Pause":"Play"} onClick={p.togglePlay}/></div>
   {p.error&&<div className={s.playerError}><RecoveryNotice compact error={p.error} context="playback" retry={p.togglePlay} href={p.error.includes("exact recording")?"/search?q="+encodeURIComponent(p.track.title+" "+p.track.artists[0]):undefined}/></div>}
  </footer>;

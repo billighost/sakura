@@ -5,8 +5,9 @@ export const BLOOM_WARMUP_LIFETIME_MS=30000;
 export class BloomWarmupWindow {
  private visible=false;private intents=new Set<string>();private allowed=false;private until=0;
  private timer:ReturnType<typeof setTimeout>|undefined;private last=false;
- constructor(private notify:(active:boolean)=>void,private lifetime=BLOOM_WARMUP_LIFETIME_MS,private now=Date.now){}
- private open(){this.until=this.now()+this.lifetime;clearTimeout(this.timer);this.timer=setTimeout(()=>this.paint(),this.lifetime);}
+ constructor(private notify:(active:boolean)=>void,private lifetime=BLOOM_WARMUP_LIFETIME_MS,private now=()=>performance.now()){}
+ private expire(){const remaining=this.until-this.now();if(remaining>0){this.timer=setTimeout(()=>this.expire(),Math.max(1,remaining));return;}this.paint();}
+ private open(){this.until=this.now()+this.lifetime;clearTimeout(this.timer);this.timer=setTimeout(()=>this.expire(),this.lifetime);}
  private paint(){const active=this.allowed&&(this.visible||this.intents.size>0)&&this.now()<this.until;if(active!==this.last){this.last=active;this.notify(active);}}
  viewport(visible:boolean){if(visible&&!this.visible)this.open();this.visible=visible;this.paint();}
  intent(kind:string,active:boolean){if(active)this.open();if(active)this.intents.add(kind);else this.intents.delete(kind);this.paint();}

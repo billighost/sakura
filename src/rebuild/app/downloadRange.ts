@@ -6,7 +6,9 @@ export class DownloadIntegrityError extends Error {
  name="DownloadIntegrityError";
  constructor(message:string,readonly retryAlternate=false){super(message);}
 }
-export async function audioSha256(blob:Blob):Promise<string>{const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());return Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,"0")).join("");}
+const blobHashes=new WeakMap<Blob,Promise<string>>();
+/** Blob contents are immutable; a newly deserialized/replaced Blob is hashed anew. */
+export function audioSha256(blob:Blob):Promise<string>{let flight=blobHashes.get(blob);if(!flight){flight=(async()=>{const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());return Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,"0")).join("");})();blobHashes.set(blob,flight);void flight.catch(()=>{if(blobHashes.get(blob)===flight)blobHashes.delete(blob);});}return flight;}
 
 /** Only a small, promptly delivered JSON error may supply an application reason. */
 async function audioResponseError(response:Response,signal:AbortSignal,timeoutMs:number):Promise<UserFacingError>{

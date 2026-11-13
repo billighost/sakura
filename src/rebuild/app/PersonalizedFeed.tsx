@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMusic } from "./MusicContext";
-import { musicTrack, type MusicTrack, type UserSettings } from "./types";
+import { type MusicTrack, type UserSettings } from "./types";
 import { Artwork, Button, TrackMenu, time } from "./Elements";
 import { ArtistLinks } from "./ArtistLinks";
 import { Blossom } from "./Brand";
@@ -15,7 +15,8 @@ import { UserFacingError } from "./errors";
 import { recommendationJson } from "./recommendationTransport";
 import { feedTasteKey, feedViewKey } from "./feedIdentity";
 import {browserOffline} from "./resourcePolicy";
-import {clearRecommendationCache,readRecommendationCache,recommendationCacheValid,recommendationCacheVersion,writeRecommendationCache} from "./recommendationCache";
+import {recommendationCacheVersion} from "./recommendationCache";
+import {cachedFeed,emptyFeed,saveFeed,parseFeed,restoreFeed,freshFeed,loadFirstFeed,invalidateRecommendationViews,FEED_PAGE_SIZE as PAGE_SIZE,type FeedItem,type FeedState} from "./recommendationViews";
 import type { SongMenuAnchor } from "./TrackActions";
 import { appendUniqueFeedItems } from "./feedItems";
 import { HeroGarden } from "./HeroGarden";
@@ -26,21 +27,7 @@ import s from "./personalized-feed.module.css";
 type Surface = "home" | "discover";
 type Mode = "balanced" | "familiar" | "explore";
 type Lane = "familiar" | "similar" | "explore" | "fresh";
-interface FeedItem { track: MusicTrack; reason: string; lane: Lane }
-interface FeedSection { id: string; title: string; description: string; tracks: MusicTrack[] }
 interface FeedSource { context: "home-feed" | "discover-feed"; contextId?: string }
-interface FeedState {
-  items: FeedItem[]; sections: FeedSection[]; nextCursor: string | null; ready: boolean;
-  busy: boolean; error: unknown; refreshRequired: boolean; personalized: boolean;
-  totalCandidates: number; generatedAt: string;
-}
-interface CachedFeed { state: FeedState; savedAt: number }
-// Keep the full visited selection, including paginated songs, in memory and on
-// this device so reopening Home or Discover offline restores the same cards.
-const visitedFeeds = new Map<string, CachedFeed>();
-const CACHE_LIFETIME = 20 * 60 * 1000;
-const PAGE_SIZE = 12;
-// One wide sleeve and ten single cards fill both two- and three-column layouts.
 const CHAPTER_SIZE = 11;
 const lanes: Record<Lane, { label: string; icon: IconName }> = {
   familiar: { label: "A familiar song", icon: "heart" },
@@ -49,70 +36,13 @@ const lanes: Record<Lane, { label: string; icon: IconName }> = {
   fresh: { label: "From a recent album", icon: "sun" },
 };
 
-function emptyFeed(): FeedState {
-  return { items: [], sections: [], nextCursor: null, ready: false, busy: true, error: null,
-    refreshRequired: false, personalized: false, totalCandidates: 0, generatedAt: "" };
-}
-function cachedFeed(key: string): FeedState {
-  const saved = visitedFeeds.get(key);
-  return saved && recommendationCacheValid(key.split(":",1)[0],saved.savedAt)&&(browserOffline()||Date.now() - saved.savedAt < CACHE_LIFETIME)
-    ? { ...saved.state, busy: false, error: null, refreshRequired: false } : emptyFeed();
-}
-function saveFeed(accountId:string,key: string, state: FeedState,version:number) {
-  visitedFeeds.delete(key);
-  const data={...state,busy:false,error:null},savedAt=Math.max(Date.now(),version+1);
-  visitedFeeds.set(key, { state:data, savedAt });
-  void writeRecommendationCache(accountId,"feed:"+key,data,version);
-  while (visitedFeeds.size > 8) visitedFeeds.delete(visitedFeeds.keys().next().value!);
-}
-function asTrack(value: unknown): MusicTrack | null {
-  try { return value && typeof value === "object" ? musicTrack(value as Record<string, unknown>) : null; }
-  catch { return null; }
-}
-function parseFeed(raw: Record<string, unknown>): Pick<FeedState, "items" | "sections" | "nextCursor" | "personalized" | "totalCandidates" | "generatedAt"> {
-  if (!Array.isArray(raw.items)) throw new Error("Feed response unavailable");
-  const items = raw.items.flatMap(value => {
-    if (!value || typeof value !== "object") return [];
-    const item = value as Record<string, unknown>, track = asTrack(item.track);
-    if (!track) return [];
-    const lane = typeof item.lane === "string" && item.lane in lanes ? item.lane as Lane : "similar";
-    return [{ track, lane, reason: typeof item.reason === "string" ? item.reason : "Selected for your recommendations." }];
-  });
-  const sections = Array.isArray(raw.sections) ? raw.sections.flatMap(value => {
-    if (!value || typeof value !== "object") return [];
-    const section = value as Record<string, unknown>;
-    if (typeof section.id !== "string" || typeof section.title !== "string" || !Array.isArray(section.tracks)) return [];
-    const tracks = section.tracks.map(asTrack).filter((track): track is MusicTrack => !!track);
-    return tracks.length ? [{ id: section.id, title: section.title,
-      description: typeof section.description === "string" ? section.description : "", tracks }] : [];
-  }) : [];
-  return { items, sections, nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null,
-    personalized: raw.personalized === true, totalCandidates: Math.max(0, Number(raw.totalCandidates) || 0),
-    generatedAt: typeof raw.generatedAt === "string" ? raw.generatedAt : "" };
-}
-function clearAccountFeeds(accountId: string,invalidate=true) {
-  if(invalidate)clearRecommendationCache(accountId);
-  for (const key of visitedFeeds.keys()) if (key.startsWith(accountId + ":")) visitedFeeds.delete(key);
-}
-
-/** Fill the same cache the visible feed consumes before its route opens. */
+/** Warm the exact initial request shared by the mounted feed and hero. */
 export async function prefetchPersonalizedFeed(accountId: string, surface: Surface, settings: UserSettings, signal: AbortSignal, mode: Mode = "balanced") {
   signal.throwIfAborted();
   if (browserOffline()) return;
-  const cacheKey = feedViewKey(accountId, surface, mode, settings), version = recommendationCacheVersion(accountId);
-  if (cachedFeed(cacheKey).ready) return;
-  const saved = await readRecommendationCache<FeedState>(accountId, "feed:" + cacheKey);
-  signal.throwIfAborted();
-  if (saved?.data.ready && Array.isArray(saved.data.items) && Array.isArray(saved.data.sections) && Date.now() - saved.savedAt < CACHE_LIFETIME) {
-    if (recommendationCacheVersion(accountId) === version) visitedFeeds.set(cacheKey, { state: saved.data, savedAt: saved.savedAt });
-    return;
-  }
-  const params = new URLSearchParams({ surface, mode, limit: String(PAGE_SIZE) });
-  const raw = await recommendationJson(accountId, "/api/v2/feed?" + params, signal, { identity: cacheKey, acceptStatuses: [409, 410] });
-  signal.throwIfAborted();
-  if (recommendationCacheVersion(accountId) !== version || typeof raw.error === "string") return;
-  const state: FeedState = { ...parseFeed(raw), ready: true, busy: false, error: null, refreshRequired: false };
-  saveFeed(accountId, cacheKey, state, version);
+  const key = feedViewKey(accountId, surface, mode, settings);
+  if (freshFeed(await restoreFeed(accountId, key, signal))) return;
+  await loadFirstFeed(accountId, key, surface, mode, signal);
 }
 
 export function PersonalizedFeed({ surface, children }: { surface: Surface; children?: ReactNode }) {
@@ -137,7 +67,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
   const music = useMusic();
   const accountId = music.account?.id || "";
   const home = surface === "home";
-  const [feed, setFeed] = useState<FeedState>(() => cachedFeed(cacheKey));
+  const [feed, setFeed] = useState<FeedState>(() => cachedFeed(accountId,cacheKey));
   const feedRef = useRef(feed);
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
@@ -171,8 +101,10 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     if (!reset && previous.nextCursor) params.set("cursor", previous.nextCursor);
     try {
       if(browserOffline())throw new UserFacingError({kind:"offline",title:previous.ready?"Your saved selection is ready.":"This selection has not been saved yet.",message:previous.ready?"Reconnect to discover more songs. Your saved recommendations are still here.":"Open this page while connected to keep its recommendations available offline.",action:"Try again"});
-      const raw = await recommendationJson(accountId, "/api/v2/feed?" + params,
-        controller.signal, { identity: cacheKey, force: reset, acceptStatuses: [409, 410] });
+      const raw = reset || !previous.nextCursor
+        ? (await loadFirstFeed(accountId, cacheKey, surface, mode, controller.signal, reset)).raw
+        : await recommendationJson(accountId, "/api/v2/feed?" + params,
+          controller.signal, { identity: cacheKey, acceptStatuses: [409, 410] });
       if (controller.signal.aborted || epoch !== generation.current) return;
       if (!Array.isArray(raw.items) && typeof raw.error === "string") {
         const changed = { ...previous, busy: false, refreshRequired: true, error: null };
@@ -201,11 +133,11 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     let active=true;
     void (async()=>{
       if(feedRef.current.ready)return;
-      const saved=await readRecommendationCache<FeedState>(accountId,"feed:"+cacheKey);
+      const saved=await restoreFeed(accountId,cacheKey);
       if(!active)return;
-      if(saved&&saved.data.ready&&Array.isArray(saved.data.items)&&Array.isArray(saved.data.sections)){
-        const restored={...saved.data,busy:false,error:null,refreshRequired:false};feedRef.current=restored;setFeed(restored);
-        if(browserOffline()||Date.now()-saved.savedAt<CACHE_LIFETIME)return;
+      if(saved){
+        const restored=saved.state;feedRef.current=restored;setFeed(restored);
+        if(freshFeed(saved))return;
       }
       await load(!!saved);
     })();
@@ -225,7 +157,7 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ accountId?: string }>).detail;
       if (detail?.accountId && detail.accountId !== accountId) return;
-      clearAccountFeeds(accountId,event.type!=="sakura-recommendations-cleared");
+      invalidateRecommendationViews(accountId,event);
       // Erasure takes effect even if the replacement request fails offline.
       // No card carrying a removed listening explanation remains cached or visible.
       if (event.type === "sakura-personalization-cleared" || event.type === "sakura-listening-erased"||event.type==="sakura-recommendations-cleared") {

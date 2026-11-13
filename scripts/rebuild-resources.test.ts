@@ -13,6 +13,71 @@ import ts from "typescript";
 import * as react from "react";
 import * as errors from "../src/rebuild/app/errors";
 import * as policy from "../src/rebuild/app/resourcePolicy";
+import * as productDto from "../src/rebuild/app/productDto";
+
+const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
+
+test("a visible resource owner promotes an active prefetch without sharing its cancellation",async t=>{
+ const account="resource-promoted",path="/api/v2/playlists/promoted";let calls=0,transportAborted=false,release!:(response:Response)=>void;
+ t.after(()=>clearResources(account));
+ t.mock.method(globalThis,"fetch",async(_url:RequestInfo|URL,init?:RequestInit)=>{calls++;init?.signal?.addEventListener("abort",()=>{transportAborted=true;});return new Promise<Response>(resolve=>release=resolve);});
+ const speculation=new AbortController(),visible=new AbortController();
+ const prepared=loadResource(account,path,{signal:speculation.signal,kind:"prefetch"});
+ await tick();
+ const mounted=loadResource(account,path,{signal:visible.signal,kind:"visible"});
+ speculation.abort(new DOMException("Pointer left","AbortError"));
+ await assert.rejects(prepared,{name:"AbortError"});assert.equal(transportAborted,false);
+ release(Response.json({recordings:["retained"]}));await mounted;
+ assert.equal(calls,1);assert.deepEqual(resourceSnapshot(account,path).data,{recordings:["retained"]});
+});
+
+test("last-owner cancellation releases a new query immediately even when old transport ignores abort",async t=>{
+ const account="resource-abandoned",path="/api/v2/search?q=abandoned";let calls=0,oldAborted=false,release!:(response:Response)=>void;
+ t.after(()=>clearResources(account));
+ t.mock.method(globalThis,"fetch",async(_url:RequestInfo|URL,init?:RequestInit)=>{if(++calls===1){init?.signal?.addEventListener("abort",()=>{oldAborted=true;});return new Promise<Response>(resolve=>release=resolve);}return Response.json({generation:"new"});});
+ const owner=new AbortController(),old=loadResource(account,path,{signal:owner.signal,kind:"visible"});await tick();
+ owner.abort(new DOMException("Search changed","AbortError"));await assert.rejects(old,{name:"AbortError"});assert.equal(oldAborted,true);
+ await loadResource(account,path,{signal:new AbortController().signal,kind:"visible"});
+ assert.equal(calls,2);assert.deepEqual(resourceSnapshot(account,path).data,{generation:"new"});
+ release(Response.json({generation:"obsolete"}));await tick();
+ assert.deepEqual(resourceSnapshot(account,path).data,{generation:"new"},"A detached response cannot overwrite the new result");
+});
+
+test("cancelled prefetch never starts transport and signalled account clear settles promptly",async t=>{
+ const account="resource-cancel-before-start";let calls=0,release!:(response:Response)=>void;
+ t.after(()=>clearResources(account));
+ t.mock.method(globalThis,"fetch",async()=>{calls++;return new Promise<Response>(resolve=>release=resolve);});
+ const queued=new AbortController(),pending=loadResource(account,"/api/v2/library",{signal:queued.signal,kind:"prefetch"});queued.abort();
+ await assert.rejects(pending,{name:"AbortError"});await tick();assert.equal(calls,0);
+ const current=loadResource(account,"/api/v2/library",{signal:new AbortController().signal,kind:"visible"});await tick();clearResources(account);
+ await assert.rejects(current,{name:"AbortError"});release(Response.json({recordings:["old account"]}));await tick();
+ assert.equal(resourceSnapshot(account,"/api/v2/library").data,undefined);
+});
+
+test("resource responses canonicalize legacy duplicate arrays without cloning canonical cards",async t=>{
+ const account="resource-dto-compat",path="/api/v2/playlists/legacy";
+ t.after(()=>clearResources(account));
+ t.mock.method(globalThis,"fetch",async()=>Response.json({recordings:[{id:"one"}],tracks:[{id:"one"}],title:"legacy"}));
+ await loadResource(account,path);const data=resourceSnapshot<Record<string,unknown>>(account,path).data!;
+ assert.equal("tracks" in data,false);assert.deepEqual(data.recordings,[{id:"one"}]);assert.equal(data.title,"legacy");
+});
+
+test("an invalidation refresh belongs to mounted subscribers and aborts when its last room leaves",async t=>{
+ let unsubscribe=()=>{},calls=0,aborted=false,release!:(response:Response)=>void;
+ const hooks={...react,useRef:()=>({current:null}),useCallback:(callback:unknown)=>callback,useEffect:()=>{},useSyncExternalStore:(subscribe:(listener:()=>void)=>()=>void,snapshot:()=>unknown)=>{unsubscribe=subscribe(()=>{});return snapshot();}};
+ const markers=new Map<string,string>(),exports={},context=vm.createContext({module:{exports},exports,Date,AbortController,DOMException,
+  window:{addEventListener:()=>{},dispatchEvent:()=>true},localStorage:{getItem:(key:string)=>markers.get(key)||null,setItem:(key:string,value:string)=>markers.set(key,value)},
+  require(name:string){if(name==="react")return hooks;if(name==="./errors")return errors;if(name==="./resourcePolicy")return policy;if(name==="./productDto")return productDto;if(name==="./offline")return {localRead:async()=>undefined,localWrite:async()=>{},localDelete:async()=>{}};throw new Error("Unexpected subscriber fixture dependency: "+name);},
+ });
+ vm.runInContext(ts.transpileModule(readFileSync(new URL("../src/rebuild/app/resources.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);
+ const api=context.module.exports as {loadResource:typeof loadResource;resourceSnapshot:typeof resourceSnapshot;invalidateResources:typeof invalidateResources;clearResources:typeof clearResources;useResource:typeof useResource},account="resource-subscriber-refresh",path="/api/v2/library";
+ t.after(()=>api.clearResources(account));
+ t.mock.method(globalThis,"fetch",async(_url:RequestInfo|URL,init?:RequestInit)=>{if(++calls===1)return Response.json({recordings:["previous"]});init?.signal?.addEventListener("abort",()=>{aborted=true;});return new Promise<Response>(resolve=>release=resolve);});
+ await api.loadResource(account,path);api.useResource(account,path);api.invalidateResources(account);await tick();assert.equal(calls,2);
+ assert.deepEqual(api.resourceSnapshot(account,path).data,{recordings:["previous"]},"Ordinary invalidation keeps usable content while refreshing; it is not a revocation");
+ unsubscribe();assert.equal(aborted,true);release(Response.json({recordings:["abandoned refresh"]}));await tick();
+ assert.deepEqual(api.resourceSnapshot(account,path).data,{recordings:["previous"]});
+});
 
 test("catalog identities outlive a time limit while evolving personal resources refresh",()=>{
  const stamp=1700000000000,monthLater=stamp+31*86400000;
@@ -83,7 +148,7 @@ test("unavailable and session responses stay authoritative when deleting their s
  let deletionGate:Promise<void>=Promise.resolve(),deletionStarted=()=>{};
  const exports={},context=vm.createContext({module:{exports},exports,Date,AbortController,DOMException,
   localStorage:{getItem:(key:string)=>markers.get(key)||null,setItem:(key:string,value:string)=>markers.set(key,value)},
-  require(name:string){if(name==="react")return react;if(name==="./errors")return errors;if(name==="./resourcePolicy")return policy;if(name==="./offline")return {
+  require(name:string){if(name==="react")return react;if(name==="./errors")return errors;if(name==="./resourcePolicy")return policy;if(name==="./productDto")return productDto;if(name==="./offline")return {
    localRead:async(account:string,name:string)=>disk.get(account+":"+name),
    localWrite:async(account:string,name:string,value:unknown)=>{disk.set(account+":"+name,value);},
    localDelete:async()=>{deletionStarted();await deletionGate;throw new DOMException("Deletion denied","SecurityError");},

@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMusic } from "./MusicContext";
+import { useMusicActions, useMusicView } from "./musicView";
 import { loadResource, resourceSnapshot, invalidateResources } from "./resources";
 import { readFavoriteDraft } from "./favorites";
 import { type MusicTrack } from "./types";
@@ -11,7 +11,7 @@ import { requestJson } from "./errors";
 import { localId } from "./sessionState";
 import { useScreenActions } from "./screenActions";
 import { Icon } from "./Icon";
-import { collectionTrackMatches } from "./collectionSearch";
+import { useCollectionSearch } from "./useCollectionSearch";
 import { CollectionHero, CollectionToolbar, PlaylistArtwork, sortRoomTracks, useRoomPresentation } from "./CollectionRoom";
 import { StickySearch } from "./StickySearch";
 import { CollectionGesture } from "./CollectionGesture";
@@ -21,8 +21,8 @@ import s from "./ink.module.css";
 import { type Data, list, normalizedSearchText, useApi, ResourceBody } from "./MusicScreenResources";
 
 export function Library({likedOnly=false}:{likedOnly?:boolean}){
- const p=useMusic(),router=useRouter(),actions=useScreenActions(p.account?.id);
- const resource=useApi("/api/v2/library?kind=all"),data=useApi(likedOnly?"/api/v2/library?kind=liked":null),active=likedOnly?data:resource;
+ const view=useMusicView(),musicActions=useMusicActions(),p={...view,...musicActions},router=useRouter(),actions=useScreenActions(p.account?.id);
+ const resource=useApi(likedOnly?null:"/api/v2/library?kind=all"),data=useApi(likedOnly?"/api/v2/library?kind=liked":null),active=likedOnly?data:resource;
  const [creating,setCreating]=useState(false),[name,setName]=useState(""),[busy,setBusy]=useState(false),[query,setQuery]=useState("");
  const [presentation,setPresentation]=useRoomPresentation(p.account?.id,likedOnly?"liked":"library"),{layout,sort,direction}=presentation;
  const creation=useRef<{name:string;id:string}|null>(null);
@@ -31,15 +31,23 @@ export function Library({likedOnly=false}:{likedOnly?:boolean}){
  const paging=useScreenActions(p.account?.id,String(likedOnly)+":"+active.updatedAt),extraValid=extra.base===active.updatedAt;
  const [favoriteCards,setFavoriteCards]=useState<{owner:string;tracks:MusicTrack[]}|null>(null);
  useEffect(()=>{const owner=p.account?.id;if(!owner)return;let live=true;void readFavoriteDraft(owner).then(draft=>{if(live)setFavoriteCards({owner,tracks:Object.values(draft?.pending||{}).filter(intent=>intent.liked).map(intent=>intent.track)});}).catch(()=>{});return()=>{live=false;};},[p.account?.id,p.liked]);
- const localLiked=[...(favoriteCards&&favoriteCards.owner===p.account?.id?favoriteCards.tracks:[]),...p.queue.map(entry=>entry.track),...Object.values(p.downloads).map(entry=>entry.track)].filter(track=>p.liked.has(p.effectiveId(track)));
- const allTracks=[...new Map([...list(active.data?.recordings),...(extraValid?extra.tracks:[]),...localLiked].filter(track=>!likedOnly||p.liked.has(p.effectiveId(track))).map(track=>[p.effectiveId(track),track])).values()];
- const match=normalizedSearchText(query),tracks=sortRoomTracks(allTracks.filter(track=>collectionTrackMatches(track,query)),sort,direction);
- const playlists=((resource.data?.playlists||[]) as Data[]).filter(playlist=>normalizedSearchText(String(playlist.name||"")).includes(match));
+ // effectiveId is stable while canonical aliases change; include their revision.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ const localLiked=useMemo(()=>[...(favoriteCards&&favoriteCards.owner===view.account?.id?favoriteCards.tracks:[]),...view.queue.map(entry=>entry.track),...Object.values(view.downloads).map(entry=>entry.track)].filter(track=>view.liked.has(musicActions.effectiveId(track))),[favoriteCards,view.account?.id,view.queue,view.downloads,view.liked,musicActions,view.aliasesRevision]);
+ const rawTracks=active.data?.recordings||active.data?.tracks;
+ const baseTracks=useMemo(()=>list(rawTracks),[rawTracks]);
+ // Canonical aliases change behind the stable action; revise membership explicitly.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ const allTracks=useMemo(()=>[...new Map([...baseTracks,...(extraValid?extra.tracks:[]),...localLiked].filter(track=>!likedOnly||view.liked.has(musicActions.effectiveId(track))).map(track=>[musicActions.effectiveId(track),track])).values()],[baseTracks,extraValid,extra.tracks,localLiked,likedOnly,view.liked,musicActions,view.aliasesRevision]);
+ const sortedTracks=useMemo(()=>sortRoomTracks(allTracks,sort,direction),[allTracks,sort,direction]);
+ const {tracks,searching}=useCollectionSearch(sortedTracks,query);
+ const match=useMemo(()=>normalizedSearchText(query),[query]);
+ const playlists=useMemo(()=>((resource.data?.playlists||[]) as Data[]).filter(playlist=>normalizedSearchText(String(playlist.name||"")).includes(match)),[resource.data?.playlists,match]);
  const cursor=extraValid?extra.cursor:typeof active.data?.nextCursor==="string"?active.data.nextCursor:null;
  async function more(){
   if(!cursor||!p.account)return;const controller=paging.begin("more");if(!controller)return;setLoadingMore(active.updatedAt);setFailedCursor(null);
   try{const pagePath="/api/v2/library?kind="+(likedOnly?"liked":"all")+"&cursor="+encodeURIComponent(cursor);
-   await loadResource(p.account.id,pagePath);
+   await loadResource(p.account.id,pagePath,{signal:controller.signal,kind:"visible"});
    const snapshot=resourceSnapshot<Data>(p.account.id,pagePath);
    if(!snapshot.data||snapshot.error&&!p.offline)throw snapshot.error||new Error("This collection page is unavailable offline.");
    const result=snapshot.data;
@@ -59,14 +67,14 @@ export function Library({likedOnly=false}:{likedOnly?:boolean}){
   e?.preventDefault();const trimmed=name.trim();if(!trimmed)return;const controller=actions.begin("create");if(!controller)return;setBusy(true);
   if(creation.current?.name!==trimmed)creation.current={name:trimmed,id:localId()};
   try{const result=await requestJson("/api/v2/playlists",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({name:trimmed,requestId:creation.current.id})},{context:"save",accountId:p.account?.id});
-   if(!actions.current("create",controller))return;creation.current=null;setCreating(false);setName("");resource.retry();if(p.account)invalidateResources(p.account.id);p.notify("Playlist created.");router.push("/playlist/"+result.id);
+   if(!actions.current("create",controller))return;creation.current=null;setCreating(false);setName("");if(p.account)invalidateResources(p.account.id,"/api/v2/library?kind=all");p.notify("Playlist created.");router.push("/playlist/"+result.id);
   }catch(error){if(actions.current("create",controller))p.reportError(error,"save",()=>void create());}finally{if(actions.finish("create",controller))setBusy(false);}
  }
- return <div className={room.libraryRoom}><CollectionHero eyebrow={likedOnly?"YOUR LIKED SONGS":"The things you keep"} title={likedOnly?"Your favorite songs.":"Your little music world."} description={likedOnly?"The songs you've liked, collected in one place.":"Your liked songs and playlists, together in one place."} covers={allTracks.slice(0,3)} label={likedOnly?p.liked.size+" liked songs":"your music, collected."}><Button icon="play" disabled={!tracks.length} onClick={()=>p.play(tracks[0],tracks)}>Play {likedOnly?"liked songs":"your collection"}</Button><SmartQueueButton scope={likedOnly?"liked":"collection"} tracks={likedOnly?undefined:allTracks} label={likedOnly?"Find my saved soundtrack":"Smart play this collection"}/>{!likedOnly&&<Button secondary icon="plus" disabled={busy} onClick={()=>setCreating(!creating)}>New playlist</Button>}</CollectionHero>
+ return <div className={room.libraryRoom} aria-busy={searching}><CollectionHero eyebrow={likedOnly?"YOUR LIKED SONGS":"The things you keep"} title={likedOnly?"Your favorite songs.":"Your little music world."} description={likedOnly?"The songs you've liked, collected in one place.":"Your liked songs and playlists, together in one place."} covers={allTracks.slice(0,3)} label={likedOnly?p.liked.size+" liked songs":"your music, collected."}><Button icon="play" disabled={!tracks.length} onClick={()=>p.play(tracks[0],tracks)}>Play {likedOnly?"liked songs":"your collection"}</Button><SmartQueueButton scope={likedOnly?"liked":"collection"} tracks={likedOnly?undefined:allTracks} label={likedOnly?"Find my saved soundtrack":"Smart play this collection"}/>{!likedOnly&&<Button secondary icon="plus" disabled={busy} onClick={()=>setCreating(!creating)}>New playlist</Button>}</CollectionHero>
  {creating&&<form className={s.createPlaylist} onSubmit={create}><label>A name for your collection<input value={name} disabled={busy} onChange={e=>setName(e.target.value)} maxLength={80} required autoFocus placeholder="Songs for a softer day"/></label><button className={s.primaryButton} disabled={busy} type="submit">{busy?"Making room...":"Create playlist"}</button><Button secondary disabled={busy} onClick={()=>setCreating(false)}>Cancel</Button></form>}
  {!likedOnly&&<div className={room.shortcuts}><Link href="/liked"><span className={room.shortcutMark}><Icon name="heart"/></span><span><h3>Your liked songs.</h3><small>{p.liked.size} liked songs, kept close</small></span><Icon name="arrow"/></Link><Link href="/library/downloaded"><span className={room.shortcutMark}><Icon name="download"/></span><span><h3>Take it with you.</h3><small>{Object.values(p.downloads).filter(d=>d.status==="ready"&&d.requested!==false).length} songs ready offline</small></span><Icon name="arrow"/></Link></div>}
  <StickySearch label={likedOnly?"Liked songs search":"Library search"}><SearchField value={query} onChange={setQuery} label={likedOnly?"Find a liked song":"Find in your library"} placeholder="Find a title, artist or album"/></StickySearch><CollectionToolbar layout={layout} onLayout={value=>setPresentation({layout:value})} sort={sort} onSort={value=>setPresentation({sort:value})} direction={direction} onDirection={value=>setPresentation({direction:value})} count={tracks.length} firstSortLabel="Order added" dateSortLabel={likedOnly?"Date liked":"Date added"}/>
- <ResourceBody resource={active}>{!likedOnly&&<><SectionTitle title="Your playlists" note="Music for any part of your day." href="/import" action="Bring your music"/><div className={room.playlistShelf} data-layout={layout}>{playlists.map((playlist,i)=><CollectionGesture key={String(playlist.id)} kind="playlist" id={String(playlist.id)} title={String(playlist.name)}><Link className={room.playlist} href={"/playlist/"+encodeURIComponent(String(playlist.id))}><div className={room.playlistCover}><PlaylistArtwork dedicatedCover={playlist.hasCustomCover===true} coverUrl={playlist.coverUrl} coverUrls={playlist.coverUrls} title={String(playlist.name)}/><span className={room.playlistNumber}>{String(i+1).padStart(2,"0")}</span></div><div><h3>{String(playlist.name)}</h3><p>{Number(playlist.trackCount)||0} songs</p></div></Link></CollectionGesture>)}</div>{!playlists.length&&<div className={s.smallEmpty}>{match?"No collections match this search yet.":"Create a playlist to collect songs in your own order."}</div>}</>}
+ {searching&&<p role="status">Searching songs…</p>}<ResourceBody resource={active}>{!likedOnly&&<><SectionTitle title="Your playlists" note="Music for any part of your day." href="/import" action="Bring your music"/><div className={room.playlistShelf} data-layout={layout}>{playlists.map((playlist,i)=><CollectionGesture key={String(playlist.id)} kind="playlist" id={String(playlist.id)} title={String(playlist.name)}><Link className={room.playlist} href={"/playlist/"+encodeURIComponent(String(playlist.id))}><div className={room.playlistCover}><PlaylistArtwork dedicatedCover={playlist.hasCustomCover===true} coverUrl={playlist.coverUrl} coverUrls={playlist.coverUrls} title={String(playlist.name)}/><span className={room.playlistNumber}>{String(i+1).padStart(2,"0")}</span></div><div><h3>{String(playlist.name)}</h3><p>{Number(playlist.trackCount)||0} songs</p></div></Link></CollectionGesture>)}</div>{!playlists.length&&<div className={s.smallEmpty}>{match?"No collections match this search yet.":"Create a playlist to collect songs in your own order."}</div>}</>}
  <div className={room.songHeader}><h2>{likedOnly?"Your liked songs":"Songs you keep close"}</h2><span>{likedOnly?"A good place to come back to.":"Your soundtrack, your way."}</span></div>{match&&cursor&&failedCursor!==cursor&&!tracks.length?<LoadingRows/>:tracks.length?<TrackList tracks={tracks} layout={layout} dateLabel={likedOnly?"Liked":"Added"}/>:<Empty title={match?"No songs match your search.":likedOnly?"No liked songs yet.":"Your collection begins with a song."} description={match?"Try another name, or clear your search.":"Like a song to add it here. Liking a song does not download it."}/>}
  {match&&cursor&&failedCursor!==cursor&&<p role="status">Searching the rest of your collection...</p>}
  {cursor&&<Button secondary disabled={loadingMore===active.updatedAt} onClick={()=>void more()}>{loadingMore===active.updatedAt?"Loading more...":"Show more songs"}</Button>}</ResourceBody></div>;

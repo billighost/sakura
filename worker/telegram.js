@@ -171,7 +171,7 @@ function resolveSessionFile(preferred) {
 }
 
 class TelegramWorkerClient {
-  constructor({ apiId, apiHash, sessionString, sessionFile }) {
+  constructor({ apiId, apiHash, sessionString, sessionFile, metrics }) {
     if (!apiId || !apiHash) {
       throw new Error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH");
     }
@@ -182,6 +182,7 @@ class TelegramWorkerClient {
     }
 
     this.apiId = apiId;
+    this.metrics = metrics;
     this.apiHash = apiHash;
     this.envSession = sessionString;
     this.sessionFile = resolveSessionFile(sessionFile);
@@ -316,7 +317,8 @@ class TelegramWorkerClient {
 
     this.connectPromise = (async () => {
       try {
-        await this.client.connect();
+        const connect = () => this.client.connect();
+        await (this.metrics ? this.metrics.measure("connection_start", connect) : connect());
         this.connected = true;
         this._persistSession();
       } catch (err) {

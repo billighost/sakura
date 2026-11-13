@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {retainArtwork} from "../src/rebuild/player/imageCache";
+import {retainArtwork,artworkMemoryStats,MAX_RETAINED_ARTWORK_BYTES} from "../src/rebuild/player/imageCache";
 
 let sequence=0;
 const source=()=>`https://artwork-fixture.invalid/${++sequence}.webp`;
@@ -8,7 +8,7 @@ const source=()=>`https://artwork-fixture.invalid/${++sequence}.webp`;
 function fixture(){
  const original=Object.getOwnPropertyDescriptor(globalThis,"Image"),images:FakeImage[]=[];
  class FakeImage {
-  src="";decoding="";fetchPriority="";decodeCalls=0;cancelled=0;
+  src="";decoding="";fetchPriority="";decodeCalls=0;cancelled=0;naturalWidth=320;naturalHeight=320;
   decodingWork:()=>Promise<void>=()=>Promise.resolve();
   handlers=new Map<string,Set<EventListener>>();
   constructor(){images.push(this);}
@@ -104,5 +104,19 @@ test("a pre-aborted caller does not create an image request",async()=>{
  const f=fixture();try{
   const controller=new AbortController();controller.abort();await assert.rejects(retainArtwork(source(),false,{signal:controller.signal}),{name:"AbortError"});
   assert.equal(f.images.length,0);
+ }finally{f.restore();}
+});
+
+test("decoded artwork evicts by bytes and releases hidden images instead of retaining twelve huge covers",async()=>{
+ const f=fixture();try{
+  for(let index=0;index<16;index++){
+   const pending=retainArtwork(source()),image=f.images.at(-1)!;image.naturalWidth=image.naturalHeight=2048;image.emit("load");await pending;
+   assert.ok(artworkMemoryStats().decodedBytes<=MAX_RETAINED_ARTWORK_BYTES);
+  }
+  assert.ok(artworkMemoryStats().entries<=3);
+  assert.ok(f.images.slice(0,-3).every(image=>image.src===""&&image.listeners()===0));
+  const url=source(),oversized=retainArtwork(url),image=f.images.at(-1)!;image.naturalWidth=image.naturalHeight=4096;image.emit("load");await oversized;
+  assert.equal(image.src,"");assert.ok(artworkMemoryStats().decodedBytes<=MAX_RETAINED_ARTWORK_BYTES);
+  const retry=retainArtwork(url),next=f.images.at(-1)!;assert.notEqual(next,image);next.emit("load");await retry;
  }finally{f.restore();}
 });

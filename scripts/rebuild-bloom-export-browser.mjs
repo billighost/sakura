@@ -16,6 +16,7 @@ const baseline=process.env.SAKURA_EXPORT_BASELINE==='1';
 const worlds=(process.env.SAKURA_EXPORT_WORLDS||'sakura,jungle,disco,japan,china,korea,india,ocean,cosmos,glass').split(',');
 const widths=(process.env.SAKURA_EXPORT_WIDTHS||'1280,320').split(',').map(Number);
 const variants=(process.env.SAKURA_EXPORT_VARIANTS||'rich,long,sparse,legacy').split(',');
+const cancellationStages=(process.env.SAKURA_EXPORT_CANCEL_STAGES||'').split(',').filter(Boolean);
 const output=`.local/bloom-export-review/${baseline?'before':'after'}`;await fs.mkdir(output,{recursive:true});
 const account={id:'90000000-0000-4000-8000-000000000097',username:'Poster fixture',email:'poster@example.invalid'};
 const secret=process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET;assert.ok(secret);
@@ -29,9 +30,9 @@ for(const chapter of long.chapters){if(chapter.id==='top-song')chapter.stat.labe
 const sparse=buildBloomSnapshot([{id:cards[5].id,audible_ms:45000,plays:1,first_ever:null}],[{...cards[5],artistId:null,artistCredits:[],genres:[]}],1,period,{discoveryUnknownIds:[cards[5].id]});
 const legacy={...rich,version:2,experience:undefined,listening:undefined};
 const related={version:1,summary:{audibleMs:900000,playCount:12,recordingCount:1,activeDays:4},chapters:[{id:'top-song',kind:'song-winner',title:'A saved listening moment.',prompt:'',stat:{label:'One Last Kiss',value:'15min',unit:''},relatedRecording:cards[0]}]};
-const report={scope:'Actual Next poster rendering and styled serialized SVG clone; signed synthetic account and authored SVG fixture artwork; all APIs intercepted.',baseline,journeys:[],errors:[]};
+const report={scope:'Actual Next poster rendering and styled serialized SVG clone; signed synthetic account and authored SVG fixture artwork; all APIs intercepted.',baseline,journeys:[],cancellations:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});let debug;
-async function journey(world,width,variant){
+async function journey(world,width,variant,cancelStage){
  const snapshot=({rich,long,sparse,legacy,related})[variant],recap={...period,...snapshot,worldId:world,status:'available',snapshotCreatedAt:variant==='legacy'||variant==='related'?undefined:'2026-11-09T12:00:00Z',completed:true,expiresAt:'2099-11-24T00:00:00+01:00',chapterCount:snapshot.chapters.length,chapters:snapshot.chapters.map(chapter=>discloseBloomChapter(chapter,true))};
  const context=await browser.newContext({viewport:{width,height:width<500?700:800},reducedMotion:'reduce',acceptDownloads:true,serviceWorkers:'block'});await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(({owner,id,index})=>{
@@ -42,9 +43,40 @@ async function journey(world,width,variant){
  },{owner:account.id,id:period.id,index:snapshot.chapters.length-1});
  const preparedAudio=bloomAudioFixture(cards);
  const page=await context.newPage();debug=page;page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error'&&/hydration|hydrated|did not match|uncaught|minified react error/i.test(message.text()))errors.push(message.text());});
- await context.route('**/api/**',async route=>{if(await preparedAudio(route))return;const path=new URL(route.request().url()).pathname;if(path==='/api/auth/session')return route.fulfill({json:{user:account}});if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,learnFromListening:false,reducedMotion:true,bloomPerformance:'5',onboarded:true,openingAnimation:0,timeZone:'Africa/Lagos',volume:0}});if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});if(path==='/api/v2/image')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#243851"/><circle cx="280" cy="125" r="110" fill="#e2b993"/><path d="M0 300Q140 105 400 320V400H0" fill="#889b8b"/></svg>'});if(path.endsWith('/prepare'))return route.fulfill({json:{story:recap,chapters:snapshot.chapters,listening:snapshot.listening}});if(path.startsWith('/api/v2/bloom/'+period.id))return route.fulfill({json:recap});if(path==='/api/v2/bloom')return route.fulfill({json:{items:[recap],schedule:{timeZone:'Africa/Lagos'}}});if(path==='/api/v2/bloom/archive')return route.fulfill({json:{items:[]}});return route.fulfill({json:{session:null,recordings:[],playlists:[]}});});
+ const settings={theme:'light',audioQuality:'high',audioTechnology:'none',privateSession:true,learnFromListening:false,reducedMotion:true,bloomPerformance:'5',onboarded:true,openingAnimation:0,timeZone:'Africa/Lagos',volume:0,seedArtists:[],seedGenres:[],shuffle:false,repeat:'off'},unexpected=[];
+ await context.route('**/api/**',async route=>{
+  if(await preparedAudio(route))return;
+  const request=route.request(),url=new URL(request.url()),path=url.pathname,method=request.method();
+  if(request.headers()['x-sakura-account']&&request.headers()['x-sakura-account']!==account.id){unexpected.push({path,method,reason:'Wrong account'});return route.fulfill({status:401,json:{error:'Account changed'}});}
+  if(path==='/api/auth/session'&&method==='GET')return route.fulfill({json:{user:account}});
+  if(path==='/api/v2/settings'&&method==='GET')return route.fulfill({json:{...settings,revision:0,fieldRevisions:Object.fromEntries(Object.keys(settings).map(key=>[key,0]))}});
+  if(path==='/api/v2/library/state'&&method==='GET')return route.fulfill({json:{favoriteStates:{}}});
+  if((path==='/api/v2/bootstrap'||path==='/api/v2/profile')&&method==='GET')return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  if(path==='/api/v2/taste'&&method==='GET')return route.fulfill({json:{feedback:[],tasteEvidence:[],historyClearedAt:null}});
+  if(path==='/api/v2/listening-session'&&method==='GET')return route.fulfill({json:{session:null,serverTime:Date.now()}});
+  if(path==='/api/v2/library'&&method==='GET')return route.fulfill({json:{recordings:[],playlists:[],favoriteStates:{},hasMore:false,nextCursor:null}});
+  if(path==='/api/v2/mixes'&&method==='GET')return route.fulfill({json:{mixes:[],items:[],hasMore:false,nextCursor:null}});
+  if(path==='/api/v2/feed'&&method==='GET')return route.fulfill({json:{items:[],sections:[],nextCursor:null,personalized:true,totalCandidates:0,generatedAt:new Date().toISOString()}});
+  if(path==='/api/v2/feed/hero'&&method==='GET')return route.fulfill({json:{item:null,refreshAt:Date.now()+600000}});
+  if(path==='/api/v2/home'&&method==='GET')return route.fulfill({json:{featured:[],mixes:[],recent:[],needsOnboarding:false}});
+  if(path.startsWith('/api/v2/artists/')&&method==='GET'){
+   const artistId=decodeURIComponent(path.slice('/api/v2/artists/'.length)),recordings=cards.filter(card=>card.artistId===artistId);
+   if(recordings.length)return route.fulfill({json:{id:artistId,name:recordings[0].artists[0],imageUrl:null,recordings,tracks:recordings,albums:[]}});
+  }
+  if(path==='/api/v2/image'&&method==='GET')return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#243851"/><circle cx="280" cy="125" r="110" fill="#e2b993"/><path d="M0 300Q140 105 400 320V400H0" fill="#889b8b"/></svg>'});
+  if(path===`/api/v2/bloom/${period.id}/prepare`&&method==='POST'||path===`/api/v2/bloom/${period.id}`&&method==='GET'&&url.searchParams.get('prepare')==='1')return route.fulfill({json:{story:recap,chapters:snapshot.chapters,listening:snapshot.listening}});
+  if(path===`/api/v2/bloom/${period.id}`&&method==='GET')return route.fulfill({json:recap});
+  if([`/api/v2/bloom/${period.id}/reveal`,`/api/v2/bloom/${period.id}/complete`].includes(path)&&method==='POST')return route.fulfill({json:recap});
+  if(path==='/api/v2/bloom'&&method==='GET')return route.fulfill({json:{items:[recap],schedule:{timeZone:'Africa/Lagos'}}});
+  if(path==='/api/v2/bloom/shelf'&&method==='GET')return route.fulfill({json:{items:[recap],schedule:{timeZone:'Africa/Lagos'}}});
+  if(path==='/api/v2/bloom/archive'&&method==='GET')return route.fulfill({json:{items:[]}});
+  unexpected.push({path,method});return route.fulfill({status:503,json:{error:'Unexpected fixture request'}});
+ });
  await page.goto(`${base}/bloom/${period.id}?world=${world}`,{waitUntil:'domcontentloaded',timeout:90000});const dialog=page.locator('dialog[open]');await dialog.locator(`[data-bloom-world="${world}"]`).waitFor();await expect(dialog.getByRole('combobox',{name:'Bloom world',exact:true})).toHaveCount(0);await dialog.getByLabel('With music',{exact:true}).uncheck();await dialog.locator('[data-bloom-action="begin"]').click();await expect(dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label',/^Chapter 1:/);for(let index=0;index<snapshot.chapters.length;index++){await expect(dialog.locator('[data-bloom-action="next"]')).toBeEnabled();await dialog.locator('[data-bloom-action="next"]').click();if(index<snapshot.chapters.length-1)await expect(dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label',new RegExp(`^Chapter ${index+2}:`));}await dialog.locator('[data-bloom-action="save"]').waitFor();
- const [download]=await Promise.all([page.waitForEvent('download',{timeout:60000}),dialog.locator('[data-bloom-action="save"]').click()]);const path=`${output}/${world}-${variant}-${width}.png`;await download.saveAs(path);const png=await fs.readFile(path);assert.equal(png.readUInt32BE(16),1080);assert.equal(png.readUInt32BE(20),1920);
+ if(cancelStage){
+  await cancelExport(page,dialog,cancelStage);assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[]);await context.close();return;
+ }
+ const [download]=await Promise.all([page.waitForEvent('download',{timeout:60000}),dialog.locator('[data-bloom-action="save"]').click()]);const path=`${output}/${world}-${variant}-${width}.png`;await download.saveAs(path);const png=await fs.readFile(path);assert.equal(png.readUInt32BE(16),1080);assert.equal(png.readUInt32BE(20),1920);assert.deepEqual(unexpected,[]);
  const geometry=await page.evaluate(()=>window.__posterGeometry);assert.equal(geometry.length,2,'The real composition and serialized clone are both measured');
  const clipping=geometry.flatMap(frame=>frame.text.flatMap(node=>node.box.x<-.5||node.box.right>540.5||node.box.y<-.5||node.box.bottom>960.5||node.ink.x<-.5||node.ink.right>540.5||node.ink.y<-.5||node.ink.bottom>960.5?[{phase:frame.phase,...node}]:[]));
  const result={world,width,variant,path,bytes:png.length,geometry,clipping};report.journeys.push(result);await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));if(!baseline)assert.deepEqual(clipping,[],`${world} ${variant} ${width}px exports every text line inside the page`);assert.deepEqual(errors,[]);
@@ -52,4 +84,22 @@ async function journey(world,width,variant){
  for(const frame of geometry){assert.ok(frame.text.some(node=>node.text.startsWith('sakura bloom ·')),'World credit and closing remain in the image');assert.ok(frame.images.length===1,'The winner artwork is retained');}
  await context.close();console.log(`Exported ${world} ${variant} ${width}px${clipping.length?' (clipped before fix)':''}`);
 }
-try{for(const width of widths)for(const variant of variants)for(const world of worlds)await journey(world,width,variant);if(!baseline&&variants.includes('legacy')&&worlds.includes('glass'))for(const world of ['japan','glass'].filter(world=>worlds.includes(world)))await journey(world,320,'related');await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({exports:report.journeys.length,clipped:report.journeys.filter(journey=>journey.clipping.length).length,errors:report.errors}));}catch(error){report.errors.push(String(error));await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));if(debug&&!debug.isClosed())await debug.screenshot({path:`${output}/failure.png`}).catch(()=>{});throw error;}finally{await browser.close();}
+async function cancelExport(page,dialog,stage){
+ assert.ok(['fonts','reader','decode','png'].includes(stage),'Unknown cancellation stage');
+ await page.evaluate(stage=>{
+  const probe=window.__exportCancellation={entered:false,images:[],readers:[],canvases:[],downloads:0};
+  const click=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(...args){if(this.download)probe.downloads++;return click.apply(this,args);};
+  if(stage==='fonts')Object.defineProperty(document.fonts,'ready',{configurable:true,get(){probe.entered=true;return new Promise(()=>{});}});
+  if(stage==='reader')FileReader.prototype.readAsDataURL=function(){probe.readers.push(this);probe.entered=true;};
+  if(stage==='decode'){const decode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(){if(this.src.startsWith('data:image/svg+xml')){probe.images.push(this);probe.entered=true;return new Promise(()=>{});}return decode.call(this);};}
+  if(stage==='png')HTMLCanvasElement.prototype.toBlob=function(){probe.canvases.push(this);probe.entered=true;};
+ },stage);
+ await dialog.locator('[data-bloom-action="save"]').click();await expect.poll(()=>page.evaluate(()=>window.__exportCancellation.entered)).toBe(true);
+ const start=performance.now();await dialog.getByRole('button',{name:'Close Sakura Bloom',exact:true}).click();
+ let releasedWithinDeadline=true;
+ try{await expect(page.locator('[data-bloom-poster]')).toHaveCount(0,{timeout:3000});}catch(error){if(!baseline)throw error;releasedWithinDeadline=false;}
+ const resources=await page.evaluate(()=>{const probe=window.__exportCancellation;return {downloads:probe.downloads,imageSourceCharacters:probe.images.map(image=>image.getAttribute('src')?.length||0),readerHandlers:probe.readers.map(reader=>[reader.onload,reader.onerror,reader.onabort].some(Boolean)),canvasSizes:probe.canvases.map(canvas=>[canvas.width,canvas.height])};});
+ assert.equal(resources.downloads,0);if(!baseline){assert.ok(resources.imageSourceCharacters.every(size=>size===0));assert.ok(resources.readerHandlers.every(attached=>!attached));assert.ok(resources.canvasSizes.every(([width,height])=>width===0&&height===0));}
+ report.cancellations.push({stage,releasedWithinDeadline,remainingPosterRoots:await page.locator('[data-bloom-poster]').count(),closeToCleanupMs:releasedWithinDeadline?performance.now()-start:null,resources});await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));console.log(`Cancelled Bloom export during ${stage}; ${releasedWithinDeadline?'resource owners released':'baseline retains export beyond the 3s deadline'}`);
+}
+try{for(const width of widths)for(const variant of variants)for(const world of worlds)await journey(world,width,variant);if(!baseline&&variants.includes('legacy')&&worlds.includes('glass'))for(const world of ['japan','glass'].filter(world=>worlds.includes(world)))await journey(world,320,'related');for(const stage of cancellationStages)await journey(worlds[0],widths[0],'rich',stage);await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));console.log(JSON.stringify({exports:report.journeys.length,clipped:report.journeys.filter(journey=>journey.clipping.length).length,cancellations:report.cancellations.length,errors:report.errors}));}catch(error){report.errors.push(String(error));await fs.writeFile(`${output}/report.json`,JSON.stringify(report,null,2));if(debug&&!debug.isClosed())await debug.screenshot({path:`${output}/failure.png`}).catch(()=>{});throw error;}finally{await browser.close();}

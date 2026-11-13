@@ -1,5 +1,5 @@
 import { getRebuildPool,inTransaction,inIdempotentTransaction } from "./db";
-import { CARD_SELECT,VERIFIED,card,cardsForIds } from "./catalog";
+import { CARD_SELECT,VERIFIED,card } from "./catalog";
 import { ProductError,encodeCursor,ids,integer,object,pageInput,text,uuid } from "./validation";
 import {randomUUID} from "node:crypto";
 import type {PoolClient} from "pg";
@@ -32,7 +32,7 @@ export async function getFavoriteStates(accountId:string,sql:Pick<PoolClient,"qu
 export async function getFavoriteRevisions(accountId:string,sql:Pick<PoolClient,"query">=getRebuildPool()):Promise<Record<string,number>> {
   return Object.fromEntries(Object.entries(await getFavoriteStates(accountId,sql)).map(([id,state])=>[id,state.revision]));
 }
-export async function getLibrary(accountId:string,url:URL) {
+export async function getLibrary(accountId:string,url:URL,compact=false) {
   const {limit,cursor}=pageInput(url);
   const kind=url.searchParams.get("kind")||"liked";
   if(!["liked","downloads","all"].includes(kind))throw new ProductError(400,"Invalid library view");
@@ -51,9 +51,13 @@ export async function getLibrary(accountId:string,url:URL) {
     ${from} WHERE ${VERIFIED} AND ($2::timestamptz IS NULL OR (f.created_at,r.id)<($2::timestamptz,$3::uuid))
     ORDER BY f.created_at DESC,r.id DESC LIMIT $4`,[accountId,cursor?.timestamp??null,cursor?.id??null,limit+1]);
   const hasMore=rows.rows.length>limit,selected=rows.rows.slice(0,limit),last=selected.at(-1);
+  const recordings=selected.map(card),nextCursor=hasMore&&last?encodeCursor(last.addedAt,last.id):null;
+  // The current provider synchronizes choices through /library/state. Cursor
+  // pages describe membership only; older installed clients retain their envelope.
+  if(compact)return {recordings,...(kind==="all"&&!cursor?{playlists:await listPlaylists(accountId,client)}:{}),nextCursor,kind};
   const favoriteStates=await getFavoriteStates(accountId,client);
-  return {recordings:selected.map(card),tracks:selected.map(card),playlists:await listPlaylists(accountId,client),favoriteStates,favoriteRevisions:Object.fromEntries(Object.entries(favoriteStates).map(([id,state])=>[id,state.revision])),
-    nextCursor:hasMore&&last?encodeCursor(last.addedAt,last.id):null,kind};
+  return {recordings,tracks:recordings,playlists:await listPlaylists(accountId,client),favoriteStates,favoriteRevisions:Object.fromEntries(Object.entries(favoriteStates).map(([id,state])=>[id,state.revision])),
+    nextCursor,kind};
   });
 }
 export async function setFavorite(accountId:string,value:unknown) {
@@ -97,26 +101,31 @@ export async function setFavorite(accountId:string,value:unknown) {
   });
 }
 export async function createPlaylist(accountId:string,value:unknown) {
+  const receipt=await createPlaylistReceipt(accountId,value);
+  return getPlaylist(accountId,receipt.id);
+}
+export async function createPlaylistReceipt(accountId:string,value:unknown) {
   const input=object(value),name=text(input.name,"playlist name",120),description=input.description===undefined?"":text(input.description,"description",2000,true);
   const id=input.requestId===undefined?randomUUID():uuid(input.requestId,"playlist request ID");
   const recordingIds=input.recordingIds===undefined?[]:ids(input.recordingIds,2000);
-  await inTransaction(async client=>{
+  return inTransaction(async client=>{
     const inserted=await client.query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description)
-      VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(id) DO NOTHING RETURNING id`,[id,accountId,name,description]);
+      VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(id) DO NOTHING RETURNING id,name,description,revision,created_at AS "createdAt",updated_at AS "updatedAt"`,[id,accountId,name,description]);
     if(!inserted.rowCount){
-      const existing=(await client.query(`SELECT name,description FROM sakura_v2."Playlist" WHERE id=$1::uuid AND account_id=$2::uuid`,[id,accountId])).rows[0];
+      const existing=(await client.query(`SELECT id,name,description,revision,created_at AS "createdAt",updated_at AS "updatedAt" FROM sakura_v2."Playlist" WHERE id=$1::uuid AND account_id=$2::uuid`,[id,accountId])).rows[0];
       if(!existing||existing.name!==name||existing.description!==description)throw new ProductError(409,"Playlist request has already been used");
       const existingIds=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows.map(row=>row.recording_id as string);
       if(existingIds.length!==recordingIds.length||existingIds.some((recordingId,index)=>recordingId!==recordingIds[index]))throw new ProductError(409,"Playlist request has already been used");
-      return;
+      return {...existing,id,name,description,revision:Number(existing.revision),trackCount:recordingIds.length,mutation:"created" as const,duplicate:true};
     }
-    if(!recordingIds.length)return;
-    const recordings=await cardsForIds(accountId,recordingIds,client);
-    if(recordings.length!==recordingIds.length)throw new ProductError(404,"A selected recording is unavailable");
-    await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
-      SELECT $1::uuid,x.id,x.position-1 FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position)`,[id,recordingIds]);
+    if(recordingIds.length){
+      const recordings=await client.query(`SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND r.id=ANY($1::uuid[])`,[recordingIds]);
+      if(recordings.rows.length!==recordingIds.length)throw new ProductError(404,"A selected recording is unavailable");
+      await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
+        SELECT $1::uuid,x.id,x.position-1 FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position)`,[id,recordingIds]);
+    }
+    return {...inserted.rows[0],id,name,description,revision:Number(inserted.rows[0].revision),trackCount:recordingIds.length,mutation:"created" as const,duplicate:false};
   });
-  return getPlaylist(accountId,id);
 }
 export async function getPlaylist(accountId:string,rawId:string) {
   const id=uuid(rawId,"playlist ID"),pool=getRebuildPool();
@@ -132,17 +141,22 @@ export async function getPlaylist(accountId:string,rawId:string) {
     durationMs:recordings.reduce((sum,r)=>sum+(r.durationMs||0),0)};
 }
 export async function updatePlaylist(accountId:string,rawId:string,value:unknown) {
+  const receipt=await updatePlaylistReceipt(accountId,rawId,value);
+  return getPlaylist(accountId,receipt.id);
+}
+export async function updatePlaylistReceipt(accountId:string,rawId:string,value:unknown) {
   const id=uuid(rawId,"playlist ID"),input=object(value);
   if(Object.keys(input).some(k=>!["name","description","recordingIds"].includes(k)))throw new ProductError(400,"Unsupported playlist field");
   const name=input.name===undefined?null:text(input.name,"playlist name",120),description=input.description===undefined?null:text(input.description,"description",2000,true);
   const order=input.recordingIds===undefined?null:ids(input.recordingIds,2000);
-  await inTransaction(async client=>{
-    const row=await client.query(`SELECT id,name,description FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id]);
+  return inTransaction(async client=>{
+    const row=await client.query(`SELECT id,name,description,revision FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id]);
     if(!row.rowCount)throw new ProductError(404,"Playlist not found");
     let changed=(name!==null&&name!==row.rows[0].name)||(description!==null&&description!==row.rows[0].description);
     if(order){
       const current=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.recording_id);
-      if(current.length!==order.length||current.some(x=>!order.includes(x)))throw new ProductError(409,"Playlist membership changed; refresh before reordering");
+      const membership=new Set(order);
+      if(current.length!==order.length||current.some(x=>!membership.has(x)))throw new ProductError(409,"Playlist membership changed; refresh before reordering");
       const reordered=current.some((x,index)=>x!==order[index]);
       changed ||= reordered;
       if(reordered)await client.query(`UPDATE sakura_v2."PlaylistRecording" SET position=ordered.position-1 FROM
@@ -150,8 +164,9 @@ export async function updatePlaylist(accountId:string,rawId:string,value:unknown
     }
     if(changed)await client.query(`UPDATE sakura_v2."Playlist" SET name=COALESCE($3,name),description=COALESCE($4,description),revision=revision+1,updated_at=now()
       WHERE account_id=$1::uuid AND id=$2::uuid`,[accountId,id,name,description]);
+    const baseRevision=Number(row.rows[0].revision);
+    return {id,name:name??row.rows[0].name,description:description??row.rows[0].description,baseRevision,revision:baseRevision+Number(changed),changed,mutation:"updated" as const,...(order?{recordingIds:order}:{})};
   });
-  return getPlaylist(accountId,id);
 }
 export async function deletePlaylist(accountId:string,rawId:string) {
   const id=uuid(rawId,"playlist ID");
@@ -160,24 +175,30 @@ export async function deletePlaylist(accountId:string,rawId:string) {
   return {deleted:true,id};
 }
 export async function mutatePlaylistTracks(accountId:string,rawId:string,value:unknown,remove=false) {
+  const receipt=await mutatePlaylistTracksReceipt(accountId,rawId,value,remove);
+  return getPlaylist(accountId,receipt.id);
+}
+export async function mutatePlaylistTracksReceipt(accountId:string,rawId:string,value:unknown,remove=false) {
   const id=uuid(rawId,"playlist ID"),input=object(value);
   const recordingIds=remove?[uuid(input.recordingId,"recording ID")]:ids(input.recordingIds??[input.recordingId],200);
-  await inTransaction(async client=>{
-    if(!(await client.query(`SELECT id FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id])).rowCount)throw new ProductError(404,"Playlist not found");
+  return inTransaction(async client=>{
+    const playlist=await client.query(`SELECT id,revision FROM sakura_v2."Playlist" WHERE id=$2::uuid AND account_id=$1::uuid FOR UPDATE`,[accountId,id]);
+    if(!playlist.rowCount)throw new ProductError(404,"Playlist not found");
     let changed=false;
     if(remove)changed=Boolean((await client.query(`DELETE FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid AND recording_id=ANY($2::uuid[])`,[id,recordingIds])).rowCount);
     else{
       const current=(await client.query(`SELECT recording_id FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid`,[id])).rows;
       const existing=new Set(current.map(row=>row.recording_id));
       const additions=recordingIds.filter(recordingId=>!existing.has(recordingId));
-      const recordings=await cardsForIds(accountId,additions,client);
-      if(recordings.length!==additions.length)throw new ProductError(404,"A selected recording is unavailable");
+      const recordings=additions.length?await client.query(`SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND r.id=ANY($1::uuid[])`,[additions]):{rows:[]};
+      if(recordings.rows.length!==additions.length)throw new ProductError(404,"A selected recording is unavailable");
       if(current.length+additions.length>2000)throw new ProductError(400,"Playlist supports up to 2000 songs");
       if(additions.length)changed=Boolean((await client.query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position)
         SELECT $1::uuid,x.id,(SELECT COALESCE(MAX(position)+1,0) FROM sakura_v2."PlaylistRecording" WHERE playlist_id=$1::uuid)+x.position-1
         FROM unnest($2::uuid[]) WITH ORDINALITY x(id,position) ON CONFLICT(playlist_id,recording_id) DO NOTHING`,[id,additions])).rowCount);
     }
     if(changed)await client.query(`UPDATE sakura_v2."Playlist" SET revision=revision+1,updated_at=now() WHERE id=$1::uuid`,[id]);
+    const baseRevision=Number(playlist.rows[0].revision);
+    return {id,baseRevision,revision:baseRevision+Number(changed),changed,mutation:"membership" as const};
   });
-  return getPlaylist(accountId,id);
 }

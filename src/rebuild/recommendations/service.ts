@@ -1,7 +1,7 @@
 import { getRebuildPool,inTransaction } from "../data/db";
 import type {PoolClient} from "pg";
 import { RANKING_CARD_SELECT,VERIFIED,card,cardsForIds } from "../data/catalog";
-import { getSettings } from "../data/settings";
+import { getSettings, getSettingsSnapshot } from "../data/settings";
 import { ProductError,uuid,ids,object } from "../data/validation";
 import { planMixes,type Candidate } from "./planner";
 import { SITUATIONAL_MIXES,eligibleSituations,planOfflineMixes,type SituationHistory } from "./situations";
@@ -101,7 +101,7 @@ export async function getMix(accountId:string,rawId:string) {
     FROM sakura_v2."Mix" WHERE account_id=$1::uuid AND id=$2::uuid`,[accountId,id])).rows[0];
   if(!mix)throw new ProductError(404,"Mix not found");
   const membership=(await sql.query(`SELECT recording_id FROM sakura_v2."MixRecording" WHERE mix_id=$1::uuid ORDER BY position`,[id])).rows.map(r=>r.recording_id);
-  const settings=await getSettings(accountId,sql);
+  const settings=await getSettingsSnapshot(accountId,sql);
   const feedbackRows=await sql.query(`SELECT target,target_id,kind,expires_at FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND (expires_at IS NULL OR expires_at>now())`,[accountId]);
   const retained=await cardsForIds(accountId,membership,sql);
   const feedback:TasteFeedback[]=feedbackRows.rows.map(f=>({target:f.target,targetId:f.target_id,kind:f.kind,expiresAt:f.expires_at?new Date(f.expires_at).toISOString():null}));
@@ -117,7 +117,7 @@ export async function offlineMixes(accountId:string,value:unknown){
   });
 }
 async function offlineMixesFor(accountId:string,value:unknown,pool:Pick<PoolClient,"query">){
-  const requested=ids(object(value).recordingIds,2000),settings=await getSettings(accountId,pool),cards=await cardsForIds(accountId,requested,pool);
+  const requested=ids(object(value).recordingIds,2000),settings=await getSettingsSnapshot(accountId,pool),cards=await cardsForIds(accountId,requested,pool);
   const favorites=new Set((await pool.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=ANY($2::uuid[])`,[accountId,requested])).rows.map(r=>r.recording_id));
   const rows=settings.learnFromListening===false?[]:(await pool.query(`SELECT s.recording_id,s.audible_ms,s.last_played_at,s.play_count,s.completed_count,s.skipped_count,
     MIN(c.occurred_at) first_played_at,

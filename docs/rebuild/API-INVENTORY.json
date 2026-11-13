@@ -1,6 +1,6 @@
 {
-  "routes": 52,
-  "methods": 69,
+  "routes": 53,
+  "methods": 71,
   "untimed": [],
   "inventory": [
     {
@@ -382,6 +382,10 @@
         {
           "method": "GET",
           "timed": true
+        },
+        {
+          "method": "HEAD",
+          "timed": true
         }
       ]
     },
@@ -482,6 +486,16 @@
     {
       "route": "/api/v2/recordings/index",
       "file": "src/app/api/v2/recordings/index/route.ts",
+      "methods": [
+        {
+          "method": "POST",
+          "timed": true
+        }
+      ]
+    },
+    {
+      "route": "/api/v2/recordings/index/batch",
+      "file": "src/app/api/v2/recordings/index/batch/route.ts",
       "methods": [
         {
           "method": "POST",

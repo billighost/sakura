@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Original covers use the authenticated image proxy, intrinsic sizes and an illustrated error fallback. */
-import {useState} from "react";
+import {useContext,useState} from "react";
 import {ArtistLinks} from "../app/ArtistLinks";
 import {Icon} from "../app/Icon";
 import {musicTrack} from "../app/types";
@@ -9,18 +9,20 @@ import {listeningDuration} from "./comparisons";
 import type {BloomArtistInsight,BloomChapter,BloomRankedRecording} from "./uiTypes";
 import s from "./cinema.module.css";
 import {responsiveArtworkSources,sameOriginArtworkUrl} from "../player/imageUrl";
+import {BloomArtworkContext} from "./ArtworkContext";
+import {bloomRecordingArtwork} from "./artwork";
 
 export function BloomArtwork({url,title,className,original=false}:{url:unknown;title:string;className?:string;original?:boolean}){
- const [failedUrl,setFailedUrl]=useState<string|null>(null),raw=typeof url==="string"?url:null;
+ const [failedUrl,setFailedUrl]=useState<string|null>(null),raw=typeof url==="string"?url:null,prepared=useContext(BloomArtworkContext),display=raw?prepared[raw]:undefined;
  // Exported posters scale their composition to 1080px. Keep the original
  // pixels there while scrolling chapter artwork chooses a native thumbnail.
- const sources=original?{src:sameOriginArtworkUrl(raw),srcSet:undefined}:responsiveArtworkSources(raw,true),src=sources.src;
+ const sources=original?{src:sameOriginArtworkUrl(raw),srcSet:undefined}:display?{src:display,srcSet:undefined}:responsiveArtworkSources(raw,true),src=sources.src;
  return src&&failedUrl!==src?<img className={className} src={src} srcSet={sources.srcSet} sizes={sources.srcSet?"auto, (max-width: 750px) 70vw, 340px":undefined} loading={original?"eager":"lazy"} width="400" height="400" decoding="async" alt={`${title} artwork`} onError={()=>setFailedUrl(src)}/>:<div className={`${s.artFallback} ${className||""}`} role="img" aria-label={`Artwork unavailable for ${title}`}><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="57"/><circle cx="80" cy="80" r="35"/><path d="M80 22Q29 46 80 80Q131 46 80 22ZM22 80Q46 131 80 80Q46 29 22 80ZM80 138Q131 114 80 80Q29 114 80 138ZM138 80Q114 29 80 80Q114 131 138 80Z"/><circle cx="80" cy="80" r="8"/></svg></div>;
 }
 
 function Recording({entry,onPlay,measured=true}:{entry:BloomRankedRecording;onPlay?:(recording:Record<string,unknown>)=>void;measured?:boolean}){
  const metadata=(entry.recording.metadata||entry.recording) as Record<string,unknown>;const title=String(entry.recording.title||metadata.title||"Song");let track=null;try{track=musicTrack(entry.recording);}catch{}
- return <article className={s.recording} data-rank={measured?entry.rank:undefined}><div className={s.recordingImage}><BloomArtwork url={entry.recording.coverUrl||metadata.coverUrl} title={title}/>{measured&&<span className={s.rank}>{String(entry.rank).padStart(2,"0")}</span>}{onPlay&&<button className={s.playArtwork} aria-label={`Play ${title}`} onClick={()=>onPlay(entry.recording)}><Icon name="play" size={17}/></button>}</div><h3>{title}</h3><p className={s.credits}>{track?<ArtistLinks track={track}/>:Array.isArray(metadata.artists)?metadata.artists.join(" · "):""}</p>{measured&&<small>{listeningDuration(entry.audibleMs)} listened · {entry.plays} {entry.plays===1?"play":"plays"}</small>}</article>;
+ return <article className={s.recording} data-rank={measured?entry.rank:undefined}><div className={s.recordingImage}><BloomArtwork url={bloomRecordingArtwork(entry.recording)} title={title}/>{measured&&<span className={s.rank}>{String(entry.rank).padStart(2,"0")}</span>}{onPlay&&<button className={s.playArtwork} aria-label={`Play ${title}`} onClick={()=>onPlay(entry.recording)}><Icon name="play" size={17}/></button>}</div><h3>{title}</h3><p className={s.credits}>{track?<ArtistLinks track={track}/>:Array.isArray(metadata.artists)?metadata.artists.join(" · "):""}</p>{measured&&<small>{listeningDuration(entry.audibleMs)} listened · {entry.plays} {entry.plays===1?"play":"plays"}</small>}</article>;
 }
 function Artist({artist}:{artist:BloomArtistInsight}){return <article className={`${s.artist} bloom-artist`}><BloomArtwork url={artist.imageUrl} title={artist.name} className={s.artistPortrait}/><div><span className={s.eyebrow}>A VOICE IN YOUR STORY</span><h3>{artist.name}</h3><p>{listeningDuration(artist.audibleMs)} of listening</p></div></article>;}
 

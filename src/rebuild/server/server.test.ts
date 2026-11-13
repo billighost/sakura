@@ -460,21 +460,87 @@ test("ready resolution reuses selected asset evidence without exposing it or cro
 function ingestionDatabase(){
  const records=new Map<string,Record<string,unknown>>(),aliases=new Map<string,string>();
  const artists=new Map<string,{id:string;name:string}>(),credits=new Map<string,{artistId:string;position:number}[]>();
+ const albums=new Map<string,{id:string;title:string}>(),recordingAlbums=new Map<string,string[]>();
+ const signatures=new Map<string,string>();
+ const statements:string[]=[];
  const query:ReadonlySql=async<Row>(statement:string,args:readonly unknown[])=>{
+  statements.push(statement);
   let rows:unknown[]=[];
-  if(statement.includes("JOIN sakura_v2.\"Recording\"")){const id=aliases.get(JSON.stringify(args.slice(0,3)));if(id)rows=[{id,metadata:records.get(id),references:[...aliases.entries()].filter(([,recording])=>recording===id).map(([key])=>{const[provider,scope,referenceId]=JSON.parse(key);return{provider,id:referenceId,...(scope?{scope}:{})};})}];}
-  else if(statement.startsWith('INSERT INTO sakura_v2."Recording"'))records.set(String(args[0]),JSON.parse(String(args[1])));
-  else if(statement.startsWith('UPDATE sakura_v2."Recording"'))records.set(String(args[0]),{...records.get(String(args[0])),...JSON.parse(String(args[1]))});
-  else if(statement.startsWith('INSERT INTO sakura_v2."ExternalReference"')){const key=JSON.stringify(args.slice(0,3));if(!aliases.has(key))aliases.set(key,String(args[3]));}
+  if(statement.includes('FROM sakura_v2."ExternalReference" e JOIN')){
+   const requested=JSON.parse(String(args[0])) as {provider:string;scope:string;id:string}[];
+   const projection=JSON.parse(String(args[1])) as {artist:{provider:string;id:string}|null;album:{provider:string;id:string}|null};
+   const selectedArtist=projection.artist?artists.get(JSON.stringify([projection.artist.provider,projection.artist.id]))?.id:null,selectedAlbum=projection.album?albums.get(JSON.stringify([projection.album.provider,projection.album.id]))?.id:null;
+   rows=[...new Set(requested.flatMap(ref=>{const id=aliases.get(JSON.stringify([ref.provider,ref.scope,ref.id]));return id?[id]:[];}))].map(id=>({id,metadata:records.get(id),catalogIngestionSignature:signatures.get(id),artistId:(credits.get(id)||[]).some(credit=>credit.artistId===selectedArtist)?selectedArtist:null,albumId:(recordingAlbums.get(id)||[]).includes(selectedAlbum||"")?selectedAlbum:null,
+    artistProjections:(credits.get(id)||[]).flatMap(credit=>[...artists.entries()].filter(([,artist])=>artist.id===credit.artistId).map(([key])=>{const[provider,artistId]=JSON.parse(key);return{provider,id:artistId,position:credit.position};})),
+    references:[...aliases.entries()].filter(([,recording])=>recording===id).map(([key])=>{const[provider,scope,referenceId]=JSON.parse(key);return{provider,id:referenceId,...(scope?{scope}:{})};})}));
+  }
+  else if(statement.startsWith('INSERT INTO sakura_v2."Recording"')){records.set(String(args[0]),JSON.parse(String(args[1])));signatures.set(String(args[0]),JSON.parse(String(args[2])).catalogIngestionSignature);}
+  else if(statement.startsWith('UPDATE sakura_v2."Recording"')){records.set(String(args[0]),{...records.get(String(args[0])),...JSON.parse(String(args[1]))});if(args[2])signatures.set(String(args[0]),String(args[2]));}
+  else if(statement.startsWith('INSERT INTO sakura_v2."ExternalReference"')){for(const ref of JSON.parse(String(args[0]))){const key=JSON.stringify([ref.provider,ref.scope,ref.id]);if(!aliases.has(key))aliases.set(key,String(args[1]));}}
+  else if(statement.startsWith("SELECT e.provider")){rows=JSON.parse(String(args[0])).flatMap((ref:{provider:string;scope:string;id:string})=>{const id=aliases.get(JSON.stringify([ref.provider,ref.scope,ref.id]));return id?[{provider:ref.provider,scope:ref.scope,external_id:ref.id,recording_id:id}]:[];});}
   else if(statement.startsWith("SELECT recording_id")){const id=aliases.get(JSON.stringify(args.slice(0,3)));if(id)rows=[{recording_id:id}];}
-  else if(statement.startsWith('INSERT INTO sakura_v2."Artist"')){const key=JSON.stringify(args.slice(0,2)),id=artists.get(key)?.id??`55555555-5555-4555-8555-${String(artists.size+1).padStart(12,"0")}`;artists.set(key,{id,name:String(args[2])});rows=[{id}];}
-  else if(statement.startsWith('INSERT INTO sakura_v2."RecordingArtist"')){const id=String(args[0]),next=(credits.get(id)??[]).filter(credit=>credit.artistId!==args[1]);credits.set(id,[...next,{artistId:String(args[1]),position:Number(args[2])}]);}
+  else if(statement.startsWith('INSERT INTO sakura_v2."Artist"')){rows=JSON.parse(String(args[0])).map((artist:{provider:string;id:string;name:string})=>{const key=JSON.stringify([artist.provider,artist.id]),id=artists.get(key)?.id??`55555555-5555-4555-8555-${String(artists.size+1).padStart(12,"0")}`;artists.set(key,{id,name:artist.name});return{id,provider:artist.provider,external_id:artist.id};});}
+  else if(statement.startsWith('INSERT INTO sakura_v2."RecordingArtist"')){const id=String(args[0]);for(const projection of JSON.parse(String(args[1]))){const next=(credits.get(id)??[]).filter(credit=>credit.artistId!==projection.id);credits.set(id,[...next,{artistId:projection.id,position:projection.position}]);}}
   else if(statement.startsWith('DELETE FROM sakura_v2."RecordingArtist"')){const id=String(args[0]),kept=args[1]as string[];credits.set(id,(credits.get(id)??[]).filter(credit=>kept.includes(credit.artistId)));}
+  else if(statement.startsWith('INSERT INTO sakura_v2."Album"')){const key=JSON.stringify(args.slice(0,2)),id=albums.get(key)?.id??`66666666-6666-4666-8666-${String(albums.size+1).padStart(12,"0")}`;albums.set(key,{id,title:String(args[2])});rows=[{id}];}
+  else if(statement.startsWith('INSERT INTO sakura_v2."RecordingAlbum"')){const id=String(args[0]),albumId=String(args[1]);recordingAlbums.set(id,[...new Set([...(recordingAlbums.get(id)||[]),albumId])]);}
   return rows as Row[];
  };
  const transaction:SqlTransaction=async operation=>operation(query);
- return{records,aliases,artists,credits,transaction};
+ return{records,aliases,artists,credits,albums,recordingAlbums,transaction,statements};
 }
+
+test("batched identical ingestion retains exact proof with two reads and no repeated writes",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const selected:CatalogRecording={...catalog,artistCredits:[{name:"Bruno Mars",role:"primary",reference:{provider:"deezer",id:"42"}},{name:"Guest A",role:"featured",reference:{provider:"deezer",id:"43"}},{name:"Guest B",role:"featured",reference:{provider:"deezer",id:"44"}}],albumReference:{provider:"deezer",id:"24"},albumTitle:"Album"};
+ const first=await ingestor.ensureCatalog(selected);assert.equal(database.statements.length,10);
+ database.statements.length=0;const second=await ingestor.ensureCatalog(selected);
+ assert.deepEqual(second,first);assert.equal(database.statements.length,2);
+ assert.ok(database.statements.every(statement=>statement.startsWith("SELECT")));
+ const changed={...selected,coverUrl:"https://example.test/new-cover.jpg"};database.statements.length=0;
+ const refreshed=await ingestor.ensureCatalog(changed);assert.equal(refreshed.recordingId,first.recordingId);assert.equal(database.records.get(first.recordingId)?.coverUrl,changed.coverUrl);
+ assert.equal(database.statements.length,10);
+});
+
+test("batch indexing starts three consumers, retains order and cancels queued work on failure",async()=>{
+ const ingestor=new RecordingIngestor(async operation=>operation(async<Row>()=>[] as Row[]),[]);
+ let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});let active=0,maximum=0,calls=0;
+ ingestor.ensureRecording=async ref=>{calls++;active++;maximum=Math.max(maximum,active);await gate;active--;return{...canonical,recordingId:ref.id};};
+ const items=Array.from({length:8},(_,index)=>({reference:{provider:"deezer" as const,id:String(index+1)}}));
+ const pending=ingestor.ensureRecordings(items);await Promise.resolve();assert.equal(calls,3);release();
+ assert.deepEqual((await pending).map(recording=>recording.recordingId),items.map(item=>item.reference.id));assert.equal(maximum,3);
+ let failedCalls=0;ingestor.ensureRecording=async ref=>{failedCalls++;if(ref.id==="1")throw new Error("Exact variant conflict");return canonical;};
+ await assert.rejects(ingestor.ensureRecordings(items),/Exact variant conflict/);assert.ok(failedCalls<=3);
+ const stop=new AbortController();stop.abort();await assert.rejects(ingestor.ensureRecordings(items,stop.signal),{name:"AbortError"});
+});
+
+test("batch failure owns entered SQL work until all consumers settle",async()=>{
+ const ingestor=new RecordingIngestor(async operation=>operation(async<Row>()=>[] as Row[]),[]);
+ let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});let finished=false,entered=0;
+ ingestor.ensureRecording=async ref=>{entered++;if(ref.id==="1")throw new Error("Exact conflict");await gate;return canonical;};
+ const pending=ingestor.ensureRecordings(Array.from({length:8},(_,index)=>({reference:{provider:"deezer" as const,id:String(index+1)}})));
+ const observed=pending.catch(error=>{finished=true;throw error;});
+ await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(entered,3);assert.equal(finished,false);
+ release();await assert.rejects(observed,/Exact conflict/);assert.equal(finished,true);
+});
+
+test("unchanged ingestion keeps last primary and current release projections",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const selected:CatalogRecording={...catalog,artistCredits:[{name:"A",role:"primary",reference:{provider:"deezer",id:"41"}},{name:"B",role:"primary",reference:{provider:"deezer",id:"42"}}],albumReference:{provider:"deezer",id:"24"},albumTitle:"Album A"};
+ const first=await ingestor.ensureCatalog(selected);assert.equal(first.artistId,database.artists.get(JSON.stringify(["deezer","42"]))?.id);
+ const alternate={...selected,albumReference:{provider:"deezer" as const,id:"25"},albumTitle:"Album B"};
+ const changed=await ingestor.ensureCatalog(alternate);assert.notEqual(changed.albumId,first.albumId);
+ database.statements.length=0;assert.deepEqual(await ingestor.ensureCatalog(alternate),changed);assert.equal(database.statements.length,2);
+});
+
+test("an unchanged ingestion signature never skips repair of missing exact projections",async()=>{
+ const database=ingestionDatabase(),ingestor=new RecordingIngestor(database.transaction,[]);
+ const selected:CatalogRecording={...catalog,artistCredits:[{name:"Lead",role:"primary",reference:{provider:"deezer",id:"41"}},{name:"Guest",role:"featured",reference:{provider:"deezer",id:"42"}}],albumReference:{provider:"deezer",id:"24"},albumTitle:"Album"};
+ const first=await ingestor.ensureCatalog(selected);database.credits.set(first.recordingId,database.credits.get(first.recordingId)!.slice(0,1));
+ database.statements.length=0;assert.deepEqual(await ingestor.ensureCatalog(selected),first);assert.equal(database.credits.get(first.recordingId)!.length,2);assert.equal(database.statements.length,10);
+ database.recordingAlbums.delete(first.recordingId);database.statements.length=0;assert.deepEqual(await ingestor.ensureCatalog(selected),first);assert.equal(database.statements.length,10);
+ database.statements.length=0;assert.deepEqual(await ingestor.ensureCatalog(selected),first);assert.equal(database.statements.length,2);
+});
 
 test("partial expected credits hydrate exact metadata while wrong known guest fails before any write",async()=>{
  const database=ingestionDatabase(),exact={...catalog,metadata:{title:"INERTIA",artists:["SawanoHiroyuki[nZk]","Rei"],artistsComplete:true,durationMs:199486}};

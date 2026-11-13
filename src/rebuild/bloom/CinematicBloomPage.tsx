@@ -16,6 +16,9 @@ import {useBloomPalette} from "./useBloomPalette";
 import {useBloomAudio} from "./useBloomAudio";
 import {useBloomPreparation} from "./useBloomPreparation";
 import {BloomReadyLink} from "./BloomReadyLink";
+import {BloomArtworkContext} from "./ArtworkContext";
+import {bloomPreparationScope} from "./preparationIdentity";
+import {applyBloomDisclosureReply,type BloomDisclosureReceipt} from "./receipts";
 import {bloomDate,type BloomItem,type BloomRecap,type BloomPeriod,type BloomPreparedStory} from "./uiTypes";
 import {bloomDesignForItem} from "./design";
 import {BLOOM_WORLDS,bloomWorld,isBloomWorld} from "./worlds/registry";
@@ -28,9 +31,9 @@ export function BloomPage({id}:{id?:string}){const p=useMusic(),query=useSearchP
 function BloomDetail({id}:{id:string}){
  const p=useMusic(),router=useRouter(),query=useSearchParams(),theme=usePalette(),archival=query.get("archive")==="1";
  const [erased,setErased]=useState(false);
- const detail=useResource<BloomRecap>(p.account?.id||null,!archival?`/api/v2/bloom/${encodeURIComponent(id)}`:null),archive=useResource<{items:BloomRecap[]}>(p.account?.id||null,archival?`/api/v2/bloom/archive?year=${encodeURIComponent(id.slice(7))}`:null);
- const recap=archival?archive.data?.items.find(item=>item.id===id):detail.data,expired=useBoundary(!archival?recap?.expiresAt:undefined,()=>{});
- const preparation=useBloomPreparation(p.account?.id||null,recap?.chapterCount&&!expired&&!erased?id:null,recap,archival);
+ const detail=useResource<BloomPreparedStory>(p.account?.id||null,!archival?`/api/v2/bloom/${encodeURIComponent(id)}?prepare=1`:null),archive=useResource<{items:BloomRecap[]}>(p.account?.id||null,archival?`/api/v2/bloom/archive?year=${encodeURIComponent(id.slice(7))}`:null);
+ const recap=archival?archive.data?.items.find(item=>item.id===id):detail.data?.story,expired=useBoundary(!archival?recap?.expiresAt:undefined,()=>{});
+ const preparation=useBloomPreparation(p.account?.id||null,recap?.chapterCount&&!expired&&!erased?id:null,recap,archival,true,"detail",detail.data);
  const audio=useBloomAudio(preparation.playback);
  useEffect(()=>{if(expired)audio.close();},[expired,audio]);
  useEffect(()=>{
@@ -39,10 +42,10 @@ function BloomDetail({id}:{id:string}){
   return()=>{window.removeEventListener("sakura-personalization-cleared",revoke);window.removeEventListener("sakura-listening-erased",revoke);};
  },[p.account?.id,router,audio]);
  function close(){audio.close();replaceMusicUrl(router,"/bloom");if(p.account)invalidateResources(p.account.id,"/api/v2/bloom");}
- async function reveal(chapterId:string){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/reveal`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chapterId})},{context:"page",accountId:p.account?.id});}
+ async function reveal(chapterId:string){if(archival&&recap)return recap;const prepared=await preparation.prepare();const reply=await requestJson<BloomRecap|BloomDisclosureReceipt>(`/api/v2/bloom/${encodeURIComponent(id!)}/reveal`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chapterId,scope:bloomPreparationScope(prepared.story)})},{context:"page",accountId:p.account?.id});return applyBloomDisclosureReply(prepared,reply);}
  async function prepare():Promise<BloomPreparedStory>{return preparation.prepare();}
- async function complete(){if(archival&&recap)return recap;return requestJson<BloomRecap>(`/api/v2/bloom/${encodeURIComponent(id!)}/complete`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"},{context:"page",accountId:p.account?.id});}
- const active=archival?archive:detail,preview=process.env.NODE_ENV!=="production"?query.get("world"):null;return erased?<LoadingRows/>:expired?<RecoveryNotice error={new UserFacingError(responseIssue(410,null))} retry={active.retry}/>:active.error?<RecoveryNotice error={active.error} retry={active.retry}/>:recap?<BloomStory key={recap.id} initial={recap} design={isBloomWorld(preview)?preview:bloomDesignForItem(recap)} theme={theme} reducedMotion={p.settings.reducedMotion} performance={p.settings.bloomPerformance} accountId={p.account?.id} preparation={preparation} onClose={close} onPrepare={prepare} onReveal={reveal} onComplete={complete} onPlay={audio.play} onStopSound={audio.stop} onPauseSound={audio.pause} onResumeSound={audio.resume} audioMessage={audio.message}/>:archival&&archive.data?<RecoveryNotice error={new UserFacingError(responseIssue(404,null))} retry={archive.retry}/>:<LoadingRows/>;
+ async function complete(){if(archival&&recap)return recap;const prepared=await preparation.prepare();const reply=await requestJson<BloomRecap|BloomDisclosureReceipt>(`/api/v2/bloom/${encodeURIComponent(id!)}/complete`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope:bloomPreparationScope(prepared.story)})},{context:"page",accountId:p.account?.id});return applyBloomDisclosureReply(prepared,reply);}
+ const active=archival?archive:detail,preview=process.env.NODE_ENV!=="production"?query.get("world"):null;return erased?<LoadingRows/>:expired?<RecoveryNotice error={new UserFacingError(responseIssue(410,null))} retry={active.retry}/>:active.error?<RecoveryNotice error={active.error} retry={active.retry}/>:recap?<BloomArtworkContext value={preparation.prepared?.artwork||{}}><BloomStory key={recap.id} initial={recap} design={isBloomWorld(preview)?preview:bloomDesignForItem(recap)} theme={theme} reducedMotion={p.settings.reducedMotion} performance={p.settings.bloomPerformance} accountId={p.account?.id} preparation={preparation} onClose={close} onPrepare={prepare} onReveal={reveal} onComplete={complete} onPlay={audio.play} onStopSound={audio.stop} onPauseSound={audio.pause} onResumeSound={audio.resume} audioMessage={audio.message}/></BloomArtworkContext>:archival&&archive.data?<RecoveryNotice error={new UserFacingError(responseIssue(404,null))} retry={archive.retry}/>:<LoadingRows/>;
 }
 function BloomGallery(){
 const p=useMusic(),theme=usePalette(),query=useSearchParams(),requested=query.get("period"),[period,setPeriod]=useState<BloomPeriod>(requested==="monthly"||requested==="yearly"?requested:"weekly");

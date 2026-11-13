@@ -4,9 +4,11 @@ import { readingEngine, READING_VERSION, type ReadingLanguage } from "./language
 import { JAPANESE_READING_VERSION } from "./versions";
 import { getSharedPublicCache, setSharedPublicCache } from "../server/redisCache";
 import { verifiedPublicReadingSource } from "./publicReadingSources";
+import { ProviderFlight } from "../server/provider-flight";
+import { AbortableAdmission } from "../server/abortableAdmission";
 
 interface ReadingFields { romanized: string; readingReviewNeeded: boolean; readingEngine: string }
-type Transform = (lines: readonly { text: string }[], language: ReadingLanguage) => Promise<ReadingFields[]>;
+type Transform = (lines: readonly { text: string }[], language: ReadingLanguage, signal?: AbortSignal) => Promise<ReadingFields[]>;
 interface SharedTransform { version: 1; key: string; language: ReadingLanguage; engine: string; fields: ReadingFields[] }
 interface SharedReadingCache {
   get(key: string): Promise<unknown>;
@@ -34,9 +36,10 @@ export function createReadingTransformCache(options: {
   const publicSource = options.publicSource || verifiedPublicReadingSource;
   const maximumEntries = options.maxEntries ?? 128, maximumBytes = options.maxBytes ?? 4 * 1024 * 1024;
   const values = new Map<string, { fields: ReadingFields[]; bytes: number }>();
-  const flights = new Map<string, Promise<ReadingFields[]>>();
+  const flights = new ProviderFlight<ReadingFields[]>(64), admission = new AbortableAdmission(2, 32);
   let retainedBytes = 0;
-  return async <T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, source: { publicReadingProof?: unknown } = {}): Promise<Array<T & ReadingFields>> => {
+  return async <T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, source: { publicReadingProof?: unknown; signal?: AbortSignal } = {}): Promise<Array<T & ReadingFields>> => {
+    source.signal?.throwIfAborted();
     if (lines.length > 400 || lines.reduce((total, line) => total + line.text.length, 0) > 20_000) throw new RangeError("Lyrics exceed reading limits");
     const texts = lines.map(line => ({ text: line.text }));
     const key = createHash("sha256").update(JSON.stringify([language, readingEngine(language), READING_VERSION, JAPANESE_READING_VERSION, texts])).digest("hex");
@@ -45,22 +48,24 @@ export function createReadingTransformCache(options: {
     if (hit) {
       values.delete(key); values.set(key, hit); fields = hit.fields;
     } else {
-      let pending = flights.get(key);
-      if (!pending) {
-        pending = Promise.resolve().then(async () => {
+      fields = await flights.run(key, source.signal, async sharedSignal => {
+        const result = await (async () => {
           const eligible = shared && publicSource(texts.map(line => line.text), source.publicReadingProof);
           if (eligible) {
             const saved = await shared!.get(key).catch(() => undefined) as Partial<SharedTransform> | undefined;
+            sharedSignal.throwIfAborted();
             if (saved?.version === 1 && saved.key === key && saved.language === language && saved.engine === readingEngine(language)
               && validFields(saved.fields, texts.length, readingEngine(language))) return saved.fields;
           }
-          const result = await transform(texts, language);
+          const result = await admission.run(sharedSignal, () => transform(texts, language, sharedSignal));
+          sharedSignal.throwIfAborted();
           if (eligible && validFields(result, texts.length, readingEngine(language))) {
             const fields = result.map(({ romanized, readingReviewNeeded, readingEngine }) => ({ romanized, readingReviewNeeded, readingEngine }));
             await shared!.set(key, { version: 1, key, language, engine: readingEngine(language), fields }, 24 * 60 * 60).catch(() => {});
           }
           return result;
-        }).then(result => {
+        })();
+          sharedSignal.throwIfAborted();
           if (result.length !== texts.length || result.some(line => typeof line.romanized !== "string" || typeof line.readingReviewNeeded !== "boolean" || line.readingEngine !== readingEngine(language))) throw new Error("Invalid reading transformation");
           const fields = result.map(({ romanized, readingReviewNeeded, readingEngine }) => ({ romanized, readingReviewNeeded, readingEngine }));
           const bytes = key.length * 2 + JSON.stringify(fields).length * 2;
@@ -73,12 +78,9 @@ export function createReadingTransformCache(options: {
             }
           }
           return fields;
-        }).finally(() => { if (flights.get(key) === pending) flights.delete(key); });
-        // The retained flight index is bounded even during bursts of distinct songs.
-        if (flights.size < 64) flights.set(key, pending);
-      }
-      fields = await pending;
+      });
     }
+    source.signal?.throwIfAborted();
     return lines.map((line, index) => ({ ...line, ...fields[index] }));
   };
 }

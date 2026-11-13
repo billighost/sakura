@@ -1,5 +1,4 @@
 /** Node/server only: the morphological dictionary must never enter a client bundle. */
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
 import kuromoji from "kuromoji";
@@ -190,8 +189,4 @@ export async function romanizeJapaneseLines<T extends { text: string }>(lines: r
   return result;
 }
 
-/** Content + engine keyed: same song/line count cannot poison another request. */
-export function japaneseReadingCacheKey(lines: readonly string[], recordingId = "adhoc", reviewedReadingsVersion = "") {
-  const digest = createHash("sha256").update(JSON.stringify({ engine: JAPANESE_READING_VERSION, lines, reviewedReadingsVersion })).digest("hex");
-  return `reading:${JAPANESE_READING_VERSION}:${recordingId}:${digest}`;
-}
+export { japaneseReadingCacheKey } from "./readingIdentity";

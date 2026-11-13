@@ -3,6 +3,7 @@ import type { TimedLyric } from "../lyrics/parse";
 import { sameOriginArtworkUrl } from "./imageUrl";
 import { checkExportCanceled as abort, yieldExport } from "./exportWork";
 import { ShareAudioPreparation, shareAudioSourceKey } from "./sharePreparation";
+import { artworkDimensions, artworkBitmapOptions } from "./artworkDimensions";
 export { ShareAudioPreparation } from "./sharePreparation";
 
 export interface ShareCardInput { track: MusicTrack; lines: readonly TimedLyric[]; colorMode: "light" | "dark"; layout: "portrait" | "square" }
@@ -16,6 +17,22 @@ export function shareVideoKey(input: ShareCardInput, accountId: string | null | 
 export interface RenderedShareCard { key: string; canvas: HTMLCanvasElement; blob: Blob; file: File }
 const wordSegments = new Intl.Segmenter(undefined, { granularity: "word" });
 const graphemeSegments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+/** Native font/PNG work may never settle; cancellation releases our preparation
+ * frame and canvas even though the browser operation itself cannot be stopped. */
+function waitForShareResource<T>(start: () => PromiseLike<T>, signal: AbortSignal | undefined, message: string): Promise<T> {
+  abort(signal);
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const clean = () => { clearTimeout(timer);signal?.removeEventListener("abort", canceled); };
+    const finish = (value: T | unknown, failed = false) => { if (settled) return;settled = true;clean();if (failed) reject(value);else resolve(value as T); };
+    const canceled = () => finish(new DOMException("Canceled", "AbortError"), true);
+    const timer = setTimeout(() => finish(new Error(message), true), 15_000);
+    signal?.addEventListener("abort", canceled, { once: true });
+    if (signal?.aborted) { canceled();return; }
+    try { Promise.resolve(start()).then(value => finish(value), error => finish(error, true)); }
+    catch (error) { finish(error, true); }
+  });
+}
 function wrap(context: CanvasRenderingContext2D, text: string, width: number) {
   const rows: string[] = [];
   // Wrap at words, falling back to complete graphemes for an unusually long
@@ -38,7 +55,7 @@ export function botanical(context: CanvasRenderingContext2D, x: number, y: numbe
   for (let index = 0; index < 5; index++) { const a = index * 17;const direction = index % 2 ? -1 : 1;context.beginPath();context.moveTo(a, 120 - a);context.bezierCurveTo(a + direction * 34, 94 - a, a + direction * 35, 76 - a, a + direction * 13, 67 - a);context.bezierCurveTo(a + direction * 2, 88 - a, a - direction * 4, 103 - a, a, 120 - a);context.stroke(); }
   context.restore();
 }
-async function loadArtwork(url: string | null, signal?: AbortSignal) {
+async function loadArtwork(url: string | null, paintedSize: number, signal?: AbortSignal) {
   const src = sameOriginArtworkUrl(url);
   if (!src) return null;
   const response = await fetch(src, { signal });
@@ -46,7 +63,12 @@ async function loadArtwork(url: string | null, signal?: AbortSignal) {
   const blob = await response.blob();
   abort(signal);
   if (typeof createImageBitmap === "function") {
-    const image = await createImageBitmap(blob);
+    const dimensions = artworkDimensions(new Uint8Array(await blob.slice(0, 256 * 1024).arrayBuffer()));
+    abort(signal);
+    const options = artworkBitmapOptions(dimensions, paintedSize);
+    let image: ImageBitmap;
+    try { image = await createImageBitmap(blob, options); }
+    catch (error) { abort(signal); if (!options) throw error; image = await createImageBitmap(blob); }
     if (signal?.aborted) { image.close();abort(signal); }
     return image;
   }
@@ -64,7 +86,7 @@ async function loadArtwork(url: string | null, signal?: AbortSignal) {
 }
 export async function renderShareCard(input: ShareCardInput, signal?: AbortSignal): Promise<RenderedShareCard> {
   abort(signal);
-  if (document.fonts) await document.fonts.ready;
+  if (document.fonts) await waitForShareResource(() => document.fonts.ready, signal, "The card fonts are taking too long to prepare. Please try again.");
   await yieldExport(signal);
   const canvas = document.createElement("canvas");
   canvas.width = 1080;canvas.height = input.layout === "square" ? 1080 : 1350;
@@ -99,8 +121,8 @@ export async function renderShareCard(input: ShareCardInput, signal?: AbortSigna
     rows!.forEach((line, index) => context.fillText(line, 120, top + index * fontSize * 1.6));
     metadataY = canvas.height - 290;
   } else {
-    const image = await loadArtwork(input.track.coverUrl, signal);
     const size = canvas.height === 1080 ? 500 : 745;
+    const image = await loadArtwork(input.track.coverUrl, size, signal);
     const left = (1080 - size) / 2;
     if (image) try {
       abort(signal);
@@ -127,7 +149,7 @@ export async function renderShareCard(input: ShareCardInput, signal?: AbortSigna
   context.fillStyle = muted;context.font = "17px Arial,sans-serif";context.textAlign = "right";context.fillText("music, with a little soul.", 980, canvas.height - 85);
   abort(signal);
   await yieldExport(signal);
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The card could not be exported.")), "image/png"));
+  const blob = await waitForShareResource(() => new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The card could not be exported.")), "image/png")), signal, "The card could not finish encoding. Please try again.");
   abort(signal);
   completed = true;
   return { key: shareCardKey(input), canvas, blob, file: new File([blob], `sakura-${input.lines.length ? "lyrics" : "song"}.png`, { type: "image/png" }) };

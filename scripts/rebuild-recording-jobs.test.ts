@@ -33,3 +33,27 @@ test("job polling refuses a different server",async t=>{
  await assert.rejects(()=>waitForRecording({...pending,pollUrl:"https://attacker.invalid/api/v2/recordings/jobs/fixture"} as ResolveRecordingResult,options()),e=>e instanceof UserFacingError);
 });
 
+test("compact pending polls retain the initiating recording and opt in to smaller status",async t=>{
+ const recordingId="11111111-1111-4111-8111-111111111111";
+ const start={...pending,recording:{recordingId}} as ResolveRecordingResult;let calls=0;
+ t.mock.method(globalThis,"fetch",async(url:unknown)=>{
+  assert.equal(new URL(String(url)).searchParams.get("compact"),"1");
+  calls++;return Response.json(calls===1?{status:"pending",schemaVersion:1,jobId:"fixture",recordingId,pollUrl:"/api/v2/recordings/jobs/fixture",retryAfterMs:1}:finished);
+ });
+ assert.deepEqual(await waitForRecording(start,options()),finished);assert.equal(calls,2);
+});
+
+test("compact status cannot switch the retained recording or polling job",async t=>{
+ const start={...pending,recording:{recordingId:"one"}} as ResolveRecordingResult;
+ t.mock.method(globalThis,"fetch",async()=>Response.json({status:"pending",schemaVersion:1,jobId:"fixture",recordingId:"another",pollUrl:pending.status==="pending"?pending.pollUrl:"",retryAfterMs:1}));
+ await assert.rejects(()=>waitForRecording(start,options()),error=>error instanceof UserFacingError);
+});
+
+test("foreground retry hints never defer result detection beyond one second",async t=>{
+ t.mock.timers.enable({apis:["setTimeout"]});let calls=0;
+ t.mock.method(globalThis,"fetch",async()=>{calls++;return Response.json(finished);});
+ const waiting=waitForRecording({...pending,retryAfterMs:5000} as ResolveRecordingResult,options());
+ t.mock.timers.tick(999);await Promise.resolve();assert.equal(calls,0);
+ t.mock.timers.tick(1);await waiting;assert.equal(calls,1);
+});
+

@@ -61,13 +61,20 @@ export async function getProfile(accountId:string) {
   });
 }
 export async function patchProfile(accountId:string,value:unknown) {
+  await patchProfileReceipt(accountId,value);
+  return getProfile(accountId);
+}
+export async function patchProfileReceipt(accountId:string,value:unknown) {
   const raw=object(value);
   if(Object.keys(raw).some(k=>!["username","bio"].includes(k)))throw new ProductError(400,"Unsupported profile field");
   const username=raw.username===undefined?null:text(raw.username,"username",30).toLowerCase(),bio=raw.bio===undefined?null:text(raw.bio,"bio",300,true);
   if(username&&!/^[a-z0-9_]{3,30}$/.test(username))throw new ProductError(400,"Use 3–30 letters, numbers or underscores for the username");
-  try{await getRebuildPool().query(`UPDATE public."User" SET username=COALESCE($2,username),bio=COALESCE($3,bio) WHERE id=$1::uuid`,[accountId,username,bio]);}
+  let profile:Record<string,unknown>|undefined;
+  try{profile=(await getRebuildPool().query(`UPDATE public."User" SET username=COALESCE($2,username),bio=COALESCE($3,bio) WHERE id=$1::uuid
+    RETURNING id,username,email,"avatarUrl",bio,"createdAt"`,[accountId,username,bio])).rows[0];}
   catch(error){if((error as {code?:string}).code==="23505")throw new ProductError(409,"Username is already taken");throw error;}
-  return getProfile(accountId);
+  if(!profile)throw new ProductError(401,"Unauthorized");
+  return {profile};
 }
 
 export async function listArtists() {
@@ -75,13 +82,13 @@ export async function listArtists() {
     FROM sakura_v2."Artist" a JOIN sakura_v2."RecordingArtist" ra ON ra.artist_id=a.id JOIN sakura_v2."Recording" r ON r.id=ra.recording_id AND r.state='verified'
     GROUP BY a.id ORDER BY COUNT(ra.recording_id) DESC,a.name LIMIT 100`,[])).rows),accountScoped:true};
 }
-export async function getArtist(accountId:string,rawId:string) {
-  return artistEntity(accountId,rawId);
+export async function getArtist(accountId:string,rawId:string,signal?:AbortSignal) {
+  return artistEntity(accountId,rawId,signal);
 }
 export async function listAlbums() {
   return {albums:(await getRebuildPool().query(`SELECT a.id,a.title,a.cover_url AS "coverUrl",a.artist_id AS "artistId",ar.name AS "artistName",a.release_date AS "releaseDate"
     FROM sakura_v2."Album" a LEFT JOIN sakura_v2."Artist" ar ON ar.id=a.artist_id ORDER BY a.updated_at DESC LIMIT 100`,[])).rows,accountScoped:true};
 }
-export async function getAlbum(accountId:string,rawId:string) {
-  return albumEntity(accountId,rawId);
+export async function getAlbum(accountId:string,rawId:string,signal?:AbortSignal) {
+  return albumEntity(accountId,rawId,signal);
 }

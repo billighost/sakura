@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { performance } from "node:perf_hooks";
+import { after } from "next/server";
+import { withPublicCacheWrites } from "./redisCache";
 
 interface TimingContext {
   active: boolean;
@@ -40,7 +42,9 @@ export async function withApiTiming(
   return timing.run(context, async () => {
     let status = 500;
     try {
-      const response = await operation();
+      // A verified public cache write can finish after headers without delaying
+      // useful data. The adapter falls back to awaited writes outside a route.
+      const response = await withPublicCacheWrites(flush => after(flush), async () => operation());
       status = response.status;
       const appDuration = performance.now() - started;
       const values = [`app;dur=${appDuration.toFixed(1)}`];

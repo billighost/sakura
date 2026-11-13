@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
+import {randomBytes} from 'node:crypto';
 
 import {setup} from './fixtures/listening-sync-test.mjs';
 const state=(positionMs=0)=>({queue:[],currentEntryId:null,positionMs,sleepUntil:null});
+
+test('protocol2 sends full choices once and small acknowledged checkpoints afterward',async()=>{
+ const f=setup({protocol:2});await f.sync.start();f.sync.change(state(10));await f.sync.flush();f.sync.change(state(15),false);await f.sync.flush(true);const puts=f.requests.filter(request=>request.init.method==='PUT');assert.equal(JSON.parse(puts[0].init.body).state.version,2);assert.equal(JSON.parse(puts[1].init.body).checkpoint.positionMs,15);assert.ok(Buffer.byteLength(puts[1].init.body)<512);assert.equal(f.remote.state.positionMs,15);f.sync.stop();
+});
+test('oversized keepalive choices remain durable and retry in the foreground',async()=>{
+ const f=setup({protocol:2});await f.sync.start();const queue=Array.from({length:80},(_,i)=>({entryId:randomUUID(),track:{id:randomUUID(),title:'Song '+i,artists:['Artist'],durationMs:180000,albumId:null,artistId:null,albumTitle:null,coverUrl:'https://example.org/'+randomBytes(1300).toString('base64'),versionLabel:'Original',reference:{provider:'deezer',id:String(i+1)},references:[{provider:'deezer',id:String(i+1)}]}}));f.sync.change({queue,currentEntryId:queue[40].entryId,positionMs:1000,sleepUntil:null});await f.sync.flush(true);assert.equal(f.requests.filter(request=>request.init.method==='PUT').length,0);assert.equal(f.sync.draft.pending,true);assert.equal(JSON.parse(f.mirror.get('sakura-v2-listening:account-a')).state.queue.length,80);await f.sync.flush();assert.equal(f.remote.state.queue.length,80);assert.equal(f.sync.draft.pending,false);f.sync.stop();
+});
 
 test('total storage failure is reported once and cannot start an undurable session upload',async()=>{
  const f=setup({blockedMirror:true,blockedDisk:true});await f.sync.start();f.sync.change(state(23000));await assert.rejects(()=>f.sync.flush(),/Storage unavailable/);assert.equal(f.storageErrors.length,1);assert.equal(f.requests.filter(row=>row.init.method==='PUT').length,0);

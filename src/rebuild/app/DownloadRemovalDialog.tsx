@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Artwork, PlayerButton, PlayerDialog } from "../player/Primitives";
+import { Artwork, PlayerButton, PlayerDialog } from "../player/CommonPrimitives";
 import { requestDialogClose } from "./dialogLifecycle";
 import { AlbumLink } from "./AlbumLink";
 import { ArtistLinks } from "./ArtistLinks";

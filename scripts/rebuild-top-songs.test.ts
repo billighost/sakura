@@ -38,7 +38,7 @@ test("profile hydrates 50 ranked songs with metrics joined by recording identity
  const query=(async(statement:string,args:unknown[])=>{
   assert.equal(args[0],accountId,"Every projection stays scoped to its listener");
   if(statement.includes("WITH days AS"))return {rows:[{days:[],hours:[],genres:[],totals:{events:55,finished:0,completed:0,skipped:0,activeDays:1,uniqueRecordings:55}}]};
-  if(statement.includes("WITH hourly AS"))return {rows:cards.map(card=>({recordingId:card.id,audibleMs:String(card.audibleMs),playCount:String(card.playCount),completedCount:"0",skippedCount:"0",lastPlayedAt:card.lastPlayedAt,hourWeights:[]}))};
+  if(statement.includes("hourly AS"))return {rows:cards.map(card=>({recordingId:card.id,audibleMs:String(card.audibleMs),playCount:String(card.playCount),completedCount:"0",skippedCount:"0",lastPlayedAt:card.lastPlayedAt,hourWeights:[]}))};
   if(statement.includes('"TasteFeedback"'))return {rows:[]};
   if(statement.startsWith("SELECT r.id")){
    requestedIds=args[1] as string[];

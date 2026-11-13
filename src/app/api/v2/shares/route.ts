@@ -9,6 +9,7 @@ import { recordingLyricIdentity } from "@/rebuild/lyrics/recordingIdentity";
 import { parseShareInput, ShareInputError, verifyLyricSelection } from "@/rebuild/player/shareInput";
 import { getRebuildServices } from "@/rebuild/server/runtime";
 import { sameRequestOrigin } from "@/rebuild/requestOrigin";
+import { readBoundedRequestText,RequestBodyError } from "@/rebuild/server/request-body";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function POST(request: NextRequest) {
@@ -18,8 +19,7 @@ export async function POST(request: NextRequest) {
     const account = await requireRebuildAccount();
     if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if(request.headers.get("X-Sakura-Account")&&request.headers.get("X-Sakura-Account")!==account.id)return NextResponse.json({error:"Session changed"},{status:401});
-    const raw = await request.text();
-    if (raw.length > 20_000) return NextResponse.json({ error: "Share is too large" }, { status: 413 });
+    const raw = await readBoundedRequestText(request,20_000);
     let body: unknown;
     try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
     const input = parseShareInput(body);
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     await getRebuildPool().query('INSERT INTO sakura_v2."Share" (slug, account_id, recording_id, kind, payload) VALUES ($1,$2::uuid,$3::uuid,$4,$5::jsonb)', [slug, account.id, recording.id, input.kind, JSON.stringify(payload)]);
     return NextResponse.json({ slug, url: `/s/${slug}`, payload }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if(error instanceof RequestBodyError)return NextResponse.json({error:error.message},{status:error.status});
     if (error instanceof ShareInputError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("[v2/shares] create failed", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Your share could not be saved. Please try again." }, { status: 503 });

@@ -25,7 +25,8 @@ async function fixture(options:{ready?:boolean;manager?:boolean;managerStatus?:s
  });
  vm.runInContext(source,context);
  context.readFixtureEntry=async(key:string)=>entries.get(key);
- vm.runInContext("audioEntry=readFixtureEntry",context);
+ context.readFixtureAudioEntries=async(capability:{accountId:string;recordingId:string},offset:number)=>{const prefix=`account:${capability.accountId}:`;return {ready:entries.get(prefix+"audio:"+capability.recordingId),record:entries.get(prefix+"download:"+capability.recordingId),chunk:entries.get(prefix+"chunk:"+capability.recordingId+":"+offset)};};
+ vm.runInContext("audioEntry=readFixtureEntry;localAudioEntries=readFixtureAudioEntries",context);
  const api=vm.runInContext("({parseAudioRange,validAudioBridge,audioFingerprintMatches,verifiedAudioChunk,serveDeviceAudio,revokeAudioCapability,audioCapabilities})",context);
  api.audioCapabilities.set(token,{...bridge,clientId:"owner-tab",expiresAt:Date.now()+60000});
  return {...api,context,handlers,bytes,entries,network,joined,bridge,prefix,save,async serve(range?:string,clientId="owner-tab",signal?:AbortSignal,method="GET"){return api.serveDeviceAudio(new Request(`https://sakura.example/_sakura/audio/${token}`,{method,headers:range?{Range:range}:{},signal}),clientId,token) as Promise<Response>;}};

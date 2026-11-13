@@ -2,9 +2,10 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import type { TimedLyric } from "./parse";
 import { canAutoSync, type AutoSyncEvidence } from "./autoSync";
 import { alignWhisperLyrics, WHISPER_SYNC_ENGINE, type RecognizedWord } from "./whisperSync";
+import { discardLyricResponse, readLyricProviderJson } from "./transport";
 
 export class HostedSyncError extends Error {
-  constructor(message: string, readonly status = 503) { super(message); }
+  constructor(message: string, readonly status = 503, readonly retryAfterMs?: number) { super(message); }
 }
 export interface VerifiedSyncAudio {
   recordingId: string; audioUrl: string; audioSha256: string; sizeBytes: number; durationSeconds: number;
@@ -13,6 +14,8 @@ interface SyncToken extends VerifiedSyncAudio {
   v: 1; accountId: string; eventId: string; expiresAt: number; lines: TimedLyric[];
 }
 type CompleteSync = { status: "complete"; lines: TimedLyric[]; evidence: AutoSyncEvidence };
+export type SyncPhase = "queued" | "waiting" | "running";
+type PendingSync = { status: "pending"; phase: SyncPhase; retryAfterMs: number };
 const contentKey = (lines: readonly Pick<TimedLyric, "text">[]) => createHash("sha256").update(JSON.stringify(lines.map(line => line.text))).digest("hex");
 export function verifiedSyncAudio(audio: VerifiedSyncAudio) {
   let url: URL;
@@ -60,26 +63,35 @@ export function createHostedSync(options: { url: string; secret: string; fetch?:
     if (!canAutoSync(lines)) throw new HostedSyncError("Auto sync currently supports English lyrics up to ten minutes.", 422);
     const raw = JSON.stringify({ v: 1, ...audio, nonce: randomBytes(24).toString("base64url"), expiresAt: now() + 300_000 });
     const signature = createHmac("sha256", secret).update(raw).digest("hex");
+    const requestSignal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(20_000)]);
     const response = await fetcher(root + "/gradio_api/call/transcribe", {
-      method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(20_000)]),
+      method: "POST", cache: "no-store", redirect: "error", signal: requestSignal,
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: [raw, signature] }),
     });
-    if (!response.ok) throw new HostedSyncError("The free sync worker is asleep, busy or out of its daily quota. Try again later.");
-    const body = await response.json() as { event_id?: string };
-    if (!body.event_id || !/^[a-zA-Z0-9_-]{1,100}$/.test(body.event_id)) throw new HostedSyncError("The sync worker returned no job identity.");
-    return { status: "pending" as const, jobToken: seal({ v: 1, ...audio, accountId, lines, eventId: body.event_id, expiresAt: now() + 15 * 60_000 }) };
+    if (!response.ok) { discardLyricResponse(response); throw new HostedSyncError("The free sync worker is asleep, busy or out of its daily quota. Try again later."); }
+    const body = await readLyricProviderJson(response, requestSignal, 32 * 1024) as { event_id?: string };
+    if (!body || typeof body !== "object" || typeof body.event_id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(body.event_id)) throw new HostedSyncError("The sync worker returned no job identity.");
+    return { status: "pending" as const, phase: "queued" as const, retryAfterMs: 2000, jobToken: seal({ v: 1, ...audio, accountId, lines, eventId: body.event_id, expiresAt: now() + 15 * 60_000 }) };
   }
-  async function poll(accountId: string, token: unknown, signal?: AbortSignal): Promise<CompleteSync | { status: "pending" }> {
+  async function poll(accountId: string, token: unknown, signal?: AbortSignal): Promise<CompleteSync | PendingSync> {
     const job = open(token, accountId), timer = AbortSignal.timeout(52_000);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let phase: SyncPhase = "waiting";
+    const requestSignal = AbortSignal.any([timer, ...(signal ? [signal] : [])]);
+    let rejectAbort: (reason: unknown) => void = () => {};
+    const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
+    const abort = () => { void reader?.cancel(requestSignal.reason).catch(() => undefined); rejectAbort(requestSignal.reason); };
     try {
-      const response = await fetcher(root + "/gradio_api/call/transcribe/" + job.eventId, { cache: "no-store", redirect: "error", signal: AbortSignal.any([timer, ...(signal ? [signal] : [])]) });
-      if (!response.ok || !response.body) throw new HostedSyncError("The free sync worker could not resume this job. Try again later.");
+      const response = await fetcher(root + "/gradio_api/call/transcribe/" + job.eventId, { cache: "no-store", redirect: "error", signal: requestSignal });
+      if (!response.ok || !response.body) { discardLyricResponse(response); throw new HostedSyncError("The free sync worker could not resume this job. Try again later."); }
       reader = response.body.getReader();
+      requestSignal.addEventListener("abort", abort, { once: true });
+      if (requestSignal.aborted) abort();
       const decoder = new TextDecoder(); let buffer = "", total = 0;
       for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return { status: "pending" };
+        const { done, value } = await Promise.race([reader.read(), aborted]);
+        requestSignal.throwIfAborted();
+        if (done) return { status: "pending", phase, retryAfterMs: phase === "running" ? 2000 : 5000 };
         total += value.byteLength;
         if (total > 1_000_000) throw new HostedSyncError("The sync worker returned too much data.");
         buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
@@ -87,6 +99,7 @@ export function createHostedSync(options: { url: string; secret: string; fetch?:
         while ((boundary = buffer.indexOf("\n\n")) >= 0) {
           const frame = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
           const event = frame.match(/^event: ?(.+)$/m)?.[1];
+          if (event === "generating") phase = "running";
           if (event === "error") throw new HostedSyncError("The sync worker could not analyze this recording. Your original lyrics have been kept.");
           if (event !== "complete") continue;
           let data: unknown;
@@ -102,9 +115,13 @@ export function createHostedSync(options: { url: string; secret: string; fetch?:
         }
       }
     } catch (error) {
-      if (timer.aborted && !signal?.aborted) return { status: "pending" };
+      if (timer.aborted && !signal?.aborted) return { status: "pending", phase, retryAfterMs: phase === "running" ? 2000 : 5000 };
       throw error;
-    } finally { await reader?.cancel().catch(() => undefined); }
+    } finally {
+      requestSignal.removeEventListener("abort", abort);
+      void reader?.cancel().catch(() => undefined);
+      try { reader?.releaseLock(); } catch { /* A provider can ignore cancellation of a pending read. */ }
+    }
   }
   return { start, poll };
 }

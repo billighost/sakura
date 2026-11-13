@@ -25,6 +25,9 @@ test("real IndexedDB preparation pins prevent cross-tab eviction and expire with
  const database=openDB("sakura-audio-pin-fixture",1,{upgrade(database){database.createObjectStore("entries");}});
  export const offlineDatabase=()=>database;
  export const savedAudio=async()=>[];
+ export const savedAudioMetadata=async()=>[];
+ export const offlineAudioMetadata=({blob,...audio})=>({version:1,...audio});
+ export const invalidateSavedAudioMetadata=()=>{};
  export const validOfflineAudio=value=>!!value&&value.blob instanceof Blob&&value.blob.size===value.sizeBytes;
  `);
  const source=ts.transpileModule(await readFile("src/rebuild/app/downloadStorage.ts","utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ES2020}}).outputText;
@@ -40,10 +43,16 @@ test("real IndexedDB preparation pins prevent cross-tab eviction and expire with
    const firstBlocked=await otherTab.clearAutomatic("recording")===false,otherAccount=await two.clearAutomatic("recording");
    await one.releaseAutomaticPin("recording","first");const secondBlocked=await otherTab.clearAutomatic("recording")===false;
    await one.releaseAutomaticPin("recording","second");const released=await otherTab.clearAutomatic("recording");
+   const scopedAudio={...audio,track:{id:"scoped"}};await one.finalize("scoped",scopedAudio);await one.pinAutomatic("scoped","tab:prepare:old",Date.now()+10000);await one.pinAutomatic("scoped","other:prepare:active",Date.now()+10000);await one.releaseAutomaticPins("tab:prepare:");
+   const scopedBlocked=await otherTab.clearAutomatic("scoped")===false;await one.releaseAutomaticPin("scoped","other:prepare:active");const scopedReleased=await otherTab.clearAutomatic("scoped");
+   const legacyAudio={...audio,track:{id:"legacy"}};await one.finalize("legacy",legacyAudio);
+   const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open("sakura-audio-pin-fixture",1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+   await new Promise<void>((resolve,reject)=>{const tx=db.transaction("entries","readwrite");tx.objectStore("entries").put({expiresAt:Date.now()+10000},"account:one:audio-pin:legacy:tab:prepare:legacy");tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});db.close();
+   await one.releaseAutomaticPins("tab:prepare:");const legacyReleased=await otherTab.clearAutomatic("legacy");
    await one.finalize("recording",audio);await one.pinAutomatic("recording","expired",Date.now()-1);const expired=await otherTab.clearAutomatic("recording");
    await one.finalize("recording",{...audio,requested:true});const explicitProtected=await otherTab.clearAutomatic("recording")===false;
-   return {firstBlocked,otherAccount,secondBlocked,released,expired,explicitProtected};
+   return {scopedBlocked,scopedReleased,legacyReleased,firstBlocked,otherAccount,secondBlocked,released,expired,explicitProtected};
   },storageUrl);
-  assert.deepEqual(result,{firstBlocked:true,otherAccount:true,secondBlocked:true,released:true,expired:true,explicitProtected:true});
+  assert.deepEqual(result,{scopedBlocked:true,scopedReleased:true,legacyReleased:true,firstBlocked:true,otherAccount:true,secondBlocked:true,released:true,expired:true,explicitProtected:true});
  }finally{await browser.close();}
 });

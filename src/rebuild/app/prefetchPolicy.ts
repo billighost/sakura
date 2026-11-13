@@ -21,7 +21,7 @@ export function routePrefetchTargets(href: string, origin = "https://sakura.inva
    case "home": surface = "home"; paths = ["/api/v2/mixes", "/api/v2/bloom/shelf"]; break;
    case "discover": surface = "discover"; paths = ["/api/v2/mixes"]; break;
    case "library": paths = ["/api/v2/library?kind=all"]; break;
-   case "liked": paths = ["/api/v2/library?kind=liked", "/api/v2/library?kind=all"]; break;
+   case "liked": paths = ["/api/v2/library?kind=liked"]; break;
    case "profile": paths = ["/api/v2/profile"]; break;
    case "bloom": paths = ["/api/v2/bloom/shelf"]; break;
    case "search": {
@@ -30,6 +30,8 @@ export function routePrefetchTargets(href: string, origin = "https://sakura.inva
     break;
    }
   }
+ } else if (parts.length === 2 && parts[0] === "mix" && parts[1] === "top-songs") {
+  paths = ["/api/v2/profile"];
  } else if (parts.length === 2) {
   const bases: Record<string, string> = { artist: "artists", album: "albums", playlist: "playlists", mix: "mixes", track: "recordings", bloom: "bloom" };
   if (bases[parts[0]]) {

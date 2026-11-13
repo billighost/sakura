@@ -40,6 +40,7 @@ try{
    return route.fulfill({json:{items:[],recordings:[],schedule:{timeZone:'Africa/Lagos'}}});
   });
   const page=await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror',error=>report.errors.push(error.message));
+  await context.route('**/*',route=>new URL(route.request().url()).origin===new URL(base).origin?route.fallback():route.abort());
   for(const path of ['/search?q=Quiet','/library','/liked',`/playlist/${collectionId}`,`/mix/${collectionId}`,`/album/${collectionId}`,`/artist/${collectionId}`,'/library/downloaded']){
    console.log(`Sticky controls ${width}px ${path}`);
    await page.goto(base+path,{waitUntil:'domcontentloaded',timeout:90000});
@@ -50,11 +51,13 @@ try{
    const field=dock.locator('input').first();
    await field.evaluate(element=>{window.stickyOriginalField=element;});
    await expect(dock).not.toHaveAttribute('data-docked');
+   const naturalHeight=await dock.evaluate(element=>element.getBoundingClientRect().height);
    await page.locator('#music-main').evaluate(element=>{element.scrollTop=1100;});
    await expect(dock).toHaveAttribute('data-docked','true');
    const bounds=await dock.evaluate(element=>({dock:element.getBoundingClientRect().toJSON(),root:document.querySelector('#music-main').getBoundingClientRect().toJSON()}));
    assert.ok(Math.abs(bounds.dock.top-bounds.root.top)<=1,'Search docks immediately below navbar');
-   assert.ok(bounds.dock.height<=45,'Docked search stays a compact single field');
+   assert.ok(Math.abs(bounds.dock.height-naturalHeight)<=1,'Docking preserves the original layout slot');
+   assert.ok(await dock.locator('[data-search-field]').evaluate(element=>element.getBoundingClientRect().height)<=45,'Docked search stays a compact single field');
    assert.equal(await dock.evaluate(element=>getComputedStyle(element).backgroundColor),'rgba(0, 0, 0, 0)','No added panel background');
    const toolbar=page.locator('[data-collection-toolbar]').first();
    assert.ok((await toolbar.boundingBox()).y+ (await toolbar.boundingBox()).height < bounds.root.top,'Sort and layout controls scroll away with the page');

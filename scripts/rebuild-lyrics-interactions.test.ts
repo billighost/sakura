@@ -70,6 +70,7 @@ test("publishing replaces negative and pre-publication server flights",async()=>
   let finish!:(value:import("../src/rebuild/lyrics/provider").LyricMatch)=>void;
   const resolver=createLyricsResolver({load:()=>new Promise(resolve=>{finish=resolve;})}),identity={title:"Song",artist:"Artist"};
   const old=resolver(identity);
+  await new Promise(resolve=>setImmediate(resolve));
   resolver.remember(identity,{status:"matched",provider:"lrclib",track:candidate});
   finish({status:"missing",reason:"old index"});
   assert.equal((await old).status,"matched");assert.equal((await resolver(identity)).status,"matched");

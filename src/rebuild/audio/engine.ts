@@ -58,8 +58,9 @@ export function createAudioGraph(context: BaseAudioContext, source: AudioNode, m
 }
 
 function abort(signal?: AbortSignal) { if (signal?.aborted) throw signal.reason || new DOMException("Cancelled", "AbortError"); }
-export function validateAudioBuffer(buffer: AudioBuffer, maxDuration = 600) {
+export function validateAudioBuffer(buffer: AudioBuffer, maxDuration = 600, checkSamples = true) {
   if (buffer.numberOfChannels < 1 || buffer.numberOfChannels > 2 || !buffer.length || buffer.duration > maxDuration || buffer.sampleRate < 8000 || buffer.sampleRate > 192000) throw new Error("Use a mono or stereo audio file within the listening preview limit.");
+  if (!checkSamples) return;
   for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
     const data = buffer.getChannelData(channel);
     for (let i = 0; i < data.length; i++) if (!Number.isFinite(data[i])) throw new Error("This audio file contains invalid samples.");
@@ -82,8 +83,10 @@ function compressorDelay(sampleRate: number): Promise<number> {
   })(); compressorDelays.set(sampleRate, promise); return promise;
 }
 
-export async function renderAudio(buffer: AudioBuffer, mode: AudioTechnology, options: { signal?: AbortSignal } = {}): Promise<AudioBuffer> {
-  abort(options.signal); validateAudioBuffer(buffer); const preset = audioPreset(mode);
+export async function renderAudio(buffer: AudioBuffer, mode: AudioTechnology, options: { signal?: AbortSignal; samplesValidated?: boolean } = {}): Promise<AudioBuffer> {
+  // The comparison worker already scanned every immutable source sample.
+  // Direct callers retain the full validation path.
+  abort(options.signal); validateAudioBuffer(buffer, 600, !options.samplesValidated); const preset = audioPreset(mode);
   if (preset.id === "none") return buffer;
   const delay = preset.dynamics ? await compressorDelay(buffer.sampleRate) : 0; abort(options.signal);
   const context = new OfflineAudioContext(buffer.numberOfChannels, buffer.length + delay, buffer.sampleRate);

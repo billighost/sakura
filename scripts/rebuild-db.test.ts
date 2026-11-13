@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {EventEmitter} from "node:events";
 import {test,type TestContext} from "node:test";
 import {Pool,type PoolClient,type QueryConfig,type QueryResult} from "pg";
-import {readAccountById,inIdempotentTransaction,inTransaction} from "../src/rebuild/data/db";
+import {readAccountById,inIdempotentTransaction,inTransaction,getRebuildPool,rebuildPoolPressure} from "../src/rebuild/data/db";
+import {withApiTiming} from "../src/rebuild/server/performance";
 
 type Callback=(error:Error|null,result?:QueryResult)=>void;
 type Dispatch={clientId:number;text:string;values:unknown[]};
@@ -101,4 +102,17 @@ test("an explicitly idempotent transaction retries once after an uncertain commi
   const result=await inIdempotentTransaction(async client=>{operations++;await client.query("INSERT INTO retry_ledger VALUES (1) ON CONFLICT DO NOTHING");return operations;});
   assert.equal(result,2);assert.equal(operations,2);assert.deepEqual(state.dispatched.filter(item=>item.text.startsWith("INSERT")).map(item=>item.clientId),[1,2]);
   assert.deepEqual(state.dispatched.filter(item=>item.text==="COMMIT").map(item=>item.clientId),[1,2]);assert.deepEqual(state.ended,[1]);
+});
+
+test("query and advisory lock timings retain pg lifecycle and contain only fixed names and numeric pressure",async t=>{
+ const {pool}=fixture(t);
+ const response=await withApiTiming("/api/fixture",new Request("https://example.test/api/fixture"),async()=>{
+  await getRebuildPool().query({text:"SELECT private_value FROM fixture WHERE account_id=$1",values:[accountA]});
+  await inTransaction(async client=>{await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",[accountA]);await client.query("UPDATE fixture SET private_value=$1",["private-value"]);});
+  await new Promise<void>((resolve,reject)=>getRebuildPool().query("SELECT callback_fixture",(error)=>error?reject(error):resolve()));
+  return new Response(null,{status:204});
+ });
+ const timing=response.headers.get("Server-Timing")!;assert.match(timing,/db_query;dur=[\d.]+;desc="2 calls"/);assert.match(timing,/db_lock;dur=[\d.]+;desc="1 calls"/);
+ assert.match(timing,/db_acquire;dur=[\d.]+;desc="1 calls"/);assert.match(timing,/db_control;dur=[\d.]+;desc="2 calls"/);
+ assert.doesNotMatch(timing,/SELECT|UPDATE|private|111111|900000/);assert.deepEqual(rebuildPoolPressure(),{total:pool.totalCount,idle:pool.idleCount,waiting:pool.waitingCount});
 });

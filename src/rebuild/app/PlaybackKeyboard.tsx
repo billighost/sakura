@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { pushMusicUrl } from "./offlineNavigation";
 import { useMusic } from "./MusicContext";
 import { Icon } from "./Icon";
-import { PlayerDialog } from "../player/Primitives";
+import { PlayerDialog } from "../player/CommonPrimitives";
 import { topDialog as activeDialog } from "./dialogLifecycle";
 import { PLAYBACK_SHORTCUTS, playbackDialogAllowsShortcuts, playbackShortcut, shortcutTargetIsInteractive } from "./playbackShortcuts";
 import s from "./keyboard.module.css";

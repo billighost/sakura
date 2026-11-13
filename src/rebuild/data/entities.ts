@@ -26,7 +26,8 @@ async function catalogCards(accountId:string,catalog:readonly CatalogRecording[]
   });
 }
 
-export async function artistEntity(accountId:string,rawId:string) {
+export async function artistEntity(accountId:string,rawId:string,signal?:AbortSignal) {
+  signal?.throwIfAborted();
   const reference=entityReference(rawId),pool=getRebuildPool();
   const existing=(await pool.query(`SELECT id,name,image_url AS "imageUrl",provider,external_id AS "externalId",provenance->>'catalogDetailSignature' AS "catalogDetailSignature" FROM sakura_v2."Artist"
     WHERE ${reference?"provider=$1 AND external_id=$2":"id=$1::uuid"}`,[...(reference?[reference.provider,reference.id]:[uuid(rawId,"artist ID")])])).rows[0];
@@ -35,7 +36,8 @@ export async function artistEntity(accountId:string,rawId:string) {
   const providerId=reference?.id||existing?.externalId;
   const detailId=provider==="spotify"?`spotify:${providerId}`:providerId;
   let detail:Awaited<ReturnType<ReturnType<typeof getRebuildServices>["catalog"]["detail"]>>|null=null;
-  if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("artist",detailId);}catch{if(!existing)throw new ProductError(503,"Artist catalog is temporarily unavailable");}
+  if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("artist",detailId,signal);}catch{signal?.throwIfAborted();if(!existing)throw new ProductError(503,"Artist catalog is temporarily unavailable");}
+  signal?.throwIfAborted();
   const savedSignature=existing?.catalogDetailSignature;if(existing)delete existing.catalogDetailSignature;
   const detailSignature=detail?createHash("sha256").update(JSON.stringify(detail)).digest("hex"):undefined;
   let artist=existing;
@@ -66,7 +68,8 @@ export async function artistEntity(accountId:string,rawId:string) {
   return {...artist,recordings,tracks:recordings,albums};
 }
 
-export async function albumEntity(accountId:string,rawId:string) {
+export async function albumEntity(accountId:string,rawId:string,signal?:AbortSignal) {
+  signal?.throwIfAborted();
   const reference=entityReference(rawId),pool=getRebuildPool();
   let album=(await pool.query(`SELECT a.id,a.title,a.cover_url AS "coverUrl",a.artist_id AS "artistId",ar.name AS "artistName",a.release_date AS "releaseDate",a.provider,a.external_id AS "externalId",a.provenance->>'catalogDetailSignature' AS "catalogDetailSignature"
     FROM sakura_v2."Album" a LEFT JOIN sakura_v2."Artist" ar ON ar.id=a.artist_id WHERE ${reference?"a.provider=$1 AND a.external_id=$2":"a.id=$1::uuid"}`,[...(reference?[reference.provider,reference.id]:[uuid(rawId,"album ID")])])).rows[0];
@@ -75,7 +78,8 @@ export async function albumEntity(accountId:string,rawId:string) {
   const providerId=reference?.id||album?.externalId;
   const detailId=provider==="spotify"?`spotify:${providerId}`:providerId;
   let detail:Awaited<ReturnType<ReturnType<typeof getRebuildServices>["catalog"]["detail"]>>|null=null;
-  if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("album",detailId);}catch{if(!album)throw new ProductError(503,"Album catalog is temporarily unavailable");}
+  if(providerId&&["deezer","spotify"].includes(provider))try{detail=await getRebuildServices().catalog.detail("album",detailId,signal);}catch{signal?.throwIfAborted();if(!album)throw new ProductError(503,"Album catalog is temporarily unavailable");}
+  signal?.throwIfAborted();
   const savedSignature=album?.catalogDetailSignature;if(album)delete album.catalogDetailSignature;
   const detailSignature=detail?createHash("sha256").update(JSON.stringify(detail)).digest("hex"):undefined;
   if(detail&&(!album||savedSignature!==detailSignature)){

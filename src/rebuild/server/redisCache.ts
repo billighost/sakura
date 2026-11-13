@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Redis } from "@upstash/redis";
 
 /** Only public, descriptive data may enter this cache. Account state, password
@@ -181,6 +182,51 @@ export function getSharedPublicCache<T>(scope: SharedPublicCacheScope, key: stri
   return sharedCache().get<T>(scope, key);
 }
 
-export function setSharedPublicCache(scope: SharedPublicCacheScope, key: string, value: unknown, ttlSeconds: number): Promise<void> {
-  return sharedCache().set(scope, key, value, ttlSeconds);
+interface PendingPublicWrite { scope:SharedPublicCacheScope;key:string;raw:string;ttl:number;bytes:number }
+interface PublicWriteScope {active:boolean;registered:boolean;pending:Map<string,PendingPublicWrite>;bytes:number;schedule:(flush:()=>Promise<void>)=>void}
+const writeScopes=new AsyncLocalStorage<PublicWriteScope>();
+let pendingWriteBytes=0,pendingWriteCount=0;
+const maximumPendingWrites=128,maximumPendingWriteBytes=8*1024*1024;
+function releasePending(item:PendingPublicWrite){pendingWriteBytes-=item.bytes;pendingWriteCount--;}
+async function flushPublicWrites(context:PublicWriteScope){
+  const writes=[...context.pending.values()];context.pending.clear();context.bytes=0;
+  let next=0;
+  await Promise.all(Array.from({length:Math.min(2,writes.length)},async()=>{
+    while(next<writes.length){const item=writes[next++];
+      try{await sharedCache().set(item.scope,item.key,JSON.parse(item.raw),item.ttl);}
+      finally{releasePending(item);}
+    }
+  }));
+}
+
+/** Route code supplies after/waitUntil. Outside that lifetime, SET is awaited.
+ * Captured public values are serialized before return, so caller edits cannot
+ * change a deferred write. Bounds apply across requests as well as per route. */
+export async function withPublicCacheWrites<T>(schedule:(flush:()=>Promise<void>)=>void,operation:()=>Promise<T>):Promise<T>{
+  const context:PublicWriteScope={active:true,registered:false,pending:new Map(),bytes:0,schedule};
+  return writeScopes.run(context,async()=>{try{return await operation();}finally{context.active=false;}});
+}
+
+export function publicCachePendingWrites(){return {count:pendingWriteCount,bytes:pendingWriteBytes};}
+
+export async function setSharedPublicCache(scope: SharedPublicCacheScope, key: string, value: unknown, ttlSeconds: number): Promise<void> {
+  const context=writeScopes.getStore();
+  // An abandoned shared flight may outlive its originating response. Awaiting
+  // in that case preserves completion instead of scheduling on a closed route.
+  if(!context?.active)return sharedCache().set(scope,key,value,ttlSeconds);
+  if(!scopes.has(scope)||!key||key.length>8192||!Number.isInteger(ttlSeconds)||ttlSeconds<1||ttlSeconds>maximumTtl)return;
+  let raw:string;try{if(!publicValue(value))return;raw=JSON.stringify(value);}catch{return;}
+  const bytes=Buffer.byteLength(raw,"utf8");if(bytes>maximumBytes)return;
+  const identity=scope+":"+key,previous=context.pending.get(identity),delta=bytes-(previous?.bytes||0);
+  if((!previous&&(context.pending.size>=32||pendingWriteCount>=maximumPendingWrites))||context.bytes+delta>2*1024*1024||pendingWriteBytes+delta>maximumPendingWriteBytes)return;
+  const item={scope,key,raw,ttl:ttlSeconds,bytes};
+  if(previous){releasePending(previous);context.bytes-=previous.bytes;}
+  context.pending.set(identity,item);context.bytes+=bytes;pendingWriteBytes+=bytes;pendingWriteCount++;
+  if(!context.registered){
+    try{context.schedule(()=>flushPublicWrites(context));context.registered=true;}
+    catch{
+      context.pending.delete(identity);context.bytes-=bytes;releasePending(item);
+      await sharedCache().set(scope,key,value,ttlSeconds);
+    }
+  }
 }

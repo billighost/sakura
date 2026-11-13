@@ -21,7 +21,7 @@ const coverUrl="https://e-cdns-images.dzcdn.net/images/cover/pwa-fixture/500x500
 const track={id:"80000000-0000-4000-8000-000000000091",recordingId:"80000000-0000-4000-8000-000000000091",title:"A saved garden",artists:["The Garden Ensemble"],artistsComplete:true,artistId:"42",albumId:"42",albumTitle:"Garden Studies",durationMs:90000,coverUrl,versionLabel:"Original recording",reference:{provider:"deezer",id:"91"},references:[{provider:"deezer",id:"91"}]};
 const mixId="90000000-0000-4000-8000-000000000392";
 const report={scope:"Real production route components, local synthetic account APIs, verified generated WAV, actual browser offline mode and service-worker storage",checks:[],pageErrors:[],apiRequests:[],blockedWrites:[],listeningReceipts:[],status:"running"};
-report.warmedModules={};report.offlineChunkResponses=[];
+report.warmedModules={};report.warmedRemovalAssets=[];report.offlineChunkResponses=[];
 report.consoleErrors=[];report.failedRequests=[];report.neutralAssets=[];report.downloadsModulePaths=[];
 let networkAvailable=true,base,session=null;const flights=new Set();
 function json(response,value,status=200){response.writeHead(status,{"Content-Type":"application/json"});response.end(JSON.stringify(value));}
@@ -31,7 +31,8 @@ const server=createServer(async(request,response)=>{
   if(!networkAvailable){response.destroy();return;}
   if(/^\/api(?:\/|$)/.test(path)){
    report.apiRequests.push({path,method});let bytes=0;const chunks=[];for await(const chunk of request){bytes+=chunk.length;if(bytes>1024*1024){response.writeHead(413);response.end();return;}chunks.push(chunk);}const body=chunks.length?JSON.parse(Buffer.concat(chunks).toString("utf8")):{};
-   if(path==="/api/v2/profile")return json(response,{profile:account,stats:{},topArtists:[]});
+   if(path==="/api/v2/profile"||path==="/api/v2/bootstrap")return json(response,{profile:account,stats:{},topArtists:[]});
+   if(path==="/api/v2/library/state")return json(response,{favoriteStates:{}});
    if(path==="/api/v2/image"){response.writeHead(200,{"Content-Type":"image/png","Cache-Control":"public, max-age=31536000"});response.end(pixel);return;}
    if(path==="/api/v2/settings"){if(method==="PATCH")Object.assign(settings,body);return json(response,settings);}
    if(path==="/api/v2/listening-session"){if(method==="PUT"){if((session?.revision||0)!==body.revision)return json(response,{accepted:false,session,serverTime:Date.now()});session={state:body.state,revision:body.revision+1,deviceId:body.deviceId,updatedAt:Date.now()};}return json(response,{accepted:true,session,serverTime:Date.now()});}
@@ -56,7 +57,8 @@ const server=createServer(async(request,response)=>{
    const result=await fetch(new URL(url.pathname+url.search,upstream),{method,headers,redirect:"manual",signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)])});
    const forwarded={};result.headers.forEach((value,name)=>{if(!["content-encoding","content-length","transfer-encoding","connection","set-cookie"].includes(name))forwarded[name]=value;});if(forwarded.location){const redirect=new URL(forwarded.location,upstream);assert.equal(redirect.origin,upstream.origin);forwarded.location=new URL(redirect.pathname+redirect.search,base).href;}
    response.writeHead(result.status,forwarded);const responseBytes=method==="HEAD"?undefined:Buffer.from(await result.arrayBuffer());
-   if(path.startsWith("/_next/static/")&&path.endsWith(".js")){const text=responseBytes.toString("utf8");for(const[name,marker]of [["FullPlayer","Room for your music."],["LyricsView","A little closer to the words."],["QueueDialog","Your next songs."]])if(text.includes(marker))report.warmedModules[name]=path;if(text.includes("Your pocket of quiet"))report.downloadsModulePaths.push(path);}
+   if(path.startsWith("/_next/static/")&&path.endsWith(".js")){const text=responseBytes.toString("utf8");for(const[name,marker]of [["FullPlayer","Room for your music."],["LyricsView","A little closer to the words."],["QueueDialog","Your next songs."],["DownloadRemoval","Remove this download?"]])if(text.includes(marker))report.warmedModules[name]=path;if(text.includes("Your pocket of quiet"))report.downloadsModulePaths.push(path);}
+   if(path.startsWith("/_next/static/")&&path.endsWith(".css")&&responseBytes.toString("utf8").includes("removeButton"))report.warmedRemovalAssets.push(path);
    if(path==="/offline")report.neutralAssets=[...new Set(responseBytes.toString("utf8").match(/\/_next\/static\/[^"\s<>\\]+\.(?:js|css)/g)||[])];
    response.end(responseBytes);
   }finally{flights.delete(controller);}
@@ -100,12 +102,13 @@ try{
  await expect.poll(()=>page.evaluate(()=>window.pwaTestAudio?.currentTime>1&&!window.pwaTestAudio.paused),{timeout:30000}).toBe(true);
  await expect(page.locator("[data-mini-lyric]")).toContainText("Music for the offline hours");
  await page.getByRole("button",{name:"Pause",exact:true}).first().click();
- await expect.poll(()=>Object.keys(report.warmedModules).sort(),{timeout:45000}).toEqual(["FullPlayer","LyricsView","QueueDialog"]);
+ await expect.poll(()=>Object.keys(report.warmedModules).sort(),{timeout:45000}).toEqual(["DownloadRemoval","FullPlayer","LyricsView","QueueDialog"]);
+ await expect.poll(()=>report.warmedRemovalAssets.length,{timeout:15000}).toBeGreaterThan(0);
  await expect.poll(()=>page.evaluate(async paths=>{
   const names=await caches.keys();const assets=await caches.open(names.find(name=>name.includes("assets")));
   return (await Promise.all(paths.map(async path=>!!await assets.match(new URL(path,location.origin),{ignoreSearch:true})))).every(Boolean);
- },[...new Set([...report.neutralAssets,...Object.values(report.warmedModules)])]),{timeout:15000}).toBe(true);
- await check("Idle warming durably caches FullPlayer, LyricsView and Queue before any modal is opened.");
+ },[...new Set([...report.neutralAssets,...Object.values(report.warmedModules),...report.warmedRemovalAssets])]),{timeout:15000}).toBe(true);
+ await check("Idle warming durably caches FullPlayer, LyricsView, Queue and removal JavaScript/CSS before any modal is opened.");
 
  const beforeOffline=report.apiRequests.length;networkAvailable=false;await context.setOffline(true);await page.close();
  page=await context.newPage();page.setDefaultTimeout(30000);observePage(page);
@@ -128,6 +131,14 @@ try{
  await page.keyboard.press("Escape");await expect(queue).toBeHidden();await expect(player).toBeVisible();await page.keyboard.press("Escape");
  await expect(page.locator("dialog[open]")).toHaveCount(0);
  await check("First-use FullPlayer, cached lyrics and Queue open and close entirely offline while playback continues.");
+ const remove=page.getByRole("button",{name:"Remove "+track.title+" from this device",exact:true});
+ await remove.click();
+ const removal=page.getByRole("dialog",{name:"Remove this download?",exact:true});
+ await expect(removal).toBeVisible();
+ await expect(removal.getByRole("button",{name:"Keep this song",exact:true})).toBeFocused();
+ await removal.getByRole("button",{name:"Keep this song",exact:true}).click();
+ await expect(removal).toHaveCount(0);await expect(remove).toBeFocused();
+ await check("First-use removal opens offline from its warmed loader; safe initial focus, cancel and trigger-focus restoration retain the saved song.");
  assert.equal(report.apiRequests.length,beforeOffline,"Offline checks reach no remote APIs");
  assert.ok(report.offlineChunkResponses.length>0,"The real service worker supplies offline JavaScript");
  assert.deepEqual(report.pageErrors,[]);assert.deepEqual(report.blockedWrites,[]);report.status="passed";

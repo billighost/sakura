@@ -139,6 +139,16 @@ CREATE TABLE IF NOT EXISTS sakura_v2."PlaylistRecording" (
   position integer NOT NULL CHECK(position >= 0), added_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY(playlist_id,recording_id), UNIQUE(playlist_id,position) DEFERRABLE INITIALLY DEFERRED
 );
+-- Source-bound import receipts survive playlist deletion: a lost response must
+-- never recreate a playlist the listener subsequently removed. No provider URL
+-- or credentials are stored; source_key is a validated provider:id pair.
+CREATE TABLE IF NOT EXISTS sakura_v2."ImportReceipt" (
+  request_id uuid PRIMARY KEY,
+  account_id uuid NOT NULL REFERENCES public."User"(id) ON DELETE CASCADE,
+  source_key text NOT NULL CHECK(length(source_key) BETWEEN 1 AND 180),
+  result jsonb NOT NULL CHECK(jsonb_typeof(result)='object'),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 -- Event UUIDs survive raw retention in the ledger. A retried old event cannot
 -- increase lifetime totals after its display row has been compacted.
 CREATE TABLE IF NOT EXISTS sakura_v2."ListeningEventLedger" (

@@ -15,10 +15,11 @@ const noResult=text=>/no results?|not found|nothing found|no tracks|unsupported|
 /** Searches share the existing socket. Only conversations in the same chat
  * serialize; independent chats and byte streams can proceed concurrently. */
 class RebuildAudioService {
- constructor({telegram,api,bigInt,bots,queue,queueFor,ensureConnected,onFatal,recoverMetadata,pollIntervalMs=650,now=Date.now,sleep=wait}){
+ constructor({telegram,api,bigInt,bots,queue,queueFor,ensureConnected,onFatal,recoverMetadata,metrics,pollIntervalMs=650,now=Date.now,sleep=wait}){
   this.telegram=telegram;this.api=api;this.bigInt=bigInt;this.bots=new Set(bots.map(bot=>bot.toLowerCase()));
   this.queue=queue;this.queueFor=queueFor;this.ensureConnected=ensureConnected;this.pollIntervalMs=pollIntervalMs;this.now=now;this.sleep=sleep;
   this.onFatal=onFatal;
+  this.metrics=metrics;
   this.recoverMetadata=recoverMetadata;this.metadataFlights=new Map();this.metadataRecovered=new Map();
   this.documents=new Map();this.documentFlights=new Map();this.peerFlights=new Map();this.resolveFlights=new Map();this.resolved=new Map();
  }
@@ -221,7 +222,7 @@ class RebuildAudioService {
      for await(const raw of download){
       if(stream.destroyed)return;
       let part=Buffer.from(raw);if(skip){const trim=Math.min(skip,part.length);part=part.subarray(trim);skip-=trim;}
-      if(!part.length)continue;part=part.subarray(0,length-sent);sent+=part.length;yield part;if(sent===length)return;
+      if(!part.length)continue;part=part.subarray(0,length-sent);sent+=part.length;self.metrics?.count("transfer_bytes",part.length);yield part;if(sent===length)return;
      }
      throw new Error("Source stream was truncated");
     }catch(error){

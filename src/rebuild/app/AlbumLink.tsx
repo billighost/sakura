@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MusicTrack } from "./types";
-import { useMusic } from "./MusicContext";
+import { useMusicActions } from "./musicView";
 import { pushMusicUrl } from "./offlineNavigation";
 
 export function albumHref(track: Pick<MusicTrack, "albumId" | "albumReference">) {
@@ -13,7 +13,7 @@ export function albumHref(track: Pick<MusicTrack, "albumId" | "albumReference">)
 }
 
 export function AlbumLink({ track, className, onNavigate }: { track: Pick<MusicTrack, "albumId" | "albumReference" | "albumTitle">; className?: string; onNavigate?: () => void }) {
-  const music=useMusic();
+  const music=useMusicActions();
   const router=useRouter();
   if (!track.albumTitle) return null;
   const href = albumHref(track);
@@ -22,7 +22,7 @@ export function AlbumLink({ track, className, onNavigate }: { track: Pick<MusicT
     if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){
       // Closing a dialog unmounts its Link. Dispatch navigation through the
       // router first so that unmount cannot cancel Link's own navigation.
-      event.preventDefault();pushMusicUrl(router,href);onNavigate?.();if(music.modal)music.closeModal();
+      event.preventDefault();pushMusicUrl(router,href);onNavigate?.();music.closeModal();
     }
   }}>{track.albumTitle}</Link>
     : <span className={className} dir="auto" title={track.albumTitle}>{track.albumTitle}</span>;

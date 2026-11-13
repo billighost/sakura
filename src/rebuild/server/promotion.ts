@@ -18,21 +18,34 @@ export interface AudioPublisher {publish(recording:CanonicalRecording,source:Sto
 
 /** Complete bytes and digest are checked before publishing and after CDN delivery.
  * This is separate from immediate playback: unpublished sources remain preparing. */
-export async function completeAudio(response:Response,expectedBytes:number,signal?:AbortSignal):Promise<Buffer>{
+async function readCompleteAudio(response:Response,expectedBytes:number,accept:(bytes:Uint8Array,offset:number)=>void,signal?:AbortSignal):Promise<void>{
+ if(signal?.aborted){await response.body?.cancel(signal.reason).catch(()=>{});signal.throwIfAborted();}
  signal?.throwIfAborted();
  if(response.status!==200||!response.body){await response.body?.cancel();throw new AudioPromotionError("provider","Full audio delivery did not start");}
  if(!supportedAudioMime(response.headers.get("Content-Type")||"")){await response.body.cancel();throw new AudioPromotionError("integrity","Full audio delivery was not valid");}
  if(!Number.isSafeInteger(expectedBytes)||expectedBytes<=0||expectedBytes>MAX_BYTES){await response.body.cancel();throw new AudioPromotionError("size","This audio exceeds the configured full-file preparation limit");}
- const reader=response.body.getReader(),parts:Uint8Array[]=[];let received=0;
+ const reader=response.body.getReader();let received=0;
  const abort=()=>{void reader.cancel(signal?.reason).catch(()=>{});};signal?.addEventListener("abort",abort,{once:true});if(signal?.aborted)abort();
  try{while(true){signal?.throwIfAborted();let timer:ReturnType<typeof setTimeout>|undefined;
   const chunk=await Promise.race([reader.read(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new AudioPromotionError("provider","Audio preparation stopped receiving bytes")),15000);})]).finally(()=>clearTimeout(timer));
-  signal?.throwIfAborted();if(chunk.done)break;received+=chunk.value.byteLength;if(received>expectedBytes)throw new AudioPromotionError("integrity","Full audio delivery exceeded its verified size");parts.push(chunk.value);
+  signal?.throwIfAborted();if(chunk.done)break;const offset=received;received+=chunk.value.byteLength;if(received>expectedBytes)throw new AudioPromotionError("integrity","Full audio delivery exceeded its verified size");accept(chunk.value,offset);
  }}catch(error){await reader.cancel(error).catch(()=>{});throw error;}finally{signal?.removeEventListener("abort",abort);reader.releaseLock();}
  // A disconnected transfer says nothing about the identity of the source. It
  // must be retried as a connection failure, not poison the recording as a remix.
  if(received!==expectedBytes)throw new AudioPromotionError("provider","Full audio delivery ended before its verified size");
- return Buffer.concat(parts,received);
+}
+/** Source inspection still needs complete bytes, but keeps only one exact-sized
+ * allocation rather than a chunk list plus a second concatenated recording. */
+export async function completeAudio(response:Response,expectedBytes:number,signal?:AbortSignal):Promise<Buffer>{
+ let bytes:Buffer|undefined;
+ await readCompleteAudio(response,expectedBytes,(chunk,offset)=>{bytes??=Buffer.allocUnsafe(expectedBytes);bytes.set(chunk,offset);},signal);
+ return bytes!;
+}
+/** The CDN verification pass needs size/MIME/SHA evidence, not another whole file. */
+export async function verifyCompleteAudio(response:Response,expectedBytes:number,expectedSha256:string,signal?:AbortSignal):Promise<void>{
+ const hash=createHash("sha256");
+ await readCompleteAudio(response,expectedBytes,chunk=>{hash.update(chunk);},signal);
+ if(hash.digest("hex")!==expectedSha256)throw new AudioPromotionError("integrity","CDN full-file checksum differs from the verified source");
 }
 function digest(bytes:Buffer){return createHash("sha256").update(bytes).digest("hex");}
 function cdnAssetId(recordingId:string,sha256:string){const hash=createHash("sha256").update("sakura-v2-cdn:"+recordingId+":"+sha256).digest("hex").slice(0,32).split("");hash[12]="5";hash[16]="8";const value=hash.join("");return `${value.slice(0,8)}-${value.slice(8,12)}-${value.slice(12,16)}-${value.slice(16,20)}-${value.slice(20)}`;}
@@ -68,7 +81,10 @@ export class CloudinaryAudioPublisher implements AudioPublisher {
   if(!raw){
   const parameters={overwrite:"false",public_id:publicId,timestamp};
   const signature=createHash("sha1").update(Object.entries(parameters).sort(([a],[b])=>a.localeCompare(b)).map(([key,value])=>key+"="+value).join("&")+this.configuration.apiSecret).digest("hex");
-  const body=new FormData();for(const [key,value]of Object.entries(parameters))body.set(key,value);body.set("api_key",this.configuration.apiKey);body.set("signature",signature);body.set("file",new Blob([new Uint8Array(bytes)],{type:source.mimeType}),source.sha256+"."+extension);
+  // Blob takes its required immutable snapshot; the view avoids an additional
+  // full-size TypedArray copy before that snapshot.
+  const uploadBytes=new Uint8Array(bytes.buffer as ArrayBuffer,bytes.byteOffset,bytes.byteLength);
+  const body=new FormData();for(const [key,value]of Object.entries(parameters))body.set(key,value);body.set("api_key",this.configuration.apiKey);body.set("signature",signature);body.set("file",new Blob([uploadBytes],{type:source.mimeType}),source.sha256+"."+extension);
   const response=await fetchAudioHeaders(`https://api.cloudinary.com/v1_1/${this.configuration.cloudName}/video/upload`,{signal,headerTimeoutMs:45000,redirect:"error",method:"POST",body},this.fetcher);
   raw=await readMetadataJson(response) as Record<string,unknown>;
   if(!response.ok)throw new AudioPromotionError(response.status===420||response.status===429?"quota":"provider","The existing CDN account could not prepare this audio");
@@ -76,7 +92,7 @@ export class CloudinaryAudioPublisher implements AudioPublisher {
   if(raw.public_id!==publicId||Number(raw.bytes)!==bytes.length||typeof raw.secure_url!=="string")throw new AudioPromotionError("integrity","CDN upload returned different audio identity or bytes");
   const format=String(raw.format||""),version=Number(raw.version),url=new URL(raw.secure_url);if(url.protocol!=="https:"||url.hostname!=="res.cloudinary.com"||!Number.isSafeInteger(version)||version<=0||!["mp3","mp4","m4a","aac","flac","ogg","opus","wav","webm"].includes(format)||url.pathname!==`/${this.configuration.cloudName}/video/upload/v${version}/${publicId}.${format}`||url.search||url.hash)throw new AudioPromotionError("integrity","CDN delivery address is not the configured immutable original asset");
   const delivered=await fetchAudioHeaders(url.toString(),{signal,headerTimeoutMs:25000,redirect:"error",headers:{"Accept-Encoding":"identity"}},this.fetcher);
-  const verified=await completeAudio(delivered,source.sizeBytes,signal);if(digest(verified)!==source.sha256)throw new AudioPromotionError("integrity","CDN full-file checksum differs from the verified source");
+  await verifyCompleteAudio(delivered,source.sizeBytes,source.sha256,signal);
   const assetId=cdnAssetId(recording.recordingId,source.sha256);
   const verifiedAt=new Date().toISOString();return{...source,assetId,candidate:{...source.candidate,candidateId:assetId},locator:{kind:"https",url:url.toString()},mimeType:normalizedAudioMime(delivered.headers.get("Content-Type")||source.mimeType),verifiedAt,deliveryEvidence:{method:"immutable-cdn-sha256",provider:"cloudinary",sourceAssetId:source.assetId,verifiedSha256:source.sha256,verifiedAt}};
  }
@@ -87,16 +103,21 @@ export class CloudinaryAudioPublisher implements AudioPublisher {
 export class AudioPromotions {
  private running=new Map<string,Promise<StoredAudioAsset>>();
  private failures=new Map<string,{until:number;reason:string}>();
+ private rememberFailure(key:string,reason:string,lifetimeMs:number){
+  this.failures.delete(key);
+  while(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);
+  this.failures.set(key,{until:Date.now()+lifetimeMs,reason});
+ }
  constructor(private readonly transport:AudioTransport,private readonly ingestor:RecordingIngestor,private readonly publisher?:AudioPublisher){}
  get configured(){return true;}
  needsPreparation(asset:StoredAudioAsset){const failure=this.failures.get(asset.recordingId+":"+asset.assetId);return Boolean(asset.ownerAccountId===null&&(!asset.sha256||(this.publisher&&asset.locator.kind==="telegram-worker"))&&(!failure||failure.until<=Date.now()));}
- failureReason(recordingId:string,assetId:string){const failure=this.failures.get(recordingId+":"+assetId);return failure&&failure.until>Date.now()?failure.reason:undefined;}
+ failureReason(recordingId:string,assetId:string){const key=recordingId+":"+assetId,failure=this.failures.get(key);if(failure&&failure.until<=Date.now())this.failures.delete(key);return failure&&failure.until>Date.now()?failure.reason:undefined;}
  prepare(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal):Promise<StoredAudioAsset>{
   const failureKey=recording.recordingId+":"+source.assetId;
   if(source.sha256&&(!this.publisher||source.locator.kind==="https")){this.failures.delete(failureKey);return Promise.resolve(source);}
   const key=recording.recordingId+":"+(source.sha256||JSON.stringify(source.locator)),existing=this.running.get(key);if(existing)return existing;
-  if(this.running.size>=2){this.failures.set(failureKey,{until:Date.now()+10000,reason:"busy"});return Promise.reject(new AudioPromotionError("busy","Audio preparation is at its transfer limit"));}
-  const work=this.execute(recording,source,signal).catch(error=>{if(this.failures.size>=1000)this.failures.delete(this.failures.keys().next().value!);const reason=error instanceof AudioPromotionError?error.reason:"provider";this.failures.set(failureKey,{until:Date.now()+(reason==="provider"&&!source.sha256?2000:5*60000),reason});throw error;}).finally(()=>this.running.delete(key));
+  if(this.running.size>=2){this.rememberFailure(failureKey,"busy",10000);return Promise.reject(new AudioPromotionError("busy","Audio preparation is at its transfer limit"));}
+  const work=this.execute(recording,source,signal).catch(error=>{const reason=error instanceof AudioPromotionError?error.reason:"provider";this.rememberFailure(failureKey,reason,reason==="provider"&&!source.sha256?2000:5*60000);throw error;}).finally(()=>this.running.delete(key));
   this.running.set(key,work);return work;
  }
  private async execute(recording:CanonicalRecording,source:StoredAudioAsset,signal?:AbortSignal){

@@ -29,6 +29,7 @@ export async function POST(request:NextRequest) {
     if(!track)throw new LyricRequestError("Verified recording not found",404);
     const identity=recordingLyricIdentity({ ...track, recordingId });
     const result=await publishLyrics(identity,body,{signal:request.signal,readback:false});
+    resolveVerifiedLyrics.invalidate(identity);
     if(result.track)resolveVerifiedLyrics.remember(identity,{status:"matched",provider:"lrclib",track:result.track});
     const synced=result.track?.syncedLyrics?parseTimedLyrics(result.track.syncedLyrics):[];
     const hasSynced=synced.some(line=>line.text.trim());

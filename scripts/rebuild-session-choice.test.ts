@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {randomUUID} from "node:crypto";
 import {isDeepStrictEqual} from "node:util";
+import * as crypto from "node:crypto";
+import * as zlib from "node:zlib";
+import * as stateTransport from "../src/rebuild/app/sessionState";
+import type {ListeningSession} from "../src/rebuild/app/sessionState";
 import vm from "node:vm";
 import {test} from "node:test";
 import ts from "typescript";
@@ -25,9 +29,22 @@ function fixture(){
  const exports:Record<string,unknown>={};
  // Database JSON and route JSON share one realm in production; normalize the
  // isolated adapter's JSON prototypes before exercising the same comparison.
- vm.runInNewContext(compiled,{exports,Date:FixtureDate,require:(name:string)=>name==="./db"?{getRebuildPool:()=>client,inIdempotentTransaction:(operation:(connection:typeof client)=>Promise<unknown>)=>{const result=tail.catch(()=>{}).then(()=>operation(client));tail=result;return result;}}:name==="./validation"?{integer,object,ProductError,text,uuid}:name==="node:util"?{isDeepStrictEqual:(left:unknown,right:unknown)=>isDeepStrictEqual(JSON.parse(JSON.stringify(left)),JSON.parse(JSON.stringify(right)))}:name==="../app/sessionState"?{SESSION_QUEUE_LIMIT:80}:name==="../app/types"?{musicTrack}:{}});
+ vm.runInNewContext(compiled,{exports,Date:FixtureDate,Buffer,require:(name:string)=>name==="./db"?{getRebuildPool:()=>client,inIdempotentTransaction:(operation:(connection:typeof client)=>Promise<unknown>)=>{const result=tail.catch(()=>{}).then(()=>operation(client));tail=result;return result;}}:name==="./validation"?{integer,object,ProductError,text,uuid}:name==="node:crypto"?crypto:name==="node:zlib"?zlib:name==="node:util"?{isDeepStrictEqual:(left:unknown,right:unknown)=>isDeepStrictEqual(JSON.parse(JSON.stringify(left)),JSON.parse(JSON.stringify(right)))}:name==="../app/sessionState"?stateTransport:name==="../app/types"?{musicTrack}:{}});
  return {rows,now:(value:number)=>{stamp=value;},get writes(){return writes;},put:exports.putSession as (owner:string,value:unknown)=>Promise<Receipt>,get:exports.getSession as (owner:string)=>Promise<{session:Receipt["session"];serverTime:number}>};
 }
+
+test("compact large queues preserve every occurrence and exact offline card metadata",async()=>{
+ const f=fixture(),track={id:randomUUID(),title:"音楽の時間",artists:["Artist"],durationMs:180000,albumId:null,artistId:null,albumTitle:"Album",coverUrl:"https://example.org/"+"a".repeat(1800),versionLabel:"Original",reference:{provider:"deezer" as const,id:"1"},references:[{provider:"deezer" as const,id:"1"}]},queue=Array.from({length:80},()=>({entryId:randomUUID(),track})),full:ListeningSession={queue,currentEntryId:queue[40].entryId,positionMs:1000,sleepUntil:null};
+ assert.ok(Buffer.byteLength(JSON.stringify({state:full}))>98304);const body=await stateTransport.sessionRequestBody(full,{protocol:2,revision:0,deviceId:writerA,explicit:true,intentAt:900});assert.ok(body);assert.ok(Buffer.byteLength(body!)<stateTransport.SESSION_KEEPALIVE_BUDGET);const saved=await f.put(accountId,JSON.parse(body!)),restored=saved.session.state as ListeningSession;assert.equal(restored.queue.length,80);assert.equal(restored.currentEntryId,queue[40].entryId);assert.equal(restored.queue[79].track.coverUrl,track.coverUrl);assert.equal(restored.queue[0].track.title,track.title);
+});
+test("acknowledged queue checkpoints are small, retain choice time and retry idempotently",async()=>{
+ const f=fixture(),first=await f.put(accountId,{state:state(10),deviceId:writerA,revision:0,explicit:true,intentAt:900}),key=(first.session as unknown as {queueKey:string}).queueKey;
+ const body=await stateTransport.sessionRequestBody(state(15),{protocol:2,queueKey:key,checkpoint:true,keepalive:true,revision:1,deviceId:writerA,explicit:false});assert.ok(body&&Buffer.byteLength(body)<512);f.now(4000);const saved=await f.put(accountId,JSON.parse(body!));assert.equal(saved.session.choiceAt,900);assert.equal(saved.session.state.positionMs,15);const retry=await f.put(accountId,JSON.parse(body!));assert.equal(retry.accepted,true);assert.equal(retry.session.revision,2);assert.equal(f.writes,2);
+ const mismatch=await f.put(accountId,{protocol:2,checkpoint:{queueKey:"0".repeat(64),currentEntryId:null,positionMs:70,sleepUntil:null},deviceId:writerA,revision:2});assert.equal(mismatch.accepted,false);assert.equal(mismatch.session.state.positionMs,15);
+});
+test("invalid compressed payloads and inflation bombs cannot bypass the bounded envelope",async()=>{
+ const f=fixture();for(const packed of ["not-base64!",Buffer.from("not gzip").toString("base64"),zlib.gzipSync(Buffer.alloc(stateTransport.SESSION_BODY_LIMIT+1,32)).toString("base64")])await assert.rejects(f.put(accountId,{protocol:2,packed,deviceId:writerA,revision:0}),ProductError);assert.equal(f.writes,0);
+});
 
 test("late passive playback checkpoints advance progress without renewing song ownership",async()=>{
  const f=fixture();const first=await f.put(accountId,{state:state(10),deviceId:writerA,revision:0,explicit:true,intentAt:900});

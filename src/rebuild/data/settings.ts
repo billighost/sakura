@@ -12,7 +12,12 @@ export async function getSettings(accountId:string,sql?:{query:PoolClient["query
     return readSettings(accountId,client);
   });
 }
-async function readSettings(accountId:string,sql:{query:PoolClient["query"]}) {
+/** A coherent caller-owned snapshot can derive an old recipe without writing
+ * it. Explicit settings/catalog maintenance retains the legacy durable repair. */
+export function getSettingsSnapshot(accountId:string,sql:{query:PoolClient["query"]}){
+  return readSettings(accountId,sql,false);
+}
+async function readSettings(accountId:string,sql:{query:PoolClient["query"]},persistDerived=true) {
   const row=(await sql.query(`SELECT preferences,seed_artists,seed_genres,onboarded,revision,field_revisions
     FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid`,[accountId])).rows[0];
   const settings={ ...DEFAULT_SETTINGS,...row?.preferences,seedArtists:row?.seed_artists||[],seedGenres:row?.seed_genres||[],
@@ -21,6 +26,7 @@ async function readSettings(accountId:string,sql:{query:PoolClient["query"]}) {
   settings.initialTasteProfile=stored?.signature===initialTasteSignature(settings)?stored:undefined;
   if(row&&!settings.initialTasteProfile&&initialTasteArtists(settings).length){
     const generated=await generateInitialTaste(accountId,settings,sql);
+    if(!persistDerived){settings.initialTasteProfile=generated;return settings;}
     const saved=await sql.query(`UPDATE sakura_v2."AccountPreferences" SET preferences=preferences||jsonb_build_object('initialTasteProfile',$2::jsonb)
       WHERE account_id=$1::uuid AND revision=$3 RETURNING account_id`,[accountId,JSON.stringify(generated),settings.revision]);
     // Supplied SQL normally owns the account lock. A revision guard also keeps

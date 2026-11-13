@@ -7,6 +7,10 @@ import { SelectPopover } from "../app/SelectPopover";
 import { PlayerDialog, PlayerIcon } from "../player/Primitives";
 import { AUDIO_TECHNOLOGIES, audioTechnology, type AudioTechnology } from "./presets";
 import { prepareComparison, type AudioComparison } from "./preview";
+import { AudioAnalysisSession } from "./analysisSession";
+import { inspectAudioInput, previewWorkingBytes, MAX_PREVIEW_WORKING_BYTES } from "./mediaInput";
+import { previewSourceUrls } from "../app/playbackSource";
+import { localRead, validOfflineAudio, type OfflineAudio } from "../app/offline";
 import s from "./audio-technology.module.css";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -83,6 +87,7 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
   const [saving, setSaving] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const sourceBuffer = useRef<AudioBuffer | null>(null);
+  const analysis = useRef<AudioAnalysisSession | null>(null);
   const comparisons = useRef(new Map<AudioTechnology, AudioComparison>());
   const currentComparison = useRef<AudioComparison | null>(null);
   const currentMode = useRef(mode);
@@ -198,7 +203,8 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
   function active(token: number) { return mounted.current && token === operation.current; }
   async function prepare(buffer: AudioBuffer, token: number, signal: AbortSignal, resumeSide: Side | null = null) {
     const target = currentMode.current;
-    const prepared = comparisons.current.get(target) || await prepareComparison(buffer, target, { signal });
+    const session = analysis.current ?? (analysis.current = new AudioAnalysisSession());
+    const prepared = comparisons.current.get(target) || await prepareComparison(buffer, target, { signal, analysis: session });
     if (!active(token) || signal.aborted) return;
     comparisons.current.set(target, prepared); currentComparison.current = prepared;
     setComparison(prepared); setBusy(false); setMessage("");
@@ -217,14 +223,28 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
   }
   function failure(reason: unknown, fallback: string) {
     const code = reason instanceof Error ? reason.message : "";
-    return code === "size" ? "Choose an audio file smaller than 20 MB." : code === "length" ? "Choose a mono or stereo song shorter than eight minutes." : code === "short" ? "Choose a song with at least half a second of audio." : fallback;
+    return code === "size" ? "Choose an audio file smaller than 20 MB." : code === "length" ? "Choose a mono or stereo song shorter than eight minutes." : code === "memory" ? "This file needs too much memory for a browser preview. Choose a shorter passage or another audio file." : code === "short" ? "Choose a song with at least half a second of audio." : fallback;
   }
   async function decode(bytes: ArrayBuffer, title: string, start: number | null, token: number, signal: AbortSignal) {
     if (!context || !active(token)) return;
     setMessage("Preparing the same passage in both styles…");
-    const decoded = await context.decodeAudioData(bytes);
+    const metadata = await inspectAudioInput(bytes, signal);
     if (!active(token) || signal.aborted) return;
-    const buffer = excerpt(decoded, start === null ? Math.min(30, decoded.duration * .2) : start);
+    if (metadata.durationSeconds > 480 || metadata.numberOfChannels > 2) throw new Error("length");
+    if (metadata.durationSeconds < .5) throw new Error("short");
+    if (previewWorkingBytes(metadata, context.sampleRate, bytes.byteLength) > MAX_PREVIEW_WORKING_BYTES)
+      throw new Error("memory");
+    const encodedBytes = bytes.byteLength;
+    // Do not retain the whole decoded song across asynchronous excerpt DSP.
+    const buffer = await (async () => {
+      const decoded = await context.decodeAudioData(bytes);
+      signal.throwIfAborted();
+      if (previewWorkingBytes({ ...metadata, durationSeconds: decoded.duration, numberOfChannels: decoded.numberOfChannels,
+        sampleRate: decoded.sampleRate }, context.sampleRate, encodedBytes) > MAX_PREVIEW_WORKING_BYTES)
+        throw new Error("memory");
+      return excerpt(decoded, start === null ? Math.min(30, decoded.duration * .2) : start);
+    })();
+    if (!active(token) || signal.aborted) return;
     sourceBuffer.current = buffer; setTitle(title);
     await prepare(buffer, token, signal);
   }
@@ -250,7 +270,7 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
     for (const part of parts) { bytes.set(part, position); position += part.byteLength; }
     return bytes.buffer;
   }
-  async function remote(song: Example, candidates: string[] = [song.url], start = 0) {
+  async function remote(song: Example, candidates: string[] = [song.url], start = 0, currentTrack = false) {
     if (!context) return;
     const { token, controller } = begin("Opening your comparison song…", true);
     setTitle(song.title);
@@ -258,7 +278,21 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
     try {
       let bytes: ArrayBuffer | null = null;
+      // A completed account-scoped save may exist even while the attached
+      // transport still names its old progressive URL.
+      const track = currentTrack ? music.track : null, accountId = music.account?.id;
+      if (track && accountId && !candidates[0]?.startsWith("blob:")) {
+        const canonical = music.effectiveId(track);
+        const local = await localRead<OfflineAudio>(accountId, "audio:" + canonical).catch(() => undefined);
+        controller.signal.throwIfAborted();
+        if (validOfflineAudio(local) && local.track.id === canonical
+          && (!track.readyPlayback?.sha256 || local.sha256 === track.readyPlayback.sha256)) {
+          if (local.blob.size > MAX_BYTES) throw new Error("size");
+          bytes = await local.blob.arrayBuffer();
+        }
+      }
       for (const candidate of [...new Set(candidates)]) {
+        if (bytes) break;
         if (controller.signal.aborted) break;
         try {
           const url = new URL(candidate, location.href);
@@ -306,8 +340,8 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
   function playCurrentSong() {
     const track = music.track;
     if (!track?.audioUrl && !track?.readyPlayback) return;
-    const urls = [track.readyPlayback?.fallbackUrl, track.audioUrl, track.readyPlayback?.url].filter((value): value is string => Boolean(value));
-    void remote({ title: track.artists.join(", ") + " — " + track.title, url: urls[0] }, urls, Math.max(0, (music.getPlaybackPosition?.()??music.positionMs) / 1000 - 5));
+    const urls = previewSourceUrls(track);
+    void remote({ title: track.artists.join(", ") + " — " + track.title, url: urls[0] }, urls, Math.max(0, (music.getPlaybackPosition?.()??music.positionMs) / 1000 - 5), true);
   }
   async function apply() {
     setSaving(true);
@@ -351,6 +385,7 @@ function AudioPreview({ context, initialMode, onClose }: { context: AudioContext
       if (metadataTimer !== null) clearTimeout(metadataTimer);
       document.removeEventListener("visibilitychange", visibility);
       sourceBuffer.current = null; cache.clear(); currentComparison.current = null;
+      analysis.current?.dispose(); analysis.current = null;
       // Strict Mode immediately re-runs this effect in development. Its second
       // setup cancels disposal; a real close still stops sound straight away.
       closeTimer.current = setTimeout(() => { void context?.close().catch(() => {}); }, 20);

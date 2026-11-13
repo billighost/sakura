@@ -1,0 +1,80 @@
+/* Shared dialog and control styles; listening-room compositions stay lazy. */
+.dialog{
+  --p-bg:var(--ink-bg,#f5f5ee);--p-card:var(--ink-card,#f9faf5);--p-surface:var(--ink-surface,#e9ede4);--p-text:var(--ink-text,#273b34);--p-muted:var(--ink-muted,#69786d);--p-line:var(--ink-line,#d7dfd3);--p-accent:var(--ink-accent,#446b57);--p-on:var(--ink-on,#f9faf3);--p-danger:var(--ink-danger,#93414a);
+  position:fixed;inset:0;margin:auto;width:min(650px,calc(100vw - 24px));max-width:100%;height:auto;max-height:92dvh;padding:0;border:1px solid var(--p-line);border-radius:14px;background:var(--p-bg);color:var(--p-text);overflow:hidden;box-shadow:0 30px 120px #0004;font:14px/1.5 var(--font-inter),Arial,sans-serif;
+}
+.dialog::backdrop{background:#0c171bb3;backdrop-filter:blur(7px)}
+.dialog[open]{transform-origin:50% 100%}
+.dialog *{box-sizing:border-box}
+.dialog h1,.dialog h2,.dialog h3,.dialog p{margin:0}
+.dialog h1,.dialog h2,.dialog h3{font-family:var(--font-fraunces),Georgia,serif;font-weight:400;letter-spacing:-.035em}
+.dialog button,.dialog input{font:inherit;color:inherit}
+.dialog button{cursor:pointer;touch-action:manipulation}
+.dialog button:disabled{opacity:.45;cursor:default}
+.dialog button:focus-visible,.dialog input:focus-visible{outline:2px solid var(--p-accent);outline-offset:3px}
+.dialog button{-webkit-tap-highlight-color:transparent}
+.dialogInner{display:flex;flex-direction:column;max-height:92dvh;min-height:0}
+.dialogHeader{display:flex;align-items:flex-start;gap:20px;justify-content:space-between;padding:26px 27px 21px;border-bottom:1px solid var(--p-line);flex-shrink:0}
+.dialogHeader h2{font-size:31px;line-height:1.15}
+.eyebrow{font-size:9px!important;letter-spacing:.15em;color:var(--p-muted);margin-bottom:9px!important;text-transform:uppercase}
+.dialogBody{padding:24px 27px 28px;overflow:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:thin;scrollbar-color:var(--p-line) transparent}
+.dialogFooter{padding:16px 27px;border-top:1px solid var(--p-line);display:flex;justify-content:flex-end;gap:12px;flex-shrink:0}
+.wide{width:min(1040px,calc(100vw - 32px))}
+.iconButton{display:inline-flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:var(--p-muted)!important;padding:0;flex-shrink:0}
+.iconButton:hover{background:var(--p-surface)}
+.active{color:var(--p-accent)!important;background:var(--p-surface)}
+.active svg{fill:color-mix(in srgb,var(--p-accent) 14%,transparent)}
+.button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;border:1px solid var(--p-accent);border-radius:6px;padding:10px 17px;background:var(--p-accent);color:var(--p-on)!important;font-size:12px!important}
+.secondary{background:transparent;color:var(--p-text)!important;border-color:var(--p-line)}
+.secondary:hover{background:var(--p-surface)}
+.artwork{display:block;aspect-ratio:1;overflow:hidden;border-radius:5px;background:var(--p-surface);color:var(--p-accent)}
+.artwork img,.artwork svg{display:block;width:100%;height:100%;object-fit:cover}
+@media(max-width:760px){.wide{width:min(100vw - 16px,650px)}
+.dialogHeader h2{font-size:26px}
+.dialogHeader{padding:22px 19px 18px}
+.dialogBody{padding:20px 19px 24px}
+.dialogFooter{padding:14px 19px}}
+@media(max-width:380px){.dialog{width:calc(100vw - 12px)}
+.dialogHeader,.dialogBody{padding-left:14px;padding-right:14px}
+.dialogHeader h2{font-size:23px}}
+@media(prefers-reduced-motion:reduce){.dialog[open]{animation:none}
+.dialog::backdrop{backdrop-filter:none}}
+.fullscreen{inset:0;margin:0;width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-radius:0;box-shadow:none}
+.fullscreen .dialogInner{height:100%;max-height:100dvh}
+.fullscreen .dialogHeader{padding:calc(22px + env(safe-area-inset-top)) max(28px,calc((100vw - 1360px)/2)) 22px;flex-shrink:0}
+.fullscreen .dialogHeader h2{font-size:clamp(22px,2.3vw,34px)}
+.fullscreen .dialogBody{padding:24px max(28px,calc((100vw - 1260px)/2)) calc(28px + env(safe-area-inset-bottom))}
+.dialog [data-artist-credits] a{color:inherit;text-decoration:none}
+.dialog [data-artist-credits] a:hover{text-decoration:underline;text-underline-offset:3px}
+.dialog [data-artist-credits] a:focus-visible{outline:2px solid var(--p-accent);outline-offset:2px}
+.dialogNotice{display:flex;align-items:flex-start;gap:8px;margin:0 0 20px}
+.dialogNotice>div{flex:1;min-width:0}
+.dialogNotice>.iconButton{margin-top:8px}
+@media(max-width:760px){.fullscreen .dialogHeader{padding:calc(20px + env(safe-area-inset-top)) 20px 18px}
+.fullscreen .dialogBody{padding:22px 20px calc(28px + env(safe-area-inset-bottom))}}
+@media(max-width:380px){.fullscreen{width:100vw;max-width:100vw}
+.fullscreen .dialogHeader{padding-left:15px;padding-right:15px}
+.fullscreen .dialogBody{padding-left:15px;padding-right:15px}}
+.button{border-radius:18px 5px 18px 5px}
+.dialog select{border-radius:15px 5px 15px 5px}
+.dialog{--p-petal:var(--ink-petal,#d5ada8)}
+.dialog[data-dialog-phase="opening"]::backdrop{animation:roomShade 520ms ease-out both}
+.dialog[data-dialog-phase="closing"]::backdrop{animation:roomShade 260ms ease-in reverse both;backdrop-filter:none}
+.dialog[data-dialog-phase="closing"]{pointer-events:none}
+.dialog[data-dialog-appearance="note"][data-dialog-phase="opening"]{animation:gardenNote 650ms cubic-bezier(.16,.78,.22,1) both;transform-origin:15% 15%}
+.dialog[data-dialog-appearance="note"][data-dialog-phase="closing"]{animation:noteTuck 230ms ease-in both}
+@keyframes roomShade{from{background:#0c171b00}to{background:#0c171bb3}}
+@keyframes gardenNote{0%{opacity:0;transform:translate(-14px,22px) rotate(-4deg)}65%{opacity:1;transform:translate(0,-2px) rotate(.7deg)}100%{opacity:1;transform:none}}
+@keyframes noteTuck{to{opacity:0;transform:translate(-10px,20px) rotate(-3deg)}}
+.dialog[data-reduced-motion="true"][open],.dialog[data-reduced-motion="true"][open] *,.dialog[data-reduced-motion="true"]::backdrop{animation:none!important;transition:none!important}
+.dialog[data-reduced-motion="true"]::backdrop{backdrop-filter:none}
+@media(prefers-reduced-motion:reduce){.dialog[open],.dialog[open] *,.dialog::backdrop{animation:none!important;transition:none!important}
+.dialog::backdrop{backdrop-filter:none}}
+.iconButton{position:relative;isolation:isolate;transition:color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease,border-radius .18s ease}
+.active{color:var(--p-accent)!important;background:linear-gradient(135deg,color-mix(in srgb,var(--p-petal) 24%,var(--p-card)),color-mix(in srgb,var(--p-accent) 9%,var(--p-surface)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--p-accent) 52%,var(--p-line)),0 4px 13px color-mix(in srgb,var(--p-petal) 18%,transparent);border-radius:65% 35% 62% 38%;transform:rotate(-2deg)}
+.active::after{content:"";position:absolute;right:1px;bottom:1px;width:8px;height:11px;border-radius:70% 25% 70% 25%;background:var(--p-petal);box-shadow:0 0 0 2px var(--p-bg);transform:rotate(30deg);pointer-events:none}
+.active svg{fill:color-mix(in srgb,var(--p-accent) 28%,transparent);filter:drop-shadow(0 1px 0 color-mix(in srgb,var(--p-bg) 70%,transparent))}
+@media(prefers-reduced-motion:reduce){.iconButton{transition:none}
+.active{transform:none}}
+.dialogHeader>div{min-width:0;flex:1}
+.headerDetail{font-size:11px;line-height:1.4;color:var(--p-muted);margin-top:6px!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

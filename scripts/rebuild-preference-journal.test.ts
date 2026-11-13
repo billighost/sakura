@@ -17,7 +17,7 @@ const plain=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
 const settings={...DEFAULT_SETTINGS,theme:"light",discovery:.4,seedArtists:[],seedGenres:[],seedArtistSelections:[],onboarded:true} as UserSettings;
 const metadata:PreferenceSyncMetadata={serverRevision:5,serverSettings:settings,baseSettings:{theme:"light",discovery:.4,volume:.8},baseFieldRevisions:{theme:2,discovery:3,volume:4},serverFieldRevisions:{theme:2,discovery:3,volume:4}};
 function fixture(){
- const disk=new Map<string,unknown>(),mirror=new Map<string,string>();let stamp=1000,blockedDisk=false,blockedMirror=false,failedTransaction=false,holdRevision:number|undefined,held:Promise<void>|undefined,release:()=>void=()=>{},transactionTail:Promise<void>=Promise.resolve();
+ const disk=new Map<string,unknown>(),mirror=new Map<string,string>();let visits=0,stamp=1000,blockedDisk=false,blockedMirror=false,failedTransaction=false,holdRevision:number|undefined,held:Promise<void>|undefined,release:()=>void=()=>{},transactionTail:Promise<void>=Promise.resolve();
  function tab(){
   const exports:Record<string,unknown>={};
   vm.runInNewContext(compiled,{exports,Date:{now:()=>stamp},crypto:{randomUUID},localStorage:{get length(){return mirror.size;},key:(index:number)=>[...mirror.keys()][index]||null,getItem:(key:string)=>mirror.get(key)||null,setItem:(key:string,value:string)=>{if(blockedMirror)throw new Error("Mirror unavailable");mirror.set(key,value);},removeItem:(key:string)=>{if(blockedMirror)throw new Error("Mirror unavailable");mirror.delete(key);}},require:(name:string)=>name==="./offline"?{
@@ -25,12 +25,27 @@ function fixture(){
    localRead:async(account:string,key:string)=>plain(disk.get(account+":"+key)??null),
    localWrite:async(account:string,key:string,value:unknown)=>{if(blockedDisk)throw new Error("Disk unavailable");if(holdRevision!==undefined&&key.startsWith("preference-intent:")&&(value as {baseRevision?:number}).baseRevision===holdRevision){holdRevision=undefined;await held;}disk.set(account+":"+key,plain(value));},
    localDelete:async(account:string,key:string)=>{if(blockedDisk)throw new Error("Disk unavailable");disk.delete(account+":"+key);},
-   localEntries:async(account:string,prefix:string)=>[...disk].filter(([key])=>key.startsWith(account+":"+prefix)).map(([key,value])=>({name:key.slice(account.length+1),value:plain(value)})),
+   localEntries:async(account:string,prefix:string)=>[...disk].filter(([key])=>key.startsWith(account+":"+prefix)).map(([key,value])=>{visits++;return {name:key.slice(account.length+1),value:plain(value)};}),
   }:name==="../audio/presets"?{AUDIO_TECHNOLOGIES}:name==="../bloom/calendar"?{validTimeZone}:name==="./feedPreferences"?{FEED_NUMERIC_FIELDS,FEED_BOOLEAN_FIELDS}:name==="../recommendations/initialTaste"?{initialTasteSignature,normalizeInitialTasteProfile}:{} });
   return exports as unknown as typeof import("../src/rebuild/app/preferences");
  }
- return {disk,mirror,tab,now:(value:number)=>{stamp=value;},blockDisk:(value=true)=>{blockedDisk=value;},blockMirror:(value=true)=>{blockedMirror=value;},failTransaction:(value=true)=>{failedTransaction=value;},holdVersion:(revision:number)=>{holdRevision=revision;held=new Promise<void>(resolve=>{release=resolve;});},release:()=>release()};
+ return {disk,mirror,tab,visits:()=>visits,resetVisits:()=>{visits=0;},now:(value:number)=>{stamp=value;},blockDisk:(value=true)=>{blockedDisk=value;},blockMirror:(value=true)=>{blockedMirror=value;},failTransaction:(value=true)=>{failedTransaction=value;},holdVersion:(revision:number)=>{holdRevision=revision;held=new Promise<void>(resolve=>{release=resolve;});},release:()=>release()};
 }
+
+test("100,000 reserved orders are point-read and do not enter preference hydration",async()=>{
+ const f=fixture(),tab=f.tab(),operations=await stage(tab,{volume:.3});await tab.acknowledgePreferenceIntents("owner",operations);
+ for(let i=0;i<100000;i++)f.disk.set("owner:preference-order:historic-"+i,{operationId:"historic-"+i,createdAt:i});f.resetVisits();assert.deepEqual(plain((await tab.readPreferenceDraft("owner"))?.pendingPatch),{});assert.ok(f.visits()<=4,String(f.visits()));
+});
+test("a durable current server checkpoint repairs missing complete preference snapshots",async()=>{
+ const f=fixture(),tab=f.tab(),current={...settings,volume:.3};await tab.writePreferenceDraft("owner",current,false,{}, {...metadata,serverRevision:6,serverSettings:current,pendingOperations:{}});f.disk.delete("owner:preference-draft");f.disk.delete("owner:settings");f.mirror.delete("sakura-v2-preferences:owner");assert.equal((await f.tab().readPreferenceDraft("owner"))?.settings.volume,.3);assert.equal(f.tab().cachedPreferences("owner").volume,.3);
+});
+test("legacy acknowledgment history compacts by field without reviving an older writer",async()=>{
+ const f=fixture(),tab=f.tab(),old=await stage(tab,{volume:.2});f.now(10000);const current=await stage(tab,{volume:.3});await tab.acknowledgePreferenceIntents("owner",current);
+ for(let i=0;i<1000;i++){const ack={...old.volume,operationId:"historic-"+i,createdAt:i};f.disk.set("owner:preference-ack:"+ack.operationId,ack);f.mirror.set("sakura-v2-preference-ack:owner:"+ack.operationId,JSON.stringify(ack));}
+ await tab.readPreferenceDraft("owner");for(let i=0;i<100&&[...f.disk.keys()].filter(key=>key.startsWith("owner:preference-ack:")).length>1;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal([...f.disk.keys()].filter(key=>key.startsWith("owner:preference-ack:")).length,1);assert.equal([...f.mirror.keys()].filter(key=>key.startsWith("sakura-v2-preference-ack:owner:")).length,1);
+ await tab.writePreferenceDraft("owner",{...settings,volume:.2},true,{volume:.2},{...metadata,pendingOperations:old});assert.deepEqual(plain((await f.tab().readPreferenceDraft("owner"))?.pendingPatch),{});
+});
 async function stage(tab:ReturnType<ReturnType<typeof fixture>["tab"]>,patch:Partial<UserSettings>,meta=metadata){
  const operations=tab.createPreferenceIntents("owner",patch,meta);await tab.writePreferenceDraft("owner",{...settings,...patch},true,patch,{...meta,pendingOperations:operations});return operations;
 }

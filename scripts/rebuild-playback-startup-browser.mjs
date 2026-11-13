@@ -6,6 +6,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {chromium,webkit,expect as playwrightExpect} from '@playwright/test';
 import {encode} from 'next-auth/jwt';
 import 'dotenv/config';
+import {performanceApi} from './fixtures/performance-browser.mjs';
 
 const upstream=new URL(process.env.SAKURA_TEST_URL||'http://localhost:3017');
 assert.ok(['localhost','127.0.0.1','[::1]'].includes(upstream.hostname),'Fixture upstream must be local');
@@ -27,6 +28,7 @@ const sha256=createHash('sha256').update(wav).digest('hex');
 const fallbackUrl=`/api/v2/recordings/${recordingId}/audio?assetId=${assetId}`;
 const ready={kind:'stream',delivery:'cdn',assetId,sizeBytes:wav.length,sha256,mimeType,durationMs:track.durationMs,url:`https://res.cloudinary.com/startup-audit-fixture/video/upload/v1/sakura/v2/audio/${recordingId}/${sha256}.${extension}`,fallbackUrl};
 const settings={theme:'light',audioQuality:'data-saver',audioTechnology:'none',privateSession:true,reducedMotion:true,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],volume:.3,shuffle:false,repeat:'off'};
+const settingsApi=performanceApi({account,catalog:{tracks:[track,nextTrack],wav},settings});
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const report={scope:'Actual Next MusicProvider, browser media element and production service worker with generated WAV, synthetic authenticated APIs and browser-only storage; no server database writes',checks:[],scenarios:[],pageErrors:[],blockedWrites:[],apiRequests:[],mediaResponses:[],browserConsole:[],requestFailures:[]};
 let scenario='fallback-race',session=null,base;
@@ -67,7 +69,8 @@ const proxy=createServer(async(request,response)=>{
    if(/\/recordings\/[^/]+\/audio$/.test(path)){await bytes(request,response,scenario==='restored-download'?20000:scenario==='slow-progressive'?(request.headers.range?.startsWith('bytes=0-')?14000:4500):0,scenario==='slow-progressive');return;}
    if(path==='/api/auth/session'){json(response,{user:account});return;}
    if(path==='/api/v2/library/state'){json(response,{favoriteStates:{}});return;}if((path==='/api/v2/bootstrap'||path==='/api/v2/profile')){json(response,{profile:account,stats:{},topArtists:[]});return;}
-   if(path==='/api/v2/settings'){json(response,settings);return;}
+   if(path==='/api/v2/settings'){const result=settingsApi.handle({url:url.href,method,headers:request.headers,body:input});json(response,result.json,result.status);return;}
+   if(path==='/api/v2/smart-queue'&&method==='POST'){const result=settingsApi.handle({url:url.href,method,headers:request.headers,body:input});json(response,result.json,result.status);return;}
    if(path==='/api/v2/library'){json(response,{recordings:scenario==='lyrics-change'?[track,nextTrack]:[scenario==='slow-progressive'?{...track,readyPlayback:ready}:track],playlists:[]});return;}
    if(path==='/api/v2/listening-session'){
     if(method==='PUT'){session={state:input.state,revision:input.revision+1,deviceId:input.deviceId,updatedAt:Date.now()};json(response,{accepted:true,session,serverTime:Date.now()});}
@@ -164,7 +167,7 @@ try{
     await page.getByRole('button',{name:'Play '+track.title,exact:true}).first().click();await page.getByRole('button',{name:'Open now playing',exact:true}).click();await page.locator('dialog[data-dialog-appearance="player"]').getByRole('button',{name:'Lyrics',exact:true}).click();
     const dialog=page.locator('dialog[data-dialog-appearance="lyrics"]'),scroll=dialog.locator('[data-player-scroll]'),view=dialog.locator('[data-lyrics-follow]');await dialog.locator('[data-lyric-index="0"]').waitFor();
     await scroll.evaluate(node=>{node.dispatchEvent(new WheelEvent('wheel',{deltaY:5000}));node.scrollTop=5000;});await expect(view).toHaveAttribute('data-lyrics-follow','false');
-    await dialog.getByRole('button',{name:'Next song',exact:true}).click();await expect(dialog.getByRole('heading',{name:nextTrack.title,exact:true})).toBeVisible();await dialog.locator('[data-lyric-index="0"]').waitFor();await page.waitForTimeout(400);
+    await dialog.getByRole('button',{name:'Next song',exact:true}).click();await expect(dialog.locator('[data-player-header-song="true"]')).toHaveText(nextTrack.title);await dialog.locator('[data-lyric-index="0"]').waitFor();await page.waitForTimeout(400);
     assert.equal(await view.getAttribute('data-lyrics-follow'),'true','The next song follows automatically after browsing the previous song');
     await page.evaluate(()=>{window.startupAudio.currentTime=42;window.startupAudio.dispatchEvent(new Event('timeupdate'));});await expect(dialog.locator('[data-lyric-index="21"]')).toHaveAttribute('aria-current','true');await expect.poll(()=>scroll.evaluate(node=>node.scrollTop)).toBeGreaterThan(500);
     await scroll.evaluate(node=>{node.dispatchEvent(new WheelEvent('wheel',{deltaY:5000}));node.scrollTop=5000;});await expect(view).toHaveAttribute('data-lyrics-follow','false');await page.waitForTimeout(250);

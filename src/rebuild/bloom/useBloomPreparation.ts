@@ -5,7 +5,7 @@ import {musicTrack,type MusicTrack} from "../app/types";
 import {localDelete,localRead,localWrite} from "../app/offline";
 import {requestJson} from "../app/errors";
 import {retainArtwork} from "../player/imageCache";
-import {sameOriginArtworkUrl} from "../player/imageUrl";
+import {bloomPreparedArtwork} from "./artwork";
 import {bloomDesignForItem} from "./design";
 import {sameBloomStory} from "./refresh";
 import {prepareBloomAssets,bloomAssetManifest,type BloomPreparationProgress,type BloomPreparedAssets} from "./preparation";
@@ -33,7 +33,7 @@ if(typeof window!=="undefined"){
 }
 
 type PrepareAudio=(track:MusicTrack,signal:AbortSignal,options?:{complete?:boolean})=>Promise<PreparedPlaybackAudio>;
-function acquire(accountId:string,id:string,prepareAudio:PrepareAudio,initial?:BloomRecap,archival=false,mode:"detail"|"speculative"="detail"){
+function acquire(accountId:string,id:string,prepareAudio:PrepareAudio,initial?:BloomRecap,archival=false,mode:"detail"|"speculative"="detail",initialPrepared?:BloomPreparedStory){
  const key=keyFor(accountId,id);let entry=entries.get(key);
  for(const candidate of entries.values())if(candidate.mode==="speculative"&&candidate!==entry)dispose(candidate);
  if(entry){try{entry.controller.signal.throwIfAborted();if(initial)entry.identity.expect(initial);if(mode==="detail"&&entry.state.error)throw entry.state.error;}catch{dispose(entry);entry=undefined;}}
@@ -44,22 +44,26 @@ function acquire(accountId:string,id:string,prepareAudio:PrepareAudio,initial?:B
   entry={accountId,id,controller,identity:new BloomPreparationIdentity(initial),mode,state:EMPTY,listeners:new Set(),users:0,details:0,task:undefined as unknown as Promise<BloomPreparedAssets>};
   entries.set(key,entry);const owner=entry;
   const publish=(state:BloomPreparationState)=>{if(controller.signal.aborted)return;owner.state=state;for(const listener of owner.listeners)listener(state);};
+  let artwork:Record<string,string>={};
   const loadStory=async()=>{
    current();let prepared:BloomPreparedStory;
    if(archival&&initial)prepared={story:initial,chapters:initial.chapters,listening:initial.listening};
    else if(navigator.onLine===false){
     const saved=await localRead<{prepared:BloomPreparedStory;updatedAt:number}>(accountId,savedKey(id));current();
     if(!saved||saved.updatedAt<=erasure)throw new Error("This Bloom has not been prepared on this device. Reconnect to save its story and soundtrack.");
-    prepared=saved.prepared;
-   }else prepared=await requestJson<BloomPreparedStory>(`/api/v2/bloom/${encodeURIComponent(id)}/prepare`,{method:"POST",signal:controller.signal},{context:"page",accountId});
+    // A resource envelope may be older than the saved preparation's display
+    // variants; immutable identity checks still bind it to this exact story.
+    prepared=initialPrepared?{...initialPrepared,artwork:sameBloomStory(initialPrepared.story,saved.prepared.story)?saved.prepared.artwork:undefined}:saved.prepared;
+   }else prepared=initialPrepared||await requestJson<BloomPreparedStory>(`/api/v2/bloom/${encodeURIComponent(id)}/prepare`,{method:"POST",signal:controller.signal},{context:"page",accountId});
    current();owner.identity.accept(prepared.story);requireBloomOpening(prepared.story);
-   return prepared;
+   artwork=bloomPreparedArtwork(prepared,bloomAssetManifest(prepared).artwork,{viewportWidth:window.innerWidth,pixelRatio:window.devicePixelRatio,offline:navigator.onLine===false});
+   return {...prepared,artwork};
   };
   owner.task=prepareBloomAssets({signal:controller.signal,loadStory,
    validateStory:story=>{current();owner.identity.check(story);requireBloomOpening(story);},
    limits:()=>owner.mode==="speculative"?BLOOM_SPECULATIVE_LIMITS:undefined,
    prepareAudio:(recording,signal)=>prepareAudio(musicTrack(recording),signal,{complete:true}),
-   prepareArtwork:async(url,signal)=>{signal.throwIfAborted();const address=sameOriginArtworkUrl(url);if(!address)throw new Error("This Bloom's artwork could not be prepared.");await retainArtwork(address,false,{signal,timeoutMs:15000});signal.throwIfAborted();},
+   prepareArtwork:async(url,signal)=>{signal.throwIfAborted();const address=artwork[url];if(!address)throw new Error("This Bloom's artwork could not be prepared.");await retainArtwork(address,false,{signal,timeoutMs:15000});signal.throwIfAborted();},
    preloadWorld:async prepared=>{await Promise.all([preloadBloomWorld(bloomDesignForItem(prepared.story)),import("./BloomStory")]);current();},
    onProgress:progress=>publish({...owner.state,progress,error:null}),
   }).then(async assets=>{
@@ -75,7 +79,7 @@ function acquire(accountId:string,id:string,prepareAudio:PrepareAudio,initial?:B
 
 /** Shelf and detail subscribers share the same preparation and retained full
  * files. The short grace period transfers ownership during client navigation. */
-export function useBloomPreparation(accountId:string|null,id:string|null,initial?:BloomRecap,archival=false,enabled=true,mode:"detail"|"speculative"="detail"){
+export function useBloomPreparation(accountId:string|null,id:string|null,initial?:BloomRecap,archival=false,enabled=true,mode:"detail"|"speculative"="detail",initialPrepared?:BloomPreparedStory){
  const music=useMusic(),latest=useRef(music);
  useEffect(()=>{latest.current=music;},[music]);
  const previousAccount=useRef(accountId);
@@ -87,7 +91,7 @@ export function useBloomPreparation(accountId:string|null,id:string|null,initial
  useEffect(()=>{
   if(!accountId||!id||!enabled)return;
   if(mode==="speculative"&&!bloomSpeculationPool.allows(keyFor(accountId,id)))return;
-  const held=acquire(accountId,id,(track,signal,options)=>{if(latest.current.account?.id!==accountId)return Promise.reject(new DOMException("Account changed","AbortError"));return latest.current.preparePlaybackAudio(track,signal,options);},initial,archival,mode);lease.current=held;
+  const held=acquire(accountId,id,(track,signal,options)=>{if(latest.current.account?.id!==accountId)return Promise.reject(new DOMException("Account changed","AbortError"));return latest.current.preparePlaybackAudio(track,signal,options);},initial,archival,mode,initialPrepared);lease.current=held;
   const listener=(value:BloomPreparationState)=>setState({key:keyFor(accountId,id),value});held.entry.listeners.add(listener);listener(held.entry.state);
   return()=>{held.entry.listeners.delete(listener);held.release();if(lease.current===held)lease.current=null;};
   // Story receipts may update frequently; only the immutable snapshot identity

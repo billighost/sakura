@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { Artwork, PlayerButton, PlayerDialog } from "../player/Primitives";
+import { Artwork, PlayerButton, PlayerDialog } from "../player/CommonPrimitives";
 import { Blossom, Branch } from "./Brand";
 import { Icon } from "./Icon";
 import { useMusic } from "./MusicContext";

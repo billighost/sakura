@@ -12,10 +12,11 @@ export async function GET(request: Request,context: { params: Promise<{ jobId: s
     const { jobId } = await context.params;
     if (!isUuid(jobId)) return Response.json({ error: "Invalid resolution job" },{ status: 400,headers:{"Cache-Control":"private, no-store"} });
     const services = getRebuildServices();
-    const result = await services.jobs.get(jobId,account.id);
+    const params = new URL(request.url).searchParams;
+    const result = params.get("compact") === "1" ? await services.jobs.getStatus(jobId,account.id,{background:params.get("background")==="1"}) : await services.jobs.get(jobId,account.id);
     if (!result) return Response.json({ error: "Resolution job not found" },{ status: 404 });
     if (result.status === "pending") after(() => services.jobs.process(jobId));
-    return Response.json(result,{ status: result.status === "pending" ? 202 : result.status === "review" ? 409 : 200,headers: { "Cache-Control": "private, no-store" } });
+    return Response.json(result,{ status: result.status === "pending" ? 202 : result.status === "review" ? 409 : 200,headers: { "Cache-Control": "private, no-store",...(result.status==="pending"?{"Retry-After":String(Math.ceil(result.retryAfterMs/1000))}:{}) } });
   } catch { return Response.json({ status: "unavailable",reason: "backend-unavailable",retryable: true },{ status: 503,headers:{"Cache-Control":"private, no-store"} }); }
 
   });

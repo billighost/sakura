@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { requestJson } from "./errors";
+import { SharedFlight } from "./sharedFlight";
 import type { RoomSort, RoomSortDirection } from "./trackSorting";
 
 export type RoomLayout = "list" | "cards" | "compact";
@@ -14,6 +15,7 @@ const sorts=new Set<RoomSort>(["kept","title","artist","duration","added","plays
 const directions=new Set<RoomSortDirection>(["asc","desc"]);
 const memoryStorage=new Map<string,string>();
 const writes=new Map<string,Promise<void>>();
+const reads=new SharedFlight<void>();
 const changeEvent="sakura-collection-presentation-changed";
 
 export function roomPresentation(value:unknown):RoomPresentation|null {
@@ -64,30 +66,43 @@ interface RemoteResult { room?:unknown;preference?:unknown }
 async function pushPending(accountId:string,room:string,key:string):Promise<void>{
  const running=writes.get(key);if(running)return running;
  const operation=(async()=>{
+  while(true){
   const draft=readStored(key);if(!draft?.pending)return;
   const sentAt=draft.savedAt;
   try{
    const result=await requestJson<RemoteResult>("/api/v2/collection-view",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({room,layout:draft.layout,sort:draft.sort,direction:draft.direction})},{context:"save",accountId,timeoutMs:10000});
    const accepted=roomPresentation(result.preference);if(!accepted)return;
-   const latest=readStored(key);if(!latest||latest.savedAt!==sentAt)return;
+   const latest=readStored(key);if(!latest)return;
+   if(latest.savedAt!==sentAt){if(latest.pending)continue;return;}
    emitStored(key,{...accepted,savedAt:latest.savedAt,pending:false,...(typeof (result.preference as {updatedAt?:unknown})?.updatedAt==="string"?{serverUpdatedAt:(result.preference as {updatedAt:string}).updatedAt}:{})});
-  }catch{/* Local intent remains pending and retries on focus or reconnection. */}
+   return;
+  }catch{return;/* Local intent remains pending and retries on focus or reconnection. */}
+  }
  })();
  writes.set(key,operation);try{await operation;}finally{if(writes.get(key)===operation)writes.delete(key);}
 }
 
-async function reconcile(accountId:string,room:string,key:string):Promise<void>{
- const before=readStored(key);
+/** Equivalent refresh triggers share one read and one application of its result. */
+export async function reconcileRoomPresentation(accountId:string,room:string,signal:AbortSignal=new AbortController().signal):Promise<void>{
+ const key=keyFor(accountId,room),before=readStored(key);
  if(before?.pending){await pushPending(accountId,room,key);return;}
- try{
-  const result=await requestJson<RemoteResult>("/api/v2/collection-view?room="+encodeURIComponent(room),{}, {context:"page",accountId,timeoutMs:10000});
+ await reads.run(key,signal,async sharedSignal=>{
+  const started=browserRead(key);
+  const result=await requestJson<RemoteResult>("/api/v2/collection-view?room="+encodeURIComponent(room),{signal:sharedSignal}, {context:"page",accountId,timeoutMs:10000});
+  sharedSignal.throwIfAborted();
   const remote=roomPresentation(result.preference),latest=readStored(key);
   if(latest?.pending){await pushPending(accountId,room,key);return;}
+  // A local edit may already have been acknowledged while this older read was
+  // pending. Never replace it, or a newer receipt from another tab, with the read.
+  if(browserRead(key)!==started)return;
   if(remote){
-   const updatedAt=typeof (result.preference as {updatedAt?:unknown})?.updatedAt==="string"?(result.preference as {updatedAt:string}).updatedAt:undefined;
+   const stamp=(result.preference as {updatedAt?:unknown})?.updatedAt;
+   const updatedAt=typeof stamp==="string"&&Number.isFinite(Date.parse(stamp))?stamp:undefined;
+   if(updatedAt&&latest?.serverUpdatedAt&&Date.parse(updatedAt)<Date.parse(latest.serverUpdatedAt))return;
+   if(latest&&latest.layout===remote.layout&&latest.sort===remote.sort&&latest.direction===remote.direction&&latest.serverUpdatedAt===updatedAt)return;
    emitStored(key,{...remote,savedAt:nextStamp(latest?.savedAt||0),pending:false,...(updatedAt?{serverUpdatedAt:updatedAt}:{})});
   }else if(latest){emitStored(key,{...latest,pending:true});await pushPending(accountId,room,key);}
- }catch{/* A local value is sufficient while the account service is unavailable. */}
+ }).catch(()=>{/* A local value is sufficient while the service is unavailable or the room left. */});
 }
 
 /** Immediate local presentation with background account reconciliation. */
@@ -108,11 +123,11 @@ export function useRoomPresentation(accountId:string|undefined,room:string){
   const initial=localState(accountId,room,storageKey);
   if(initial)window.dispatchEvent(new CustomEvent(changeEvent,{detail:storageKey}));
   if(!accountId)return;
-  let live=true;
-  const refresh=()=>{if(live)void reconcile(accountId,room,storageKey);};
+  let live=true;const controller=new AbortController();
+  const refresh=()=>{if(live)void reconcileRoomPresentation(accountId,room,controller.signal);};
   const visible=()=>{if(document.visibilityState==="visible")refresh();};
   refresh();window.addEventListener("focus",refresh);window.addEventListener("online",refresh);document.addEventListener("visibilitychange",visible);
-  return()=>{live=false;window.removeEventListener("focus",refresh);window.removeEventListener("online",refresh);document.removeEventListener("visibilitychange",visible);};
+  return()=>{live=false;controller.abort(new DOMException("Room left","AbortError"));window.removeEventListener("focus",refresh);window.removeEventListener("online",refresh);document.removeEventListener("visibilitychange",visible);};
  },[accountId,room,storageKey]);
  useEffect(()=>{
   if(!accountId||!stored?.pending)return;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { CanonicalRecording } from "../core/types";
-import type { ResolveRecordingResult, RecordingRepository } from "./contracts";
+import type { ResolveRecordingResult, RecordingRepository, RecordingJobStatus } from "./contracts";
 import type { ReadonlySql } from "./repository";
 import type { RecordingIngestor } from "./ingestion";
 import type { AudioSourceDiscovery } from "./sources";
@@ -9,8 +9,8 @@ import type { PlaybackTargets } from "./targets";
 import type { AudioPromotions } from "./promotion";
 import { selectedResolvedAsset } from "./resolved-asset";
 
-interface JobRow { id: string; accountId: string; recordingId: string; state: string; result: ResolveRecordingResult | null; leaseUntil: Date | null; attempts: number }
-const JOB_SELECT = `SELECT id,account_id AS "accountId",recording_id AS "recordingId",state,result,lease_until AS "leaseUntil",attempts FROM sakura_v2."AudioResolveJob"`;
+interface JobRow { id: string; accountId: string; recordingId: string; state: string; result: ResolveRecordingResult | null; leaseUntil: Date | null; leaseExpired?: boolean; attempts: number }
+const JOB_SELECT = `SELECT id,account_id AS "accountId",recording_id AS "recordingId",state,result,lease_until AS "leaseUntil",(lease_until IS NULL OR lease_until<NOW()) AS "leaseExpired",attempts FROM sakura_v2."AudioResolveJob"`;
 
 /** DB-backed jobs survive navigation/reload; each source search is bounded and coalesced. */
 export class AudioResolutionJobs {
@@ -28,20 +28,36 @@ export class AudioResolutionJobs {
   private pending(jobId: string,recording: CanonicalRecording,stage?:"finding-source"|"preparing-audio"): ResolveRecordingResult {
     return { status: "pending",jobId,recording,pollUrl: `/api/v2/recordings/jobs/${jobId}`,retryAfterMs: 1000,...(stage?{stage}:{}) };
   }
-  async get(jobId: string,accountId: string): Promise<ResolveRecordingResult | null> {
+  private async read(jobId: string,accountId: string): Promise<JobRow | null> {
     let job = (await this.query<JobRow>(`${JOB_SELECT} WHERE id=$1::uuid AND account_id=$2::uuid`,[jobId,accountId]))[0];
     if (!job) return null;
-    if (!job.result && job.state === "resolving" && job.attempts >= 2) {
+    if (!job.result && job.state === "resolving" && job.attempts >= 2 && job.leaseExpired !== false) {
       const failure: ResolveRecordingResult = { status: "unavailable",reason: "provider-unavailable",recordingId: job.recordingId,retryable: true };
       const expired = await this.query<JobRow>(`UPDATE sakura_v2."AudioResolveJob" SET state='failed',result=$3::jsonb,lease_until=NULL,updated_at=NOW()
         WHERE id=$1::uuid AND account_id=$2::uuid AND state='resolving' AND attempts>=2 AND (lease_until IS NULL OR lease_until<NOW())
         RETURNING id,account_id AS "accountId",recording_id AS "recordingId",state,result,lease_until AS "leaseUntil",attempts`,[jobId,accountId,JSON.stringify(failure)]);
       if (expired[0]) job = expired[0];
     }
-    if (job.result) {const result=this.decoratePreparation(job.result);return this.targets?this.targets.decorate(result,accountId):result;}
+    return job;
+  }
+  private completed(result:ResolveRecordingResult,accountId:string):Promise<ResolveRecordingResult>|ResolveRecordingResult {
+    const decorated=this.decoratePreparation(result);return this.targets?this.targets.decorate(decorated,accountId):decorated;
+  }
+  async get(jobId: string,accountId: string): Promise<ResolveRecordingResult | null> {
+    const job=await this.read(jobId,accountId);if(!job)return null;
+    if(job.result)return this.completed(job.result,accountId);
     const recording = await this.repository.findById(job.recordingId);
     if (!recording) return { status: "unavailable",reason: "recording-not-indexed",retryable: false };
     return this.pending(job.id,recording);
+  }
+  async getStatus(jobId:string,accountId:string,options:{background?:boolean}={}):Promise<RecordingJobStatus|null>{
+    const job=await this.read(jobId,accountId);if(!job)return null;
+    if(job.result)return this.completed(job.result,accountId);
+    // Foreground first playback keeps the existing one-second pickup interval.
+    // Only an explicitly background caller accepts a wider long-job interval.
+    const leaseRemaining=job.leaseUntil?new Date(job.leaseUntil).getTime()-Date.now():0;
+    const retryAfterMs=options.background&&job.state==="resolving"?(leaseRemaining>95000?2000:5000):1000;
+    return {status:"pending",schemaVersion:1,jobId:job.id,recordingId:job.recordingId,pollUrl:`/api/v2/recordings/jobs/${job.id}`,retryAfterMs};
   }
   process(jobId: string): Promise<void> {
     const current = this.running.get(jobId);

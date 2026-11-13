@@ -111,9 +111,9 @@ export async function getHistory(accountId:string,url:URL) {
     WHERE ${VERIFIED} AND l.audible_ms>0 AND ($2::timestamptz IS NULL OR (l.started_at,l.event_id)<($2::timestamptz,$3::uuid))
     ORDER BY l.started_at DESC,l.event_id DESC LIMIT $4`,[accountId,cursor?.timestamp??null,cursor?.id??null,limit+1]);
   const selected=rows.rows.slice(0,limit),last=selected.at(-1);
-  const events=selected.map(row=>({eventId:row.eventId,playedAt:row.playedAt,audibleMs:Number(row.audibleMs),completed:row.completed,
+  const events=selected.map(row=>{const recording=card(row);return {eventId:row.eventId,playedAt:row.playedAt,audibleMs:Number(row.audibleMs),completed:row.completed,
     skipped:row.skipped,finished:row.finished,positionMs:Number(row.positionMs||0),maxPositionMs:Number(row.maxPositionMs||0),
-    context:row.context,contextId:row.contextId,recording:card(row),track:card(row)}));
+    context:row.context,contextId:row.contextId,recording,track:recording};});
   return {events,history:events,nextCursor:rows.rows.length>limit&&last?encodeCursor(last.playedAt,last.eventId):null};
 }
 

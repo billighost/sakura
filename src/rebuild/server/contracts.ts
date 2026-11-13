@@ -86,6 +86,19 @@ export type ResolveRecordingResult =
     sourceReason?: string;
   };
 
+/** Opt-in polling envelope. The initiating response already supplied the
+ * canonical recording; terminal results keep the original full contract. */
+export interface CompactRecordingJobPending {
+  status: "pending";
+  schemaVersion: 1;
+  jobId: string;
+  recordingId: string;
+  pollUrl: string;
+  retryAfterMs: number;
+  stage?: "finding-source" | "preparing-audio";
+}
+export type RecordingJobStatus = ResolveRecordingResult | CompactRecordingJobPending;
+
 export class ProviderError extends Error {
   constructor(readonly code: "timeout" | "unavailable" | "invalid-response" | "not-configured", message: string) {
     super(message);

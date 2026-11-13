@@ -22,20 +22,25 @@ export function SongGesture({children,className,onOptions,id,label,entity="song"
   const surface=useRef<HTMLDivElement>(null);
   const press=useRef<{x:number;y:number;id:number}|null>(null);
   const suppress=useRef(0);
-  function cancel(){if(timer.current)clearTimeout(timer.current);timer.current=null;press.current=null;if(surface.current)delete surface.current.dataset.pressPhase;}
-  useEffect(()=>{
+  const stopWatching=useRef<(()=>void)|null>(null);
+  function cancel(){const active=press.current;if(timer.current)clearTimeout(timer.current);timer.current=null;press.current=null;stopWatching.current?.();stopWatching.current=null;if(active&&surface.current)delete surface.current.dataset.pressPhase;}
+  function watchHold(){
     function abort(){cancel();}
     function secondaryPointer(event:PointerEvent){if(!event.isPrimary)cancel();}
     document.addEventListener("scroll",abort,true);window.addEventListener("blur",abort);document.addEventListener("visibilitychange",abort);
     document.addEventListener("pointerdown",secondaryPointer,true);
-    return()=>{if(timer.current)clearTimeout(timer.current);document.removeEventListener("scroll",abort,true);window.removeEventListener("blur",abort);document.removeEventListener("visibilitychange",abort);document.removeEventListener("pointerdown",secondaryPointer,true);};
-  },[]);
+    stopWatching.current=()=>{document.removeEventListener("scroll",abort,true);window.removeEventListener("blur",abort);document.removeEventListener("visibilitychange",abort);document.removeEventListener("pointerdown",secondaryPointer,true);};
+  }
+  // A mounted row owns no global listeners until a touch hold is in progress.
+  // Ref-backed cancellation also clears a hold if its row disappears.
+  useEffect(()=>()=>cancel(),[]);
   return <div ref={surface} className={`${className} ${s.contextSurface}`} title="Hold or right-click for options (Shift+F10)" aria-keyshortcuts="Shift+F10" data-song-id={entity==="song"?id:undefined} data-collection-id={entity==="collection"?id:undefined} data-options-label={label||undefined} onPointerDown={event=>{
     if(event.isPrimary&&event.pointerType==="mouse")suppress.current=0;
     if(!event.isPrimary||event.pointerType==="mouse"||event.button!==0)return;
     if(press.current){cancel();return;}
     if(ownsNativeGesture(event.target)||ownsButtonGesture(event.target))return;
     cancel();press.current={x:event.clientX,y:event.clientY,id:event.pointerId};const origin=press.current;
+    watchHold();
     event.currentTarget.dataset.pressPhase="pending";
     timer.current=setTimeout(()=>{suppress.current=Date.now()+1000;onOptions({left:origin.x,top:origin.y,width:0,height:0});if(navigator.vibrate)navigator.vibrate(12);cancel();},460);
   }} onPointerMove={event=>{if(press.current&&(press.current.id!==event.pointerId||holdMoved(event.clientX-press.current.x,event.clientY-press.current.y)))cancel();}} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel} onClickCapture={event=>{if(event.detail>0&&Date.now()<suppress.current){event.preventDefault();event.stopPropagation();}}} onContextMenu={event=>{

@@ -2,7 +2,7 @@ import {createHash,randomBytes} from "node:crypto";
 import type {PoolClient} from "pg";
 import {getRebuildPool,inTransaction} from "../data/db";
 import {RANKING_CARD_SELECT,VERIFIED,card,cardsForIds,type RecordingCard} from "../data/catalog";
-import {getSettings} from "../data/settings";
+import {getSettingsSnapshot as getSettings} from "../data/settings";
 import {ProductError,ids,integer,object} from "../data/validation";
 import {FEED_DEFAULTS} from "../app/feedPreferences";
 import {rankPersonalizedTracks,orderPersonalizedTracks,planLocalQueue,recentRelease,tasteExcluded,
@@ -14,6 +14,11 @@ type FeedCard=RecordingCard&{releaseDate:string|null};
 interface FeedEntry {recordingId:string;reason:string;lane:RankedTrack<FeedCard>["lane"]}
 interface FeedSection {id:string;title:string;description:string;tracks:FeedCard[]}
 type Queryable=Pick<PoolClient,"query">;
+type SettingsSnapshot=Awaited<ReturnType<typeof getSettings>>;
+interface HeroProjection {item:{track:RecordingCard;reason:string;lane:RankedTrack<FeedCard>["lane"]}|null;generatedAt:string;refreshAt:number}
+const feedSettings=new WeakMap<object,SettingsSnapshot>();
+/** The route's after callback reuses this private server-only snapshot. */
+export function personalizedFeedSettings(page:object){return feedSettings.get(page);}
 const CANDIDATE_SELECT=RANKING_CARD_SELECT.replace("SELECT r.id,r.metadata,r.provenance,",()=>`SELECT r.id,r.metadata,r.provenance,
   (SELECT MIN(a.release_date) FROM sakura_v2."RecordingAlbum" ra JOIN sakura_v2."Album" a ON a.id=ra.album_id
     WHERE ra.recording_id=r.id AND a.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$') AS "releaseDate",`);
@@ -112,7 +117,7 @@ export async function getPersonalizedHero(accountId:string,url:URL){
 async function personalizedFeedPage(accountId:string,url:URL,pool:Queryable){
   const {surface,mode,limit,cursor}=feedInput(url);
   let session:{id:string;entries:FeedEntry[];cursor_secret:string;settings_signature:string;generated_at:Date;expires_at:Date;surface:string;mode:string;personalized:boolean};
-  let offset=0,sections:FeedSection[]=[],personalized=false,settings:TasteSettings,feedback:TasteFeedback[]|undefined;
+  let offset=0,sections:FeedSection[]=[],personalized=false,settings:TasteSettings,feedback:TasteFeedback[]|undefined,hero:HeroProjection|undefined,settingsSnapshot:SettingsSnapshot|undefined;
   const hydratedCards=new Map<string,RecordingCard>(),hydratedIds=new Set<string>();
   const hydrate=async(recordingIds:readonly string[])=>{
     const missing=[...new Set(recordingIds)].filter(id=>!hydratedIds.has(id));
@@ -133,12 +138,16 @@ async function personalizedFeedPage(accountId:string,url:URL,pool:Queryable){
     session=row;offset=parsed.offset;personalized=row.personalized;
   }else{
     const context=await tasteContext(accountId,pool),now=Date.now();
+    settingsSnapshot=context.settings as SettingsSnapshot;
     settings=context.settings;feedback=context.feedback;
     const ranked=rankPersonalizedTracks(context.cards,{...context,settings:context.settings,surface,mode,nowMs:now,seed:`${accountId}:${now}`});
     const ordered=orderPersonalizedTracks(ranked,context.settings);
     sections=sectionsFor(ordered,context,now);
-    const initialIds=[...new Set([...sections.flatMap(section=>section.tracks.map(track=>track.id)),...ordered.slice(0,Math.max(limit,12)).map(item=>item.track.id)])];
+    const heroSelection=url.searchParams.get("includeHero")==="1"?personalizedHeroPicks(context.cards,{...context,settings:context.settings,mode,nowMs:now,seed:accountId}):undefined;
+    const selectedHero=heroSelection?.[surface];
+    const initialIds=[...new Set([...sections.flatMap(section=>section.tracks.map(track=>track.id)),...ordered.slice(0,Math.max(limit,12)).map(item=>item.track.id),...(selectedHero?[selectedHero.track.id]:[])])];
     const visibleCards=new Map((await hydrate(initialIds)).map(track=>[track.id,track]));
+    if(heroSelection){const track=selectedHero?visibleCards.get(selectedHero.track.id):undefined;hero={item:track&&selectedHero?{track,reason:selectedHero.reason,lane:selectedHero.lane}:null,generatedAt:new Date(now).toISOString(),refreshAt:heroSelection.refreshAt};}
     sections=sections.map(section=>({...section,tracks:section.tracks.flatMap(track=>{const full=visibleCards.get(track.id);return full?[{...full,releaseDate:track.releaseDate}]:[];})})).filter(section=>section.tracks.length);
     const entries=ordered.map(item=>({recordingId:item.track.id,reason:item.reason,lane:item.lane})),secret=randomBytes(32).toString("hex");
     const eligibleIds=new Set(ranked.map(item=>item.track.id));
@@ -171,9 +180,10 @@ async function personalizedFeedPage(accountId:string,url:URL,pool:Queryable){
     }
   }
   sections=sections.map(section=>({...section,tracks:section.tracks.filter(track=>!tasteExcluded(track,feedback)&&(settings.explicitContent!==false||track.metadata.explicit!=="explicit"))})).filter(section=>section.tracks.length);
-  return {items,sections,nextCursor:offset<session.entries.length?encodeFeedCursor(session.id,offset,session.cursor_secret):null,
+  const page={items,sections,nextCursor:offset<session.entries.length?encodeFeedCursor(session.id,offset,session.cursor_secret):null,
     sessionId:session.id,generatedAt:new Date(session.generated_at).toISOString(),totalCandidates:session.entries.length,personalized,
-    learning:settings.learnFromListening!==false,exhausted:offset>=session.entries.length};
+    learning:settings.learnFromListening!==false,exhausted:offset>=session.entries.length,...(hero?{hero}:{})};
+  if(settingsSnapshot)feedSettings.set(page,settingsSnapshot);return page;
 }
 
 export async function generateSmartQueue(accountId:string,value:unknown){

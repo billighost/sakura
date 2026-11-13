@@ -12,6 +12,7 @@ import aes from 'telegram/crypto/IGE.js';
 import bigInt from 'big-integer';
 import service from '../../rebuild/service.cjs';
 import queues from '../../rebuild/serial-queue.cjs';
+import workerPerformance from '../../rebuild/performance.cjs';
 import { socketClass } from './socket.mjs';
 import { Ownership } from './ownership.mjs';
 import { DurableSession } from './session.mjs';
@@ -37,7 +38,8 @@ export class TelegramOwner extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.ctx = ctx; this.env = env; this.sockets = new Set(); this.queues = new Map();
-    this.owner = new Ownership(ctx.storage, crypto.randomUUID());
+    this.metrics = workerPerformance.createWorkerPerformance(env.SAKURA_PERFORMANCE_LOG === '1');
+    this.owner = new Ownership(ctx.storage, crypto.randomUUID(), Date.now, this.metrics);
     this.active = 0; this.transfers = 0; this.lastUse = Date.now();
     this.bots = [...new Set([env.TELEGRAM_BOT_USERNAME || 'musicshuntersbot', ...(env.TELEGRAM_FALLBACK_BOTS || '').split(',')].map(v => v.trim().toLowerCase()).filter(v => /^[a-z0-9_]{3,64}$/.test(v)))];
     ctx.blockConcurrencyWhile(async () => {
@@ -81,14 +83,14 @@ export class TelegramOwner extends DurableObject {
       if (this.client !== client || client._destroyed) return;
       await this.owner.fence();
       this.saved = session.snapshot();
-      await this.ctx.storage.put('telegram-session', this.saved);
+      await this.metrics.measure('session_persist', () => this.ctx.storage.put('telegram-session', this.saved));
     };
     session.onChange = () => { this.ctx.waitUntil(persist().catch(async () => { if (this.client === client) await this.retire(); })); };
     const quiet = new logger.Logger('none');
     const Socket = socketClass(connect, async () => {
       if (this.client !== client || client._destroyed) throw new Error('Telegram client retired');
       try { await this.owner.fence(); } catch (error) { await this.retire(); throw error; }
-    }, this.sockets);
+    }, this.sockets, this.metrics);
     const client = new telegram.TelegramClient(session, Number(this.env.TELEGRAM_API_ID), this.env.TELEGRAM_API_HASH, {
       connection: connections.ConnectionTCPFull, networkSocket: Socket, useWSS: false,
       autoReconnect: false, connectionRetries: 2, requestRetries: 2, downloadRetries: 2,
@@ -102,7 +104,7 @@ export class TelegramOwner extends DurableObject {
     const expire = () => { if (this.client === client) this.ctx.waitUntil(this.retire()); };
     guardClientSenders(client, () => this.client === client, expire);
     client.onError = async error => { await this.fatalError(error); };
-    await withDeadline(client.connect(), 20000, expire);
+    await this.metrics.measure('connection_start', () => withDeadline(client.connect(), 20000, expire));
     guardSender(client._sender, expire);
     await persist();
     this.rebuild = new service.RebuildAudioService({ telegram: () => this.client, api: telegram.Api, bigInt,
@@ -130,7 +132,8 @@ export class TelegramOwner extends DurableObject {
     if (!authorized(request, this.env.WORKER_SECRET)) return json({ error: 'Unauthorized' }, 401);
     const path = new URL(request.url).pathname;
     if (request.method === 'POST' && path === '/v2/capabilities') return json({ protocol: 'v2', botScopes: this.bots, features,
-      acquisitionEnabled: this.env.TELEGRAM_ENABLED === 'true', ready: !this.fatal && Date.now() >= this.readyAt, connected: Boolean(this.client?.connected), revision: this.env.CF_VERSION_METADATA?.id || null, fatal: this.fatal || null });
+      acquisitionEnabled: this.env.TELEGRAM_ENABLED === 'true', ready: !this.fatal && Date.now() >= this.readyAt, connected: Boolean(this.client?.connected), revision: this.env.CF_VERSION_METADATA?.id || null, fatal: this.fatal || null,
+      ...(this.metrics.enabled ? { performance: this.metrics.snapshot() } : {}) });
     // Dedicated runtime proof configuration only; it cannot access a real key.
     if (request.method === 'POST' && path === '/v2/runtime-proof' && this.env.RUNTIME_PROOF === 'true' && this.env.TELEGRAM_ENABLED !== 'true') {
       const fake = new sessions.StringSession(); fake.setDC(2, '149.154.167.51', 80);
@@ -170,7 +173,7 @@ export class TelegramOwner extends DurableObject {
     this.active++; this.lastUse = Date.now();
     try {
       if (audio && ['GET', 'HEAD'].includes(request.method)) {
-        if (request.method === 'GET' && this.transfers >= 2) return json({ reason: 'audio-worker-busy', retryable: true }, 429, { 'Retry-After': '3' });
+        if (request.method === 'GET' && this.transfers >= 2) { this.metrics.count('transfers_rejected'); return json({ reason: 'audio-worker-busy', retryable: true }, 429, { 'Retry-After': '3' }); }
         await this.ensureConnected();
         const { audio: info } = await this.rebuild.info(audio[1], audio[2]);
         const prepared = audioHeaders(request, info);
@@ -178,17 +181,18 @@ export class TelegramOwner extends DurableObject {
         if (request.method === 'HEAD') return new Response(null, { status: prepared.status, headers: prepared.headers });
         // Reserve before the asynchronous opening so simultaneous fetches cannot
         // all pass the transfer cap. Release only on completion or cancellation.
-        if (this.transfers >= 2) return json({ reason: 'audio-worker-busy', retryable: true }, 429, { 'Retry-After': '3' });
+        if (this.transfers >= 2) { this.metrics.count('transfers_rejected'); return json({ reason: 'audio-worker-busy', retryable: true }, 429, { 'Retry-After': '3' }); }
         this.transfers++;
+        this.metrics.maximum('peak_transfers', this.transfers);
         let nodeStream;
         try { nodeStream = await this.rebuild.stream(audio[1], audio[2], prepared.start, prepared.length, info); }
         catch (error) { this.transfers--; throw error; }
-        const reader = Readable.toWeb(nodeStream).getReader(); let finished = false;
+        const reader = Readable.toWeb(nodeStream).getReader(), metrics = this.metrics; let finished = false;
         const finish = () => { if (!finished) { finished = true; this.transfers--; this.lastUse = Date.now(); request.signal.removeEventListener('abort', abort); } };
         const abort = () => { nodeStream.destroy(); void reader.cancel().catch(() => {}); finish(); };
         request.signal.addEventListener('abort', abort, { once: true });
         const body = new ReadableStream({
-          async pull(controller) { try { const part = await reader.read(); if (part.done) { finish(); controller.close(); } else controller.enqueue(part.value); } catch (error) { finish(); nodeStream.destroy(); controller.error(error); } },
+          async pull(controller) { try { const part = await reader.read(); if (part.done) { finish(); controller.close(); } else { metrics.count('transfer_bytes', part.value.byteLength); controller.enqueue(part.value); } } catch (error) { finish(); nodeStream.destroy(); controller.error(error); } },
           async cancel(reason) { nodeStream.destroy(); finish(); await reader.cancel(reason).catch(() => {}); }
         });
         if (request.signal.aborted) abort();
@@ -219,6 +223,6 @@ export class TelegramOwner extends DurableObject {
       if (/Invalid|Unknown|JSON|body too large/.test(message)) return json({ error: 'Invalid source request' }, /too large/.test(message) ? 413 : 400);
       if (/Source audio not found/.test(message)) return json({ reason: 'audio-source-unavailable' }, 404);
       return json({ status: 'unavailable', reason, retryable: !this.fatal }, 503);
-    } finally { this.active--; this.lastUse = Date.now(); await this.ctx.storage.setAlarm(Date.now() + 60000); }
+    } finally { this.active--; this.lastUse = Date.now(); await this.metrics.measure('alarm_schedule', () => this.ctx.storage.setAlarm(Date.now() + 60000)); }
   }
 }

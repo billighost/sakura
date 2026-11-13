@@ -30,7 +30,7 @@ export interface BloomChapter {id:string;title:string;prompt:string;stat:{label:
 export interface BloomRecap extends BloomItem {summary:{audibleMs:number;playCount:number;recordingCount:number;activeDays:number};chapters:BloomChapter[];snapshotCreatedAt?:string;listening?:BloomListeningProfile;completed?:boolean;completedAt?:string|null}
 /** A private staging response, warmed for an available story before entry. Preparation
  * never changes its persisted reveal frontier or completion state. */
-export interface BloomPreparedStory {story:BloomRecap;chapters:Omit<BloomChapter,"revealed">[];listening?:BloomListeningProfile}
+export interface BloomPreparedStory {story:BloomRecap;chapters:Omit<BloomChapter,"revealed">[];listening?:BloomListeningProfile;artwork?:Record<string,string>}
 export const bloomDesigns:{id:BloomDesign;name:string;description:string}[]=[
  {id:"herbarium",name:"The listening herbarium",description:"Pressed petals, botanical ink, and the pages of a secret listening journal."},
  {id:"nocturne",name:"A nocturne in bloom",description:"Your music becomes a constellation. Quiet celestial forms reveal its hidden gravity."},

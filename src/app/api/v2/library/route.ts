@@ -1,8 +1,8 @@
 import { withApiTiming } from "@/rebuild/server/performance";
-import { productResponse,jsonBody } from "@/rebuild/data/http";
+import { productResponse,jsonBody,compactProductRequest } from "@/rebuild/data/http";
 import { getLibrary,setFavorite } from "@/rebuild/data/collections";
 export async function GET(request:Request){
-  return withApiTiming("/api/v2/library", request, async () => {return productResponse(request,a=>getLibrary(a.id,new URL(request.url)));
+  return withApiTiming("/api/v2/library", request, async () => {return productResponse(request,a=>getLibrary(a.id,new URL(request.url),compactProductRequest(request)));
   });
 }
 export async function POST(request:Request){

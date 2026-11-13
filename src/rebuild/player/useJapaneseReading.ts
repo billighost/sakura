@@ -1,32 +1,33 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useMusic } from "../app/MusicContext";
+import { useEffect, useMemo, useState } from "react";
+import { useMusicActions, useMusicView } from "../app/musicView";
 import { userMessage } from "../app/errors";
 import { READING_LABELS, readingEngine, type ReadingLanguage } from "../lyrics/language";
 import { lyricInputKey, type useLyrics } from "./useLyrics";
 
 /** The account preference outlives a lyric view; fetching never changes that choice. */
 export function useJapaneseReading(lyrics: ReturnType<typeof useLyrics>) {
-  const music = useMusic();
+  const music = { ...useMusicView(), ...useMusicActions() };
   const language=lyrics.data?.readingLanguage||(lyrics.data?.hasJapanese?"ja":null);
   const enabled = (language==="ja"?music.settings.japaneseReading:music.settings.lyricReading) === true;
   const [retryVersion, setRetryVersion] = useState(0);
   const [state, setState] = useState<{ key: string; busy: boolean; error: string | null }>({ key: "", busy: false, error: null });
-  const key = music.track && language && lyrics.data
-    ? JSON.stringify([music.account?.id, language, lyricInputKey(music.track), lyrics.data.lines.map(line => [line.start, line.end, line.text])]) : "";
-  const needsReading = Boolean(lyrics.data?.lines.some(line => line.text.trim() && (line.romanized === undefined || line.readingEngine !== (language?readingEngine(language):""))));
+  const key = useMemo(() => music.track && language && lyrics.data
+    ? JSON.stringify([music.account?.id, language, lyricInputKey(music.track), lyrics.data.lines.map(line => [line.start, line.end, line.text])]) : "", [music.account?.id, music.track, language, lyrics.data]);
+  const needsReading = useMemo(() => Boolean(lyrics.data?.lines.some(line => line.text.trim() && (line.romanized === undefined || line.readingEngine !== (language?readingEngine(language):"")))), [lyrics.data, language]);
   const getReadings = lyrics.getJapaneseReadings;
 
   useEffect(() => {
     if (!enabled || !key || !needsReading) return;
     let cancelled = false;
+    const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let attempt = 0;
     const prepare = async () => {
       if (cancelled) return;
       setState({ key, busy: true, error: null });
       try {
-        await getReadings(language!);
+        await getReadings(language!, controller.signal, music.account?.id);
         if (!cancelled) setState({ key, busy: false, error: null });
       } catch (error) {
         if (cancelled) return;
@@ -36,8 +37,8 @@ export function useJapaneseReading(lyrics: ReturnType<typeof useLyrics>) {
       }
     };
     void prepare();
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [enabled, key, needsReading, getReadings, retryVersion, language]);
+    return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
+  }, [enabled, key, needsReading, getReadings, retryVersion, language, music.account?.id]);
 
   useEffect(() => {
     if (!enabled) return;

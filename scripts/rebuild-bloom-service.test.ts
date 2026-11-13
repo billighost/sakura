@@ -6,6 +6,8 @@ import {createBloomExperience} from "../src/rebuild/bloom/experience";
 import {getBloom,listBloom,listBloomShelf,prepareBloom,revealBloom,completeBloom,archivedBloom} from "../src/rebuild/bloom/service";
 import {ProductError} from "../src/rebuild/data/validation";
 import type {BloomSnapshot} from "../src/rebuild/bloom/snapshot";
+import {applyBloomDisclosureReply,bloomDisclosureReply} from "../src/rebuild/bloom/receipts";
+import {bloomPreparationScope} from "../src/rebuild/bloom/preparationIdentity";
 
 type Stored={account_id:string;recap_id:string;time_zone:string;period_start:string;period_end:string;snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at:Date};
 const stored=new Map<string,Stored>(),timeZones=new Map<string,string>();
@@ -61,6 +63,26 @@ function fixture(account:string,recapId=id,version=4){
 }
 
 describe("Bloom service persistence and reveal contracts without network",()=>{
+ it("serializes database completion dates identically in legacy recaps and compact receipts",async()=>{
+  const row=fixture("wire-date");
+  const prepared=await prepareBloom("wire-date",id,now),scope=bloomPreparationScope(prepared.story);
+  assert.equal(prepared.story.completedAt,null);
+  const first=await revealBloom("wire-date",id,"listening-time",now);
+  const firstReply=bloomDisclosureReply(first,scope);
+  assert.ok("receipt" in firstReply);assert.equal(firstReply.completedAt,null);
+  assert.deepEqual(JSON.parse(JSON.stringify(applyBloomDisclosureReply(prepared,firstReply))),JSON.parse(JSON.stringify(first)));
+  await revealBloom("wire-date",id,"song-count",now);
+  const completed=await completeBloom("wire-date",id,now);
+  assert.ok(row.completed_at instanceof Date);
+  assert.equal(completed.completedAt,now.toISOString());
+  const legacy=bloomDisclosureReply(completed,"old-client");assert.equal(legacy,completed);
+  assert.equal(JSON.stringify(legacy),JSON.stringify({...completed,completedAt:now}),"Legacy Date JSON output is unchanged");
+  const compact=bloomDisclosureReply(completed,scope);assert.ok("receipt" in compact);
+  assert.equal(compact.completedAt,now.toISOString());
+  assert.deepEqual(JSON.parse(JSON.stringify(applyBloomDisclosureReply(prepared,compact))),JSON.parse(JSON.stringify(completed)));
+  assert.equal((await getBloom("wire-date",id,now)).completedAt,now.toISOString());
+  assert.equal((await prepareBloom("wire-date",id,now)).story.completedAt,now.toISOString());
+ });
  it("uses one transaction and the saved timezone for warm preparation and skips duplicate receipt writes",async()=>{
   fixture("lean");timeZones.set("lean","Invalid/Zone");
   let start=operations.length;
@@ -115,6 +137,8 @@ describe("Bloom service persistence and reveal contracts without network",()=>{
   fixture("prepare-owner");
   await assert.rejects(prepareBloom("prepare-other",id,now),error=>error instanceof ProductError&&error.status===409);
   assert.equal(stored.has(key("prepare-other",id)),false);
+  const empty=await prepareBloom("prepare-other",id,now,{includeEmpty:true});
+  assert.equal(empty.story.status,"empty");assert.deepEqual(empty.chapters,[]);assert.equal(stored.has(key("prepare-other",id)),false,"Combined detail still must not freeze empty periods");
   await assert.rejects(prepareBloom("prepare-owner","monthly-2026-11",now),error=>error instanceof ProductError&&error.status===423);
   await assert.rejects(prepareBloom("prepare-owner",id,new Date(bloomWindow(id,now).expiresAt)),error=>error instanceof ProductError&&error.status===410);
  });

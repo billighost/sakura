@@ -18,7 +18,7 @@ test("player toggles expose pressed state and the repeat-one mark",()=>{
  const source=readFileSync(new URL("../src/rebuild/app/Elements.tsx",import.meta.url),"utf8");
  const fullPlayer=readFileSync(new URL("../src/rebuild/player/FullPlayer.tsx",import.meta.url),"utf8");
  assert.match(source,/aria-pressed=\{active\}/);
- assert.match(source,/aria-pressed=\{liked\.has\(id\)\}/);
+ assert.match(source,/aria-pressed=\{liked\}/);
  assert.match(source,/className=\{s\.repeatControl\}/);
  assert.match(source,/p\.repeat==="one"&&<b aria-hidden="true">1<\/b>/);
  assert.match(fullPlayer,/const trackId = track \? music\.effectiveId\(track\) : undefined;/);
@@ -31,6 +31,7 @@ test("memoized collection rows render liked pressed state against the canonical 
  const exports={},context=vm.createContext({module:{exports},exports,require(name:string){
   if(name==="react")return react;if(name==="react/jsx-runtime")return jsx;
   if(name==="./MusicContext")return {useMusic:()=>state};
+  if(name==="./musicView")return {useMusicView:()=>({...state,aliasesRevision:0}),useMusicActions:()=>state,useDownloadEntry:()=>undefined};
   if(name==="../player/imageUrl")return {responsiveArtworkSources:()=>({src:null,srcSet:undefined})};
   if(name==="next/link")return {__esModule:true,default:({children,...props}:react.ComponentProps<"a">)=>react.createElement("a",props,children)};
   if(name==="./SongGesture")return {SongGesture:({children,id}: {children:react.ReactNode;id:string})=>react.createElement("div",{"data-song-id":id},children)};
@@ -72,4 +73,15 @@ test("active player controls have a visible botanical pressed treatment",()=>{
   assert.match(css,/\.active\{[^}]*linear-gradient/);
   assert.match(css,/\.active::after\{[^}]*background:var\(--(?:ink|p)-petal\)/);
  }
+});
+
+test("player dialog ignores descendant file-input cancel while retaining Escape dismissal",()=>{
+ const source=readFileSync(new URL("../src/rebuild/player/CommonPrimitives.tsx",import.meta.url),"utf8");
+ assert.match(source,/onCancel=\{\(event\) => \{[\s\S]*?if \(event\.target !== event\.currentTarget\) return;[\s\S]*?event\.preventDefault\(\); requestClose\(\);[\s\S]*?\}\}/);
+});
+
+test("mobile listening headers keep nested dialog close controls visible",()=>{
+ const styles=readFileSync(new URL("../src/rebuild/player/player.module.css",import.meta.url),"utf8");
+ assert.match(styles,/\.playerDialog>\.dialogInner>\.dialogHeader>\.iconButton,\.lyricsDialog>\.dialogInner>\.dialogHeader>\.iconButton\{display:none\}/);
+ assert.doesNotMatch(styles,/\.lyricsDialog \.dialogHeader>\.iconButton/);
 });

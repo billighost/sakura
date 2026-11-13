@@ -116,7 +116,7 @@ export function CollectionGesture({ children, className = "", kind, id, title, t
     const path=`/api/v2/${endpoint}/${encodeURIComponent(id)}`;
     // Share the page's durable cache and flight. Cancelling this menu action
     // must not cancel another screen's use of the same collection.
-    await loadResource(accountId,path);
+    await loadResource(accountId,path,{signal:controller.signal,kind:"visible"});
     if(!actions.current("collection",controller))return;
     const snapshot=resourceSnapshot<Record<string,unknown>>(accountId,path);
     if(snapshot.error&&snapshot.data===undefined)throw snapshot.error;

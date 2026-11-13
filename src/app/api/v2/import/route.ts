@@ -13,7 +13,7 @@ export async function POST(request:Request){
  if(request.headers.get("X-Sakura-Account")&&request.headers.get("X-Sakura-Account")!==account.id)return Response.json({error:"Session changed"},{status:401});
  try{const body=await readRequestJson(request) as {url?:string;confirm?:boolean;requestId?:string};if(!body||typeof body.url!=="string"||body.url.length>2000||typeof body.confirm!=="boolean")return Response.json({error:"A playlist URL and confirmation choice are required."},{status:400});
   const requestId=body.requestId===undefined?undefined:uuid(body.requestId,"import request ID");
-  const importer=getRebuildServices().importer;const result=body.confirm?await importer.confirm(account.id,body.url,requestId):await importer.preview(body.url,request.signal);return Response.json(result,{headers:{"Cache-Control":"private, no-store"}});
+  const importer=getRebuildServices().importer;const result=body.confirm?await importer.confirm(account.id,body.url,requestId,request.signal):await importer.preview(body.url,request.signal);return Response.json(result,{headers:{"Cache-Control":"private, no-store"}});
  }catch(error){return Response.json({error:error instanceof Error?error.message:"This playlist could not be imported."},{status:error instanceof InputError?400:error instanceof ProductError?error.status:422});}
 
   });

@@ -28,6 +28,7 @@ try{
    return route.fulfill({json:{items:[],recordings:[],feedback:[],tasteEvidence:[]}});
   });
   const page=await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror',error=>report.pageErrors.push(`${width}px: ${error.message}`));
+  await context.route('**/*',route=>new URL(route.request().url()).origin===new URL(base).origin?route.fallback():route.abort());
   await page.goto(base+'/library',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Play A little room',exact:true}).click();
   await page.getByRole('button',{name:'Open now playing',exact:true}).click();

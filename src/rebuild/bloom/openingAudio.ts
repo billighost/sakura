@@ -1,5 +1,6 @@
 import type {BloomDesign} from "./uiTypes";
 import type {BloomWorldId} from "./worlds/types";
+import type {OpeningSamples} from "./openingSamples";
 
 type Instrument="pluck"|"flute"|"bell"|"string"|"felt";
 export type OpeningNote={at:number;midi:number;duration:number;gain:number;pan:number;instrument:Instrument};
@@ -45,17 +46,16 @@ export function bloomOpeningScore(design:BloomDesign,seed=0):OpeningScore{
 export interface OpeningPerformance {fade:(seconds?:number)=>void;dispose:()=>void;endsAt:number}
 
 /** Schedule an entire short score in sample time, without JS polling timers. */
-export function playBloomOpening(context:AudioContext,score:OpeningScore,seed=0):OpeningPerformance{
+export function playBloomOpening(context:AudioContext,score:OpeningScore,samples:OpeningSamples):OpeningPerformance{
+ if(samples.version!==1||samples.sampleRate!==context.sampleRate||samples.impulse.some(channel=>channel.length!==Math.floor(context.sampleRate*2.5))||samples.noise.length!==context.sampleRate*2)throw new Error("Opening samples do not match this audio device");
  const nodes:AudioNode[]=[],sources:AudioScheduledSourceNode[]=[],start=context.currentTime+.045;
  const own=<T extends AudioNode>(node:T)=>{nodes.push(node);return node;};
  const master=own(context.createGain());master.gain.setValueAtTime(0,context.currentTime);master.gain.linearRampToValueAtTime(1.85,start+.85);master.gain.setValueAtTime(1.85,start+score.duration-1.3);master.gain.linearRampToValueAtTime(0,start+score.duration);master.connect(context.destination);
  const dry=own(context.createGain());dry.gain.value=.88;dry.connect(master);
  const reverb=own(context.createConvolver()),wet=own(context.createGain());wet.gain.value=.24;reverb.connect(wet);wet.connect(master);
  const impulse=context.createBuffer(2,Math.floor(context.sampleRate*2.5),context.sampleRate);
- for(let channel=0;channel<2;channel++){
-  const data=impulse.getChannelData(channel);let previous=0;
-  for(let index=0;index<data.length;index++){previous=previous*.32+(fraction(seed+channel*19,index+1)*2-1)*.68;data[index]=previous*Math.pow(1-index/data.length,2.5)*.45;}
- }reverb.buffer=impulse;
+ for(let channel=0;channel<2;channel++)impulse.getChannelData(channel).set(samples.impulse[channel]);
+ reverb.buffer=impulse;
  const harmonics:Record<Instrument,number[]>={pluck:[0,1,.44,.19,.09,.04],flute:[0,1,.14,.065,.025],bell:[0,1,.38,.13,.04],string:[0,1,.34,.17,.065,.025],felt:[0,1,.48,.21,.095,.04]};
  const waves=Object.fromEntries(Object.entries(harmonics).map(([voice,values])=>[voice,context.createPeriodicWave(new Float32Array(values.length),new Float32Array(values),{disableNormalization:false})])) as Record<Instrument,PeriodicWave>;
  for(const note of score.notes){
@@ -71,8 +71,8 @@ export function playBloomOpening(context:AudioContext,score:OpeningScore,seed=0)
  }
  // A band-limited, softly enveloped texture gives pages, tides and light their
  // own physical sound without an abrupt noise transient.
- const noise=context.createBuffer(1,context.sampleRate*2,context.sampleRate),data=noise.getChannelData(0);
- for(let index=0;index<data.length;index++)data[index]=(fraction(seed,index+997)*2-1)*.22;
+ const noise=context.createBuffer(1,context.sampleRate*2,context.sampleRate);
+ noise.getChannelData(0).set(samples.noise);
  for(const [index,offset] of score.textureAt.entries()){
   const source=own(context.createBufferSource()),filter=own(context.createBiquadFilter()),envelope=own(context.createGain()),pan=own(context.createStereoPanner());sources.push(source);
   source.buffer=noise;filter.type="bandpass";filter.Q.value=score.texture==="paper"?.7:.35;

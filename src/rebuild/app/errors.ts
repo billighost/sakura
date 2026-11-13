@@ -88,7 +88,7 @@ export async function requestJson<T=Record<string,unknown>>(url:string,init:Requ
  // A stalled service must not leave a loading state forever. Caller cancellation stays distinct.
  const controller=new AbortController();const abort=()=>controller.abort(init.signal?.reason);if(init.signal?.aborted)abort();else init.signal?.addEventListener("abort",abort,{once:true});
  const timer=setTimeout(()=>controller.abort(new DOMException("Request timed out","TimeoutError")),options.timeoutMs||20000);
- const headers=new Headers(init.headers);if(options.accountId)headers.set("X-Sakura-Account",options.accountId);
+ const headers=new Headers(init.headers);if(options.accountId)headers.set("X-Sakura-Account",options.accountId);if(!headers.has("X-Sakura-DTO"))headers.set("X-Sakura-DTO","3");
  try{return await readJsonResponse<T>(await fetch(url,{credentials:"same-origin",...init,headers,signal:controller.signal}),options);}
  catch(error){if(init.signal?.aborted)throw error;throw error instanceof UserFacingError?error:new UserFacingError(userIssue(error,options.context));}
  finally{clearTimeout(timer);init.signal?.removeEventListener("abort",abort);}

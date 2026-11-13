@@ -1,5 +1,6 @@
 /** Music pages fetch their account data on the client. Keep that same renderer
  * available when a Server Component navigation cannot reach the server. */
+import { clientStaticAssets } from "./cacheClientAssets";
 const routeEvent="sakura-local-navigation";
 let shellMode=false;
 let pendingNavigation:{href:string;replace:boolean;at:number}|null=null;
@@ -74,5 +75,5 @@ export function installPublicOfflineNavigation(isOffline:()=>boolean){
 export function rememberMusicRoute(pathname:string){
  if(pendingNavigation&&typeof location!=="undefined"&&new URL(pendingNavigation.href,location.href).pathname===pathname)pendingNavigation=null;
  if(typeof navigator==="undefined"||!("serviceWorker" in navigator)||!navigator.onLine||!(musicRoute(pathname)||publicRoute(pathname)))return;
- navigator.serviceWorker.controller?.postMessage({type:"sakura-cache-route",path:pathname});
+ navigator.serviceWorker.controller?.postMessage({type:"sakura-cache-route",path:pathname,...clientStaticAssets()});
 }

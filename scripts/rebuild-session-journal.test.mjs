@@ -54,3 +54,10 @@ test('superseded choice snapshots are compacted after the newer choice is durabl
  assert.equal([...f.disk.keys()].filter(key=>key.startsWith('account-a:listening-choice:')).length,1);
  assert.equal([...f.mirror.keys()].filter(key=>key.startsWith('sakura-v2-listening-choice:account-a:')).length,1);f.sync.stop();
 });
+
+for(const storage of [{},{blockedMirror:true},{blockedDisk:true}])test('compaction bounds receipts and a sleeping writer cannot resurrect a retired choice '+JSON.stringify(storage),async()=>{
+ const f=setup(storage);await f.sync.start();f.offline(true);f.sync.change(state(1));await assert.rejects(()=>f.sync.flush());const stale=JSON.parse(JSON.stringify(f.sync.draft));
+ for(let position=2;position<=1000;position++){f.sync.change(state(position));await assert.rejects(()=>f.sync.flush());}
+ assert.ok([...f.disk.keys()].filter(key=>key.startsWith('account-a:listening-receipt:')).length<=1);assert.ok([...f.mirror.keys()].filter(key=>key.startsWith('sakura-v2-listening-receipt:account-a:')).length<=1);assert.ok([...f.mirror.keys()].filter(key=>key.startsWith('sakura-v2-listening-choice:account-a:')).length<=1);
+ f.disk.set('account-a:listening-choice:'+stale.choiceId,stale);f.mirror.set('sakura-v2-listening-choice:account-a:'+stale.choiceId,JSON.stringify(stale));f.sync.stop();const reopened=f.newSync(randomUUID());await reopened.start();assert.equal(f.restored.at(-1).positionMs,1000);reopened.stop();
+});

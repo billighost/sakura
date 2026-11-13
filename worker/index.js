@@ -28,6 +28,7 @@ const http = require("node:http");
 const crypto = require("node:crypto");
 const { TelegramWorkerClient, DEFAULT_BOT } = require("./telegram");
 const { RebuildAudioService } = require("./rebuild/service.cjs");
+const { createWorkerPerformance } = require("./rebuild/performance.cjs");
 const { Api } = require("telegram/tl");
 const bigInt = require("big-integer");
 
@@ -63,15 +64,17 @@ if (!WORKER_SECRET || WORKER_SECRET.length < 24) {
   process.exit(1);
 }
 
+const metrics = createWorkerPerformance(process.env.SAKURA_PERFORMANCE_LOG === "1");
 const client = new TelegramWorkerClient({
   apiId: parseInt(process.env.TELEGRAM_API_ID || "0", 10),
   apiHash: process.env.TELEGRAM_API_HASH || "",
   sessionString: (process.env.TELEGRAM_SESSION_STRING || "").trim(),
   sessionFile: SESSION_FILE,
+  metrics,
 });
 const rebuild = new RebuildAudioService({ telegram: () => client.client, api: Api, bigInt,
   bots: [DEFAULT_BOT, ...(process.env.TELEGRAM_FALLBACK_BOTS || "").split(",").map(bot => bot.trim()).filter(Boolean)],
-  queue: client.botQueue, queueFor: bot => client.queueFor(bot), ensureConnected: () => client._ensureConnected(),onFatal: error => client._goFatal(error) });
+  queue: client.botQueue, queueFor: bot => client.queueFor(bot), ensureConnected: () => client._ensureConnected(),onFatal: error => client._goFatal(error), metrics });
 
 function scopedSignature(bot,messageId,expires,documentTag) {
   return crypto.createHmac("sha256",WORKER_SECRET).update(JSON.stringify([bot.toLowerCase(),String(messageId),expires,...(documentTag?[documentTag]:[])])).digest("hex");
@@ -426,7 +429,7 @@ const server = http.createServer(async (req, res) => {
 
     switch (pathname) {
       case "/v2/capabilities": {
-        sendJson(res,200,{protocol:"v2",botScopes:[...rebuild.bots],features:["exact-metadata-search","verified-metadata-aliases","resumable-ranges","document-etag"]});
+        sendJson(res,200,{protocol:"v2",botScopes:[...rebuild.bots],features:["exact-metadata-search","verified-metadata-aliases","resumable-ranges","document-etag"],...(metrics.enabled?{performance:metrics.snapshot()}:{})});
         return;
       }
       case "/v2/resolve": {

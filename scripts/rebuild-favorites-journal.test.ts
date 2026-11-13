@@ -13,22 +13,22 @@ const track=(id:string):MusicTrack=>({id,title:id,artists:["Artist"],durationMs:
 const intent=(id:string,liked=true,createdAt=1000):FavoriteIntent=>({track:track(id),liked,createdAt,operationId:randomUUID()});
 const plain=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
 function fixture(){
- const disk=new Map<string,unknown>(),mirror=new Map<string,string>();let blockedDisk=false,blockedMirror=false,stamp=2000,transactionTail:Promise<void>=Promise.resolve();
+ const disk=new Map<string,unknown>(),mirror=new Map<string,string>();let diskWrites=0,mirrorWrites=0,entryVisits=0,blockedDisk=false,blockedMirror=false,stamp=2000,transactionTail:Promise<void>=Promise.resolve();
  function transaction(){
   const ready=transactionTail;let complete:()=>void=()=>{},pending=0,generation=0;
   const done=new Promise<void>(resolve=>{complete=resolve;});transactionTail=done;
   const request=async<T>(action:()=>T):Promise<T>=>{pending++;generation++;try{await ready;if(blockedDisk)throw new Error("Storage unavailable");return action();}finally{pending--;const captured=generation;setImmediate(()=>{if(!pending&&captured===generation)complete();});}};
   const diskKey=(key:string)=>key.replace(/^account:/,"");
-  return {done,store:{get:(key:string)=>request(()=>plain(disk.get(diskKey(key))??null)),put:(value:unknown,key:string)=>request(()=>disk.set(diskKey(key),plain(value))),delete:(key:string)=>request(()=>disk.delete(diskKey(key))),getAll:()=>request(()=>[...disk.values()].map(plain))}};
+  return {done,store:{get:(key:string)=>request(()=>plain(disk.get(diskKey(key))??null)),put:(value:unknown,key:string)=>request(()=>{diskWrites++;return disk.set(diskKey(key),plain(value));}),delete:(key:string)=>request(()=>disk.delete(diskKey(key))),getAll:()=>request(()=>[...disk.values()].map(plain))}};
  }
  function tab(){
   const exports:Record<string,unknown>={};
-  vm.runInNewContext(compiled,{exports,Date:{now:()=>stamp},localStorage:{get length(){return mirror.size;},key:(index:number)=>[...mirror.keys()][index]||null,getItem:(key:string)=>mirror.get(key)||null,setItem:(key:string,value:string)=>{if(blockedMirror)throw new Error("Storage unavailable");mirror.set(key,value);},removeItem:(key:string)=>{if(blockedMirror)throw new Error("Storage unavailable");mirror.delete(key);}},require:(name:string)=>name==="./sessionState"?{localId,portableTrack}:name==="./offline"?{
+  vm.runInNewContext(compiled,{exports,Date:{now:()=>stamp},localStorage:{get length(){return mirror.size;},key:(index:number)=>[...mirror.keys()][index]||null,getItem:(key:string)=>mirror.get(key)||null,setItem:(key:string,value:string)=>{if(blockedMirror)throw new Error("Storage unavailable");mirrorWrites++;mirror.set(key,value);},removeItem:(key:string)=>{if(blockedMirror)throw new Error("Storage unavailable");mirror.delete(key);}},require:(name:string)=>name==="./sessionState"?{localId,portableTrack}:name==="./offline"?{
    offlineDatabase:async()=>{if(blockedDisk)throw new Error("Storage unavailable");return {transaction};},
    localRead:async(account:string,key:string)=>plain(disk.get(account+":"+key)??null),
-   localWrite:async(account:string,key:string,value:unknown)=>{if(blockedDisk)throw new Error("Storage unavailable");disk.set(account+":"+key,plain(value));},
+   localWrite:async(account:string,key:string,value:unknown)=>{if(blockedDisk)throw new Error("Storage unavailable");diskWrites++;disk.set(account+":"+key,plain(value));},
    localDelete:async(account:string,key:string)=>disk.delete(account+":"+key),
-   localEntries:async(account:string,prefix:string)=>[...disk].filter(([key])=>key.startsWith(account+":"+prefix)).map(([key,value])=>({name:key.slice(account.length+1),value:plain(value)})),
+   localEntries:async(account:string,prefix:string)=>[...disk].filter(([key])=>key.startsWith(account+":"+prefix)).map(([key,value])=>{entryVisits++;return {name:key.slice(account.length+1),value:plain(value)};}),
   }:{}});
   return exports as unknown as {
    writeFavoriteDraft:(account:string,liked:string[],pending:Record<string,FavoriteIntent>,revisions?:Record<string,number>,serverSnapshot?:{likedIds?:Iterable<string>;revisions?:Record<string,number>;states?:Record<string,{liked:boolean;revision:number}>})=>Promise<void>;
@@ -37,8 +37,28 @@ function fixture(){
    createFavoriteIntent:(account:string,track:MusicTrack,liked:boolean,baseRevision?:number)=>FavoriteIntent;
   };
  }
- return {disk,mirror,tab,now(value:number){stamp=value;},failMirror(){blockedMirror=true;},failDisk(){blockedDisk=true;},fail(){blockedDisk=true;blockedMirror=true;}};
+ return {disk,mirror,tab,counts:()=>({diskWrites,mirrorWrites,entryVisits}),resetCounts(){diskWrites=mirrorWrites=entryVisits=0;},now(value:number){stamp=value;},failMirror(){blockedMirror=true;},failDisk(){blockedDisk=true;},fail(){blockedDisk=true;blockedMirror=true;}};
 }
+
+for(const size of [1000,5000])for(const diskOnly of [false,true])test(`unchanged ${size}-song snapshot performs no writes${diskOnly?" with IndexedDB only":""}`,async()=>{
+ const f=fixture();if(diskOnly)f.failMirror();const tab=f.tab(),ids=Array.from({length:size},(_,i)=>"song-"+i),states=Object.fromEntries(ids.map(id=>[id,{liked:true,revision:1}]));
+ await tab.writeFavoriteDraft("owner",ids,{},undefined,{states});f.resetCounts();await tab.writeFavoriteDraft("owner",ids,{},undefined,{states});assert.equal(f.counts().diskWrites,0);assert.equal(f.counts().mirrorWrites,0);
+ const updated={...states,"song-0":{liked:false,revision:2}};f.resetCounts();await tab.writeFavoriteDraft("owner",ids.slice(1),{},undefined,{states:updated});assert.ok(f.counts().diskWrites<=3,JSON.stringify(f.counts()));if(!diskOnly)assert.ok(f.counts().mirrorWrites<=2,JSON.stringify(f.counts()));assert.equal((await tab.readFavoriteDraft("owner"))?.likedIds.includes("song-0"),false);
+});
+
+test("100,000 reserved orders do not enter favorite hydration",async()=>{
+ const f=fixture(),tab=f.tab(),choice=tab.createFavoriteIntent("owner",track("song"),true);await tab.writeFavoriteDraft("owner",["song"],{song:choice});await tab.acknowledgeFavoriteDraft("owner",choice.operationId,{recordingId:"song",liked:true,revision:1});
+ for(let i=0;i<100000;i++)f.disk.set("owner:favorite-order:historic-"+i,{operationId:"historic-"+i,createdAt:i});f.resetCounts();assert.equal((await tab.readFavoriteDraft("owner"))?.likedIds.includes("song"),true);assert.ok(f.counts().entryVisits<=4,JSON.stringify(f.counts()));
+});
+test("a repeated receipt without its retired intent preserves the newer song watermark",async()=>{
+ const f=fixture(),tab=f.tab(),old=tab.createFavoriteIntent("owner",track("song"),true);await tab.writeFavoriteDraft("owner",["song"],{song:old});await tab.acknowledgeFavoriteDraft("owner",old.operationId,{recordingId:"song",liked:true,revision:1});const current=tab.createFavoriteIntent("owner",track("song"),false);await tab.writeFavoriteDraft("owner",[],{song:current});await tab.acknowledgeFavoriteDraft("owner",current.operationId,{recordingId:"song",liked:false,revision:2});await tab.acknowledgeFavoriteDraft("owner",old.operationId,{recordingId:"song",liked:true,revision:1});await tab.writeFavoriteDraft("owner",["song"],{song:old});const restored=await f.tab().readFavoriteDraft("owner");assert.equal(restored?.likedIds.includes("song"),false);assert.deepEqual(Object.keys(restored?.pending||{}),[]);
+});
+test("legacy confirmations and acknowledgments compact without undoing a newer unlike",async()=>{
+ const f=fixture(),tab=f.tab(),old=tab.createFavoriteIntent("owner",track("song"),true);await tab.writeFavoriteDraft("owner",["song"],{song:old});const current=tab.createFavoriteIntent("owner",track("song"),false);await tab.writeFavoriteDraft("owner",[],{song:current});await tab.acknowledgeFavoriteDraft("owner",current.operationId,{recordingId:"song",liked:false,revision:1001});
+ for(let i=1;i<=1000;i++){const receipt={recordingId:"song",liked:true,revision:i},ack={...receipt,choice:{key:"song",operationId:"historic-"+i,createdAt:i}};f.disk.set("owner:favorite-choice:song:"+i,receipt);f.disk.set("owner:favorite-ack:historic-"+i,ack);f.mirror.set("sakura-v2-favorite-choice:owner:song:"+i,JSON.stringify(receipt));f.mirror.set("sakura-v2-favorite-ack:owner:historic-"+i,JSON.stringify(ack));}
+ await tab.readFavoriteDraft("owner");for(let i=0;i<200&&[...f.disk.keys()].filter(key=>key.startsWith("owner:favorite-choice:")).length>1;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal([...f.disk.keys()].filter(key=>key.startsWith("owner:favorite-choice:")).length,1);assert.equal([...f.disk.keys()].filter(key=>key.startsWith("owner:favorite-ack:")).length,1);await tab.writeFavoriteDraft("owner",["song"],{song:old});assert.equal((await f.tab().readFavoriteDraft("owner"))?.likedIds.includes("song"),false);
+});
 
 test("independent offline tabs preserve every song across complete draft writes",async()=>{
  const f=fixture(),a=f.tab(),b=f.tab(),first=intent("first"),second=intent("second");

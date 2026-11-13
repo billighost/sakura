@@ -8,7 +8,7 @@ class DocumentAttributeAudio{constructor(value){Object.assign(this,value);}}
 class InputDocumentFileLocation{constructor(value){Object.assign(this,value);}}
 const api={Document,DocumentAttributeAudio,InputDocumentFileLocation};
 
-function fixture(){
+function fixture(measure=false){
  const bytes=Buffer.alloc(5000);for(let at=0;at<bytes.length;at++)bytes[at]=at%251;
  const state={fileId:123,downloads:0,handler:null};
  class TelegramWorkerClient{
@@ -24,10 +24,11 @@ function fixture(){
  const mocks={
   dotenv:{config(){}},"node:http":{createServer(handler){state.handler=handler;return{listen(){},close(){}};}},
   "./telegram":{TelegramWorkerClient,DEFAULT_BOT:"primary"},"./rebuild/service.cjs":{RebuildAudioService},"telegram/tl":{Api:api},"big-integer":Number,
+  "./rebuild/performance.cjs":require("./performance.cjs"),
  };
  vm.runInNewContext(readFileSync(path.join(__dirname,"../index.js"),"utf8"),{
   require:name=>Object.hasOwn(mocks,name)?mocks[name]:require(name),
-  process:{env:{WORKER_SECRET:"generated-worker-secret-for-tests",TELEGRAM_API_ID:"1",TELEGRAM_API_HASH:"generated",TELEGRAM_SESSION_STRING:"generated"},on(){},exit(){throw new Error("Worker unexpectedly exited");}},
+  process:{env:{WORKER_SECRET:"generated-worker-secret-for-tests",TELEGRAM_API_ID:"1",TELEGRAM_API_HASH:"generated",TELEGRAM_SESSION_STRING:"generated",SAKURA_PERFORMANCE_LOG:measure?"1":"0"},on(){},exit(){throw new Error("Worker unexpectedly exited");}},
   console:{log(){},warn(){},error(){}},Buffer,URL,URLSearchParams,setTimeout,clearTimeout,
  },{filename:"worker/index.js"});
  async function request(method,url,headers={},body){
@@ -50,6 +51,16 @@ test("actual scoped signed HTTP playback pins its file before HEAD or range byte
  state.fileId=789;assert.equal((await request("POST","/v2/audio-info",bearer,{chatScope:"primary",messageId:"42",refresh:true})).status,200);
  for(const method of ["HEAD","GET"]){const changed=await request(method,signed.path,{range:"bytes=-10"});assert.equal(changed.status,412);assert.equal(changed.bytes.length,0);}
  assert.equal(state.downloads,1);
+});
+test("numeric worker diagnostics remain private and count exact delivered range bytes",async()=>{
+ const {request,bearer,tag}=fixture(true);
+ const denied=await request("POST","/v2/capabilities",{},{});assert.equal(denied.status,401);
+ const signed=JSON.parse((await request("POST","/v2/sign-audio",bearer,{chatScope:"primary",messageId:"42",documentTag:tag})).bytes.toString());
+ await request("GET",signed.path,{range:"bytes=-10"});
+ const capabilities=JSON.parse((await request("POST","/v2/capabilities",bearer,{})).bytes.toString());
+ assert.deepEqual(capabilities.performance.counters,{transfer_bytes:10});
+ assert.ok(!JSON.stringify(capabilities.performance).includes("primary"));
+ const disabled=fixture();assert.equal(JSON.parse((await disabled.request("POST","/v2/capabilities",disabled.bearer,{})).bytes.toString()).performance,undefined);
 });
 
 test("actual scoped signed HTTP rejects document tag tampering and conflicting client preconditions",async()=>{

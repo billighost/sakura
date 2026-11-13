@@ -46,7 +46,12 @@ async function room(variant){
   if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/v2/settings')return route.fulfill({json:{theme:'light',privateSession:true,reducedMotion:true,bloomPerformance:'1',onboarded:true,openingAnimation:0}});
   if(path==='/api/v2/image'){images.push(url.searchParams.get('url'));return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#7c9186"/><circle cx="285" cy="120" r="66" fill="#e6c49e"/></svg>'});}
-  if(path.endsWith('/prepare')){prepares++;await preparedGate.promise;if(variant==='retry'&&prepares===1)return route.fulfill({status:503,json:{error:'Synthetic preparation interruption'}});return route.fulfill({json:{story:recap(),chapters,listening}});}
+  if(path===`/api/v2/bloom/${skeleton.id}`){
+   if(request.method()!=='GET'||[...url.searchParams].some(([key,value])=>key!=='prepare'||value!=='1')){report.errors.push(`Unexpected Bloom detail request: ${request.method()} ${url.pathname}${url.search}`);return route.fulfill({status:501,json:{error:'Unexpected synthetic Bloom detail request'}});}
+   if(url.searchParams.get('prepare')==='1'){prepares++;await preparedGate.promise;if(variant==='retry'&&prepares===1)return route.fulfill({status:503,json:{error:'Synthetic preparation interruption'}});return route.fulfill({json:{story:recap(),chapters,listening}});}
+   return route.fulfill({json:recap()});
+  }
+  if(path.endsWith('/prepare')){report.errors.push(`Obsolete Bloom preparation request: ${request.method()} ${path}`);return route.fulfill({status:501,json:{error:'Obsolete synthetic Bloom preparation request'}});}
   if(path.endsWith('/reveal')){
    const id=request.postDataJSON().chapterId,index=chapters.findIndex(chapter=>chapter.id===id);writes.push(id);
    assert.ok(index>=0);assert.ok(chapters.slice(0,index).every(chapter=>revealed.has(chapter.id)),'server prerequisites remain sequential');
@@ -58,15 +63,14 @@ async function room(variant){
    if(variant==='retry'&&completions===1)return route.fulfill({status:503,json:{error:'Synthetic completion interruption'}});
    await completeGate.promise;completed=true;return route.fulfill({json:recap()});
   }
-  if(path===`/api/v2/bloom/${skeleton.id}`)return route.fulfill({json:recap()});
   if(path==='/api/v2/bloom')return route.fulfill({json:{items:[],schedule:{timeZone:'Africa/Lagos'}}});
   return route.fulfill({json:{items:[],recordings:[],session:null,serverTime:Date.now()}});
  });
  await page.goto(`${base}/bloom/${skeleton.id}`,{waitUntil:'domcontentloaded',timeout:120000});
- const dialog=page.locator('dialog[open]');await dialog.locator('[data-bloom-action="begin"]').waitFor();
- await expect.poll(()=>prepares).toBe(1);assert.deepEqual(writes,[]);
- if(variant==='delayed')await expect(dialog.locator('[data-bloom-action="begin"]')).toBeDisabled();
- else if(variant!=='retry')await dialog.locator('[data-bloom-action="begin"]').click();
+ const dialog=page.locator('dialog[open]');await expect.poll(()=>prepares).toBe(1);assert.deepEqual(writes,[]);
+ if(variant==='delayed')await expect(dialog).toHaveCount(0);
+ else if(variant==='retry')await expect(page.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
+ else{await dialog.locator('[data-bloom-action="begin"]').waitFor();await dialog.locator('[data-bloom-action="begin"]').click();}
  return {context,page,dialog,writes,images,preparedGate,revealGate,completeGate,counts:()=>({prepares,completions,completed,confirmed:revealed.size})};
 }
 
@@ -75,6 +79,7 @@ try{
  await expect.poll(()=>delayed.counts().prepares).toBe(1);
  assert.equal(await delayed.dialog.locator('[aria-current="step"]').count(),0);
  delayed.preparedGate.release();
+ await delayed.dialog.locator('[data-bloom-action="begin"]').waitFor();
  await delayed.dialog.locator('[data-bloom-action="begin"]').click();
  await expect(delayed.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label','Chapter 1: Your listening time.');
  await expect.poll(()=>delayed.writes.length).toBe(1);assert.equal(delayed.counts().confirmed,0);
@@ -105,8 +110,8 @@ try{
  await delayed.context.close();
 
  const retry=await room('retry');
- await expect(retry.dialog.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
- await retry.dialog.getByRole('button',{name:'Reconnect',exact:true}).click();
+ await retry.page.getByRole('button',{name:'Reconnect',exact:true}).click();
+ await retry.dialog.locator('[data-bloom-action="begin"]').waitFor();
  if(await retry.dialog.locator('[data-bloom-action="begin"]').count())await retry.dialog.locator('[data-bloom-action="begin"]').click();
  await expect(retry.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label','Chapter 1: Your listening time.');
  for(let index=1;index<chapters.length;index++){await retry.dialog.locator('[data-bloom-action="next"]').click();await expect(retry.dialog.locator('[aria-current="step"]')).toHaveAttribute('aria-label',`Chapter ${index+1}: ${chapters[index].title}`);}

@@ -7,9 +7,12 @@ import { readMetadataJson, readMetadataText } from "./providers";
 import { catalogTrack, type DeezerCatalogService } from "./catalog";
 import type { RecordingIngestor, SqlTransaction } from "./ingestion";
 import { ProviderFlight } from "./provider-flight";
+import { ProductError } from "../data/validation";
 
 type ImportItem={reference?:ProviderReference;metadata?:RecordingMetadata;title:string;artist:string;status:"matched"|"review"|"unavailable";candidates?:readonly CatalogRecording[]};
 export interface ImportPreview {provider:"deezer"|"spotify"|"youtube";sourceId:string;name:string;coverUrl?:string;items:ImportItem[];total:number;truncated:boolean;}
+export interface ImportResult {playlistId:string;added:number;total:number;review:number;unavailable:number;failed:number;truncated:boolean}
+interface ImportReceipt {account_id:string;source_key:string;result:ImportResult}
 function row(value:unknown):Record<string,unknown>{return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};}
 function runs(value:unknown):string{const raw=row(value);return typeof raw.simpleText==="string"?raw.simpleText:Array.isArray(raw.runs)?raw.runs.map(item=>String(row(item).text??"")).join(""):"";}
 export function youtubeInitialData(text:string):unknown {
@@ -36,6 +39,7 @@ export class MusicCollectionImporter {
  private readonly previewReads=new ProviderFlight<ImportPreview>(100);
  private readonly tokenReads=new ProviderFlight<string>(1);
  private spotifyToken:{value:string;expires:number}|undefined;
+  private receiptSupport:{supported:boolean;expires:number}|undefined;
  constructor(private readonly catalog:DeezerCatalogService,private readonly ingestor:RecordingIngestor,private readonly transaction:SqlTransaction,
    private readonly credentials:{spotifyClientId?:string;spotifyClientSecret?:string;youtubeApiKey?:string}={},private readonly fetcher:typeof fetch=fetch){}
  private async json(url:string,headers?:Record<string,string>,method="GET",body?:string,signal?:AbortSignal){
@@ -123,16 +127,59 @@ export class MusicCollectionImporter {
   }}));}catch(error){matching.abort(error);throw error;}
   return{provider:"youtube",sourceId:id,name,items,total:videos.length,truncated:videos.length>2000};
  }
- async confirm(accountId:string,url:string,requestId?:string){
-  const preview=await this.preview(url),recordingIds:string[]=[],failed:string[]=[];const selected=preview.items.filter(item=>item.status==="matched"&&item.reference);
-  for(let at=0;at<selected.length;at+=4){const results=await Promise.allSettled(selected.slice(at,at+4).map(item=>this.ingestor.ensureRecording(item.reference!,item.metadata)));
-   results.forEach((result,index)=>{if(result.status==="fulfilled")recordingIds.push(result.value.recordingId);else failed.push(selected[at+index].title);});}
-  const unique=[...new Set(recordingIds)];if(!unique.length)throw new Error("No songs were verified. Review the playlist matches before importing.");const playlistId=requestId||randomUUID();
-  await this.transaction(async query=>{
-   if(requestId){await query("SELECT pg_advisory_xact_lock(hashtext('playlist-import:'||$1))",[requestId]);const existing=(await query('SELECT account_id FROM sakura_v2."Playlist" WHERE id=$1::uuid',[requestId]))[0] as {account_id:string}|undefined;if(existing){if(existing.account_id!==accountId)throw new Error("Import request has already been used.");return;}}
+ private async receiptsAvailable(){
+  if(this.receiptSupport&&this.receiptSupport.expires>Date.now())return this.receiptSupport.supported;
+  // An additive migration is reviewed separately. Existing deployments continue
+  // to import safely before it is applied; no DDL ever runs on the request path.
+  const rows=await this.transaction(query=>query<{relation:string|null}>(`SELECT to_regclass('sakura_v2."ImportReceipt"')::text AS relation`,[]));
+  const supported=Boolean(rows[0]?.relation);this.receiptSupport={supported,expires:Date.now()+60000};return supported;
+ }
+ private receiptResult(receipt:ImportReceipt,accountId:string,sourceKey:string):ImportResult{
+  if(receipt.account_id!==accountId||receipt.source_key!==sourceKey)throw new ProductError(409,"Import request has already been used for another collection.");
+  return structuredClone(receipt.result);
+ }
+ async confirm(accountId:string,url:string,requestId?:string,signal?:AbortSignal):Promise<ImportResult>{
+  signal?.throwIfAborted();
+  const source=collectionUrl(url),sourceKey=`${source.provider}:${source.id}`;
+  const receipts=Boolean(requestId)&&await this.receiptsAvailable();
+  if(requestId&&receipts){
+   const existing=(await this.transaction(query=>query<ImportReceipt>('SELECT account_id,source_key,result FROM sakura_v2."ImportReceipt" WHERE request_id=$1::uuid',[requestId])))[0];
+   signal?.throwIfAborted();if(existing)return this.receiptResult(existing,accountId,sourceKey);
+  }
+  const preview=await this.preview(url,signal),selected=preview.items.filter(item=>item.status==="matched"&&item.reference);
+  const recordingIds=new Array<string|undefined>(selected.length);let next=0,failed=0;
+  // A slow item no longer stalls an entire four-item batch. Indexed results keep
+  // source order and duplicate-recording handling identical to the old path.
+  await Promise.all(Array.from({length:Math.min(4,selected.length)},async()=>{
+   while(next<selected.length){
+    signal?.throwIfAborted();const at=next++,item=selected[at];
+    try{recordingIds[at]=(await this.ingestor.ensureRecording(item.reference!,item.metadata,signal)).recordingId;}
+    catch{signal?.throwIfAborted();failed++;}
+   }
+  }));
+  signal?.throwIfAborted();
+  const unique=[...new Set(recordingIds.filter((id):id is string=>Boolean(id)))];
+  if(!unique.length)throw new Error("No songs were verified. Review the playlist matches before importing.");
+  const playlistId=requestId||randomUUID();
+  const result:ImportResult={playlistId,added:unique.length,total:preview.total,review:preview.items.filter(item=>item.status==="review").length,unavailable:preview.items.filter(item=>item.status==="unavailable").length,failed,truncated:preview.truncated};
+  // Cancellation owns preparation. Once the durable transaction starts, it must
+  // finish (or roll back) even if the HTTP response is lost.
+  return this.transaction(async query=>{
+   if(requestId){
+    await query("SELECT pg_advisory_xact_lock(hashtext('playlist-import:'||$1))",[requestId]);
+    if(receipts){const receipt=(await query<ImportReceipt>('SELECT account_id,source_key,result FROM sakura_v2."ImportReceipt" WHERE request_id=$1::uuid',[requestId]))[0];if(receipt)return this.receiptResult(receipt,accountId,sourceKey);}
+    const existing=(await query<{account_id:string}>('SELECT account_id FROM sakura_v2."Playlist" WHERE id=$1::uuid',[requestId]))[0];
+    if(existing){
+     if(existing.account_id!==accountId)throw new ProductError(409,"Import request has already been used.");
+     // A pre-migration playlist has no trustworthy source binding. Keep the
+     // legacy retry behavior rather than inventing a receipt for another URL.
+     return result;
+    }
+   }
    await query(`INSERT INTO sakura_v2."Playlist"(id,account_id,name,description,cover_url) VALUES($1::uuid,$2::uuid,$3,$4,$5)`,[playlistId,accountId,preview.name,`Imported from ${preview.provider}.`,preview.coverUrl??null]);
    await query(`INSERT INTO sakura_v2."PlaylistRecording"(playlist_id,recording_id,position) SELECT $1::uuid,id,ordinality-1 FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id,ordinality)`,[playlistId,unique]);
+   if(requestId&&receipts)await query('INSERT INTO sakura_v2."ImportReceipt"(request_id,account_id,source_key,result) VALUES($1::uuid,$2::uuid,$3,$4::jsonb)',[requestId,accountId,sourceKey,JSON.stringify(result)]);
+   return result;
   });
-  return{playlistId,added:unique.length,total:preview.total,review:preview.items.filter(item=>item.status==="review").length,unavailable:preview.items.filter(item=>item.status==="unavailable").length,failed:failed.length,truncated:preview.truncated};
  }
 }

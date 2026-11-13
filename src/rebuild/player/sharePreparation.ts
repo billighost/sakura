@@ -1,10 +1,16 @@
 import type { MusicTrack } from "../app/types";
 import { SharedFlight } from "../app/sharedFlight";
 import { localRead, validOfflineAudio } from "../app/offline";
+import { inspectAudioInput, previewWorkingBytes, MAX_PREVIEW_WORKING_BYTES, type AudioInputMetadata } from "../audio/mediaInput";
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const MAX_RETAINED_PCM_BYTES = 96 * 1024 * 1024;
 const RETAIN_MS = 2 * 60_000;
+export function shareAudioWorkingBytes(metadata: AudioInputMetadata, encodedBytes: number) {
+  // Native PCM, encoded copies, excerpt/render copies plus the authored 1080
+  // card/video surface. This is a preflight bound, not measured browser RSS.
+  return previewWorkingBytes(metadata, 48_000, encodedBytes, 12) + 16 * 1024 * 1024;
+}
 
 /** A different account, file revision or active Blob must prepare its own audio. */
 export function shareAudioSourceKey(track: MusicTrack, accountId?: string | null) {
@@ -20,13 +26,13 @@ async function verifiedLocalAudio(track: MusicTrack, accountId: string | null | 
 }
 
 async function audioBytes(track: MusicTrack, accountId: string | null | undefined, signal: AbortSignal, preparedBlob?: Blob) {
-  const saved = preparedBlob || await verifiedLocalAudio(track, accountId);
+  const saved = preparedBlob || (!track.audioUrl?.startsWith("blob:") ? await verifiedLocalAudio(track, accountId) : null);
   signal.throwIfAborted();
   if (saved) return saved.arrayBuffer();
   if (!track.audioUrl) throw new Error("Let this recording load before preparing a clip.");
   const response = await fetch(track.audioUrl, { signal });
-  if (!response.ok) throw new Error("The audio for this clip could not be loaded.");
-  if (Number(response.headers.get("Content-Length")) > MAX_AUDIO_BYTES) throw new Error("This recording is too large for a browser clip. Save the PNG card instead.");
+  if (!response.ok) { await response.body?.cancel().catch(() => {}); throw new Error("The audio for this clip could not be loaded."); }
+  if (Number(response.headers.get("Content-Length")) > MAX_AUDIO_BYTES) { await response.body?.cancel().catch(() => {}); throw new Error("This recording is too large for a browser clip. Save the PNG card instead."); }
   if (!response.body) throw new Error("The recording has no audio data.");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -51,9 +57,16 @@ type AudioLoader = (track: MusicTrack, accountId: string | null | undefined, sig
 async function decodeShareAudio(track: MusicTrack, accountId: string | null | undefined, signal: AbortSignal, blob?: Blob) {
   const bytes = await audioBytes(track, accountId, signal, blob);
   signal.throwIfAborted();
+  const metadata = await inspectAudioInput(bytes, signal);
+  signal.throwIfAborted();
+  const encodedBytes = bytes.byteLength;
+  if (shareAudioWorkingBytes(metadata, encodedBytes) > MAX_PREVIEW_WORKING_BYTES)
+    throw new Error("This recording needs too much browser memory for a clip. Save the PNG card instead.");
   // Offline decoding never attaches to or changes the listening player's graph.
   const decoded = await new OfflineAudioContext(2, 1, 48000).decodeAudioData(bytes);
   signal.throwIfAborted();
+  if (shareAudioWorkingBytes({ ...metadata, durationSeconds: decoded.duration, numberOfChannels: decoded.numberOfChannels }, encodedBytes) > MAX_PREVIEW_WORKING_BYTES)
+    throw new Error("This recording needs too much browser memory for a clip. Save the PNG card instead.");
   return decoded;
 }
 

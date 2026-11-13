@@ -2,7 +2,7 @@ import { withApiTiming } from "@/rebuild/server/performance";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { createHash } from "node:crypto";
-import { japaneseReadingCacheKey } from "@/rebuild/lyrics/japanese";
+import { japaneseReadingCacheKey } from "@/rebuild/lyrics/readingIdentity";
 import { LyricRequestError, parseReadingRequest } from "@/rebuild/lyrics/request";
 import { cachedLyricReadings } from "@/rebuild/lyrics/readingTransforms";
 import { readingEngine } from "@/rebuild/lyrics/language";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const input = parseReadingRequest(body);
     const suppliedProof = body && typeof body === "object" && "publicReadingProof" in body ? body.publicReadingProof : undefined;
     const publicReadingProof = typeof suppliedProof === "string" && suppliedProof.length <= 1024 ? suppliedProof : undefined;
-    const lines = await cachedLyricReadings(input.lines, input.language, { publicReadingProof });
+    const lines = await cachedLyricReadings(input.lines, input.language, { publicReadingProof, signal: request.signal });
     return NextResponse.json({
       recordingId: input.recordingId || null, language: input.language, engine: readingEngine(input.language),
       contentKey:input.language==="ja"?japaneseReadingCacheKey(input.lines.map(line=>line.text),input.recordingId):createHash("sha256").update(JSON.stringify([input.recordingId,input.language,readingEngine(input.language),input.lines])).digest("hex"),

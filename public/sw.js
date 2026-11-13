@@ -1,7 +1,14 @@
 const CACHE="sakura-ink-shell-v4";
 const ASSETS="sakura-ink-assets-v1";
 const ARTWORK="sakura-ink-artwork-v1";
+const CACHE_METADATA="sakura-ink-cache-metadata-v1";
+const cacheRecords=new Map();
+const validatedDocuments=new Set();
+const pendingDocumentAssets=new Map();
+let cacheRecordsLoaded,cacheRecordWork=Promise.resolve(),cachePruning,pruneAgain=false;
+const cacheBudgets={assets:{entries:1024,bytes:96*1024*1024,age:90*86400000},artwork:{entries:256,bytes:48*1024*1024,age:30*86400000},documents:{entries:64,bytes:16*1024*1024,age:30*86400000}};
 const resourceFlights=new Map();
+const resourceDurability=new Map();
 const documentFlights=new Map();
 const OFFLINE="/offline";
 const AUDIO_PREFIX="/_sakura/audio/";
@@ -20,6 +27,16 @@ function audioDb(){
  return audioDatabase;
 }
 async function audioEntry(key){const db=await audioDb();return new Promise((resolve,reject)=>{const request=db.transaction("entries","readonly").objectStore("entries").get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+/** One coherent transaction cannot mix a finalized file with an old manifest. */
+async function localAudioEntries(capability,offset){const db=await audioDb(),prefix="account:"+capability.accountId+":";return new Promise((resolve,reject)=>{
+ const tx=db.transaction("entries","readonly"),store=tx.objectStore("entries"),result={};
+ const ready=store.get(prefix+"audio:"+capability.recordingId);ready.onsuccess=()=>{result.ready=ready.result;
+  const saved=ready.result;if(saved?.track?.id===capability.recordingId&&saved.sha256===capability.sha256&&saved.sizeBytes===capability.sizeBytes&&saved.blob instanceof Blob&&saved.blob.size===capability.sizeBytes&&saved.blob.type.startsWith("audio/"))return;
+  const record=store.get(prefix+"download:"+capability.recordingId),chunk=store.get(prefix+"chunk:"+capability.recordingId+":"+offset);
+  record.onsuccess=()=>{result.record=record.result;};chunk.onsuccess=()=>{result.chunk=chunk.result;};
+ };
+ tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("Audio storage read was interrupted."));
+ });}
 async function saveAudioCapability(token,capability){const db=await audioDb();return new Promise((resolve,reject)=>{const tx=db.transaction("entries","readwrite");const {streams,...saved}=capability;void streams;tx.objectStore("entries").put(saved,"audio-bridge:"+token);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function deleteAudioCapability(token){const db=await audioDb();return new Promise((resolve,reject)=>{const tx=db.transaction("entries","readwrite");tx.objectStore("entries").delete("audio-bridge:"+token);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function pruneAudioCapabilities(clientId){const db=await audioDb();return new Promise((resolve,reject)=>{const tx=db.transaction("entries","readwrite"),entries=[];const request=tx.objectStore("entries").openCursor(IDBKeyRange.bound("audio-bridge:","audio-bridge:\uffff"));request.onsuccess=()=>{const cursor=request.result;if(cursor){const saved=cursor.value;if(saved?.expiresAt<Date.now()||saved?.clientId===clientId)cursor.delete();else entries.push({key:cursor.key,issuedAt:saved.issuedAt||0});cursor.continue();}else{entries.sort((a,b)=>b.issuedAt-a.issuedAt);for(const entry of entries.slice(100))tx.objectStore("entries").delete(entry.key);}};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
@@ -31,8 +48,13 @@ function revokeAudioCapability(token){const capability=audioCapabilities.get(tok
 self.addEventListener("message",event=>{
  const data=event.data,clientId=event.source?.id;
  if(!clientId||event.origin&&event.origin!==self.location.origin)return;
- if(data?.type==="sakura-cache-route"&&typeof data.path==="string"&&data.path.length<2048&&documentPath(data.path)){event.waitUntil(cacheDocument(data.path).catch(()=>{}));return;}
+ if(data?.type==="sakura-cache-route"&&typeof data.path==="string"&&data.path.length<2048&&documentPath(data.path)){event.waitUntil((async()=>{const assets=Array.isArray(data.assets)?data.assets.filter(path=>typeof path==="string"&&path.startsWith("/_next/static/")&&path.length<2048).slice(0,512):[];await rememberCacheRecord("client:"+clientId,{kind:"client",clientId,path:data.path,assets,complete:data.assetsComplete===true&&assets.length<512,updatedAt:Date.now()});await cacheDocument(data.path).catch(()=>{});await pruneCacheStorage();})());return;}
  if(data?.type==="sakura-warm-shell"){event.waitUntil(cacheDocument(OFFLINE,true).catch(()=>{}));return;}
+ if(data?.type==="sakura-assets-ready"){
+  const port=event.ports[0];
+  const work=(async()=>{try{while(resourceDurability.size)await Promise.allSettled([...resourceDurability.values()]);await cacheRecordWork.catch(()=>{});port?.postMessage({status:"ready"});}catch{port?.postMessage({status:"unavailable"});}finally{port?.close();}})();
+  event.waitUntil(work);return;
+ }
  if(data?.type==="sakura-audio-revoke"){audioClientEpochs.set(clientId,(audioClientEpochs.get(clientId)||0)+1);revokedAudioClients.add(clientId);for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{for(const [token,capability]of audioCapabilities)if(capability.clientId===clientId)revokeAudioCapability(token);await pruneAudioCapabilities(clientId);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type==="sakura-audio-revoke-token"&&audioUuid.test(data.token)){audioCapabilityWork=audioCapabilityWork.catch(()=>{}).then(async()=>{const active=audioCapabilities.get(data.token),saved=active||await audioEntry("audio-bridge:"+data.token).catch(()=>undefined);if(saved?.clientId!==clientId)return;if(active)revokeAudioCapability(data.token);else await deleteAudioCapability(data.token);});event.waitUntil(audioCapabilityWork);return;}
  if(data?.type!=="sakura-audio-register"||!audioUuid.test(data.token)||!validAudioBridge(data.bridge)){if(data?.type==="sakura-audio-register")event.ports[0]?.postMessage({status:"unavailable"});return;}
@@ -64,12 +86,10 @@ async function verifiedAudioChunk(chunk,offset,size){
  if(sha!==chunk.sha256.toLowerCase())return;return new Uint8Array(data);
 }
 async function localAudioChunk(capability,offset,size){
- const prefix="account:"+capability.accountId+":";
- const ready=await audioEntry(prefix+"audio:"+capability.recordingId);
+ const {ready,record,chunk}=await localAudioEntries(capability,offset);
  if(ready?.track?.id===capability.recordingId&&ready.sha256===capability.sha256&&ready.sizeBytes===capability.sizeBytes&&ready.blob instanceof Blob&&ready.blob.size===capability.sizeBytes&&ready.blob.type.startsWith("audio/"))return {bytes:new Uint8Array(await ready.blob.slice(offset,offset+size).arrayBuffer()),mimeType:ready.blob.type};
- const record=await audioEntry(prefix+"download:"+capability.recordingId);
  if(!audioFingerprintMatches(record,capability))return;
- const bytes=await verifiedAudioChunk(await audioEntry(prefix+"chunk:"+capability.recordingId+":"+offset),offset,size);
+ const bytes=await verifiedAudioChunk(chunk,offset,size);
  if(bytes&&typeof record.mimeType==="string"&&record.mimeType.startsWith("audio/"))return {bytes,mimeType:record.mimeType};
 }
 async function askClientForChunk(capability,token,offset,signal){
@@ -132,11 +152,54 @@ function publicPath(path){return /^\/(?:about|privacy|terms)\/?$/.test(path);}
 function documentPath(path){return musicPath(path)||publicPath(path);}
 async function openCache(name){try{return await caches.open(name);}catch{return undefined;}}
 async function matchCache(cache,request,options){try{return await cache?.match(request,options);}catch{return undefined;}}
-async function timedFetch(input,options={},buffer=false){
+function cacheRecordRequest(key){return new Request(new URL("/__sakura_cache__/"+encodeURIComponent(key),self.location.origin));}
+async function loadCacheRecords(){if(!cacheRecordsLoaded)cacheRecordsLoaded=(async()=>{const cache=await openCache(CACHE_METADATA);if(!cache?.keys)return;const keys=await cache.keys();for(let start=0;start<keys.length;start+=16){await Promise.allSettled(keys.slice(start,start+16).map(async request=>{const response=await matchCache(cache,request);if(!response)return;const value=await response.json();if(value&&["resource","document","client"].includes(value.kind)){const key=decodeURIComponent(new URL(request.url).pathname.slice("/__sakura_cache__/".length));cacheRecords.set(key,value);}}));}})().catch(()=>{});await cacheRecordsLoaded;}
+async function rememberCacheRecord(key,value){await loadCacheRecords();cacheRecords.set(key,value);const work=cacheRecordWork.catch(()=>{}).then(async()=>{if(cacheRecords.get(key)!==value)return;const cache=await openCache(CACHE_METADATA);try{await cache?.put(cacheRecordRequest(key),new Response(JSON.stringify(value),{headers:{"Content-Type":"application/json"}}));}catch{}});cacheRecordWork=work;await work;}
+async function deleteCacheRecord(key){cacheRecords.delete(key);const cache=await openCache(CACHE_METADATA);try{await cache?.delete?.(cacheRecordRequest(key));}catch{}}
+/** Protected offline documents and open old-build tabs take precedence over a budget. */
+async function pruneCacheStorage(pressure=false){
+ if(cachePruning){pruneAgain=true;await cachePruning;return;}
+ const work=(async()=>{await loadCacheRecords();await cacheRecordWork.catch(()=>{});const now=Date.now(),clients=await self.clients.matchAll?.({type:"window",includeUncontrolled:true}).catch(()=>[])||[],liveIds=new Set(clients.map(client=>client.id)),protectedAssets=new Set(),protectedDocuments=new Set([OFFLINE]);let unknownClient=false;
+  for(const client of clients){const record=cacheRecords.get("client:"+client.id);if(!record?.complete)unknownClient=true;if(record?.path)protectedDocuments.add(record.path);for(const path of record?.assets||[])protectedAssets.add(path);}
+  for(const [key,record]of [...cacheRecords])if(record.kind==="client"&&!liveIds.has(record.clientId))await deleteCacheRecord(key);
+  const documents=[...cacheRecords].filter(([,record])=>record.kind==="document").sort((a,b)=>a[1].updatedAt-b[1].updatedAt),shell=await openCache(CACHE);let documentBytes=documents.reduce((sum,[,record])=>sum+record.bytes,0),documentCount=documents.length;
+  const docEntryTarget=pressure?Math.min(cacheBudgets.documents.entries,Math.floor(documentCount/2)):cacheBudgets.documents.entries,docByteTarget=pressure?Math.min(cacheBudgets.documents.bytes,documentBytes/2):cacheBudgets.documents.bytes;
+  for(const [key,record]of documents){if(protectedDocuments.has(record.path))continue;if(documentCount<=docEntryTarget&&documentBytes<=docByteTarget&&record.updatedAt>now-cacheBudgets.documents.age)continue;try{if(await shell?.delete?.(record.path)){documentBytes-=record.bytes;documentCount--;await deleteCacheRecord(key);}}catch{}}
+  // Legacy documents get manifests before any of their dependencies can retire.
+  if(shell?.keys)for(const request of await shell.keys()){const path=new URL(request.url).pathname;if(!documentPath(path)||validatedDocuments.has(path))continue;const response=await matchCache(shell,request);if(response){try{const html=await cachedDocumentText(response),old=cacheRecords.get("document:"+path);await rememberCacheRecord("document:"+path,{kind:"document",path,assets:documentAssets(html),bytes:new TextEncoder().encode(html).length,updatedAt:old?.updatedAt||now});validatedDocuments.add(path);}catch{unknownClient=true;}}}
+  for(const record of cacheRecords.values())if(record.kind==="document")for(const path of record.assets||[])protectedAssets.add(path);
+  for(const path of pendingDocumentAssets.keys())protectedAssets.add(path);
+  for(const [name,budget]of [[ARTWORK,cacheBudgets.artwork],[ASSETS,cacheBudgets.assets]]){const cache=await openCache(name);if(!cache?.keys)continue;const keys=await cache.keys(),records=[];
+   for(const request of keys){const url=new URL(request.url);if(name===ASSETS)url.search="";const key="resource:"+name+":"+url.href;let record=cacheRecords.get(key);if(!record){const response=await matchCache(cache,request),length=Number(response?.headers.get("Content-Length"));record={kind:"resource",name,url:url.href,bytes:Number.isFinite(length)&&length>0?length:256*1024,accessedAt:now};await rememberCacheRecord(key,record);}records.push({key,record,request,path:url.pathname});}
+   let bytes=records.reduce((sum,value)=>sum+value.record.bytes,0),count=records.length;const entryTarget=pressure?Math.min(budget.entries,Math.floor(count/2)):budget.entries,byteTarget=pressure?Math.min(budget.bytes,bytes/2):budget.bytes;records.sort((a,b)=>a.record.accessedAt-b.record.accessedAt);
+   for(const value of records){if(name===ASSETS&&(unknownClient||protectedAssets.has(value.path)))continue;if(count<=entryTarget&&bytes<=byteTarget&&value.record.accessedAt>now-budget.age)continue;try{if(await cache.delete(value.request)){bytes-=value.record.bytes;count--;await deleteCacheRecord(value.key);}}catch{}}
+  }
+  // Historical shell names are expendable only when no old tab can depend on
+  // them and the current neutral shell has every required dependency saved.
+  if(!clients.length&&!pendingDocumentAssets.size){const obsolete=(await caches.keys()).filter(name=>name!==CACHE&&/^sakura-ink-shell-v\d+$/.test(name));if(obsolete.length&&await usableDocument(shell,OFFLINE))for(const name of obsolete)await caches.delete?.(name);}
+ })();cachePruning=work;try{await work;}finally{if(cachePruning===work)cachePruning=undefined;if(pruneAgain){pruneAgain=false;await pruneCacheStorage();}}
+}
+async function putCachedResource(cache,request,response,name){
+ let bytes=0;const reader=response.body?.getReader(),maximum=name===ARTWORK?10*1024*1024:32*1024*1024;
+ const body=reader?new ReadableStream({async pull(controller){try{const value=await reader.read();if(value.done){controller.close();return;}bytes+=value.value.byteLength;if(bytes>maximum)throw new Error("Resource exceeds the device cache limit.");controller.enqueue(value.value);}catch(error){controller.error(error);}},cancel(reason){return reader.cancel(reason);}}):null;
+ const url=new URL(request.url);if(name===ASSETS)url.search="";
+ try{await cache.put(new Request(url.href),new Response(body,{status:response.status,headers:response.headers}));}finally{if(reader){void reader.cancel().catch(()=>{});reader.releaseLock();}}
+ await rememberCacheRecord("resource:"+name+":"+url.href,{kind:"resource",name,url:url.href,bytes,accessedAt:Date.now()});await pruneCacheStorage();
+}
+async function touchCachedResource(request,name){await loadCacheRecords();const url=new URL(request.url);if(name===ASSETS)url.search="";const key="resource:"+name+":"+url.href,record=cacheRecords.get(key);if(record&&record.accessedAt<Date.now()-60000)await rememberCacheRecord(key,{...record,accessedAt:Date.now()});}
+async function timedFetch(input,options={}){
  const controller=new AbortController(),source=options.signal||(input instanceof Request?input.signal:null),abort=()=>controller.abort(source.reason);
  if(source?.aborted)abort();else source?.addEventListener("abort",abort,{once:true});
  const timer=setTimeout(()=>controller.abort(new Error("The connection did not respond in time.")),15000);
- try{const response=await fetch(input,{...options,signal:controller.signal});if(buffer)await response.clone().arrayBuffer();return response;}finally{clearTimeout(timer);source?.removeEventListener("abort",abort);}
+ try{return await fetch(input,{...options,signal:controller.signal});}finally{clearTimeout(timer);source?.removeEventListener("abort",abort);}
+}
+/** Cached documents are bounded independently of the live network response. */
+async function cachedDocumentText(response){
+ const reader=response.body?.getReader();if(!reader)return "";
+ const decoder=new TextDecoder();let bytes=0,text="",timer;
+ const read=(async()=>{while(true){const value=await reader.read();if(value.done)return text+decoder.decode();bytes+=value.value.byteLength;if(bytes>8*1024*1024)throw new Error("The page exceeds the device cache limit.");text+=decoder.decode(value.value,{stream:true});}})();
+ try{return await Promise.race([read,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("The page ended before it could be saved.")),15000);})]);}
+ finally{clearTimeout(timer);void reader.cancel().catch(()=>{});reader.releaseLock();}
 }
 function cacheableResource(request,response,name){
  if(!response.ok||response.status!==200||response.redirected)return false;
@@ -146,23 +209,34 @@ function cacheableResource(request,response,name){
  if(name===ASSETS&&path.endsWith(".css"))return mime.startsWith("text/css");
  return !mime.includes("text/html")||name===CACHE;
 }
-async function cacheFirst(request,name){
+async function cacheFirst(request,name,lifetime,durable=false){
  // Browser storage can be unavailable or full while the network still works.
- const cache=await openCache(name),saved=await matchCache(cache,request,{ignoreSearch:name===ASSETS});if(saved&&cacheableResource(request,saved,name))return saved;
+ const cache=await openCache(name),saved=await matchCache(cache,request,{ignoreSearch:name===ASSETS});if(saved&&cacheableResource(request,saved,name)){const work=touchCachedResource(request,name).catch(()=>{});lifetime?.waitUntil?.(work);return saved;}
  const identity=new URL(request.url);if(name===ASSETS)identity.search="";
  const key=name+":"+identity.href;let flight=resourceFlights.get(key);
  if(!flight){
   // One consumer cancelling its image does not cancel another consumer's copy.
-  flight=(async()=>{const response=await timedFetch(new Request(request,{signal:null}),{},true);if(cacheableResource(request,response,name)){try{await cache?.put(request,response.clone());}catch{}}return response;})();
-  resourceFlights.set(key,flight);void flight.finally(()=>{if(resourceFlights.get(key)===flight)resourceFlights.delete(key);}).catch(()=>{});
+  flight=(async()=>{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(new Error("The resource ended before it could be saved.")),15000);
+   let response;
+   try{response=await fetch(new Request(request,{signal:null}),{signal:controller.signal});}catch(error){clearTimeout(timer);throw error;}
+   const work=(async()=>{try{if(cacheableResource(request,response,name)){const copy=response.clone();try{if(cache)await putCachedResource(cache,request,copy,name);else{const reader=copy.body?.getReader();if(reader)try{while(!(await reader.read()).done){/* Drain without a full-body allocation. */}}finally{reader.releaseLock();}}}catch(error){void copy.body?.cancel().catch(()=>{});if(cache&&error?.name==="QuotaExceededError"){await pruneCacheStorage(true).catch(()=>{});try{await putCachedResource(cache,request,response.clone(),name);}catch{}}}}}finally{clearTimeout(timer);}})();
+   resourceDurability.set(key,work);
+   void work.finally(()=>{if(resourceFlights.get(key)===flight){resourceFlights.delete(key);resourceDurability.delete(key);}setTimeout(()=>{void response.body?.cancel().catch(()=>{});},0);}).catch(()=>{});
+   return response;
+  })();
+  resourceFlights.set(key,flight);void flight.catch(()=>{if(resourceFlights.get(key)===flight){resourceFlights.delete(key);resourceDurability.delete(key);}});
  }
- return (await flight).clone();
+ const response=(await flight).clone(),work=resourceDurability.get(key);
+ if(lifetime?.waitUntil)lifetime.waitUntil(work||Promise.resolve());
+ if(durable)await work;
+ return response;
 }
 function documentAssets(html){return [...new Set(html.match(/\/_next\/static\/[^"\s<>\\]+\.(?:js|css|woff2?)/g)||[])];}
 async function usableDocument(cache,path){
  const response=await matchCache(cache,path);if(!response)return;
  try{
-  const assets=await openCache(ASSETS),critical=documentAssets(await response.clone().text()).filter(path=>/\.(?:js|css)$/.test(path));
+  const assets=await openCache(ASSETS),critical=documentAssets(await cachedDocumentText(response.clone())).filter(path=>/\.(?:js|css)$/.test(path));
   for(const path of critical){const request=new Request(new URL(path,self.location.origin)),saved=await matchCache(assets,request,{ignoreSearch:true});if(!saved||!cacheableResource(request,saved,ASSETS))return;}
   return response;
  }catch{return undefined;}
@@ -171,26 +245,30 @@ async function commitDocument(cache,path,response){
  // A deployment is usable offline only after its critical modules and styles
  // are in durable storage. Failed warming must retain the previous document.
  if(!cache||!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return false;
- const copy=response.clone();let timer;
- const html=await Promise.race([copy.text(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("The page ended before it could be saved.")),15000);})]).finally(()=>clearTimeout(timer));
+ const html=await cachedDocumentText(response.clone());
  const assets=documentAssets(html),assetCache=await openCache(ASSETS);
+ // A new document's dependencies must survive budget pruning until its
+ // manifest replaces the old document. Concurrent warmups own separate pins.
+ for(const path of assets)pendingDocumentAssets.set(path,(pendingDocumentAssets.get(path)||0)+1);
+ try{
  const results=await Promise.allSettled(assets.map(async path=>{
   const request=new Request(new URL(path,self.location.origin)),critical=/\.(?:js|css)$/.test(path);
-  const fetched=await cacheFirst(request,ASSETS),saved=await matchCache(assetCache,request,{ignoreSearch:true});
+  const fetched=await cacheFirst(request,ASSETS,undefined,true),saved=await matchCache(assetCache,request,{ignoreSearch:true});
   if(critical&&(!cacheableResource(request,fetched,ASSETS)||!saved||!cacheableResource(request,saved,ASSETS)))throw new Error("A required page dependency could not be saved.");
  }));
  if(results.some((result,index)=>result.status==="rejected"&&/\.(?:js|css)$/.test(assets[index])))return false;
- try{await cache.put(path,response);return true;}catch{return false;}
+ try{await cache.put(path,response);await rememberCacheRecord("document:"+path,{kind:"document",path,assets,bytes:new TextEncoder().encode(html).length,updatedAt:Date.now()});validatedDocuments.add(path);return true;}catch{return false;}
+ }finally{for(const path of assets){const owners=(pendingDocumentAssets.get(path)||1)-1;if(owners)pendingDocumentAssets.set(path,owners);else pendingDocumentAssets.delete(path);}await pruneCacheStorage().catch(()=>{});}
 }
 async function cacheDocument(path,refresh=false){
  if(!documentPath(path))return;const cache=await openCache(CACHE);if(!cache)return;
  if(!refresh&&await usableDocument(cache,path))return;
  let flight=documentFlights.get(path);if(flight)return flight;
  flight=(async()=>{
-  const response=await timedFetch(path,{cache:"reload",credentials:"same-origin",headers:{Accept:"text/html"}},true);
+  const response=await timedFetch(path,{cache:"reload",credentials:"same-origin",headers:{Accept:"text/html"}});
   // Never persist an authentication redirect as an offline music page.
-  if(!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return;
-  return commitDocument(cache,path,response);
+  try{if(!response.ok||response.redirected||!response.headers.get("Content-Type")?.includes("text/html"))return;
+  return await commitDocument(cache,path,response);}finally{void response.body?.cancel().catch(()=>{});}
  })();documentFlights.set(path,flight);
  try{return await flight;}finally{if(documentFlights.get(path)===flight)documentFlights.delete(path);}
 }
@@ -203,12 +281,13 @@ self.addEventListener("activate",event=>event.waitUntil((async()=>{
  // Artwork and verified audio belong to the device, not this deployment. Keep
  // the previous shell's hashed assets available to already-open player tabs.
  await self.clients.claim();
+ await pruneCacheStorage().catch(()=>{});
 })()));
 self.addEventListener("fetch",event=>{
  const request=event.request;const url=new URL(request.url);
  if(["GET","HEAD"].includes(request.method)&&url.origin===self.location.origin&&url.pathname.startsWith(AUDIO_PREFIX)){event.respondWith(serveDeviceAudio(request,event.clientId,url.pathname.slice(AUDIO_PREFIX.length)));return;}
  if(request.method!=="GET"||url.origin!==self.location.origin)return;
- if(url.pathname==="/api/v2/image"){event.respondWith(cacheFirst(request,ARTWORK));return;}
+ if(url.pathname==="/api/v2/image"){event.respondWith(cacheFirst(request,ARTWORK,event));return;}
  // Account JSON is persisted by Sakura's account-scoped resource store. RSC
  // responses vary by router state and must never share a URL-only cache.
  if(url.pathname.startsWith("/api/")||request.headers.has("RSC")||url.searchParams.has("_rsc"))return;
@@ -234,7 +313,7 @@ self.addEventListener("fetch",event=>{
    return new Response("Open Sakura once while connected to prepare this device for offline listening.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8"}});
   }
  })());return;}
- if(url.pathname.startsWith("/_next/static/")){event.respondWith(cacheFirst(request,ASSETS));return;}
- if(request.destination==="image"&&!url.pathname.startsWith("/icons/")&&url.pathname!=="/favicon.svg"){event.respondWith(cacheFirst(request,ARTWORK));return;}
- if(url.pathname.startsWith("/icons/")||["/manifest.json","/favicon.svg","/lyric-publish-worker.js"].includes(url.pathname))event.respondWith(cacheFirst(request,CACHE));
+ if(url.pathname.startsWith("/_next/static/")){event.respondWith(cacheFirst(request,ASSETS,event));return;}
+ if(request.destination==="image"&&!url.pathname.startsWith("/icons/")&&url.pathname!=="/favicon.svg"){event.respondWith(cacheFirst(request,ARTWORK,event));return;}
+ if(url.pathname.startsWith("/icons/")||["/manifest.json","/favicon.svg","/lyric-publish-worker.js"].includes(url.pathname))event.respondWith(cacheFirst(request,CACHE,event));
 });

@@ -1,4 +1,5 @@
 import {sameBloomStory} from "./refresh";
+import {bloomRecordingArtwork} from "./artwork";
 import type {BloomPreparedStory,BloomRecap} from "./uiTypes";
 
 export interface BloomPreparationProgress {phase:"story"|"assets"|"ready";completed:number;total:number;songsReady:number;songCount:number}
@@ -39,7 +40,7 @@ function abortable<T>(task:Promise<T>,signal:AbortSignal,timeoutMs?:number):Prom
 export function bloomAssetManifest(prepared:BloomPreparedStory){
  const recordings=new Map<string,Record<string,unknown>>(),artwork=new Set<string>();
  const addArtwork=(url:unknown)=>{if(typeof url==="string"&&url)artwork.add(url);};
- const addRecording=(recording:Record<string,unknown>|null|undefined)=>{if(!recording)return;recordings.set(recordingKey(recording),recording);addArtwork(recording.coverUrl);};
+ const addRecording=(recording:Record<string,unknown>|null|undefined)=>{if(!recording)return;recordings.set(recordingKey(recording),recording);addArtwork(bloomRecordingArtwork(recording));};
  for(const chapter of prepared.chapters){
   addRecording(chapter.relatedRecording);
   for(const entry of chapter.recordings||[])addRecording(entry.recording);
@@ -69,9 +70,19 @@ export async function prepareBloomAssets(options:BloomPreparationOptions):Promis
   let completed=0,songsReady=0,audioBytes=0;
   const progress=(ready=false)=>options.onProgress?.({phase:ready?"ready":"assets",completed,total,songsReady,songCount:manifest.recordings.length});
   progress();
-  const tasks:Array<()=>Promise<void>>=[async()=>{await abortable(options.preloadWorld(prepared),signal);signal.throwIfAborted();completed++;progress();},
-   ...manifest.artwork.map(url=>async()=>{await abortable(options.prepareArtwork(url,signal),signal,15000);signal.throwIfAborted();completed++;progress();}),
-   ...manifest.recordings.map(recording=>async()=>{let capabilityReleased=false;const releaseCapability=(capability:{release:()=>void})=>{if(!capabilityReleased){capabilityReleased=true;capability.release();}};const pending=options.prepareAudio(recording,signal);void pending.then(capability=>{if(signal.aborted||released)releaseCapability(capability);},()=>{});const capability=await abortable(pending,signal);if(signal.aborted||released){releaseCapability(capability);signal.throwIfAborted();throw new Error("Bloom preparation was cancelled.");}const limits=options.limits?.(),size=capability.sizeBytes;if(limits&&(!Number.isSafeInteger(size)||size!<=0||audioBytes+size!>limits.maxAudioBytes)){releaseCapability(capability);throw new Error("This Bloom will finish saving when you open its welcome screen.");}audioBytes+=size||0;audio.set(recordingKey(recording),capability);releases.push(()=>releaseCapability(capability));songsReady++;completed++;progress();})];
+  const firstRecording=manifest.recordings.shift();
+  const duration=(recording:Record<string,unknown>)=>{const metadata=recording.metadata as {durationMs?:unknown}|undefined;const value=Number(recording.durationMs??metadata?.durationMs);return Number.isFinite(value)&&value>0?value:0;};
+  manifest.recordings.sort((a,b)=>duration(b)-duration(a));
+  if(firstRecording)manifest.recordings.unshift(firstRecording);
+  const artworkTasks=manifest.artwork.map(url=>async()=>{await abortable(options.prepareArtwork(url,signal),signal,15000);signal.throwIfAborted();completed++;progress();});
+  const audioTasks=manifest.recordings.map(recording=>async()=>{let capabilityReleased=false;const releaseCapability=(capability:{release:()=>void})=>{if(!capabilityReleased){capabilityReleased=true;capability.release();}};const pending=options.prepareAudio(recording,signal);void pending.then(capability=>{if(signal.aborted||released)releaseCapability(capability);},()=>{});const capability=await abortable(pending,signal);if(signal.aborted||released){releaseCapability(capability);signal.throwIfAborted();throw new Error("Bloom preparation was cancelled.");}const limits=options.limits?.(),size=capability.sizeBytes;if(limits&&(!Number.isSafeInteger(size)||size!<=0||audioBytes+size!>limits.maxAudioBytes)){releaseCapability(capability);throw new Error("This Bloom will finish saving when you open its welcome screen.");}audioBytes+=size||0;audio.set(recordingKey(recording),capability);releases.push(()=>releaseCapability(capability));songsReady++;completed++;progress();});
+  const tasks:Array<()=>Promise<void>>=[async()=>{await abortable(options.preloadWorld(prepared),signal);signal.throwIfAborted();completed++;progress();}];
+  // Start soundtrack work alongside the first sleeves instead of behind every
+  // image. Keep the same three-owner ceiling and the complete final gate.
+  for(let index=0;index<Math.max(audioTasks.length,artworkTasks.length);index++){
+   if(audioTasks[index])tasks.push(audioTasks[index]);
+   if(artworkTasks[index])tasks.push(artworkTasks[index]);
+  }
   let next=0,failed:unknown;
   // Three consumers limit metadata/storage work; the shared download scheduler
   // gives active playback and explicit saves priority over these full files.

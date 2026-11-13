@@ -1,5 +1,13 @@
 import type {MusicTrack} from "./types";
 
+/** The attached, account-owned full Blob is already the exact selected audio.
+ * Prefer it to fetching that same recording again through its HTTP gateway. */
+export function previewSourceUrls(track: MusicTrack): string[] {
+ const local=track.audioUrl?.startsWith("blob:")?track.audioUrl:undefined;
+ return [...new Set([local,track.readyPlayback?.fallbackUrl,track.audioUrl,track.readyPlayback?.url]
+  .filter((value):value is string=>!!value))];
+}
+
 /** Only immutable, canonical CDN pointers can bypass recording resolution. */
 export function readyPlaybackFor(track:MusicTrack){
  const ready=track.readyPlayback;

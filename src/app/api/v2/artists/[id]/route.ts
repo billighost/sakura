@@ -3,6 +3,6 @@ import { productResponse } from "@/rebuild/data/http";
 import { getArtist } from "@/rebuild/data/product";
 type Context={params:Promise<{id:string}>};
 export async function GET(request:Request,context:Context){
-  return withApiTiming("/api/v2/artists/[id]", request, async () => {return productResponse(request,async a=>getArtist(a.id,(await context.params).id));
+  return withApiTiming("/api/v2/artists/[id]", request, async () => {return productResponse(request,async a=>getArtist(a.id,(await context.params).id,request.signal));
   });
 }

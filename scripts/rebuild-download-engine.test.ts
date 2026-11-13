@@ -34,6 +34,33 @@ function setup(options:{data?:Uint8Array;storage?:MemoryStorage;delay?:number;li
 async function until(condition:()=>boolean,timeout=2000){const end=Date.now()+timeout;while(!condition()){if(Date.now()>end)throw new Error("Condition did not become true");await new Promise(resolve=>setTimeout(resolve,5));}}
 async function withoutWebLocks(operation:()=>Promise<void>){const descriptor=Object.getOwnPropertyDescriptor(globalThis,"navigator");Object.defineProperty(globalThis,"navigator",{value:{onLine:true},configurable:true});try{await operation();}finally{if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}}
 
+test("metadata-first hydration exposes saved and paused rows without reading complete or partial Blob payloads",async()=>{
+ class MetadataStorage extends MemoryStorage {
+  fullReads=0;chunkReads=0;
+  async allReadyMetadata(){return [...this.audio.values()].map(audio=>({version:1 as const,track:audio.track,sha256:audio.sha256,sizeBytes:audio.sizeBytes,savedAt:audio.savedAt,requested:audio.requested}));}
+  async allReady(){this.fullReads++;return super.allReady();}
+  async chunks(id:string){this.chunkReads++;return super.chunks(id);}
+ }
+ const storage=new MetadataStorage(),data=bytes(4096);for(let i=0;i<500;i++)storage.audio.set("saved"+i,{track:track("saved"+i),blob:new Blob([data],{type:"audio/mpeg"}),sha256:sha(data),sizeBytes:data.length,savedAt:Date.now(),requested:true});
+ for(let i=0;i<50;i++){const id="partial"+i;storage.records.set(id,{version:1,recordingId:id,track:track(id),status:"paused",requested:true,mode:"full",priority:0,chunkBytes:4096,createdAt:Date.now(),updatedAt:Date.now(),fingerprint:{assetId:"asset-"+id,sizeBytes:8192,sha256:"a".repeat(64)},downloadedBytes:4096});storage.parts.set(id,new Map([[0,{offset:0,blob:new Blob([data],{type:"audio/mpeg"}),sha256:sha(data)}]]));}
+ const f=setup({storage});try{await f.manager.hydrate();assert.equal(Object.keys(f.snapshot).length,550);assert.equal(f.manager.getReadyTracks().length,500);assert.equal(storage.fullReads,0);assert.equal(storage.chunkReads,0);assert.equal(f.requests,0);
+  assert.equal((await f.manager.ensureChunk("partial0",0))?.blob.size,4096);assert.equal(storage.chunkReads,1);assert.equal(f.requests,0);
+ }finally{f.manager.dispose();}
+});
+
+test("speculative owners cancel independently and completed next songs retain Saved behavior",async()=>{
+ const f=setup({delay:15}),first=new AbortController(),second=new AbortController();
+ try{const a=f.manager.enqueueSpeculative(track("1"),{signal:first.signal}),b=f.manager.enqueueSpeculative(track("1"),{signal:second.signal});void a.catch(()=>{});await until(()=>f.rangeStarts.length>0);first.abort();await assert.rejects(a,{name:"AbortError"});await b;assert.equal(f.snapshot["1"].status,"ready");assert.equal(f.storage.audio.get("1")?.requested,true);assert.equal(f.requests,8);second.abort();assert.equal(f.storage.audio.get("1")?.requested,true);
+ }finally{first.abort();second.abort();f.manager.dispose();}
+});
+
+test("the last obsolete speculative owner parks unfinished work while explicit saves remain protected",async()=>{
+ const f=setup({delay:35}),obsolete=new AbortController();
+ try{const pending=f.manager.enqueueSpeculative(track("1"),{signal:obsolete.signal});void pending.catch(()=>{});await until(()=>f.rangeStarts.length>0);obsolete.abort();await assert.rejects(pending,{name:"AbortError"});await until(()=>f.snapshot["1"].status==="paused");const requests=f.requests;await new Promise(resolve=>setTimeout(resolve,100));assert.equal(f.requests,requests);assert.equal(f.storage.audio.has("1"),false);
+  const controller=new AbortController(),speculation=f.manager.enqueueSpeculative(track("1"),{signal:controller.signal});void speculation.catch(()=>{});const explicit=f.manager.enqueue(track("1"));controller.abort();await assert.rejects(speculation,{name:"AbortError"});await explicit;assert.equal(f.storage.audio.get("1")?.requested,true);
+ }finally{obsolete.abort();f.manager.dispose();}
+});
+
 test("full experience preparation verifies all bytes and survives playback or prefix joins",async()=>{
  const f=setup({delay:12});const controller=new AbortController();
  try{const pending=f.manager.prepareFull(track("1"),controller.signal);await until(()=>f.rangeStarts.length>0);assert.equal(f.storage.audio.has("1"),false);await f.manager.ensureChunk("1",0);void f.manager.enqueue(track("1"),{mode:"prefix",requested:false}).catch(()=>{});await f.manager.prepare("1");const prepared=await pending;assert.equal(prepared.audio.blob.size,f.data.length);assert.equal(prepared.audio.sha256,sha(f.data));assert.equal(prepared.audio.requested,false);assert.equal(f.snapshot["1"].status,"ready");assert.equal(f.requests,8);prepared.release();prepared.release();}finally{controller.abort();f.manager.dispose();}
@@ -47,6 +74,43 @@ test("canceling one full-preparation consumer retains another and an explicit do
 test("prepared full experiences pin automatic cache until their final consumer releases",async()=>{
  const f=setup(),controller=new AbortController(),leases:Array<{audio:OfflineAudio;release:()=>void}>=[];
  try{for(let value=1;value<=14;value++)leases.push(await f.manager.prepareFull(track(String(value)),controller.signal));assert.equal(f.storage.audio.size,14);f.manager.setPriorities([]);await new Promise(resolve=>setTimeout(resolve,20));assert.equal(f.storage.audio.size,14);leases[0].release();leases[1].release();await until(()=>f.storage.audio.size<=12);for(const value of leases.slice(2))assert.equal(f.storage.audio.has(value.audio.track.id),true);}finally{controller.abort();for(const lease of leases)lease.release();f.manager.dispose();}
+});
+
+test("history erasure releases this document's current and stale preparation pins only",async()=>{
+ class PinStorage extends MemoryStorage {
+  pins:Array<{recordingId:string;owner:string;expiresAt:number}>=[];lastOwner="";
+  async pinAutomatic(recordingId:string,owner:string,expiresAt:number){this.lastOwner=owner;this.pins=this.pins.filter(pin=>pin.recordingId!==recordingId||pin.owner!==owner);this.pins.push({recordingId,owner,expiresAt});}
+  async releaseAutomaticPin(recordingId:string,owner:string){this.pins=this.pins.filter(pin=>pin.recordingId!==recordingId||pin.owner!==owner);}
+  async releaseAutomaticPins(ownerPrefix:string){this.pins=this.pins.filter(pin=>!pin.owner.startsWith(ownerPrefix));}
+ }
+ const storage=new PinStorage(),f=setup({storage}),controller=new AbortController();try{
+  const prepared=await f.manager.prepareFull(track("1"),controller.signal),marker=storage.lastOwner.lastIndexOf(":prepare:");assert.ok(marker>0);const prefix=storage.lastOwner.slice(0,marker+":prepare:".length);
+  storage.pins.push({recordingId:"1",owner:prefix+"stale",expiresAt:Date.now()+90000},{recordingId:"1",owner:"another-tab:prepare:active",expiresAt:Date.now()+90000});
+  await f.manager.releasePreparationPins();assert.deepEqual(storage.pins.map(pin=>pin.recordingId+":"+pin.owner),["1:another-tab:prepare:active"]);prepared.release();
+ }finally{controller.abort();f.manager.dispose();}
+});
+
+test("a preparation started after erasure keeps its rotated live pin",async()=>{
+ let enterCleanup:()=>void=()=>{},finishCleanup:()=>void=()=>{};const cleanupEntered=new Promise<void>(resolve=>{enterCleanup=resolve;}),cleanupGate=new Promise<void>(resolve=>{finishCleanup=resolve;});
+ class PinStorage extends MemoryStorage {
+  pins:Array<{recordingId:string;owner:string}>=[];
+  async pinAutomatic(recordingId:string,owner:string){this.pins=this.pins.filter(pin=>pin.recordingId!==recordingId||pin.owner!==owner);this.pins.push({recordingId,owner});}
+  async releaseAutomaticPin(recordingId:string,owner:string){this.pins=this.pins.filter(pin=>pin.recordingId!==recordingId||pin.owner!==owner);}
+  async releaseAutomaticPins(ownerPrefix:string){enterCleanup();await cleanupGate;this.pins=this.pins.filter(pin=>!pin.owner.startsWith(ownerPrefix));}
+ }
+ const storage=new PinStorage(),f=setup({storage}),first=new AbortController(),second=new AbortController();try{
+  const old=await f.manager.prepareFull(track("1"),first.signal),cleanup=f.manager.releasePreparationPins();await cleanupEntered;
+  const fresh=await f.manager.prepareFull(track("2"),second.signal),freshPin=storage.pins.find(pin=>pin.recordingId==="2");assert.ok(freshPin);finishCleanup();await cleanup;
+  assert.equal(storage.pins.some(pin=>pin.recordingId==="1"),false);assert.equal(storage.pins.some(pin=>pin.recordingId==="2"&&pin.owner===freshPin.owner),true);old.release();fresh.release();
+ }finally{finishCleanup();first.abort();second.abort();f.manager.dispose();}
+});
+
+test("a reopened manager drains only its account's interrupted erasure cleanup",async()=>{
+ const descriptor=Object.getOwnPropertyDescriptor(globalThis,"sessionStorage"),values=new Map<string,string>(),cleanupKey="sakura-v2-audio-preparation-cleanup",now=Date.now();values.set(cleanupKey,JSON.stringify([{accountId:"account-a",ownerPrefix:"old-tab:prepare:",createdAt:now},{accountId:"account-b",ownerPrefix:"other-account:prepare:",createdAt:now}]));
+ Object.defineProperty(globalThis,"sessionStorage",{configurable:true,value:{getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)}});
+ class CleanupStorage extends MemoryStorage {released:string[]=[];async releaseAutomaticPins(ownerPrefix:string){this.released.push(ownerPrefix);}}
+ const storage=new CleanupStorage(),f=setup({storage});try{await until(()=>storage.released.length===1);assert.deepEqual(storage.released,["old-tab:prepare:"]);assert.deepEqual(JSON.parse(values.get(cleanupKey)||"[]").map((item:{accountId:string})=>item.accountId),["account-b"]);}
+ finally{f.manager.dispose();if(descriptor)Object.defineProperty(globalThis,"sessionStorage",descriptor);else Reflect.deleteProperty(globalThis,"sessionStorage");}
 });
 
 test("automatic cache returns to its budget after delayed storage unpin commits",async()=>{
@@ -358,7 +422,7 @@ test("failed persistence after fallback lease loss reports a failed job without 
  const interval=globalThis.setInterval;globalThis.setInterval=((callback:()=>void)=>interval(callback,10)) as typeof setInterval;const storage=new MemoryStorage(),save=storage.save.bind(storage),lease=storage.lease.bind(storage);let calls=0;storage.lease=async(id,owner,expiresAt)=>++calls===1?lease(id,owner,expiresAt):false;storage.save=async record=>{if(record.status==="paused")throw new DOMException("Cannot persist the pause","QuotaExceededError");await save(record);};const s=setup({storage,delay:50});try{const pending=s.manager.enqueue(track("1")).catch(()=>{});await until(()=>s.snapshot["1"]?.status==="failed");await pending;assert.match(s.snapshot["1"].error||"",/Cannot persist/);assert.equal(storage.audio.size,0);}finally{s.manager.dispose();globalThis.setInterval=interval;}
 }));
 test("one failed partial-storage read does not block other restored downloads or its own retry",async()=>{
- const storage=new MemoryStorage(),now=Date.now();for(const recordingId of ["1","2"])storage.records.set(recordingId,{version:1,recordingId,track:track(recordingId),status:"downloading",mode:"full",requested:true,priority:0,chunkBytes:4096,createdAt:now,updatedAt:now});const chunks=storage.chunks.bind(storage);let blocked=true;storage.chunks=async id=>{if(id==="1"&&blocked){blocked=false;throw new Error("A partial file could not be read");}return chunks(id);};const s=setup({storage});try{await s.manager.hydrate();await until(()=>s.snapshot["2"]?.status==="ready");assert.equal(s.snapshot["1"]?.status,"failed");assert.match(s.snapshot["1"].error||"",/partial file/);await s.manager.resume("1");assert.equal(s.snapshot["1"].status,"ready");assert.equal(storage.audio.size,2);}finally{s.manager.dispose();}
+ const storage=new MemoryStorage(),now=Date.now();for(const recordingId of ["1","2"])storage.records.set(recordingId,{version:1,recordingId,track:track(recordingId),status:"downloading",mode:"full",requested:true,priority:0,chunkBytes:4096,createdAt:now,updatedAt:now,fingerprint:{assetId:"asset-"+recordingId,sizeBytes:bytes().length,sha256:sha(bytes())}});const chunks=storage.chunks.bind(storage);let blocked=true;storage.chunks=async id=>{if(id==="1"&&blocked){blocked=false;throw new Error("A partial file could not be read");}return chunks(id);};const s=setup({storage});try{await s.manager.hydrate();await until(()=>s.snapshot["2"]?.status==="ready");assert.equal(s.snapshot["1"]?.status,"failed");assert.match(s.snapshot["1"].error||"",/partial file/);await s.manager.resume("1");assert.equal(s.snapshot["1"].status,"ready");assert.equal(storage.audio.size,2);}finally{s.manager.dispose();}
 });
 test("demoting failed automatic playback does not restart source discovery before an explicit replay",async()=>{
  const data=bytes();let blocked=true,resolves=0;const s=setup({data,resolve:async value=>{resolves++;if(blocked)throw new Error("This recording is unavailable");return {track:value,url:"https://cdn.example/1",assetId:"asset-1",sizeBytes:data.length,sha256:sha(data)};}});try{await assert.rejects(s.manager.enqueue(track("1"),{requested:false}),/unavailable/);await s.manager.prepare("1");await new Promise(resolve=>setTimeout(resolve,40));assert.equal(resolves,1);assert.equal(s.requests,0);assert.equal(s.snapshot["1"].status,"failed");assert.equal(s.storage.records.get("1")?.mode,"prefix");blocked=false;await s.manager.enqueue(track("1"),{requested:false});assert.equal(s.snapshot["1"].status,"ready");assert.equal(resolves,2);}finally{s.manager.dispose();}

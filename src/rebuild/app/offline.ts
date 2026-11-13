@@ -25,13 +25,32 @@ export async function localEntries<T>(accountId:string,prefix:string):Promise<Ar
  return result;
 }
 export interface OfflineAudio {track:MusicTrack;blob:Blob;sha256:string;sizeBytes:number;savedAt:number;requested?:boolean}
+export interface OfflineAudioMetadata {version:1;track:MusicTrack;sha256:string;sizeBytes:number;savedAt:number;requested?:boolean}
+export const offlineAudioMetadata=(audio:OfflineAudio):OfflineAudioMetadata=>({version:1,track:audio.track,sha256:audio.sha256,sizeBytes:audio.sizeBytes,savedAt:audio.savedAt,requested:audio.requested});
+const audioMetadataCaches=new Map<string,{generation:number;value?:OfflineAudioMetadata[];until:number;flight?:Promise<OfflineAudioMetadata[]>}>();
+export function invalidateSavedAudioMetadata(accountId:string){const cached=audioMetadataCaches.get(accountId);if(cached){cached.generation++;cached.value=undefined;cached.until=0;}}
+function validAudioMetadata(value:unknown):value is OfflineAudioMetadata {const saved=value as Partial<OfflineAudioMetadata>|undefined;return saved?.version===1&&typeof saved.track?.id==="string"&&!!saved.track.id&&Number.isSafeInteger(saved.sizeBytes)&&saved.sizeBytes!>0&&saved.sizeBytes!<=120*1024*1024&&typeof saved.sha256==="string"&&/^[a-f0-9]{64}$/i.test(saved.sha256)&&Number.isFinite(saved.savedAt);}
+/** Legacy files are indexed once; ordinary queue planning never deserializes audio Blobs. */
+export async function savedAudioMetadata(accountId:string):Promise<OfflineAudioMetadata[]>{
+ let cached=audioMetadataCaches.get(accountId);if(!cached){cached={generation:0,until:0};audioMetadataCaches.set(accountId,cached);if(audioMetadataCaches.size>4){for(const [id,value]of audioMetadataCaches)if(id!==accountId&&!value.flight){audioMetadataCaches.delete(id);break;}}}
+ if(cached.value&&cached.until>Date.now())return cached.value;if(cached.flight)return cached.flight;
+ const owner=cached;
+ const flight=(async()=>{while(true){const generation=owner.generation,database=await db(),audioPrefix=key(accountId,"audio:"),metaPrefix=key(accountId,"audio-meta:");
+  const [audioKeys,metadata]=await Promise.all([database.getAllKeys("entries",IDBKeyRange.bound(audioPrefix,audioPrefix+"\uffff")),database.getAll("entries",IDBKeyRange.bound(metaPrefix,metaPrefix+"\uffff"))]);
+  const ids=audioKeys.map(String).map(name=>name.slice(audioPrefix.length)),rows=new Map<string,OfflineAudioMetadata>();for(const value of metadata)if(validAudioMetadata(value))rows.set(value.track.id,value);
+  const missing=ids.filter(id=>!rows.has(id));
+  if(missing.length){for(let start=0;start<missing.length;start+=16){const tx=database.transaction("entries","readwrite");for(const id of missing.slice(start,start+16)){const current=await tx.store.get(audioPrefix+id);if(validOfflineAudio(current)&&current.track.id===id){const value=offlineAudioMetadata(current);await tx.store.put(value,metaPrefix+id);rows.set(id,value);}}await tx.done;}}
+  if(generation!==owner.generation)continue;
+  const value=ids.flatMap(id=>{const item=rows.get(id);return item?[item]:[];});owner.value=value;owner.until=Date.now()+15000;return value;
+ }})();owner.flight=flight;try{return await flight;}finally{if(owner.flight===flight)owner.flight=undefined;}
+}
 export function validOfflineAudio(value:unknown):value is OfflineAudio {
  const saved=value as Partial<OfflineAudio>|null;
  return !!saved&&saved.blob instanceof Blob&&saved.blob.type.startsWith("audio/")&&typeof saved.sizeBytes==="number"&&Number.isSafeInteger(saved.sizeBytes)&&saved.sizeBytes>0&&saved.sizeBytes<=120*1024*1024&&saved.blob.size===saved.sizeBytes&&typeof saved.sha256==="string"&&/^[a-f0-9]{64}$/i.test(saved.sha256)&&typeof saved.track?.id==="string"&&!!saved.track.id;
 }
 export async function savedAudio(accountId:string):Promise<OfflineAudio[]>{const result:OfflineAudio[]=[];const prefix=key(accountId,"audio:");let cursor=await (await db()).transaction("entries").store.openCursor(IDBKeyRange.bound(prefix,prefix+"\uffff"));while(cursor){if(validOfflineAudio(cursor.value)&&String(cursor.key)===key(accountId,"audio:"+cursor.value.track.id))result.push(cursor.value);cursor=await cursor.continue();}return result;}
 /** Cached account data may be discarded without deleting this account's downloaded songs. */
-export async function removeAccountCache(accountId:string,options:{includeDownloads?:boolean}={}){const database=await db(),tx=database.transaction("entries","readwrite");let cursor=await tx.store.openCursor();while(cursor){const name=String(cursor.key);const audio=["audio:","download:","chunk:"].some(prefix=>name.startsWith(key(accountId,prefix)));if(name.startsWith(key(accountId,""))&&(options.includeDownloads||!audio))await cursor.delete();cursor=await cursor.continue();}await tx.done;const active=await database.get("entries","last-account") as Account|undefined;if(active?.id===accountId)await forgetActiveAccount();}
+export async function removeAccountCache(accountId:string,options:{includeDownloads?:boolean}={}){const database=await db(),tx=database.transaction("entries","readwrite"),prefix=key(accountId,"");let cursor=await tx.store.openCursor(IDBKeyRange.bound(prefix,prefix+"\uffff"));while(cursor){const name=String(cursor.key);const audio=["audio:","audio-meta:","download:","chunk:"].some(prefix=>name.startsWith(key(accountId,prefix)));if(options.includeDownloads||!audio)await cursor.delete();cursor=await cursor.continue();}await tx.done;invalidateSavedAudioMetadata(accountId);const active=await database.get("entries","last-account") as Account|undefined;if(active?.id===accountId)await forgetActiveAccount();}
 export async function forgetActiveAccount(){try{localStorage.removeItem("sakura-v2-active-account");localStorage.removeItem("sakura-v2-theme");}catch{}await (await db()).delete("entries","last-account");}
 export async function rememberAccount(account:Account){try{localStorage.setItem("sakura-v2-active-account",account.id);}catch{}await (await db()).put("entries",account,"last-account");}
 export async function lastAccount():Promise<Account|undefined>{return (await db()).get("entries","last-account");}
@@ -53,6 +72,7 @@ const listenClearRanges=new Map<string,{period:"week"|"month"|"all";cutoffMs:num
 const listenFlightChunks=new Map<string,ListenChunk>();
 const listenRejections=new Set<string>();
 const listenDrainPositions=new Map<string,string>();
+const listenScanPositions=new Map<string,string>();
 function validListenChunk(value:unknown):value is ListenChunk {
  const chunk=value as Partial<ListenChunk>|null;
  return !!chunk&&typeof chunk.eventId==="string"&&!!chunk.eventId&&typeof chunk.recordingId==="string"&&!!chunk.recordingId&&Number.isSafeInteger(chunk.sequence)&&chunk.sequence!>=0&&chunk.sequence!<=100000&&Number.isSafeInteger(chunk.msPlayed)&&chunk.msPlayed!>=0&&chunk.msPlayed!<=120000&&Number.isSafeInteger(chunk.positionMs)&&chunk.positionMs!>=0&&chunk.positionMs!<=21600000&&typeof chunk.completed==="boolean"&&(chunk.skipped===undefined||typeof chunk.skipped==="boolean")&&(chunk.finished===undefined||typeof chunk.finished==="boolean")&&typeof chunk.context==="string"&&!!chunk.context.trim()&&chunk.context.length<=40&&(chunk.contextId==null||typeof chunk.contextId==="string"&&!!chunk.contextId.trim()&&chunk.contextId.length<=120)&&(chunk.occurredAt===undefined||typeof chunk.occurredAt==="string"&&Number.isFinite(Date.parse(chunk.occurredAt)));
@@ -105,7 +125,10 @@ export async function deliverListen(accountId:string,chunk:ListenChunk,timeoutMs
 export async function drainListen(accountId:string,options:{timeoutMs?:number;maxDurationMs?:number;maxChunks?:number}={}){
  const deadline=performance.now()+(options.maxDurationMs??10000);
  const pending=new Map<string,ListenChunk>(),invalidDisk:string[]=[],invalidMirror:string[]=[];
- try{let cursor=await (await db()).transaction("entries").store.openCursor();while(cursor){const name=String(cursor.key);if(name.startsWith(key(accountId,"listen:"))){const chunk=cursor.value;if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidDisk.push(name.slice(key(accountId,"").length));}cursor=await cursor.continue();}}catch{}
+ try{const prefix=key(accountId,"listen:"),upper=prefix+"\uffff",database=await db(),limit=Math.max(100,Math.min(1000,(options.maxChunks??100)*2));let position=listenScanPositions.get(accountId)||await localRead<string>(accountId,"listen-scan-progress").catch(()=>undefined);if(position&&!position.startsWith(prefix))position=undefined;const seen=new Set<string>();let last=position;
+  for(const [pass,bounds]of (position?[[position,upper],[prefix,position]]:[[prefix,upper]]).entries()){let cursor=await database.transaction("entries").store.openCursor(IDBKeyRange.bound(bounds[0],bounds[1]));while(cursor&&seen.size<limit&&performance.now()<deadline){const name=String(cursor.key);if(!seen.has(name)&&(name!==position||pass>0)){seen.add(name);last=name;const chunk=cursor.value;if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidDisk.push(name.slice(key(accountId,"").length));}cursor=await cursor.continue();}if(seen.size>=limit||performance.now()>=deadline)break;}
+  if(last){listenScanPositions.set(accountId,last);await localWrite(accountId,"listen-scan-progress",last).catch(()=>{});}
+ }catch{}
  try{for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name?.startsWith("sakura-v2-outbox:"+accountId+":")){try{const chunk:unknown=JSON.parse(localStorage.getItem(name)||"null");if(validListenChunk(chunk))pending.set(chunk.eventId+":"+chunk.sequence,chunk);else invalidMirror.push(name);}catch{invalidMirror.push(name);}}}for(const name of invalidMirror)localStorage.removeItem(name);}catch{}
  await Promise.allSettled(invalidDisk.map(name=>localDelete(accountId,name)));
  let position=listenDrainPositions.get(accountId);try{position=localStorage.getItem("sakura-v2-listen-drain:"+accountId)||position;}catch{}

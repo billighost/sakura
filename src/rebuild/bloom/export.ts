@@ -1,6 +1,7 @@
 import type {BloomDesign,BloomRecap} from "./uiTypes";
 import type {BloomQuality} from "./worlds/types";
 import {checkExportCanceled,exportCheckpoint,yieldExport} from "../player/exportWork";
+import {bloomExportOwner,bloomExportPng,waitForBloomExport} from "./exportLifecycle";
 export async function exportBloomCard(recap:BloomRecap,design:BloomDesign,theme:"light"|"dark",demo=false,_liveCanvas?:HTMLElement,quality:BloomQuality=5,signal?:AbortSignal){
  checkExportCanceled(signal);
  if(!["herbarium","nocturne","risograph"].includes(design)){
@@ -11,10 +12,11 @@ export async function exportBloomCard(recap:BloomRecap,design:BloomDesign,theme:
 }
 async function exportLegacyBloomCard(recap:BloomRecap,design:BloomDesign,theme:"light"|"dark",demo=false,signal?:AbortSignal){
  await yieldExport(signal);
+ const owner=bloomExportOwner(signal);signal=owner.signal;
  const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1920;
  try{
  const context=canvas.getContext("2d");if(!context)throw new Error("Canvas unavailable");const ctx=context;
- await document.fonts.ready;
+ await waitForBloomExport(()=>document.fonts.ready,{signal,message:"The Bloom fonts could not finish loading. Please try again."});
  const colors=design==="herbarium"?(theme==="dark"?["#172922","#e6e7cb","#c39b97"]:["#f3f1dc","#344e3d","#bc7a86"]):design==="nocturne"?(theme==="dark"?["#10182c","#ece6f5","#c6a7ed"]:["#e8e5f0","#26213f","#77609b"]):(theme==="dark"?["#261d34","#fbded0","#f38d69"]:["#f8d5b6","#37214d","#ef6946"]);
  const [bg,ink,accent]=colors;ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);
  if(design==="herbarium"){ctx.save();ctx.translate(850,380);ctx.rotate(.2);ctx.globalAlpha=.3;for(let i=0;i<8;i++){ctx.rotate(Math.PI/4);ctx.beginPath();ctx.ellipse(0,-130,80,190,0,0,Math.PI*2);ctx.fillStyle=accent;ctx.fill();}ctx.restore();ctx.strokeStyle=accent;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(1020,120);ctx.bezierCurveTo(700,300,1100,650,620,1750);ctx.stroke();for(let i=0;i<4;i++){ctx.save();ctx.translate(1000-i*65,700+i*220);ctx.rotate(i%2?.5:-.6);ctx.globalAlpha=.16;ctx.fillStyle=accent;ctx.beginPath();ctx.ellipse(0,0,40,130,0,0,Math.PI*2);ctx.fill();ctx.restore();}}
@@ -31,6 +33,6 @@ async function exportLegacyBloomCard(recap:BloomRecap,design:BloomDesign,theme:"
  ctx.fillStyle=ink;ctx.font=`italic 27px ${serif}`;ctx.fillText("The songs and artists in your listening story.",80,1840);
  if(demo){ctx.font=`18px ${sans}`;ctx.fillStyle=accent;ctx.fillText("DESIGN PREVIEW · SAMPLE LISTENING",80,1880);}
  await yieldExport(signal);
- const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Image unavailable")),"image/png"));checkExportCanceled(signal);return new File([blob],`sakura-bloom-${recap.id}.png`,{type:"image/png"});
- }finally{canvas.width=0;canvas.height=0;}
+ const blob=await bloomExportPng(canvas,signal);checkExportCanceled(signal);return new File([blob],`sakura-bloom-${recap.id}.png`,{type:"image/png"});
+ }finally{owner.release();canvas.width=0;canvas.height=0;}
 }

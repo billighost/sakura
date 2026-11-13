@@ -134,7 +134,9 @@ test("iPhone fixed element volume still produces the saved level, mute and dry b
   } finally { await browser.close(); }
 });
 test("Actual browser renders preserve None, safe peaks, crossfeed mono and comparison timing", { timeout: 60000 }, async () => {
-  const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets }), analysis = await browserModule("src/rebuild/audio/analysis.ts", { "./presets": presets }), preview = await browserModule("src/rebuild/audio/preview.ts", { "./presets": presets, "./engine": engine, "./analysis": analysis });
+  const presets = await browserModule("src/rebuild/audio/presets.ts"), engine = await browserModule("src/rebuild/audio/engine.ts", { "./presets": presets }), analysis = await browserModule("src/rebuild/audio/analysis.ts", { "./presets": presets });
+  const session = await browserModule("src/rebuild/audio/analysisSession.ts", { "./analysis": analysis });
+  const preview = await browserModule("src/rebuild/audio/preview.ts", { "./presets": presets, "./engine": engine, "./analysis": analysis, "./analysisSession": session });
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   try {
     const page = await browser.newPage();

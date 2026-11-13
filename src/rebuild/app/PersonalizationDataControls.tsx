@@ -5,12 +5,12 @@ import { useMusic } from "./MusicContext";
 import { useResource, invalidateResources } from "./resources";
 import { invalidateRecommendationResources } from "./recommendationResources";
 import { useScreenActions } from "./screenActions";
-import { requestJson, userMessage } from "./errors";
+import { requestJson, readJsonResponse,userMessage } from "./errors";
 import { musicTrack } from "./types";
 import { Button, LoadError } from "./Elements";
 import { Blossom } from "./Brand";
 import { Icon } from "./Icon";
-import { PlayerButton, PlayerDialog } from "../player/Primitives";
+import { PlayerButton, PlayerDialog } from "../player/CommonPrimitives";
 import { requestDialogClose } from "./dialogLifecycle";
 import type { TasteFeedback } from "../recommendations/personalization";
 import s from "./listening-profile.module.css";
@@ -78,14 +78,22 @@ function DataControls() {
     if (!accountId) return;
     const controller = actions.begin("export"); if (!controller) return;
     setExporting(true); setError(null);
+    const transfer=new AbortController(),abort=()=>transfer.abort(controller.signal.reason);
+    controller.signal.addEventListener("abort",abort,{once:true});
+    if(controller.signal.aborted)abort();
+    const timeout=setTimeout(()=>transfer.abort(new DOMException("Export timed out","TimeoutError")),300000);
     try {
-      const data = await requestJson("/api/v2/personalization/data", { signal: controller.signal }, { context: "save", accountId });
+      const response=await fetch("/api/v2/personalization/data",{credentials:"same-origin",signal:transfer.signal,headers:{"X-Sakura-Account":accountId,"X-Sakura-DTO":"3"}});
+      if(!response.ok)await readJsonResponse(response,{context:"save"});
+      // Keep the complete file in native Blob storage. Parsing and pretty
+      // stringifying every measurement creates two unnecessary JS copies.
+      const file=await response.blob();
       if (!actions.current("export", controller)) return;
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const url = URL.createObjectURL(file);
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = `sakura-my-listening-data-${new Date().toISOString().slice(0, 10)}.json`; anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000); music.notify("Your data export is ready.");
     } catch (failure) { if (actions.current("export", controller)) setError(userMessage(failure, "save")); }
-    finally { if (actions.finish("export", controller)) setExporting(false); }
+    finally { clearTimeout(timeout);controller.signal.removeEventListener("abort",abort);if (actions.finish("export", controller)) setExporting(false); }
   }
   const feedback = resource.data?.feedback || [], displayed = showAll ? feedback : feedback.slice(0, 5);
   return <section className={s.dataControls} id="listening-data" aria-label="Your listening data">

@@ -1,13 +1,17 @@
-import {localRead,localWriteOrdered,localDelete,localEntries} from "./offline";
+import {localRead,localWriteOrdered,localDelete,localEntries,offlineDatabase} from "./offline";
 import {requestJson} from "./errors";
 import type {ListeningSession,SessionDraft,SessionRecord} from "./sessionState";
-import {localId} from "./sessionState";
+import {localId,sessionRequestBody} from "./sessionState";
 
 const prefix="sakura-v2-listening:";
 const choicePrefix=(accountId:string)=>"sakura-v2-listening-choice:"+accountId+":";
 const receiptPrefix=(accountId:string)=>"sakura-v2-listening-receipt:"+accountId+":";
 interface ChoiceDraft extends SessionDraft {choiceId:string;choiceOrder:number}
-interface ChoiceReceipt {throughSavedAt:number;record?:SessionRecord;superseded?:boolean}
+interface ChoiceReceipt {throughSavedAt:number;record?:SessionRecord;superseded?:boolean;choiceOrder?:number}
+interface ChoiceFloor {choiceOrder:number;choiceId:string;savedAt:number}
+const floorPrefix="sakura-v2-listening-floor:";
+function floor(value:unknown):ChoiceFloor|undefined {const item=value as ChoiceFloor|undefined;return item&&Number.isSafeInteger(item.choiceOrder)&&item.choiceOrder>=0&&typeof item.choiceId==="string"&&item.choiceId?item:undefined;}
+function floorCompare(left:ChoiceFloor,right:ChoiceFloor){return left.choiceOrder-right.choiceOrder||left.choiceId.localeCompare(right.choiceId);}
 function validState(value:unknown):value is ListeningSession {
  if(!value||typeof value!=="object")return false;const state=value as ListeningSession;
  if(!Array.isArray(state.queue)||state.queue.length>80)return false;const seen=new Set<string>();
@@ -60,8 +64,11 @@ export class ListeningSync {
  private clockKnown=false;
  private intentStartedAt:number|null=null;
  private storageFailureReported=false;
- constructor(private accountId:string,private deviceId:string,private restore:(state:ListeningSession)=>void,private onStorageError?:(error:unknown)=>void){}
- private order(){return Math.min(Number.MAX_SAFE_INTEGER,Math.max(Date.now(),this.draft?.choiceOrder||0,...mirrorEntries(choicePrefix(this.accountId)).map(entry=>storedDraft(entry.value)?.choiceOrder||0),storedDraft(readJson(prefix+this.accountId))?.choiceOrder||0)+1);}
+ private protocol=1;
+ private acknowledgedQueue:string|undefined;
+ private acknowledgedKey:string|undefined;
+ constructor(private accountId:string,private deviceId:string,private restore:(state:ListeningSession)=>void,private onStorageError?:(error:unknown)=>void,private readSession?:(signal:AbortSignal)=>Promise<{session:unknown;serverTime?:number;protocol?:number}>,private invalidateSession?:()=>void ){}
+ private order(){return Math.min(Number.MAX_SAFE_INTEGER,Math.max(Date.now(),this.draft?.choiceOrder||0,floor(readJson(floorPrefix+this.accountId))?.choiceOrder||0,...mirrorEntries(choicePrefix(this.accountId)).map(entry=>storedDraft(entry.value)?.choiceOrder||0),storedDraft(readJson(prefix+this.accountId))?.choiceOrder||0)+1);}
  private stamp(){return Math.min(Number.MAX_SAFE_INTEGER,Math.max(Date.now(),(this.draft?.savedAt||0)+1,(storedDraft(readJson(prefix+this.accountId))?.savedAt||0)+1));}
  private save(){
   if(!this.draft)return;const draft={...this.draft},name=choicePrefix(this.accountId)+draft.choiceId;
@@ -73,29 +80,38 @@ export class ListeningSync {
     await localWriteOrdered(this.accountId,"listening-choice:"+draft.choiceId,draft as unknown as Record<string,unknown>);
     await localWriteOrdered(this.accountId,"listening-session",draft as unknown as Record<string,unknown>,"choiceOrder");this.storageFailureReported=false;
     await this.compact(draft);
-   }catch(error){if(!mirrored){if(!this.storageFailureReported){this.storageFailureReported=true;this.onStorageError?.(error);}throw error;}}
+   }catch(error){if(mirrored)await this.compact(draft).catch(()=>{});else{if(!this.storageFailureReported){this.storageFailureReported=true;this.onStorageError?.(error);}throw error;}}
   });void this.writes.catch(()=>{});
  }
  private writeReceipt(choiceId:string,value:ChoiceReceipt){
+  if(this.draft?.choiceId===choiceId)value={...value,choiceOrder:this.draft.choiceOrder};
   try{const previous=receipt(readJson(receiptPrefix(this.accountId)+choiceId));if(!previous||previous.throughSavedAt<=value.throughSavedAt)localStorage.setItem(receiptPrefix(this.accountId)+choiceId,JSON.stringify(value));}catch{}
   this.writes=this.writes.catch(()=>{}).then(()=>localWriteOrdered(this.accountId,"listening-receipt:"+choiceId,value as unknown as Record<string,unknown>,"throughSavedAt"));void this.writes.catch(()=>{});
  }
  private async compact(current:ChoiceDraft){
-  const entries=await localEntries<unknown>(this.accountId,"listening-choice:");
+  // A durable monotonic floor replaces one permanent tombstone per retired
+  // choice. Write it before removing either storage path's older records.
+  const checkpoint:ChoiceFloor={choiceOrder:current.choiceOrder,choiceId:current.choiceId,savedAt:current.savedAt};let mirrorFloor=false;
+  try{const old=floor(readJson(floorPrefix+this.accountId));if(!old||floorCompare(checkpoint,old)>0)localStorage.setItem(floorPrefix+this.accountId,JSON.stringify(checkpoint));mirrorFloor=true;}catch{}
+  let diskFloor=false;try{const database=await offlineDatabase(),tx=database.transaction("entries","readwrite"),done=tx.done;void done.catch(()=>{});const name="account:"+this.accountId+":listening-floor",old=floor(await tx.store.get(name));if(!old||floorCompare(checkpoint,old)>0)await tx.store.put(checkpoint,name);await done;diskFloor=true;}catch{}
+  if(!mirrorFloor&&!diskFloor)return;
+  const entries=[...await localEntries<unknown>(this.accountId,"listening-choice:").catch(()=>[]),...mirrorEntries(choicePrefix(this.accountId)).map(entry=>({name:"listening-choice:"+entry.name,value:entry.value}))];
   for(const entry of entries){const old=storedDraft(entry.value);if(!old||old.choiceId===current.choiceId||newer(old,current)>=0)continue;
-   const retired:ChoiceReceipt={throughSavedAt:Number.MAX_SAFE_INTEGER,superseded:true};
-   await localWriteOrdered(this.accountId,"listening-receipt:"+old.choiceId,retired as unknown as Record<string,unknown>,"throughSavedAt");
-   try{localStorage.setItem(receiptPrefix(this.accountId)+old.choiceId,JSON.stringify(retired));localStorage.removeItem(choicePrefix(this.accountId)+old.choiceId);}catch{}
-   await localDelete(this.accountId,entry.name);
+   if(mirrorFloor)try{localStorage.removeItem(choicePrefix(this.accountId)+old.choiceId);localStorage.removeItem(receiptPrefix(this.accountId)+old.choiceId);}catch{}
+   if(diskFloor){await localDelete(this.accountId,entry.name);await localDelete(this.accountId,"listening-receipt:"+old.choiceId);}
   }
+  const retained=new Set(entries.map(entry=>storedDraft(entry.value)).filter((entry):entry is ChoiceDraft=>!!entry&&newer(entry,current)>=0).map(entry=>entry.choiceId));retained.add(current.choiceId);
+  if(diskFloor)for(const entry of await localEntries<unknown>(this.accountId,"listening-receipt:")){const id=entry.name.slice("listening-receipt:".length),value=receipt(entry.value);if(!retained.has(id)&&(!value?.choiceOrder||value.choiceOrder<current.choiceOrder))await localDelete(this.accountId,entry.name);}
+  if(mirrorFloor)for(const entry of mirrorEntries(receiptPrefix(this.accountId))){const value=receipt(entry.value);if(!retained.has(entry.name)&&(!value?.choiceOrder||value.choiceOrder<current.choiceOrder))try{localStorage.removeItem(receiptPrefix(this.accountId)+entry.name);}catch{}}
  }
  private async localDraft(){
-  const [legacy,choices,receipts]=await Promise.all([localRead<unknown>(this.accountId,"listening-session").catch(()=>undefined),localEntries<unknown>(this.accountId,"listening-choice:").catch(()=>[]),localEntries<unknown>(this.accountId,"listening-receipt:").catch(()=>[])]);
+  const [legacy,choices,receipts,diskFloor]=await Promise.all([localRead<unknown>(this.accountId,"listening-session").catch(()=>undefined),localEntries<unknown>(this.accountId,"listening-choice:").catch(()=>[]),localEntries<unknown>(this.accountId,"listening-receipt:").catch(()=>[]),localRead<unknown>(this.accountId,"listening-floor").catch(()=>undefined)]);
+  const floors=[floor(diskFloor),floor(readJson(floorPrefix+this.accountId))].filter((item):item is ChoiceFloor=>!!item).sort(floorCompare),checkpoint=floors.at(-1);
   const acknowledgments=new Map<string,ChoiceReceipt>();
   for(const entry of [...receipts.map(entry=>({name:entry.name.slice("listening-receipt:".length),value:entry.value})),...mirrorEntries(receiptPrefix(this.accountId))]){const clean=receipt(entry.value),old=acknowledgments.get(entry.name);if(clean&&(!old||clean.throughSavedAt>old.throughSavedAt))acknowledgments.set(entry.name,clean);}
   let latest:ChoiceDraft|undefined;
   for(const value of [legacy,readJson(prefix+this.accountId),...choices.map(entry=>entry.value),...mirrorEntries(choicePrefix(this.accountId)).map(entry=>entry.value)]){
-   let clean=storedDraft(value);if(!clean)continue;const ack=acknowledgments.get(clean.choiceId);if(ack?.superseded)continue;
+   let clean=storedDraft(value);if(!clean||checkpoint&&floorCompare(clean,checkpoint)<0)continue;const ack=acknowledgments.get(clean.choiceId);if(ack?.superseded)continue;
    if(ack?.record&&clean.savedAt<=ack.throughSavedAt)clean={...clean,...ack.record,state:{...ack.record.state,sleepUntil:ack.record.state.sleepUntil&&ack.record.state.sleepUntil>Date.now()?ack.record.state.sleepUntil:null},pending:false,intent:false,intentAt:undefined};
    if(!latest||newer(clean,latest)>0)latest=clean;
   }
@@ -125,7 +141,7 @@ export class ListeningSync {
  }
  private adopt(record:SessionRecord){
   if(this.draft)this.writeReceipt(this.draft.choiceId,{throughSavedAt:Number.MAX_SAFE_INTEGER,superseded:true});
-  const choiceOrder=this.order(),savedAt=this.stamp();this.draft={...record,choiceId:localId(),choiceOrder,pending:false,savedAt,clockOffset:this.clockKnown?this.clockOffset:undefined};this.explicit=false;this.intentStartedAt=null;this.save();this.restore(record.state);
+  const choiceOrder=this.order(),savedAt=this.stamp();this.draft={...record,choiceId:localId(),choiceOrder,pending:false,savedAt,clockOffset:this.clockKnown?this.clockOffset:undefined};this.acknowledgedQueue=JSON.stringify(record.state.queue);this.acknowledgedKey=record.queueKey;this.explicit=false;this.intentStartedAt=null;this.save();this.restore(record.state);
  }
  private rebaseOwnCheckpoint(record:SessionRecord):boolean {
   if(!this.draft)return false;const ownLiveWriter=record.deviceId===this.deviceId&&this.sequence>0,ownRestoredWriter=this.sequence===0&&this.draft.pending&&record.deviceId===this.draft.deviceId;
@@ -135,8 +151,9 @@ export class ListeningSync {
  async refresh(){
   if(this.stopped||this.request)return;await this.writes.catch(()=>{});await this.reconcileLocal();if(this.stopped||this.request)return;const before=this.sequence;
   const request=(async()=>{
-   const data=await requestJson<{session:unknown;serverTime?:number}>("/api/v2/listening-session",{signal:this.controller.signal},{context:"save",accountId:this.accountId});
+   const data=await (this.readSession?this.readSession(this.controller.signal):requestJson<{session:unknown;serverTime?:number;protocol?:number}>("/api/v2/listening-session",{signal:this.controller.signal},{context:"save",accountId:this.accountId}));
    if(this.stopped)return;this.calibrate(data.serverTime);if(before!==this.sequence)return;
+   if(data.protocol===2)this.protocol=2;
    if(data.session===null)return;const remote=serverRecord(data.session);if(!remote)throw new Error("The saved listening session is incomplete.");
    if(this.draft?.pending&&this.explicit&&(this.draft.intentAt??this.draft.savedAt)>choiceTime(remote)){this.draft.revision=remote.revision;this.save();return;}
    if(!this.draft||remote.revision>this.draft.revision){if(!this.rebaseOwnCheckpoint(remote))this.adopt(remote);}
@@ -146,18 +163,25 @@ export class ListeningSync {
   if(this.stopped||!this.ready)return;const pendingRequest=this.request;if(pendingRequest){await pendingRequest.catch(()=>{});return this.flush(keepalive);}
   if(!this.draft?.pending)return;await this.writes;await this.reconcileLocal();if(this.stopped||!this.draft?.pending)return;
   if(this.request){await this.request.catch(()=>{});return this.flush(keepalive);}const sent={...this.draft},before=this.sequence;
+  const body=await sessionRequestBody(sent.state,{protocol:this.protocol,queueKey:this.acknowledgedKey,checkpoint:this.acknowledgedQueue===JSON.stringify(sent.state.queue),keepalive,revision:sent.revision,deviceId:this.deviceId,explicit:sent.intent===true,...(sent.intent&&Number.isFinite(sent.intentAt)?{intentAt:Math.max(0,Math.floor(sent.intentAt!))}:{})});
+  if(body===null||this.stopped)return;
+  // Compression yields. Re-enter if another save started in the meantime.
+  const concurrent=this.request as Promise<void>|null;if(concurrent){await concurrent.catch(()=>{});return this.flush(keepalive);}
   const request=(async()=>{
-   const data=await requestJson<{accepted:unknown;session:unknown;serverTime?:number}>("/api/v2/listening-session",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({state:sent.state,revision:sent.revision,deviceId:this.deviceId,explicit:sent.intent===true,...(sent.intent&&Number.isFinite(sent.intentAt)?{intentAt:Math.max(0,Math.floor(sent.intentAt!))}:{})}),signal:this.controller.signal,keepalive},{context:"save",accountId:this.accountId});
+   const data=await requestJson<{accepted:unknown;session:unknown;serverTime?:number;protocol?:number}>("/api/v2/listening-session",{method:"PUT",headers:{"Content-Type":"application/json"},body,signal:this.controller.signal,keepalive},{context:"save",accountId:this.accountId});
    if(this.stopped)return;
    if(typeof data.accepted!=="boolean")throw new Error("The listening session was not acknowledged.");
-   if(data.accepted===false&&data.session===null){if(this.draft){this.draft.revision=0;this.save();}return;}
+   if(data.accepted===false&&data.session===null){this.invalidateSession?.();if(this.draft){this.draft.revision=0;this.save();}return;}
    const remote=serverRecord(data.session);if(!remote)throw new Error("The listening session receipt is incomplete.");
    if(data.accepted&&(remote.deviceId!==this.deviceId||remote.revision<=sent.revision||!sameSubmittedState(sent.state,remote.state)))throw new Error("The listening session receipt belongs to another save.");
+   this.invalidateSession?.();
    this.calibrate(data.serverTime);
-   if(data.accepted){this.writeReceipt(sent.choiceId,{throughSavedAt:sent.savedAt,record:remote});if(this.draft){this.draft.revision=remote.revision;this.draft.updatedAt=remote.updatedAt;this.draft.choiceAt=choiceTime(remote);this.draft.deviceId=this.deviceId;if(before===this.sequence){this.draft.pending=false;this.explicit=false;this.intentStartedAt=null;}this.save();}}
-   else if(this.rebaseOwnCheckpoint(remote)){/* Preserve a checkpoint recorded during an earlier save. */}
+   if(data.protocol===2)this.protocol=2;
+   if(data.accepted){this.acknowledgedQueue=JSON.stringify(sent.state.queue);this.acknowledgedKey=remote.queueKey;this.writeReceipt(sent.choiceId,{throughSavedAt:sent.savedAt,record:remote});if(this.draft){this.draft.revision=remote.revision;this.draft.updatedAt=remote.updatedAt;this.draft.choiceAt=choiceTime(remote);this.draft.deviceId=this.deviceId;if(before===this.sequence){this.draft.pending=false;this.explicit=false;this.intentStartedAt=null;}this.save();}}
+   else{this.acknowledgedQueue=undefined;this.acknowledgedKey=undefined;}
+   if(!data.accepted){if(this.rebaseOwnCheckpoint(remote)){/* Preserve a checkpoint recorded during an earlier save. */}
    else if(this.explicit&&(this.draft?.intentAt??this.draft?.savedAt??0)>choiceTime(remote)){if(this.draft){this.draft.revision=remote.revision;this.save();}}
-   else this.adopt(remote);
+   else this.adopt(remote);}
   })();this.request=request;try{await request;}finally{if(this.request===request)this.request=null;}
   if(this.draft?.pending&&!this.stopped){if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=null;void this.flush().catch(()=>{});},250);}
  }

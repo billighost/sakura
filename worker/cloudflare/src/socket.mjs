@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 
 // Inject the runtime TCP function and the durable ownership fence. GramJS also
 // uses this adapter for its separate media DC connections.
-export function socketClass(open, fence, sockets = new Set()) {
+export function socketClass(open, fence, sockets = new Set(), metrics) {
   return class WorkersSocket {
     constructor() { this.closed = true; this.pending = Buffer.alloc(0); this.writes = Promise.resolve(); }
     async connect(port, hostname) {
@@ -44,7 +44,9 @@ export function socketClass(open, fence, sockets = new Set()) {
         if (this.closed) throw new Error('Telegram socket closed');
         await fence();
         if (this.closed) throw new Error('Telegram socket closed');
-        await this.writer.write(bytes);
+        metrics?.count('packet_bytes', bytes.byteLength);
+        const send = () => this.writer.write(bytes);
+        await (metrics ? metrics.measure('socket_write', send) : send());
       });
       this.writes = work.catch(async () => { await this.close(); });
       return work;

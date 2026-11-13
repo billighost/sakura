@@ -7,9 +7,10 @@ import {encode} from 'next-auth/jwt';
 import 'dotenv/config';
 import {romanizeLyricLines} from '../src/rebuild/lyrics/readings.ts';
 import {readingEngine} from '../src/rebuild/lyrics/language.ts';
+import {localOrigin} from './fixtures/performance-browser.mjs';
 
 const expect=baseExpect.configure({timeout:20000});
-const base=process.env.SAKURA_TEST_URL || 'http://localhost:3000';
+const base=localOrigin(process.env.SAKURA_TEST_URL || 'http://localhost:3000');
 const secret=process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 assert.ok(secret,'Local auth signing configuration is required');
 const account={id:'94000000-0000-4000-8000-000000000401',username:'Reading fixture',email:'readings@example.invalid'};
@@ -28,11 +29,20 @@ const desktopHeaderOnly=process.argv.includes('--desktop-header');
 const viewportOnly=process.argv.includes('--viewport')||desktopHeaderOnly;
 const miniArtworkOnly=process.argv.includes('--mini-artwork');
 const output=miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/lyrics-interactions-browser';
-const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[]};
+const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[],blockedExternal:[]};
 let browser;
 
 async function room(theme,width,sharedSettings,height=900){
  const context=await browser.newContext({viewport:{width,height},isMobile:width<700,hasTouch:width<700,colorScheme:theme,serviceWorkers:'block'});
+ // Later synthetic media/API handlers take priority; everything else must be a
+ // read from the loopback build. Root/share Server Components can read accounts
+ // outside browser interception, so these unrelated routes are never visited.
+ await context.route('**/*',route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.origin!==base){report.blockedExternal.push(request.url());return route.abort('blockedbyclient');}
+  if(url.pathname==='/'||url.pathname.startsWith('/s/')||!['GET','HEAD'].includes(request.method()))return route.abort('blockedbyclient');
+  return route.continue();
+ });
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.readingFixtureAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;});
  const settings=sharedSettings||{theme,audioTechnology:'none',japaneseReading:false,audioQuality:'balanced',privateSession:true,reducedMotion:false,openingAnimation:0,onboarded:true,seedArtists:[],seedGenres:[],discovery:.4,volume:.4,shuffle:false,repeat:'off',revision:1,fieldRevisions:{}};
@@ -44,7 +54,8 @@ async function room(theme,width,sharedSettings,height=900){
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;
   if(/^\/api\/v2\/recordings\/[^/]+\/audio$/.test(path))return serveAudio(route);
-  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:{}}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
+  // Liked membership is authoritative here; collection pages provide cards only.
+  if(path==='/api/v2/library/state')return route.fulfill({json:{favoriteStates:Object.fromEntries(tracks.map(track=>[track.id,{liked:true,revision:1}]))}});if((path==='/api/v2/bootstrap'||path==='/api/v2/profile'))return route.fulfill({json:{profile:account,stats:{},topArtists:[]}});
   if(path==='/api/auth/session')return route.fulfill({json:{user:account}});
   if(path==='/api/v2/settings'){
    if(request.method()==='PATCH'){counts.patches++;const patch=request.postDataJSON();delete patch.expectedRevision;Object.assign(settings,patch);settings.revision++;for(const key of Object.keys(patch))settings.fieldRevisions[key]=settings.revision;}
@@ -96,7 +107,9 @@ async function setup(width){
     }
     if(path==='/api/v2/lyrics/challenge')return route.fulfill({json:{prefix:'lyrics-fixture',target:'f'.repeat(64),expiresAt:Date.now()+240000}});
     if(path==='/api/v2/lyrics/publish'){
-      publications++;assert.equal(request.postDataJSON().recordingId,tracks[3].id);
+      const submission=request.postDataJSON();
+      publications++;assert.equal(submission.recordingId,tracks[3].id);
+      assert.equal(submission.format,'plain');assert.equal(submission.text,'Freshly published words');
       return route.fulfill({status:201,json:{published:true,lyrics:{lines:[{text:'Freshly published words',start:0}],timing:'plain',provider:'lrclib',providerTrackId:400,schemaVersion:'verified-lyrics-v3'}}});
     }
     if(path==='/api/v2/taste'&&request.method()==='POST'){
@@ -123,7 +136,7 @@ async function run(width){
     await expect(page.getByRole('button',{name:`Play ${tracks[1].title}`,exact:true})).toBeVisible();
     assert.ok(counts.pages>=2,'Artist/album search exhausts membership pages');
     await search.fill('蓝色 beyonce');await expect(page.getByRole('button',{name:`Play ${tracks[0].title}`,exact:true})).toBeVisible();
-    await search.fill('');
+    await search.fill('');await expect(page.getByRole('button',{name:`Play ${tracks[1].title}`,exact:true})).toBeVisible();
     const album=page.locator('[data-track-layout] [data-album-link]').filter({hasText:'蓝色 Album'}).filter({visible:true}).first();
     if(width>=700){await expect(album).toHaveAttribute('href','/album/deezer%3A800');}
     await page.getByRole('button',{name:`Play ${tracks[0].title}`,exact:true}).click();
@@ -158,6 +171,8 @@ async function run(width){
     await page.keyboard.press('m');await page.keyboard.press('s');await page.keyboard.press('r');
     await expect.poll(()=>settings.shuffle).toBe(true);await expect.poll(()=>settings.repeat).toBe('all');
     await page.keyboard.press('s');await expect.poll(()=>settings.shuffle).toBe(false);
+    await page.keyboard.press('r');await expect.poll(()=>settings.repeat).toBe('one');
+    await page.keyboard.press('r');await expect.poll(()=>settings.repeat).toBe('off');
     const slider=lyrics.getByRole('slider',{name:'Playback position in lyrics',exact:true});await slider.focus();const pos=await slider.inputValue();await slider.press('ArrowRight');assert.notEqual(await slider.inputValue(),pos);
     await line.focus();await page.keyboard.press('Shift+ArrowRight');await expect(lyrics.locator('[data-player-header-song]')).toHaveText(tracks[1].title);
     await expect(lyrics.getByRole('button',{name:'Korean romanization',exact:true})).toHaveAttribute('aria-pressed','true');await expect(lyrics.locator('button[data-lyric-index="0"] small')).toContainText('bogo');
@@ -189,9 +204,34 @@ async function run(width){
     await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});await page.getByRole('searchbox',{name:'Find a liked song'}).fill('Unpublished');await page.getByRole('button',{name:'Play Unpublished fixture',exact:true}).click();
     await page.getByRole('button',{name:'Open now playing',exact:true}).click();player=page.locator('dialog[data-dialog-appearance="player"]');await expect(player).toHaveAttribute('data-dialog-phase','open');
     await player.getByRole('button',{name:'Lyrics',exact:true}).click();lyrics=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(lyrics).toHaveAttribute('data-dialog-phase','open');
-    await lyrics.getByRole('button',{name:'Missing lyrics? Add the words',exact:true}).click();const studio=page.locator('dialog').last(),text=studio.getByRole('textbox',{name:'Lyrics text',exact:true});await text.fill('Freshly published words');
+    const openStudio=async()=>{await lyrics.getByRole('button',{name:'Missing lyrics? Add the words',exact:true}).click();const dialog=page.locator('dialog[data-dialog-appearance="note"]').filter({has:page.locator('[data-lyric-studio]')});await expect(dialog).toHaveAttribute('data-dialog-phase','open');return dialog;};
+    const readDraft=()=>page.evaluate(owner=>{const keys=Object.keys(localStorage).filter(key=>key.startsWith('sakura-lyric-studio:'+owner+':'));return keys.map(key=>({key,...JSON.parse(localStorage.getItem(key))}));},account.id);
+    let studio=await openStudio(),text=studio.getByRole('textbox',{name:'Lyrics text',exact:true});
+    await text.fill('Freshly published words\nAn unfinished second line');
     const pausedBefore=await page.evaluate(()=>window.readingFixtureAudio.paused);await text.press('Space');assert.equal(await page.evaluate(()=>window.readingFixtureAudio.paused),pausedBefore,'Typing Space never changes playback');
+    const manuscript=await text.inputValue();
+    await studio.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('[data-lyric-studio]')).toHaveCount(0);
+    let drafts=await readDraft();assert.equal(drafts.length,1);assert.equal(drafts[0].text,manuscript,'Closing preserves the last ordinary edit exactly');
+    studio=await openStudio();text=studio.getByRole('textbox',{name:'Lyrics text',exact:true});await expect(text).toHaveValue(manuscript);
+    await studio.getByRole('button',{name:'Start tap timing',exact:true}).click();
+    await expect.poll(()=>page.evaluate(()=>!window.readingFixtureAudio.paused&&window.readingFixtureAudio.currentTime>.25)).toBe(true);
+    const beforeTap=await page.evaluate(()=>{const audio=window.readingFixtureAudio;audio.currentTime=1.25;audio.dispatchEvent(new Event('timeupdate'));return audio.currentTime;});
+    await studio.getByRole('button',{name:/^Time next line/}).click();
+    const afterTap=await page.evaluate(()=>window.readingFixtureAudio.currentTime);
+    await expect.poll(async()=>{const [draft]=await readDraft();return draft?.times?.[0]!==null&&typeof draft?.times?.[0]==='number';}).toBe(true);
+    drafts=await readDraft();const savedTiming=drafts[0].times;
+    assert.equal(savedTiming.length,2);assert.equal(savedTiming[1],null);
+    assert.ok(savedTiming[0]>=beforeTap-.02&&savedTiming[0]<=afterTap+.02,'A tap records the real media position to hundredths');
+    await studio.getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('[data-lyric-studio]')).toHaveCount(0);
+    studio=await openStudio();await expect(studio.getByRole('textbox',{name:'Lyrics text',exact:true})).toHaveValue(manuscript);
+    assert.deepEqual((await readDraft())[0].times,savedTiming,'Reopening cannot erase a precise partial tap');
+    await studio.getByRole('button',{name:/Continue your saved timing/}).click();await expect(studio.getByRole('button',{name:'Time line 2: An unfinished second line',exact:true})).toBeEnabled();
+    await studio.getByRole('button',{name:'Review timing',exact:true}).click();const acceptedBefore=publications;
+    await studio.getByRole('button',{name:'Publish to LRCLIB',exact:true}).click();await expect(studio.getByRole('status')).toContainText('remaining 1 line');assert.equal(publications,acceptedBefore,'Incomplete timing cannot reach the publish API');
+    await studio.getByRole('button',{name:'Edit the manuscript',exact:true}).click();await studio.getByRole('textbox',{name:'Lyrics text',exact:true}).fill('Freshly published words');
+    report.checks.push(`${width}px: ordinary manuscript edits survive closing, precise native-media taps survive reopening and resume at the untimed line, and partial timing cannot publish`);
     await studio.getByRole('button',{name:'Publish to LRCLIB',exact:true}).click();await expect(lyrics.locator('button[data-lyric-index="0"]')).toContainText('Freshly published words');assert.equal(publications,width>=700?1:2);
+    await expect.poll(async()=> (await readDraft()).length).toBe(0);await page.waitForTimeout(1100);assert.deepEqual(await readDraft(),[],'Accepted publication cannot restore the removed draft after pending saves');
     await page.screenshot({path:`${output}/complete-${width}.png`});
     report.checks.push(`${width}px: pagination, collaborator/album/non-Latin searches, Chinese/Korean readings, current-recording taste actions, mouse/touch lyric focus, Space after click/selection, repeat/IME isolation, seek/volume/native slider keys, song keys, help/queue/player/lyrics/search shortcuts, album dialog navigation, 4-cover mix/3-cover broken fallback/0-cover empty/1-cover custom playlist, typed-space isolation and exact fresh upload result`);
   }finally{await context.close();}
@@ -199,6 +239,6 @@ async function run(width){
 try{
   await fs.mkdir(output,{recursive:true});browser=await chromium.launch({channel:'chrome',headless:true});
   for(const width of [1440,390])await run(width);
-  assert.deepEqual(report.errors,[]);await fs.writeFile(output+'/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+  assert.deepEqual(report.errors,[]);assert.deepEqual(report.blockedExternal,[]);await fs.writeFile(output+'/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }catch(error){report.failure=error.message;await fs.writeFile(output+'/report.json',JSON.stringify(report,null,2));throw error;}
 finally{await browser?.close();}

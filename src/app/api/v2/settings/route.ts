@@ -13,7 +13,7 @@ export async function PATCH(request:Request){
   return withApiTiming("/api/v2/settings", request, async () => {return productResponse(request,async a=>{
   const body=await jsonBody(request),settings=await patchSettings(a.id,body);
   if(body.seedArtists!==undefined||body.seedGenres!==undefined||body.onboarded===true)after(async()=>{
-    try{await warmCandidateCatalog(a.id);await ensureMixes(a.id,true);}catch{console.error("[Sakura v2] Personalized catalog refresh failed");}
+    try{await warmCandidateCatalog(a.id,{priority:"background"});await ensureMixes(a.id,true);}catch{console.error("[Sakura v2] Personalized catalog refresh failed");}
   });
   return settings;
 });

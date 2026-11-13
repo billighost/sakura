@@ -13,6 +13,45 @@ export interface LyricProviderOptions {
 }
 
 const cooldowns = new Map<string, number>();
+export const LYRIC_PROVIDER_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Error responses have no useful lyric data. Release the stream without waiting
+ * for a stalled provider's cancellation acknowledgement. */
+export function discardLyricResponse(response: Response) {
+  void response.body?.cancel().catch(() => undefined);
+}
+
+/** Bound the entire provider envelope, rather than truncating lyric candidates. */
+export async function readLyricProviderJson(response: Response, signal: AbortSignal, maximumBytes = LYRIC_PROVIDER_MAX_BYTES): Promise<unknown> {
+  if (signal.aborted) { discardLyricResponse(response); signal.throwIfAborted(); }
+  if (Number(response.headers.get("Content-Length")) > maximumBytes) {
+    discardLyricResponse(response);
+    throw new RangeError("Lyrics provider response is too large");
+  }
+  if (!response.body) throw new SyntaxError("Lyrics provider response is empty");
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let bytes = 0, text = "", rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
+  const abort = () => { void reader.cancel(signal.reason).catch(() => undefined); rejectAbort(signal.reason); };
+  signal.addEventListener("abort", abort, { once: true });
+  try {
+    if (signal.aborted) abort();
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), aborted]);
+      signal.throwIfAborted();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maximumBytes) throw new RangeError("Lyrics provider response is too large");
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return JSON.parse(text);
+  } finally {
+    signal.removeEventListener("abort", abort);
+    void reader.cancel().catch(() => undefined);
+    try { reader.releaseLock(); } catch { /* An ignored abort can leave a read pending. */ }
+  }
+}
 export const LYRIC_PROVIDER_TIMEOUT_MS = 12_000;
 // Primary providers run together, followed by the plain-text fallback.
 // Leave time for both stages plus the request/response overhead.
@@ -49,14 +88,17 @@ export function createLyricTransport(options: LyricProviderOptions, provider: st
         if (remaining > 1500) return { status: "unavailable", reason: `${provider} is waiting for its rate limit to reset`, retryAfterMs: remaining };
         if (remaining > 0) await wait(remaining, signal);
         signal.throwIfAborted();
-        const response = await fetcher(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]), headers: { "User-Agent": "Sakura/2.0 (https://github.com/billighost/sakura)", "Accept": "application/json" }, cache: "no-store" });
-        if (response.status === 404) return { status: "missing" };
+        const responseSignal = AbortSignal.any([signal, AbortSignal.timeout(4000)]);
+        const response = await fetcher(url, { signal: responseSignal, headers: { "User-Agent": "Sakura/2.0 (https://github.com/billighost/sakura)", "Accept": "application/json" }, cache: "no-store" });
+        if (responseSignal.aborted) { discardLyricResponse(response); responseSignal.throwIfAborted(); }
+        if (response.status === 404) { discardLyricResponse(response); return { status: "missing" }; }
         if (response.ok) {
-          const data: unknown = await response.json();
+          const data = await readLyricProviderJson(response, responseSignal);
           if (data === null || typeof data !== "object") return { status: "unavailable", reason: `${provider} returned an invalid response` };
           return { status: "ok", data };
         }
         const retryAfterMs = lyricRetryAfter(response.headers.get("Retry-After"), now());
+        discardLyricResponse(response);
         last = { status: "unavailable", reason: `${provider} HTTP ${response.status}`, ...(retryAfterMs ? { retryAfterMs } : {}) };
         if (response.status === 429 || retryAfterMs) limits.set(origin, now() + (retryAfterMs ?? 1000));
         if (response.status !== 429 && response.status < 500) return last;

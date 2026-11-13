@@ -2,7 +2,7 @@
 // packet drain for 35 seconds before opening another Telegram main connection.
 export const DRAIN_MS = 35000;
 export class Ownership {
-  constructor(storage, token, now = Date.now) { this.storage = storage; this.token = token; this.now = now; }
+  constructor(storage, token, now = Date.now, metrics) { this.storage = storage; this.token = token; this.now = now; this.metrics = metrics; }
   async claim() {
     return this.storage.transaction(async tx => {
       const prior = await tx.get('ownership');
@@ -12,11 +12,12 @@ export class Ownership {
     });
   }
   async fence() {
-    await this.storage.transaction(async tx => {
+    const work = () => this.storage.transaction(async tx => {
       const current = await tx.get('ownership');
       if (!current || current.token !== this.token) throw new Error('Telegram owner retired');
       if (this.now() < current.readyAt) throw new Error('Telegram owner draining');
       await tx.put('ownership', { ...current, lastWrite: this.now() });
     });
+    await (this.metrics ? this.metrics.measure('storage_fence', work) : work());
   }
 }

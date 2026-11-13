@@ -1,0 +1,17 @@
+# Bloom performance continuation
+
+The continuation verified the approved B1–B7 work against the current source. Tests use deterministic local transports and generated samples; no remote accounts, database or media were changed.
+
+| Item | Current behavior | Evidence |
+| --- | --- | --- |
+| B1 opening samples | Exact impulse/noise arrays are prepared off the gesture task, shared by seed/rate/version, and bounded by admission and retained bytes. AudioContext resume remains gesture bound. | Byte parity at 8/44.1/48 kHz, cooperative yield, independent owners, cancellation and graph tests. The separate sample report records native graph costs that remain. |
+| B2 artwork identity | Preparation, displayed chapters and nearby warmups use the same concrete native artwork variant. Saved offline variants remain usable after DPR changes; exports retain original pixels. | Display identity and saved variant tests. The continuation additionally fixes metadata-only saved cards: `metadata.coverUrl` now enters the manifest and warmups exactly as it enters the renderer. A delayed sleeve keeps readiness disabled. |
+| B3 admission | World loading, audio and artwork interleave under three owners. First soundtrack audio starts before the entire image list finishes; every required file still gates readiness. | Stalled image/audio tests, peak owner bound, final song gate, failure and cancellation release. |
+| B4 detail | `GET /bloom/:id?prepare=1` provides one authoritative prepared detail envelope. Detail preparation reuses it rather than repeating a preparation POST. | Actual service persistence tests; production browser fixture asserts one detail GET and zero preparation POSTs. |
+| B5 automatic quality | Existing hardware/light-frame selection and all five manual tiers remain. Post-mount adaptive changes are conditional on evidence of sustained world load and safe transition behavior. | The all-world browser matrix records settled frames, DOM/SVG counts and manual tier preservation. A desktop Chrome sample cannot certify phone GPU/thermal performance or justify changing authored quality. |
+| B6 poster cleanup | Fonts, frames, FileReader, image decoding and PNG encoding have bounded owned waits. Closing releases offscreen roots, handlers, sources and canvases. | Nine lifecycle tests and the staged production cancellation harness; see the export lifecycle report. |
+| B7 disclosure | Matching immutable story scopes negotiate a compact sequential disclosure receipt; mismatched/legacy consumers retain the full authoritative recap. | Tests reject changed scopes, skipped/repeated chapters, regressing frontiers and early completion, and reconstruct concealed/confirmed chapters from the trusted prepared snapshot. |
+
+The unchanged full Bloom regression passed 110 tests. The initial sample/export/detail/preparation group passed 39 tests. After the metadata-only artwork fix, all 22 affected preparation/artwork/detail tests passed. Focused ESLint and diff checks passed. Evidence: `.local/bloom-continuation-regression.log`, `.local/bloom-continuation-unit.log`, `.local/bloom-continuation-artwork.log`.
+
+Production readiness/offline, opening permissions, cancellation and all-world browser validation run against the root agent's final identified build. Source tests establish contracts and cleanup; they do not establish deployed latency, a physical Safari result or a universal 100 ms opening budget. Native convolution setup, image decoding and encoding retain device-dependent costs.

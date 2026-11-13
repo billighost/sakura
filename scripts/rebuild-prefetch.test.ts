@@ -11,6 +11,8 @@ const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 test("route intent targets match mounted resource keys without warming mutations or external URLs", () => {
  assert.deepEqual(routePrefetchTargets("/search?q=wind%20song&tab=Artists").paths, ["/api/v2/search?q=wind+song&searchVersion=2"]);
  assert.deepEqual(routePrefetchTargets("/artist/spotify%3A42").paths, ["/api/v2/artists/spotify%3A42"]);
+ assert.deepEqual(routePrefetchTargets("/mix/top-songs").paths,["/api/v2/profile"]);
+ assert.deepEqual(routePrefetchTargets("/liked").paths,["/api/v2/library?kind=liked"]);
  assert.equal(routePrefetchTargets("/home").surface, "home");
  for (const href of ["https://elsewhere.example/library", "/api/v2/bloom/id/reveal", "/login", "/import", "/library/downloaded", "/artist/%E0"])
   assert.deepEqual(routePrefetchTargets(href).paths, [], href);

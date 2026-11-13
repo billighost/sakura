@@ -35,6 +35,16 @@ test("music routes keep an instant loading shell and page-local transition",()=>
  assert.match(css,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.routeTransition/);
 });
 
+test("online Bloom routes warm the offline renderer before refreshing their cache record",()=>{
+ const ux=read("src/rebuild/app/NavigationUX.tsx");
+ assert.match(ux,/const loadBloomPage=\(\)=>import\("\.\.\/bloom\/BloomPage"\)/);
+ assert.match(ux,/const BloomPage=dynamic\(loadBloomPage,/);
+ assert.match(ux,/musicRoute\(pathname\)\?\.\[0\]!=="bloom"/);
+ assert.match(ux,/!navigator\.onLine\|\|!worker\?\.controller/);
+ assert.match(ux,/loadBloomPage\(\)\.then\(\(\)=>\{if\(!stopped&&location\.pathname===pathname\)rememberMusicRoute\(pathname\)/);
+ assert.match(ux,/worker\?\.addEventListener\("controllerchange",warm\)/);
+});
+
 test("dynamic music pages do not opt out of instant navigation",()=>{
  for(const route of ["album","artist","mix","playlist","track"]){
   const source=read(`src/app/(music)/${route}/[id]/page.tsx`);

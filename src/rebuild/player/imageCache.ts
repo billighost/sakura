@@ -1,6 +1,7 @@
 // Only recent full-player sleeves need to remain decoded. Keeping dozens of
 // full-size covers alive can consume hundreds of megabytes on a phone.
 const MAX_RETAINED_ARTWORK = 12;
+export const MAX_RETAINED_ARTWORK_BYTES = 48 * 1024 * 1024;
 const ARTWORK_TIMEOUT_MS = 15000;
 
 type ArtworkOptions = { signal?: AbortSignal; timeoutMs?: number };
@@ -10,10 +11,27 @@ type RetainedArtwork = {
   ready: Promise<void>;
   pending: boolean;
   subscribers: number;
+  decodedBytes: number;
   cancel: (reason: unknown) => void;
 };
 
 const retainedArtwork = new Map<string, RetainedArtwork>();
+
+export function artworkMemoryStats() {
+  return { entries: retainedArtwork.size, decodedBytes: [...retainedArtwork.values()].reduce((sum, entry) => sum + entry.decodedBytes, 0) };
+}
+
+function trimArtwork() {
+  while (retainedArtwork.size > MAX_RETAINED_ARTWORK || artworkMemoryStats().decodedBytes > MAX_RETAINED_ARTWORK_BYTES) {
+    const oldest = retainedArtwork.keys().next().value as string | undefined;
+    if (!oldest) break;
+    const entry = retainedArtwork.get(oldest)!;
+    retainedArtwork.delete(oldest);
+    // Pending callers still own their load. Once it settles, finish releases
+    // the detached decode. Loaded entries are hidden retention images only.
+    if (!entry.pending) entry.image.removeAttribute("src");
+  }
+}
 
 function timeoutError() { return new DOMException("Artwork took too long to load.", "TimeoutError"); }
 function abortError(signal: AbortSignal) { return signal.reason ?? new DOMException("Artwork preparation stopped.", "AbortError"); }
@@ -79,7 +97,7 @@ export function retainArtwork(src: string, priority = false, options: ArtworkOpt
     resolveReady = resolve;
     rejectReady = reject;
   });
-  const entry: RetainedArtwork = { image, ready, pending: true, subscribers: 0, cancel: reason => finish(reason, true) };
+  const entry: RetainedArtwork = { image, ready, pending: true, subscribers: 0, decodedBytes: 0, cancel: reason => finish(reason, true) };
   const finish = (reason?: unknown, failed = false) => {
     if (!entry.pending) return;
     entry.pending = false;
@@ -91,7 +109,13 @@ export function retainArtwork(src: string, priority = false, options: ArtworkOpt
       if (retainedArtwork.get(src) === entry) retainedArtwork.delete(src);
       image.removeAttribute("src");
       rejectReady(reason);
-    } else resolveReady();
+    } else {
+      const width = image.naturalWidth || 0, height = image.naturalHeight || 0;
+      entry.decodedBytes = width * height * 4;
+      if (retainedArtwork.get(src) !== entry) image.removeAttribute("src");
+      trimArtwork();
+      resolveReady();
+    }
   };
   const load = () => {
     // A loaded image remains usable when a browser declines an explicit decode.
@@ -107,10 +131,6 @@ export function retainArtwork(src: string, priority = false, options: ArtworkOpt
   const consumer = subscribe(entry, options);
   try { image.src = src; } catch (reason) { finish(reason, true); }
 
-  while (retainedArtwork.size > MAX_RETAINED_ARTWORK) {
-    const oldest = retainedArtwork.keys().next().value as string | undefined;
-    if (!oldest) break;
-    retainedArtwork.delete(oldest);
-  }
+  trimArtwork();
   return consumer;
 }

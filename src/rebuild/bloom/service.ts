@@ -9,7 +9,7 @@ import {buildBloomSnapshot,discloseBloomChapter,type BloomSnapshot,type SavedBlo
 import {bloomDesignForItem,legacyBloomDesignForMonth} from "./design";
 import {bloomArtistKey,discloseBloomListening} from "./listening";
 import {createBloomExperience} from "./experience";
-import type {BloomShelfItem} from "./uiTypes";
+import type {BloomShelfItem,BloomRecap} from "./uiTypes";
 export type BloomChapter = SavedBloomChapter;
 interface StoredBloom {
  snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;
@@ -79,14 +79,14 @@ async function snapshot(accountId:string,item:BloomWindow,client:PoolClient):Pro
     previous:{periodLabel:`Previous ${item.period==="weekly"?"week":item.period==="monthly"?"month":"year"}`,rows:priorRows,cards}});
 }
 
-function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at?:Date|string}) {
+function view(item:BloomWindow,row:{snapshot:BloomSnapshot;revealed_chapters:string[];completed_at:Date|null;created_at?:Date|string}):BloomRecap {
   const revealed=new Set(row.revealed_chapters);
   const kinds=new Set(row.snapshot.chapters.filter(chapter=>revealed.has(chapter.id)).flatMap(chapter=>[chapter.kind||"",chapter.id]));
-  return {...item,version:row.snapshot.version||1,worldId:row.snapshot.worldId||fallbackWorld(item,row.snapshot.version||1),experience:row.snapshot.experience,status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
+  return {...item,version:row.snapshot.version||1,worldId:(row.snapshot.worldId||fallbackWorld(item,row.snapshot.version||1)) as BloomRecap["worldId"],experience:row.snapshot.experience,status:row.snapshot.chapters.length?item.status:"empty",summary:row.snapshot.summary,chapterCount:row.snapshot.chapters.length,
     snapshotCreatedAt:row.created_at?new Date(row.created_at).toISOString():undefined,
     listening:discloseBloomListening(row.snapshot.listening,kinds,Boolean(row.completed_at)),
     chapters:row.snapshot.chapters.map(c=>discloseBloomChapter(c,revealed.has(c.id))),
-    completedAt:row.completed_at,completed:Boolean(row.completed_at)};
+    completedAt:row.completed_at?row.completed_at.toISOString():null,completed:Boolean(row.completed_at)};
 }
 export async function listBloom(accountId:string,rawPeriod:string|null,now=new Date()){
   const period=(rawPeriod||"weekly") as BloomPeriod;if(!["weekly","monthly","yearly"].includes(period))throw new ProductError(400,"Invalid Bloom period");
@@ -167,10 +167,10 @@ export async function getBloom(accountId:string,id:string,now=new Date()){
 /** Explicit story entry may stage its immutable facts ahead of navigation.
  * Keep the ordinary view concealed and never advance the saved reveal frontier
  * or completion date merely because the browser prepared the next scenes. */
-export async function prepareBloom(accountId:string,id:string,now=new Date()){
+export async function prepareBloom(accountId:string,id:string,now=new Date(),options:{includeEmpty?:boolean}={}){
   return inTransaction(async client=>{
     const {item,row}=await loadBloom(accountId,id,now,client," FOR SHARE");
-    if(!row.snapshot.chapters.length)throw new ProductError(409,"This Bloom has no listening story yet");
+    if(!row.snapshot.chapters.length&&!options.includeEmpty)throw new ProductError(409,"This Bloom has no listening story yet");
     return {story:view(item,row),chapters:row.snapshot.chapters as SavedBloomChapter[],listening:row.snapshot.listening};
   });
 }

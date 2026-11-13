@@ -1,5 +1,5 @@
 import { fetchAudioHeaders } from "../core/streaming";
-import { referenceKey, parseRecordingTitle } from "../core/identity";
+import { referenceKey, parseRecordingTitle, isRecordingProofReference } from "../core/identity";
 import { parseRecordingMetadata } from "./input";
 import { ProviderError } from "./contracts";
 import type { CatalogProvider, CatalogRecording } from "./contracts";
@@ -75,7 +75,8 @@ export async function readMetadataJson(response: Response): Promise<unknown> {
 /** Exact /track/:id fetch. Search results and preview URLs never become audio assets. */
 export class DeezerCatalogProvider implements CatalogProvider {
   readonly provider = "deezer" as const;
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
+  readonly sharedCacheEnabled:boolean;
+  constructor(private readonly fetcher: typeof fetch = fetch) {this.sharedCacheEnabled=fetcher===fetch;}
   async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
     referenceKey({ provider: "isrc", id: isrc });
     const payload = await getJson(this.fetcher, `https://api.deezer.com/track/isrc:${encodeURIComponent(isrc.toUpperCase())}`, signal);
@@ -127,7 +128,7 @@ export class SpotifyCatalogProvider implements CatalogProvider {
   private metadata = new Map<string,{value:unknown;expires:number}>();
   private readonly tokenReads = new ProviderFlight<string>(1);
   private readonly metadataReads = new ProviderFlight<unknown>();
-  private readonly sharedCacheEnabled:boolean;
+  readonly sharedCacheEnabled:boolean;
   constructor(private readonly clientId: string, private readonly clientSecret: string, private readonly fetcher: typeof fetch = fetch) {
     this.sharedCacheEnabled=fetcher===fetch;
   }
@@ -219,17 +220,56 @@ export function spotifyCatalogTrack(payload: unknown): CatalogRecording {
 }
 
 /** Public metadata cache only; never caches auth, worker secrets or signed audio URLs. */
+function sharedCatalog(value:unknown,provider:CatalogProvider["provider"]):CatalogRecording|undefined{
+  try{
+    const raw=obj(value),ref=raw.reference as ProviderReference;
+    if(!isRecordingProofReference(ref)||ref.provider!==provider||!Array.isArray(raw.references)||raw.references.length<1||raw.references.length>16)return;
+    const references=raw.references as ProviderReference[];
+    if(!references.every(isRecordingProofReference)||!references.some(proof=>referenceKey(proof)===referenceKey(ref)))return;
+    const credits=raw.artistCredits as ArtistCredit[]|undefined;
+    if(credits!==undefined&&(!Array.isArray(credits)||credits.length>30||!credits.every(credit=>credit&&typeof credit.name==="string"&&credit.name.length>0&&credit.name.length<=300&&(credit.role==="primary"||credit.role==="featured")&&(!credit.reference||isRecordingProofReference(credit.reference)))))return;
+    for(const field of ["artistReference","albumReference"] as const)if(raw[field]!==undefined&&!isRecordingProofReference(raw[field] as ProviderReference))return;
+    if(raw.genres!==undefined&&(!Array.isArray(raw.genres)||raw.genres.length>80||!raw.genres.every(genre=>typeof genre==="string"&&genre.length<=300)))return;
+    return {reference:{...ref},references:references.map(proof=>({...proof})),metadata:parseRecordingMetadata(raw.metadata),
+      ...(typeof raw.albumTitle==="string"?{albumTitle:raw.albumTitle}:{}),...(https(raw.coverUrl)?{coverUrl:https(raw.coverUrl)}:{}),...(https(raw.artistImageUrl)?{artistImageUrl:https(raw.artistImageUrl)}:{}),
+      ...(raw.artistReference?{artistReference:{...raw.artistReference as ProviderReference}}:{}),...(raw.albumReference?{albumReference:{...raw.albumReference as ProviderReference}}:{}),
+      ...(credits?{artistCredits:structuredClone(credits)}:{}),...(Array.isArray(raw.genres)?{genres:raw.genres as string[]}:{}),...(typeof raw.popularity==="number"&&Number.isFinite(raw.popularity)?{popularity:raw.popularity}:{})};
+  }catch{return;}
+}
+
 export class CachedCatalogProvider implements CatalogProvider {
   readonly provider: CatalogProvider["provider"];
   private readonly entries = new Map<string, { value: CatalogRecording; expiresAt: number }>();
   private readonly reads = new ProviderFlight<CatalogRecording|null>();
   private readonly isrcReads = new ProviderFlight<readonly CatalogRecording[]>(200);
-  constructor(private readonly upstream: CatalogProvider, private readonly ttlMs = 15 * 60 * 1000, private readonly capacity = 1000) { this.provider = upstream.provider; }
+  private readonly isrcEntries=new Map<string,{value:readonly CatalogRecording[];expiresAt:number}>();
+  private readonly sharedCacheEnabled:boolean;
+  constructor(private readonly upstream: CatalogProvider, private readonly ttlMs = 15 * 60 * 1000, private readonly capacity = 1000) {
+    this.provider = upstream.provider;
+    this.sharedCacheEnabled=(upstream instanceof DeezerCatalogProvider||upstream instanceof SpotifyCatalogProvider)&&upstream.sharedCacheEnabled;
+  }
   async getByIsrc(isrc: string, signal?: AbortSignal): Promise<readonly CatalogRecording[]> {
     signal?.throwIfAborted();
     const key=referenceKey({provider:"isrc",id:isrc});
     if(!this.upstream.getByIsrc)return [];
-    return structuredClone(await this.isrcReads.run(key,signal,sharedSignal=>this.upstream.getByIsrc!(isrc,sharedSignal)));
+    const cached=this.isrcEntries.get(key);if(cached&&cached.expiresAt>Date.now())return structuredClone(cached.value);
+    if(cached)this.isrcEntries.delete(key);
+    return structuredClone(await this.isrcReads.run(key,signal,async sharedSignal=>{
+      const saved=this.sharedCacheEnabled?await getSharedPublicCache<{version?:number;records?:unknown[]}>(this.provider==="deezer"?"provider_deezer":"provider_spotify",`isrc:v1:${key}`):undefined;
+      sharedSignal.throwIfAborted();
+      const shared=saved?.version===1&&Array.isArray(saved.records)&&saved.records.length>0&&saved.records.length<=4?saved.records.map(value=>sharedCatalog(value,this.provider)):undefined;
+      const valid=shared&&shared.every(value=>value&&value.references.some(proof=>referenceKey(proof)===key));
+      const records=valid?shared as CatalogRecording[]:await this.upstream.getByIsrc!(isrc,sharedSignal);
+      sharedSignal.throwIfAborted();
+      // Empty results are deliberately not retained across instances: catalog
+      // availability and ISRC replacements can change independently.
+      if(records.length){
+        if(this.isrcEntries.size>=200)this.isrcEntries.delete(this.isrcEntries.keys().next().value!);
+        this.isrcEntries.set(key,{value:structuredClone(records),expiresAt:Date.now()+(valid?30000:this.ttlMs)});
+        if(this.sharedCacheEnabled&&!valid)await setSharedPublicCache(this.provider==="deezer"?"provider_deezer":"provider_spotify",`isrc:v1:${key}`,publicCatalogMetadata({version:1,records}),Math.min(86400,Math.max(1,Math.floor(this.ttlMs/1000))));
+      }
+      return records;
+    }));
   }
   async getExact(reference: ProviderReference, signal?: AbortSignal) {
     const key = referenceKey(reference);
@@ -238,11 +278,21 @@ export class CachedCatalogProvider implements CatalogProvider {
     if (cached && cached.expiresAt > Date.now()) return structuredClone(cached.value);
     if (cached) this.entries.delete(key);
     const value=await this.reads.run(key,signal,async sharedSignal=>{
+      const scope=this.provider==="deezer"?"provider_deezer":"provider_spotify";
+      const saved=this.sharedCacheEnabled?await getSharedPublicCache<{version?:number;record?:unknown}>(scope,`exact:v1:${key}`):undefined;
+      sharedSignal.throwIfAborted();
+      const shared=saved?.version===1?sharedCatalog(saved.record,this.provider):undefined;
+      if(shared&&referenceKey(shared.reference)===key){
+        if(this.entries.size>=this.capacity)this.entries.delete(this.entries.keys().next().value!);
+        this.entries.set(key,{value:structuredClone(shared),expiresAt:Date.now()+Math.min(this.ttlMs,30000)});return shared;
+      }
       const result = await this.upstream.getExact({...reference}, sharedSignal);
       sharedSignal.throwIfAborted();
       if (!result) return null;
       if (this.entries.size >= this.capacity) this.entries.delete(this.entries.keys().next().value!);
       this.entries.set(key, { value: structuredClone(result), expiresAt: Date.now() + this.ttlMs });
+      if(this.sharedCacheEnabled)await setSharedPublicCache(scope,`exact:v1:${key}`,publicCatalogMetadata({version:1,record:result}),Math.min(86400,Math.max(1,Math.floor(this.ttlMs/1000))));
+      sharedSignal.throwIfAborted();
       return result;
     });
     return structuredClone(value);

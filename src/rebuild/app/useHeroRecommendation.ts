@@ -1,50 +1,28 @@
 "use client";
 
 import {useCallback,useEffect,useRef,useState} from "react";
-import {musicTrack,type MusicTrack,type UserSettings} from "./types";
-import {recommendationJson} from "./recommendationTransport";
+import {type UserSettings} from "./types";
+
 import {feedViewKey} from "./feedIdentity";
-import {HERO_REFRESH_MS} from "../recommendations/hero";
-import {clearRecommendationCache,readRecommendationCache,recommendationCacheValid,recommendationCacheVersion,writeRecommendationCache} from "./recommendationCache";
 
-export interface HeroRecommendation {track:MusicTrack;reason:string;lane:"familiar"|"similar"|"explore"|"fresh"}
-interface HeroState {item:HeroRecommendation|null;ready:boolean;refreshAt:number}
-const visitedHeroes=new Map<string,{state:HeroState;savedAt:number}>();
-const empty=():HeroState=>({item:null,ready:false,refreshAt:0});
-function parseHero(raw:Record<string,unknown>):HeroState {
- if(raw.item!==null&&(!raw.item||typeof raw.item!=="object"))throw new Error("Hero response unavailable");
- const value=raw.item as Record<string,unknown>|null;
- const item=value?{track:musicTrack(value.track as Record<string,unknown>),reason:typeof value.reason==="string"?value.reason:"Selected for your recommendations.",
-  lane:(["familiar","similar","explore","fresh"].includes(String(value.lane))?value.lane:"similar") as HeroRecommendation["lane"]}:null;
- const now=Date.now(),at=Number(raw.refreshAt);
- return {item,ready:true,refreshAt:Number.isFinite(at)?Math.max(now+1000,Math.min(now+HERO_REFRESH_MS,at)):now+HERO_REFRESH_MS};
-}
+import {recommendationCacheVersion} from "./recommendationCache";
+import {cachedHero,restoreHero,loadInitialHero,loadHero,invalidateRecommendationViews,type HeroState} from "./recommendationViews";
+export type {HeroRecommendation} from "./recommendationViews";
 
-/** Warm the hero's existing account/taste cache, independently of feed pages. */
+/** Either prefetch lease shares the initial feed/hero envelope. */
 export async function prefetchHeroRecommendation(accountId:string,surface:"home"|"discover",settings:UserSettings,signal:AbortSignal,mode:"balanced"|"familiar"|"explore"="balanced"){
  signal.throwIfAborted();
  if(typeof navigator!=="undefined"&&navigator.onLine===false)return;
- const cacheKey=feedViewKey(accountId,surface,mode,settings),version=recommendationCacheVersion(accountId),present=visitedHeroes.get(cacheKey);
- if(present&&recommendationCacheValid(accountId,present.savedAt)&&present.state.refreshAt>Date.now())return;
- const saved=await readRecommendationCache<HeroState>(accountId,"hero:"+cacheKey);
- signal.throwIfAborted();
- if(saved?.data.ready&&saved.data.refreshAt>Date.now()){
-  if(recommendationCacheVersion(accountId)===version)visitedHeroes.set(cacheKey,{state:saved.data,savedAt:saved.savedAt});
-  return;
- }
- const raw=await recommendationJson(accountId,"/api/v2/feed/hero?"+new URLSearchParams({surface,mode}),signal,{identity:cacheKey});
- signal.throwIfAborted();
- if(recommendationCacheVersion(accountId)!==version)return;
- const state=parseHero(raw);visitedHeroes.set(cacheKey,{state,savedAt:Math.max(Date.now(),version+1)});
- while(visitedHeroes.size>8)visitedHeroes.delete(visitedHeroes.keys().next().value!);
- await writeRecommendationCache(accountId,"hero:"+cacheKey,state,version);
+ const key=feedViewKey(accountId,surface,mode,settings),saved=await restoreHero(accountId,key,signal);
+ if(saved.ready&&saved.refreshAt>Date.now())return;
+ await loadInitialHero(accountId,key,surface,mode,signal);
 }
 
 /** Refresh only the hero, preserving the listener's feed order and scroll position. */
 export function useHeroRecommendation({accountId,cacheKey,surface,mode,hold}:{
  accountId:string;cacheKey:string;surface:"home"|"discover";mode:"balanced"|"familiar"|"explore";hold:()=>boolean;
 }){
- const [state,setState]=useState<HeroState>(()=>{const saved=visitedHeroes.get(cacheKey);return saved&&recommendationCacheValid(accountId,saved.savedAt)?saved.state:empty();});
+ const [state,setState]=useState<HeroState>(()=>cachedHero(accountId,cacheKey));
  const holdRef=useRef(hold);useEffect(()=>{holdRef.current=hold;},[hold]);
  const stateRef=useRef(state),pending=useRef<HeroState|null>(null),request=useRef<AbortController|null>(null);
  const refreshTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -58,11 +36,10 @@ export function useHeroRecommendation({accountId,cacheKey,surface,mode,hold}:{
    if(!force&&stateRef.current.refreshAt>Date.now()){schedule(stateRef.current.refreshAt);return;}
    const controller=new AbortController(),cacheVersion=recommendationCacheVersion(accountId);request.current=controller;
    try{
-    const raw=await recommendationJson(accountId,"/api/v2/feed/hero?"+new URLSearchParams({surface,mode}),controller.signal,{identity:cacheKey,force});
+    const next=force||!stateRef.current.ready
+      ? await loadInitialHero(accountId,cacheKey,surface,mode,controller.signal,force)
+      : await loadHero(accountId,cacheKey,surface,mode,controller.signal);
     if(!active||controller.signal.aborted||recommendationCacheVersion(accountId)!==cacheVersion)return;
-    const next=parseHero(raw);visitedHeroes.set(cacheKey,{state:next,savedAt:Math.max(Date.now(),cacheVersion+1)});
-    void writeRecommendationCache(accountId,"hero:"+cacheKey,next,cacheVersion);
-    while(visitedHeroes.size>8)visitedHeroes.delete(visitedHeroes.keys().next().value!);
     if(holdRef.current())pending.current=next;else {pending.current=null;stateRef.current=next;setState(next);}
     schedule(next.refreshAt);
    }catch{
@@ -75,12 +52,11 @@ export function useHeroRecommendation({accountId,cacheKey,surface,mode,hold}:{
   const changed=(event:Event)=>{
    const owner=(event as CustomEvent<{accountId?:string}>).detail?.accountId;
    if(owner&&owner!==accountId)return;
-   if(event.type!=="sakura-recommendations-cleared")clearRecommendationCache(accountId);
-   for(const key of visitedHeroes.keys())if(key.startsWith(accountId+":"))visitedHeroes.delete(key);
+   invalidateRecommendationViews(accountId,event);
    request.current?.abort();request.current=null;pending.current=null;clearTimer();
    // Clear the old explanation immediately, even when the listener erased data
    // offline or the new response fails. No stale fallback should reappear.
-   const cleared={item:null,ready:true,refreshAt:0};stateRef.current=cleared;setState(cleared);
+   const cleared={item:null,ready:false,refreshAt:0};stateRef.current=cleared;setState(cleared);
    void refresh(true);
   };
   const afterInteraction=()=>setTimeout(release,0);
@@ -88,10 +64,8 @@ export function useHeroRecommendation({accountId,cacheKey,surface,mode,hold}:{
   window.addEventListener("focusout",afterInteraction);window.addEventListener("pointerup",afterInteraction);window.addEventListener("pointercancel",afterInteraction);
   for(const name of ["sakura-taste-updated","sakura-personalization-cleared","sakura-listening-erased","sakura-recommendations-cleared"])window.addEventListener(name,changed);
   void (async()=>{
-   if(!stateRef.current.ready){const saved=await readRecommendationCache<HeroState>(accountId,"hero:"+cacheKey);if(!active)return;
-    if(saved&&saved.data.ready&&(saved.data.item===null||saved.data.item?.track)){
-     stateRef.current=saved.data;setState(saved.data);visitedHeroes.set(cacheKey,{state:saved.data,savedAt:saved.savedAt});
-    }
+   if(!stateRef.current.ready){const saved=await restoreHero(accountId,cacheKey);if(!active)return;
+    if(saved.ready){stateRef.current=saved;setState(saved);}
    }
    await refresh();
   })();
