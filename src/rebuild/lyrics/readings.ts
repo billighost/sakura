@@ -1,5 +1,6 @@
 /** Server-only dictionaries. Original text and every timing field stay intact. */
-import { readingEngine, type ReadingLanguage } from "./language";
+import { arabicReadingLanguage, cyrillicReadingLanguage, devanagariReadingLanguage, indicReadingLanguage, normalizeLyricLanguageHint, readingEngine, type ReadingLanguage } from "./language";
+import type { ScriptReadingLanguage } from "./scriptReading";
 
 let japanese: Promise<typeof import("./japanese")> | undefined;
 let chinese: Promise<Awaited<ReturnType<typeof chineseTools>>> | undefined;
@@ -21,7 +22,7 @@ interface SpanReading { romanized: string; reviewNeeded: boolean }
 const CJK_SPAN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{N}ー々〆〻ﾞﾟ]+/gu;
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const HAN = /\p{Script=Han}/u;
-const remainingScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Devanagari}\p{Script=Arabic}]/u;
+const remainingScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Devanagari}\p{Script=Arabic}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Oriya}\p{Script=Georgian}\p{Script=Tamil}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}]/u;
 
 /** Separate a converted word from adjoining original words without altering punctuation. */
 async function replaceReadingSpans(text: string, expression: RegExp, read: (span: string) => Promise<SpanReading>, checkpoint: () => Promise<void>): Promise<SpanReading> {
@@ -34,7 +35,7 @@ async function replaceReadingSpans(text: string, expression: RegExp, read: (span
     if (result.romanized !== match[0]) {
       if (/[\p{L}\p{N}]$/u.test(text.slice(Math.max(0, start - 2), start)) && /^[\p{L}\p{N}]/u.test(result.romanized)) romanized += " ";
       romanized += result.romanized;
-      if (/[\p{L}\p{N}]$/u.test(result.romanized) && /^[\p{L}\p{N}]/u.test(text.slice(end, end + 2))) romanized += " ";
+      if (/[\p{L}\p{N}]\p{M}*$/u.test(result.romanized) && /^[\p{L}\p{N}]/u.test(text.slice(end, end + 2))) romanized += " ";
     } else romanized += result.romanized;
     reviewNeeded ||= result.reviewNeeded;
     cursor = end;
@@ -50,10 +51,11 @@ function neutralComplementIndices(text: string) {
   return indices;
 }
 
-export async function romanizeLyricLines<T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, signal?: AbortSignal) {
+export async function romanizeLyricLines<T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, signal?: AbortSignal, languageHint?: string) {
   signal?.throwIfAborted();
   if (lines.length > 400 || lines.reduce((sum, line) => sum + line.text.length, 0) > 20_000) throw new RangeError("Lyrics exceed reading limits");
   const result = [];
+  const hinted = normalizeLyricLanguageHint(languageHint) || language;
   let deadline = performance.now() + 8;
   const checkpoint = async () => {
     signal?.throwIfAborted();
@@ -70,6 +72,7 @@ export async function romanizeLyricLines<T extends { text: string }>(lines: read
     // engine. The requested language resolves genuinely ambiguous Han spans.
     let reading = await replaceReadingSpans(line.text, CJK_SPAN, async span => {
       if (!HAN.test(span) && !KANA.test(span)) return { romanized: span, reviewNeeded: false };
+      if (hinted === "yue" && !KANA.test(span)) return { romanized: span, reviewNeeded: true };
       if (KANA.test(span) || language === "ja") {
         const { romanizeJapanese } = await loadJapanese();
         await checkpoint();
@@ -98,13 +101,19 @@ export async function romanizeLyricLines<T extends { text: string }>(lines: read
       return { romanized, reviewNeeded: /\p{Script=Hangul}/u.test(romanized) };
     }, checkpoint);
     reading = { romanized: hangul.romanized, reviewNeeded: reading.reviewNeeded || hangul.reviewNeeded };
-    const scripts: Array<["ru" | "uk" | "el" | "hi" | "ar", RegExp]> = [
-      [language === "uk" || /[іїєґ]/iu.test(line.text) ? "uk" : "ru", /\p{Script=Cyrillic}[\p{Script=Cyrillic}\p{M}'’ʼ]*/gu],
+    const scripts: Array<[ScriptReadingLanguage | null, RegExp]> = [
+      [cyrillicReadingLanguage(line.text, hinted, language), /\p{Script=Cyrillic}[\p{Script=Cyrillic}\p{M}'’ʼ]*/gu],
       ["el", /\p{Script=Greek}[\p{Script=Greek}\p{M}]*/gu],
-      ["hi", /\p{Script=Devanagari}[\p{Script=Devanagari}\p{M}]*/gu],
-      ["ar", /\p{Script=Arabic}[\p{Script=Arabic}\p{M}]*/gu],
+      [devanagariReadingLanguage(line.text, hinted, language), /\p{Script=Devanagari}[\p{Script=Devanagari}\p{M}\u200c\u200d]*/gu],
+      [arabicReadingLanguage(line.text, hinted), /\p{Script=Arabic}[\p{Script=Arabic}\p{M}]*/gu],
+      [indicReadingLanguage("te", hinted), /\p{Script=Telugu}[\p{Script=Telugu}\p{M}\u200c\u200d]*/gu],
+      [indicReadingLanguage("kn", hinted), /\p{Script=Kannada}[\p{Script=Kannada}\p{M}\u200c\u200d]*/gu],
+      [indicReadingLanguage("ml", hinted), /\p{Script=Malayalam}[\p{Script=Malayalam}\p{M}\u200c\u200d]*/gu],
+      [indicReadingLanguage("or", hinted), /\p{Script=Oriya}[\p{Script=Oriya}\p{M}\u200c\u200d]*/gu],
+      [hinted === "xmf" || hinted === "sva" || hinted === "lzz" ? null : "ka", /\p{Script=Georgian}[\p{Script=Georgian}\p{M}]*/gu],
     ];
     for (const [spanLanguage, expression] of scripts) {
+      if (!spanLanguage) continue;
       const next = await replaceReadingSpans(reading.romanized, expression, async span => {
         const { romanizeScriptSpan } = await loadOther();
         await checkpoint();

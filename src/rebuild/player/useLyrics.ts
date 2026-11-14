@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MusicTrack } from "../app/types";
 import type { TimedLyric } from "../lyrics/parse";
-import { lyricReadingLanguage, readingEngine, type ReadingLanguage } from "../lyrics/language";
+import { lyricReadingLanguage, readingEngine, READING_VERSION, type ReadingLanguage } from "../lyrics/language";
+import { upgradeCachedLyricReadings } from "./readingCacheUpgrade";
 import { lyricReadingEnabled } from "../app/readingPreferences";
 import { VERIFIED_LYRICS_VERSION } from "../lyrics/versions";
 import { readJsonResponse, requestJson,responseIssue, userMessage, UserFacingError,type UserIssue } from "../app/errors";
@@ -26,6 +27,8 @@ export interface PlayerLyrics {
   schemaVersion: string;
   hasJapanese: boolean;
   readingLanguage?: ReadingLanguage|null;
+  readingLanguageSource?: "detected" | "chosen";
+  readingLanguageVersion?: string;
   autoSyncEvidence?: AutoSyncEvidence;
   /** Public-source eligibility proof; contains no account data or lyric text. */
   publicReadingProof?: string;
@@ -105,8 +108,9 @@ async function readCache(key: string) {
      return;
     }
     if(cacheRank(value,key)>0){
-     const cached={...value,key} as CacheValue;
-     if(value.key!==key)await writeCache(cached);else memory.set(key,cached);
+     const upgraded = upgradeCachedLyricReadings(value.data, key);
+     const cached={...value,key,data:upgraded,guides:rememberReadingGuides(value.guides,upgraded)} as CacheValue;
+     if(value.key!==key||upgraded!==value.data)await writeCache(cached);else memory.set(key,cached);
      return memory.get(key) || cached;
     }
   } catch { return undefined; }
@@ -231,7 +235,7 @@ export async function prefetchLyrics(track: LyricInput, signal: AbortSignal) {
     const { publicReadingProof, ...sourcePayload } = payload;
     const data: PlayerLyrics = { ...sourcePayload,
       ...(typeof publicReadingProof === "string" && publicReadingProof.length <= 1024 ? { publicReadingProof } : {}),
-      hasJapanese: payload.lines.some(line => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)), readingLanguage: lyricReadingLanguage(payload.lines.map(line => line.text).join("\n"), input.language) };
+      hasJapanese: payload.lines.some(line => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)), readingLanguage: lyricReadingLanguage(payload.lines.map(line => line.text).join("\n"), input.language), readingLanguageSource: "detected", readingLanguageVersion: READING_VERSION };
     return (await writeCache({ key, savedAt: Date.now(), checkedAt: Date.now(), data: preserveLyricReadingLanguage(memory.get(key)?.data, data) })).data;
     } finally { flightOwner.release(); }
   });
@@ -258,7 +262,8 @@ async function prepareReadings(input: LyricInput, requestedLanguage: ReadingLang
     signal.throwIfAborted();
     const language = requestedLanguage || source?.readingLanguage || "ja", engine = readingEngine(language);
     if (!source || source.lines.every(line => !line.text.trim() || line.readingEngine === engine && typeof line.romanized === "string")) return source;
-    const prepared = chooseReadingLanguage(source, language, rememberReadingGuides(cached?.guides, source));
+    const provenance = source.readingLanguageSource === "chosen" || source.readingLanguage && source.readingLanguage !== language ? "chosen" : "detected";
+    const prepared = chooseReadingLanguage(source, language, rememberReadingGuides(cached?.guides, source), provenance);
     if (prepared.lines.every(line => !line.text.trim() || typeof line.romanized === "string" && line.readingEngine === engine)) {
       return (await writeCache({ key, savedAt: Date.now(), data: prepared })).data;
     }
@@ -269,14 +274,14 @@ async function prepareReadings(input: LyricInput, requestedLanguage: ReadingLang
       try {
         const publicReadingProof = typeof source.publicReadingProof === "string" && source.publicReadingProof.length <= 1024 ? source.publicReadingProof : undefined;
         const lines = source.lines.map(({ text, start, end, words }) => ({ text, start, ...(end === undefined ? {} : { end }), ...(words === undefined ? {} : { words }) }));
-        const payload = await requestJson<{ engine: string; lines: PlayerLyricLine[] }>("/api/v2/readings", { method: "POST", signal: sharedSignal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: input.id, language, lines, publicReadingProof }) }, { context: "lyrics", accountId: accountId || undefined });
+        const payload = await requestJson<{ engine: string; lines: PlayerLyricLine[] }>("/api/v2/readings", { method: "POST", signal: sharedSignal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recordingId: input.id, language, languageHint: provenance === "chosen" ? language : input.language, lines, publicReadingProof }) }, { context: "lyrics", accountId: accountId || undefined });
         sharedSignal.throwIfAborted();
         if (payload.engine !== engine || !validLines(payload.lines) || payload.lines.length !== source.lines.length || payload.lines.some((line, index) => line.text !== source.lines[index].text || line.start !== source.lines[index].start || line.end !== source.lines[index].end || JSON.stringify(line.words) !== JSON.stringify(source.lines[index].words) || typeof line.romanized !== "string" || line.readingEngine !== engine)) throw new Error("The reading guide did not match these lyrics.");
         const latest = memory.get(key)?.data;
         if (!cacheMemory.publicationCurrent(publicationBefore) || latest && JSON.stringify(latest.lines.map(line => line.text)) !== content) return latest;
         const guideData = { ...source, readingLanguage: language, lines: payload.lines };
         const guides = rememberReadingGuides(memory.get(key)?.guides, guideData);
-        const data = latest?.readingLanguage && latest.readingLanguage !== language ? latest : chooseReadingLanguage(latest || source, language, guides);
+        const data = latest?.readingLanguage && latest.readingLanguage !== language ? latest : chooseReadingLanguage(latest || source, language, guides, provenance);
         return (await writeCache({ key, savedAt: Date.now(), data, guides })).data;
       } finally { flightOwner.release(); }
     });
@@ -289,7 +294,7 @@ async function prepareReadings(input: LyricInput, requestedLanguage: ReadingLang
 export async function prefetchPreferredReadings(track: LyricInput, preferences: { japaneseReading?: boolean; lyricReading?: boolean }, signal: AbortSignal, accountId?: string | null) {
   const source = await prefetchLyrics(track, signal);
   signal.throwIfAborted();
-  const language = source?.readingLanguage || (source?.hasJapanese ? "ja" : null);
+  const language = source?.readingLanguage === undefined && source?.hasJapanese ? "ja" : source?.readingLanguage;
   if (!source || !language || !lyricReadingEnabled(preferences)) return source;
   return prepareReadings(track, language, signal, accountId);
 }
@@ -335,7 +340,7 @@ export function useLyrics(track: MusicTrack | null) {
       let cached = await readCache(thisKey);
       const missing=missingMemory.get(thisKey),explicitRefresh=retryVersion>0&&refreshKey===thisKey;
       if (controller.signal.aborted) return;
-      if (cached) setResult({ key: thisKey, data: cached.data, error: null, loading: false });
+      if (cached) setResult({ key: thisKey, data: memory.get(thisKey)?.data || cached.data, error: null, loading: false });
       if (cached && !explicitRefresh&&lyricCacheFresh(cached.data.timing,lyricProviderCheckedAt(cached))) {if(cached.data.timing==="plain")checkNextWeek(lyricProviderCheckedAt(cached));return;}
       if(missing&&!explicitRefresh&&lyricCacheFresh("missing",missing.checkedAt)){setResult({key:thisKey,data:null,error:missing.issue.message,loading:false});checkNextWeek(missing.checkedAt);return;}
       if(browserOffline()){
@@ -380,6 +385,7 @@ export function useLyrics(track: MusicTrack | null) {
             ...(typeof payload.publicReadingProof === "string" && payload.publicReadingProof.length <= 1024 ? { publicReadingProof: payload.publicReadingProof } : {}),
             ...(payload.autoSyncEvidence?{autoSyncEvidence:payload.autoSyncEvidence}:{}),
             readingLanguage: lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language),
+            readingLanguageSource: "detected", readingLanguageVersion: READING_VERSION,
             hasJapanese: payload.lines.some((line: PlayerLyricLine) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)) };
           signal.throwIfAborted();
           // A pre-publication provider request can finish after the upload. It
@@ -391,8 +397,11 @@ export function useLyrics(track: MusicTrack | null) {
         release = request.release;
         const data = await waitForLyricFlight(request, controller.signal);
         if (controller.signal.aborted) return;
-        setResult({ key: thisKey, data, error: null, loading: false });
-        if(data.timing==="plain")checkNextWeek(lyricProviderCheckedAt(memory.get(thisKey)||{savedAt:Date.now()}));
+        // A guide or publication can finish after this shared provider flight.
+        // Never replace a subscriber's newer words/readings with its old result.
+        const latest = memory.get(thisKey)?.data || data;
+        setResult({ key: thisKey, data: latest, error: null, loading: false });
+        if(latest.timing==="plain")checkNextWeek(lyricProviderCheckedAt(memory.get(thisKey)||{savedAt:Date.now()}));
         setRefreshKey(previous=>previous===thisKey?"":previous);
         return;
       } catch (error) {
@@ -414,7 +423,7 @@ export function useLyrics(track: MusicTrack | null) {
     if(!input||!key)return;
     if(!payload){await invalidateLyricsAfterPublication(input);setRefreshKey(key);setRetryVersion(version=>version+1);return;}
     if(!validLines(payload.lines)||payload.schemaVersion!==VERIFIED_LYRICS_VERSION||!payload.lines.some(line=>line.text.trim()))throw new Error("Published lyrics did not match a valid provider response.");
-    const data={...payload,hasJapanese:payload.lines.some(line=>/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)),readingLanguage:lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language)};
+    const data:PlayerLyrics={...payload,hasJapanese:payload.lines.some(line=>/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)),readingLanguage:lyricReadingLanguage(payload.lines.map(line=>line.text).join("\n"),input.language),readingLanguageSource:"detected",readingLanguageVersion:READING_VERSION};
     const owner = cacheMemory.acquire(key);
     try { owner.publish(); await writeCache({key,savedAt:Date.now(),checkedAt:Date.now(),data:preserveLyricReadingLanguage(memory.get(key)?.data,data)}); }
     finally { owner.release(); }

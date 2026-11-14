@@ -9,7 +9,7 @@ import { lyricInputKey, type useLyrics } from "./useLyrics";
 /** The account preference outlives a lyric view; fetching never changes that choice. */
 export function useJapaneseReading(lyrics: ReturnType<typeof useLyrics>) {
   const music = { ...useMusicView(), ...useMusicActions() };
-  const language=lyrics.data?.readingLanguage||(lyrics.data?.hasJapanese?"ja":null);
+  const language=lyrics.data?.readingLanguage===undefined&&lyrics.data?.hasJapanese?"ja":lyrics.data?.readingLanguage;
   const enabled = lyricReadingEnabled(music.settings);
   const [retryVersion, setRetryVersion] = useState(0);
   const [state, setState] = useState<{ key: string; busy: boolean; error: string | null }>({ key: "", busy: false, error: null });

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { romanizeLyricLines } from "./readings";
-import { readingEngine, READING_VERSION, type ReadingLanguage } from "./language";
+import { normalizeLyricLanguageHint, readingEngine, READING_VERSION, type ReadingLanguage } from "./language";
 import { JAPANESE_READING_VERSION } from "./versions";
 import { getSharedPublicCache, setSharedPublicCache } from "../server/redisCache";
 import { verifiedPublicReadingSource } from "./publicReadingSources";
@@ -8,7 +8,7 @@ import { ProviderFlight } from "../server/provider-flight";
 import { AbortableAdmission } from "../server/abortableAdmission";
 
 interface ReadingFields { romanized: string; readingReviewNeeded: boolean; readingEngine: string }
-type Transform = (lines: readonly { text: string }[], language: ReadingLanguage, signal?: AbortSignal) => Promise<ReadingFields[]>;
+type Transform = (lines: readonly { text: string }[], language: ReadingLanguage, signal?: AbortSignal, languageHint?: string) => Promise<ReadingFields[]>;
 interface SharedTransform { version: 1; key: string; language: ReadingLanguage; engine: string; fields: ReadingFields[] }
 interface SharedReadingCache {
   get(key: string): Promise<unknown>;
@@ -38,11 +38,12 @@ export function createReadingTransformCache(options: {
   const values = new Map<string, { fields: ReadingFields[]; bytes: number }>();
   const flights = new ProviderFlight<ReadingFields[]>(64), admission = new AbortableAdmission(2, 32);
   let retainedBytes = 0;
-  return async <T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, source: { publicReadingProof?: unknown; signal?: AbortSignal } = {}): Promise<Array<T & ReadingFields>> => {
+  return async <T extends { text: string }>(lines: readonly T[], language: ReadingLanguage, source: { publicReadingProof?: unknown; signal?: AbortSignal; languageHint?: string } = {}): Promise<Array<T & ReadingFields>> => {
     source.signal?.throwIfAborted();
     if (lines.length > 400 || lines.reduce((total, line) => total + line.text.length, 0) > 20_000) throw new RangeError("Lyrics exceed reading limits");
     const texts = lines.map(line => ({ text: line.text }));
-    const key = createHash("sha256").update(JSON.stringify([language, readingEngine(language), READING_VERSION, JAPANESE_READING_VERSION, texts])).digest("hex");
+    const hint = normalizeLyricLanguageHint(source.languageHint);
+    const key = createHash("sha256").update(JSON.stringify([language, hint, readingEngine(language), READING_VERSION, JAPANESE_READING_VERSION, texts])).digest("hex");
     const hit = values.get(key);
     let fields: ReadingFields[];
     if (hit) {
@@ -57,7 +58,7 @@ export function createReadingTransformCache(options: {
             if (saved?.version === 1 && saved.key === key && saved.language === language && saved.engine === readingEngine(language)
               && validFields(saved.fields, texts.length, readingEngine(language))) return saved.fields;
           }
-          const result = await admission.run(sharedSignal, () => transform(texts, language, sharedSignal));
+          const result = await admission.run(sharedSignal, () => transform(texts, language, sharedSignal, hint));
           sharedSignal.throwIfAborted();
           if (eligible && validFields(result, texts.length, readingEngine(language))) {
             const fields = result.map(({ romanized, readingReviewNeeded, readingEngine }) => ({ romanized, readingReviewNeeded, readingEngine }));

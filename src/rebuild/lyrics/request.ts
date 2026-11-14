@@ -1,6 +1,6 @@
 import type { TimedLyric, TimedWord } from "./parse";
 import type { LyricIdentity } from "./provider";
-import { READING_LANGUAGES, type ReadingLanguage } from "./language";
+import { normalizeLyricLanguageHint, READING_LANGUAGES, type ReadingLanguage } from "./language";
 
 export class LyricRequestError extends Error {
   constructor(message: string, public readonly status = 400) { super(message); }
@@ -40,12 +40,13 @@ const time = (value: unknown, name: string, fallback?: number) => {
   return value;
 };
 
-export function parseReadingRequest(body: unknown): { recordingId?: string; language: ReadingLanguage; lines: TimedLyric[] } {
+export function parseReadingRequest(body: unknown): { recordingId?: string; language: ReadingLanguage; languageHint?: string; lines: TimedLyric[] } {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new LyricRequestError("A reading request object is required");
   const value = body as Record<string, unknown>;
   const language = value.language === undefined ? "ja" : value.language;
   if (!READING_LANGUAGES.includes(language as ReadingLanguage)) throw new LyricRequestError("Unsupported reading language");
   const recordingId = boundedString(value.recordingId, "recordingId", 100, true);
+  const languageHint = normalizeLyricLanguageHint(boundedString(value.languageHint, "languageHint", 48, true));
   if (!Array.isArray(value.lines) || !value.lines.length) throw new LyricRequestError("lines are required");
   if (value.lines.length > 400) throw new LyricRequestError("Lyrics exceed 400 lines", 413);
   let characters = 0;
@@ -74,5 +75,5 @@ export function parseReadingRequest(body: unknown): { recordingId?: string; lang
     return { text: line.text, start, ...(end === undefined ? {} : { end }), ...(words === undefined ? {} : { words }) };
   });
   if (characters > 20_000 || wordCount > 5000) throw new LyricRequestError("Lyrics exceed the reading request limit", 413);
-  return { recordingId, language:language as ReadingLanguage, lines };
+  return { recordingId, language:language as ReadingLanguage, ...(languageHint ? { languageHint } : {}), lines };
 }

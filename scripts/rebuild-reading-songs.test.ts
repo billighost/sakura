@@ -15,7 +15,7 @@ for (const song of READING_SONG_EXCERPTS) {
   assert.equal(line.end,original.end);
   assert.deepEqual(line.words,original.words);
   assert.equal(line.readingEngine,readingEngine(song.language));
-  if (song.mode === 'pinyin' || song.mode === 'script') assert.equal(line.romanized,song.expected,'correct tones/neutral particles or written Arabic consonants and vowels');
+  if (song.mode === 'pinyin' || song.mode === 'script') assert.equal(line.romanized.normalize('NFC'),song.expected.normalize('NFC'),'match independent tones, vowel length, nasalization and established written romanization');
   else assert.equal(pronunciationLetters(line.romanized),pronunciationLetters(song.expected),'match independently chosen sound/letter reading');
   if (song.id === 'lemon') assert.doesNotMatch(line.romanized,/\bdesho\s+u\b/,'keep the long vowel together in deshou');
  });

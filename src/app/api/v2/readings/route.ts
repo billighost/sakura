@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
     const input = parseReadingRequest(body);
     const suppliedProof = body && typeof body === "object" && "publicReadingProof" in body ? body.publicReadingProof : undefined;
     const publicReadingProof = typeof suppliedProof === "string" && suppliedProof.length <= 1024 ? suppliedProof : undefined;
-    const lines = await cachedLyricReadings(input.lines, input.language, { publicReadingProof, signal: request.signal });
+    const lines = await cachedLyricReadings(input.lines, input.language, { publicReadingProof, signal: request.signal, languageHint: input.languageHint });
     return NextResponse.json({
       recordingId: input.recordingId || null, language: input.language, engine: readingEngine(input.language),
-      contentKey:input.language==="ja"?japaneseReadingCacheKey(input.lines.map(line=>line.text),input.recordingId):createHash("sha256").update(JSON.stringify([input.recordingId,input.language,readingEngine(input.language),input.lines])).digest("hex"),
+      contentKey:input.language==="ja"?japaneseReadingCacheKey(input.lines.map(line=>line.text),input.recordingId,undefined,input.languageHint):createHash("sha256").update(JSON.stringify([input.recordingId,input.language,input.languageHint,readingEngine(input.language),input.lines])).digest("hex"),
       lines,
       quality: { method: input.language==="ja"||input.language==="zh"?"dictionary-assisted":"script-transliteration", reviewNeeded: lines.some((line) => line.readingReviewNeeded), note: "Unusual names and poetic readings may need review." },
     }, { headers: { "Cache-Control": "private, no-store" } });

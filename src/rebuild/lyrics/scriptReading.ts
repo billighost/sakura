@@ -1,7 +1,8 @@
 /** Server-only, script-specific reading rules. These never translate lyric words. */
 import { transliterate } from "transliteration";
+import { romanizeIndicSpan } from "./indicReading";
 
-export type ScriptReadingLanguage = "ru" | "uk" | "el" | "hi" | "ar";
+export type ScriptReadingLanguage = "ru" | "uk" | "el" | "hi" | "ar" | "te" | "kn" | "ml" | "or" | "sr" | "ka";
 export interface ScriptReading { romanized: string; reviewNeeded: boolean }
 
 const CYRILLIC: Record<string, string> = {
@@ -13,6 +14,17 @@ const UKRAINIAN: Record<string, string> = {
   ...CYRILLIC, г:"h", ґ:"g", и:"y", і:"i", й:"i", є:"ie", ї:"i", ю:"iu", я:"ia",
 };
 const UKRAINIAN_INITIAL: Record<string, string> = { є:"ye", ї:"yi", й:"y", ю:"yu", я:"ya" };
+const SERBIAN: Record<string, string> = {
+  а:"a", б:"b", в:"v", г:"g", д:"d", ђ:"đ", е:"e", ж:"ž", з:"z", и:"i", ј:"j",
+  к:"k", л:"l", љ:"lj", м:"m", н:"n", њ:"nj", о:"o", п:"p", р:"r", с:"s", т:"t",
+  ћ:"ć", у:"u", ф:"f", х:"h", ц:"c", ч:"č", џ:"dž", ш:"š",
+};
+// Georgian national system (2002 / BGN-PCGN 2009). Apostrophes mark ejectives.
+const GEORGIAN: Record<string, string> = {
+  ა:"a", ბ:"b", გ:"g", დ:"d", ე:"e", ვ:"v", ზ:"z", თ:"t", ი:"i", კ:"k'", ლ:"l",
+  მ:"m", ნ:"n", ო:"o", პ:"p'", ჟ:"zh", რ:"r", ს:"s", ტ:"t'", უ:"u", ფ:"p", ქ:"k",
+  ღ:"gh", ყ:"q'", შ:"sh", ჩ:"ch", ც:"ts", ძ:"dz", წ:"ts'", ჭ:"ch'", ხ:"kh", ჯ:"j", ჰ:"h",
+};
 
 function caseReading(source: string, reading: string) {
   if (!reading) return "";
@@ -21,6 +33,16 @@ function caseReading(source: string, reading: string) {
   }
   if (source[0] !== source[0]?.toLowerCase()) return reading[0].toUpperCase() + reading.slice(1);
   return reading;
+}
+
+function alphabetWords(text: string, expression: RegExp, table: Record<string, string>) {
+  return text.replace(expression, word => {
+    const capitals = [...word].length > 1 && word === word.toUpperCase() && word !== word.toLowerCase();
+    return [...word].map(character => {
+      const reading = table[character.toLowerCase()];
+      return reading === undefined ? character : capitals ? reading.toUpperCase() : caseReading(character, reading);
+    }).join("");
+  });
 }
 
 function cyrillic(text: string, language: "ru" | "uk") {
@@ -91,7 +113,8 @@ interface HindiSyllable { consonant: string; vowel: string; inherent: boolean; m
 
 /** Hindi is an abugida: a consonant has a vowel unless a matra/virama changes it. */
 function hindiWord(word: string) {
-  const syllables: HindiSyllable[] = [], characters = [...word.normalize("NFC")];
+  const normalized = word.normalize("NFC").replace(/[\u200c\u200d]/gu, "");
+  const syllables: HindiSyllable[] = [], characters = [...normalized];
   for (let index = 0; index < characters.length; index++) {
     const character = characters[index];
     let consonant = HINDI_CONSONANTS[character];
@@ -108,8 +131,12 @@ function hindiWord(word: string) {
     } else if (character === "्" && previous?.consonant) {
       previous.vowel = ""; previous.inherent = false;
     } else if ((character === "ं" || character === "ँ") && previous) {
-      // A learner-friendly nasal marker; m before labials, n elsewhere.
-      previous.marks += /[पफबभम]/u.test(characters[index + 1] || "") ? "m" : "n";
+      // Chandrabindu nasalizes a vowel. Anusvara assimilates before stops;
+      // elsewhere it nasalizes the written vowel, not an invented final n.
+      const next = characters[index + 1] || "";
+      previous.marks += character === "ँ" ? "\u0303" : /[कखगघङ]/u.test(next) ? "ṅ"
+        : /[चछजझञ]/u.test(next) ? "ñ" : /[टठडढण]/u.test(next) ? "ṇ"
+        : /[तथदधन]/u.test(next) ? "n" : /[पफबभम]/u.test(next) ? "m" : "\u0303";
     } else if (character === "ः" && previous) previous.marks += "h";
     else if (HINDI_VOWELS[character] !== undefined) syllables.push({consonant:"", vowel:HINDI_VOWELS[character], inherent:false, marks:""});
     else syllables.push({consonant:character === "ॐ" ? "om" : character === "ऽ" ? "'" : character, vowel:"", inherent:false, marks:""});
@@ -121,17 +148,17 @@ function hindiWord(word: string) {
   // Only established verb stems/function words justify this internal deletion:
   // सकते -> sakte, अपना -> apnā, सुनना -> sunnā. Preserve noun vowels otherwise.
   const suffix = syllables.at(-1), beforeSuffix = syllables.at(-2);
-  const inflection = /^(.+)[तन][ाीे]$/u.exec(word.normalize("NFC"));
-  const knownInflection = Boolean(inflection && HINDI_VERB_STEMS.has(inflection[1])) || HINDI_FUNCTION_ENDINGS.has(word.normalize("NFC"));
+  const inflection = /^(.+)[तन][ाीे]$/u.exec(normalized);
+  const knownInflection = Boolean(inflection && HINDI_VERB_STEMS.has(inflection[1])) || HINDI_FUNCTION_ENDINGS.has(normalized);
   if (suffix && /^(?:t|n)$/.test(suffix.consonant) && /^(?:ā|ī|e)$/.test(suffix.vowel)
       && knownInflection && beforeSuffix?.inherent && !beforeSuffix.marks && syllables.slice(0, -2).some(syllable => syllable.vowel)) {
     beforeSuffix.vowel = "";
   }
-  return syllables.map(({consonant, vowel, marks}) => consonant + vowel + marks).join("");
+  return syllables.map(({consonant, vowel, marks}) => consonant + vowel + marks).join("").normalize("NFC");
 }
 
 function hindi(text: string) {
-  return text.replace(/[\p{Script=Devanagari}\p{M}]+/gu, hindiWord);
+  return text.replace(/\p{Script=Devanagari}[\p{Script=Devanagari}\p{M}\u200c\u200d]*/gu, hindiWord);
 }
 
 const ARABIC: Record<string, string> = {
@@ -176,7 +203,10 @@ function arabic(text: string) {
 
 export function romanizeScriptSpan(text: string, language: ScriptReadingLanguage): ScriptReading {
   const romanized = language === "ru" || language === "uk" ? cyrillic(text, language)
-    : language === "el" ? greek(text) : language === "hi" ? hindi(text) : arabic(text);
+    : language === "el" ? greek(text) : language === "hi" ? hindi(text) : language === "ar" ? arabic(text)
+    : language === "sr" ? alphabetWords(text.normalize("NFC"), /\p{Script=Cyrillic}+/gu, SERBIAN)
+    : language === "ka" ? alphabetWords(text.normalize("NFC"), /\p{Script=Georgian}+/gu, GEORGIAN)
+    : romanizeIndicSpan(text, language);
   // Internal provenance stays conservative, particularly for Hindi schwas and
   // unvocalized Arabic. The listening UI decides how to present the guide.
   return {romanized, reviewNeeded: romanized !== text};

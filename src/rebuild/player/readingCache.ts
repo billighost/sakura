@@ -1,4 +1,4 @@
-import {readingEngine,type ReadingLanguage} from "../lyrics/language";
+import {readingEngine,READING_VERSION,type ReadingLanguage} from "../lyrics/language";
 import type {PlayerLyricLine,PlayerLyrics} from "./useLyrics";
 
 export type ReadingGuides=Partial<Record<ReadingLanguage,{engine:string;texts:string[];lines:Pick<PlayerLyricLine,"romanized"|"readingEngine"|"readingReviewNeeded">[]}>>;
@@ -19,9 +19,9 @@ export function rememberReadingGuides(previous:ReadingGuides|undefined,lyrics:Pl
  return guides;
 }
 
-export function chooseReadingLanguage(lyrics:PlayerLyrics,language:ReadingLanguage,guides?:ReadingGuides):PlayerLyrics{
+export function chooseReadingLanguage(lyrics:PlayerLyrics,language:ReadingLanguage,guides?:ReadingGuides,source:"chosen"|"detected"="chosen"):PlayerLyrics{
  const guide=matchingReadingGuide(guides,lyrics,language);
- return {...lyrics,readingLanguage:language,lines:lyrics.lines.map((line,index)=>{
+ return {...lyrics,readingLanguage:language,readingLanguageSource:source,readingLanguageVersion:READING_VERSION,lines:lyrics.lines.map((line,index)=>{
   const {romanized,readingEngine,readingReviewNeeded,...text}=line;void romanized;void readingEngine;void readingReviewNeeded;
   return guide?{...text,...guide.lines[index]}:text;
  })};

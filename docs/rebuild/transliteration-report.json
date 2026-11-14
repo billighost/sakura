@@ -1,178 +1,446 @@
 {
-  "checkedAt": "2026-11-13T17:40:40.917Z",
-  "scope": "Read-only live Deezer/LRCLIB original lyric captures and independently chosen short song excerpts; no audio/account/publication requests.",
+  "checkedAt": "2026-11-14T01:07:16.764Z",
+  "scope": "Read-only live Deezer/LRCLIB original lyric captures and independently checked short song excerpts; no audio/account/publication requests.",
   "limits": {
-    "maximumRequests": 24,
-    "maximumBytes": 4194304,
+    "maximumRequests": 64,
+    "maximumBytes": 8388608,
     "maximumResponseBytes": 1048576,
-    "totalTimeoutMs": 180000
+    "totalTimeoutMs": 240000
   },
   "traffic": {
-    "newRequests": 2,
-    "newBytes": 188508,
+    "newRequests": 0,
+    "newBytes": 0,
     "requests": [
       {
         "id": "catalogue:tian-mi-mi",
         "url": "https://api.deezer.com/search?q=%E7%94%9C%E8%9C%9C%E8%9C%9C+Teresa+Teng&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:31:05.638Z",
-        "bytes": 10842
+        "capturedAt": "2026-11-13T22:55:34.320Z",
+        "bytes": 21676
       },
       {
         "id": "catalogue:moon-heart",
         "url": "https://api.deezer.com/search?q=%E6%9C%88%E4%BA%AE%E4%BB%A3%E8%A1%A8%E6%88%91%E7%9A%84%E5%BF%83+Teresa+Teng&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:14.771Z",
+        "capturedAt": "2026-11-13T22:55:33.899Z",
         "bytes": 17936
       },
       {
         "id": "tian-mi-mi",
         "url": "https://lrclib.net/api/search?track_name=%E7%94%9C%E8%9C%9C%E8%9C%9C&artist_name=%E9%82%93%E4%B8%BD%E5%90%9B",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:31:05.728Z",
+        "capturedAt": "2026-11-13T22:55:36.601Z",
         "bytes": 97858
       },
       {
         "id": "moon-heart",
         "url": "https://lrclib.net/api/search?track_name=%E6%9C%88%E4%BA%AE%E4%BB%A3%E8%A1%A8%E6%88%91%E7%9A%84%E5%BF%83&artist_name=%E9%82%93%E4%B8%BD%E5%90%9B",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:18.980Z",
+        "capturedAt": "2026-11-13T22:55:37.074Z",
         "bytes": 92085
       },
       {
         "id": "catalogue:world-this-big",
         "url": "https://api.deezer.com/search?q=%E4%B8%96%E7%95%8C%E8%BF%99%E4%B9%88%E5%A4%A7%E8%BF%98%E6%98%AF%E9%81%87%E8%A7%81%E4%BD%A0+Cheng+Xiang&limit=10",
-        "status": 200,
-        "bytes": 2280,
-        "capturedAt": "2026-11-13T17:40:38.166Z"
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:37.360Z",
+        "bytes": 2280
+      },
+      {
+        "id": "world-this-big",
+        "url": "https://lrclib.net/api/search?track_name=%E4%B8%96%E7%95%8C%E8%BF%99%E4%B9%88%E5%A4%A7%E8%BF%98%E6%98%AF%E9%81%87%E8%A7%81%E4%BD%A0&artist_name=%E7%A8%8B%E5%93%8D",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:37.755Z",
+        "bytes": 186228
       },
       {
         "id": "catalogue:yoru-ni-kakeru",
         "url": "https://api.deezer.com/search?q=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B+YOASOBI&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:19.632Z",
+        "capturedAt": "2026-11-13T22:55:42.643Z",
         "bytes": 24011
-      },
-      {
-        "id": "yoru-ni-kakeru",
-        "url": "https://lrclib.net/api/search?track_name=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist_name=YOASOBI",
-        "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:31:05.968Z",
-        "bytes": 243870
       },
       {
         "id": "catalogue:lemon",
         "url": "https://api.deezer.com/search?q=Lemon+Kenshi+Yonezu&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:18.984Z",
+        "capturedAt": "2026-11-13T22:55:42.421Z",
         "bytes": 21504
+      },
+      {
+        "id": "yoru-ni-kakeru",
+        "url": "https://lrclib.net/api/search?track_name=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist_name=YOASOBI",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:43.087Z",
+        "bytes": 243870
       },
       {
         "id": "lemon",
         "url": "https://lrclib.net/api/search?track_name=Lemon&artist_name=Kenshi+Yonezu",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:38.602Z",
-        "bytes": 207751
+        "capturedAt": "2026-11-13T22:55:42.900Z",
+        "bytes": 211075
       },
       {
         "id": "catalogue:spring-day",
         "url": "https://api.deezer.com/search?q=Spring+Day+BTS&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:19.976Z",
+        "capturedAt": "2026-11-13T22:55:43.777Z",
         "bytes": 21309
-      },
-      {
-        "id": "spring-day",
-        "url": "https://lrclib.net/api/search?track_name=Spring+Day&artist_name=BTS",
-        "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:31:05.992Z",
-        "bytes": 329459
       },
       {
         "id": "catalogue:gruppa-krovi",
         "url": "https://api.deezer.com/search?q=Gruppa+Krovi+Kino&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:21.419Z",
+        "capturedAt": "2026-11-13T22:55:44.285Z",
         "bytes": 2306
       },
       {
-        "id": "world-this-big",
-        "url": "https://lrclib.net/api/search?track_name=%E4%B8%96%E7%95%8C%E8%BF%99%E4%B9%88%E5%A4%A7%E8%BF%98%E6%98%AF%E9%81%87%E8%A7%81%E4%BD%A0&artist_name=%E7%A8%8B%E5%93%8D",
-        "status": 200,
-        "bytes": 186228,
-        "capturedAt": "2026-11-13T17:40:40.691Z"
+        "id": "spring-day",
+        "url": "https://lrclib.net/api/search?track_name=Spring+Day&artist_name=BTS",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:44.565Z",
+        "bytes": 329459
       },
       {
         "id": "gruppa-krovi",
         "url": "https://lrclib.net/api/search?track_name=%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0+%D0%BA%D1%80%D0%BE%D0%B2%D0%B8&artist_name=%D0%9A%D0%B8%D0%BD%D0%BE",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:39.566Z",
+        "capturedAt": "2026-11-13T22:55:44.611Z",
         "bytes": 161546
       },
       {
         "id": "catalogue:chervona-ruta",
         "url": "https://api.deezer.com/search?q=Chervona+Ruta+Sofia+Rotaru&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:21.737Z",
+        "capturedAt": "2026-11-13T22:55:45.079Z",
         "bytes": 21
-      },
-      {
-        "id": "chervona-ruta",
-        "url": "https://lrclib.net/api/search?track_name=%D0%A7%D0%B5%D1%80%D0%B2%D0%BE%D0%BD%D0%B0+%D1%80%D1%83%D1%82%D0%B0&artist_name=%D0%A1%D0%BE%D1%84%D1%96%D1%8F+%D0%A0%D0%BE%D1%82%D0%B0%D1%80%D1%83",
-        "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:39.002Z",
-        "bytes": 43515
       },
       {
         "id": "catalogue:dodeka",
         "url": "https://api.deezer.com/search?q=Dodeka+Anna+Vissi&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:21.950Z",
+        "capturedAt": "2026-11-13T22:55:45.124Z",
         "bytes": 12759
+      },
+      {
+        "id": "chervona-ruta",
+        "url": "https://lrclib.net/api/search?track_name=%D0%A7%D0%B5%D1%80%D0%B2%D0%BE%D0%BD%D0%B0+%D1%80%D1%83%D1%82%D0%B0&artist_name=%D0%A1%D0%BE%D1%84%D1%96%D1%8F+%D0%A0%D0%BE%D1%82%D0%B0%D1%80%D1%83",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:45.296Z",
+        "bytes": 43515
       },
       {
         "id": "catalogue:tum-hi-ho",
         "url": "https://api.deezer.com/search?q=Tum+Hi+Ho+Arijit+Singh&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:22.223Z",
+        "capturedAt": "2026-11-13T22:55:45.707Z",
         "bytes": 21895
       },
       {
         "id": "dodeka",
         "url": "https://lrclib.net/api/search?track_name=Dodeka&artist_name=Anna+Vissi",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:39.600Z",
+        "capturedAt": "2026-11-13T22:55:45.345Z",
         "bytes": 113230
       },
       {
         "id": "tum-hi-ho",
         "url": "https://lrclib.net/api/search?track_name=Tum+Hi+Ho&artist_name=Arijit+Singh",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:39.931Z",
+        "capturedAt": "2026-11-13T22:55:45.919Z",
         "bytes": 118104
       },
       {
         "id": "catalogue:tamally-maak",
         "url": "https://api.deezer.com/search?q=Tamally+Maak+Amr+Diab&limit=10",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:37:22.272Z",
+        "capturedAt": "2026-11-13T22:55:45.770Z",
         "bytes": 21160
+      },
+      {
+        "id": "catalogue:channa-mereya",
+        "url": "https://api.deezer.com/track/133088188",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:46.267Z",
+        "bytes": 5917
       },
       {
         "id": "tamally-maak",
         "url": "https://lrclib.net/api/search?track_name=Tamally+Maak&artist_name=Amr+Diab",
         "replayedCapture": true,
-        "capturedAt": "2026-11-13T17:35:40.017Z",
+        "capturedAt": "2026-11-13T22:55:46.071Z",
         "bytes": 209189
+      },
+      {
+        "id": "channa-mereya",
+        "url": "https://lrclib.net/api/search?track_name=Channa+Mereya&artist_name=Arijit+Singh",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:46.551Z",
+        "bytes": 203048
+      },
+      {
+        "id": "catalogue:inkem-inkem",
+        "url": "https://api.deezer.com/search?q=Inkem+Inkem+Inkem+Kaavaale+Sid+Sriram&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:46.434Z",
+        "bytes": 21
+      },
+      {
+        "id": "catalogue:samajavaragamana",
+        "url": "https://api.deezer.com/search?q=Samajavaragamana+Sid+Sriram&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:46.953Z",
+        "bytes": 2272
+      },
+      {
+        "id": "inkem-inkem",
+        "url": "https://lrclib.net/api/search?track_name=Inkem+Inkem+Inkem+Kaavaale&artist_name=Sid+Sriram",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:46.816Z",
+        "bytes": 399125
+      },
+      {
+        "id": "samajavaragamana",
+        "url": "https://lrclib.net/api/search?track_name=Samajavaragamana&artist_name=Sid+Sriram",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.194Z",
+        "bytes": 196968
+      },
+      {
+        "id": "catalogue:anisuthide",
+        "url": "https://api.deezer.com/track/3707259792",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.191Z",
+        "bytes": 5891
+      },
+      {
+        "id": "catalogue:bombe-helutaite",
+        "url": "https://api.deezer.com/track/1988866497",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.578Z",
+        "bytes": 6808
+      },
+      {
+        "id": "anisuthide",
+        "url": "https://lrclib.net/api/search?track_name=Anisuthide&artist_name=Sonu+Nigam",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.412Z",
+        "bytes": 102155
+      },
+      {
+        "id": "bombe-helutaite",
+        "url": "https://lrclib.net/api/search?track_name=Bombe+Helutaite&artist_name=Vijay+Prakash",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.813Z",
+        "bytes": 12972
+      },
+      {
+        "id": "catalogue:malare",
+        "url": "https://api.deezer.com/track/101723673",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:47.907Z",
+        "bytes": 5094
+      },
+      {
+        "id": "catalogue:darshana",
+        "url": "https://api.deezer.com/track/1528362742",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:48.215Z",
+        "bytes": 6888
+      },
+      {
+        "id": "malare",
+        "url": "https://lrclib.net/api/search?track_name=Malare&artist_name=Vijay+Yesudas",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:48.432Z",
+        "bytes": 313488
+      },
+      {
+        "id": "darshana",
+        "url": "https://lrclib.net/api/search?track_name=Darshana&artist_name=Hesham+Abdul+Wahab",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:48.460Z",
+        "bytes": 224443
+      },
+      {
+        "id": "catalogue:bande-utkala-janani",
+        "url": "https://api.deezer.com/track/1031257622",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:48.798Z",
+        "bytes": 5921
+      },
+      {
+        "id": "bande-utkala-janani",
+        "url": "https://lrclib.net/api/search?track_name=Bande+Utkala+Janani&artist_name=Satyajeet+Pradhan",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:48.992Z",
+        "bytes": 2
+      },
+      {
+        "id": "catalogue:ahe-nila-saila",
+        "url": "https://api.deezer.com/track/1268022722",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:49.254Z",
+        "bytes": 5003
+      },
+      {
+        "id": "catalogue:tamo-daleko",
+        "url": "https://api.deezer.com/search?q=Tamo+daleko+Dusan+Jaksic&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:49.487Z",
+        "bytes": 2163
+      },
+      {
+        "id": "ahe-nila-saila",
+        "url": "https://lrclib.net/api/search?track_name=Ahe+Nila+Saila&artist_name=Kuldeep+Pattnaik",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:49.517Z",
+        "bytes": 5858
+      },
+      {
+        "id": "tamo-daleko",
+        "url": "https://lrclib.net/api/search?track_name=Tamo+daleko&artist_name=Dusan+Jaksic",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:49.699Z",
+        "bytes": 2
+      },
+      {
+        "id": "catalogue:boze-pravde",
+        "url": "https://api.deezer.com/track/851044042",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:49.883Z",
+        "bytes": 5005
+      },
+      {
+        "id": "catalogue:suliko",
+        "url": "https://api.deezer.com/search?q=Suliko+Nino+Katamadze&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:50.038Z",
+        "bytes": 2116
+      },
+      {
+        "id": "boze-pravde",
+        "url": "https://lrclib.net/api/search?track_name=Boze+pravde&artist_name=Nikola+Urosevic+Gedza",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:50.127Z",
+        "bytes": 7573
+      },
+      {
+        "id": "suliko",
+        "url": "https://lrclib.net/api/search?track_name=Suliko&artist_name=Nino+Katamadze",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:50.271Z",
+        "bytes": 12383
+      },
+      {
+        "id": "catalogue:tbiliso",
+        "url": "https://api.deezer.com/search?q=Tbiliso+Niaz+Diasamidze&limit=10",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:50.521Z",
+        "bytes": 21123
+      },
+      {
+        "id": "tbiliso",
+        "url": "https://lrclib.net/api/search?track_name=Tbiliso&artist_name=Niaz+Diasamidze",
+        "replayedCapture": true,
+        "capturedAt": "2026-11-13T22:55:50.740Z",
+        "bytes": 10518
       }
     ]
   },
   "summary": {
-    "songs": 11,
-    "excerptChecksPassed": 11,
-    "liveMatched": 9,
-    "liveExcerptChecksPassed": 9,
-    "correctnessFailures": []
+    "songs": 24,
+    "excerptChecksPassed": 24,
+    "liveMatched": 19,
+    "liveExcerptChecksPassed": 18,
+    "correctnessFailures": [],
+    "byLanguage": {
+      "zh": {
+        "excerpts": 3,
+        "excerptChecksPassed": 3,
+        "liveMatched": 3,
+        "liveExcerptChecksPassed": 3
+      },
+      "ja": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 2,
+        "liveExcerptChecksPassed": 2
+      },
+      "ko": {
+        "excerpts": 1,
+        "excerptChecksPassed": 1,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "ru": {
+        "excerpts": 1,
+        "excerptChecksPassed": 1,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "uk": {
+        "excerpts": 1,
+        "excerptChecksPassed": 1,
+        "liveMatched": 0,
+        "liveExcerptChecksPassed": 0
+      },
+      "el": {
+        "excerpts": 1,
+        "excerptChecksPassed": 1,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "hi": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "ar": {
+        "excerpts": 1,
+        "excerptChecksPassed": 1,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "te": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "kn": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 2,
+        "liveExcerptChecksPassed": 2
+      },
+      "ml": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 2,
+        "liveExcerptChecksPassed": 1
+      },
+      "or": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "sr": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 1,
+        "liveExcerptChecksPassed": 1
+      },
+      "ka": {
+        "excerpts": 2,
+        "excerptChecksPassed": 2,
+        "liveMatched": 2,
+        "liveExcerptChecksPassed": 2
+      }
+    }
   },
   "cases": [
     {
@@ -180,7 +448,7 @@
       "title": "甜蜜蜜",
       "artist": "邓丽君",
       "language": "zh",
-      "engine": "multilingual-reading-v2:zh",
+      "engine": "multilingual-reading-v3:zh",
       "independentExcerpt": {
         "text": "甜蜜蜜你笑得甜蜜蜜",
         "expected": "tián mì mì nǐ xiào de tián mì mì",
@@ -191,8 +459,9 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
-        "id": 7295422,
+        "id": 1115721,
         "title": "甜蜜蜜",
         "artist": "鄧麗君",
         "durationSeconds": 212
@@ -200,17 +469,17 @@
       "live": {
         "status": "matched",
         "provider": "lrclib",
-        "providerId": 7977130,
+        "providerId": 31401974,
         "providerTitle": "甜蜜蜜",
         "providerArtist": "邓丽君",
-        "durationSeconds": 208,
+        "durationSeconds": 212,
         "timing": "synced",
         "lines": 34,
         "languageDetected": "zh",
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "88d565c257f5761d135a3901c36181a09b173644081590cabe5d9cca1abbb9df",
-        "capturedAt": "2026-11-13T17:31:05.728Z",
+        "capturedAt": "2026-11-13T22:55:36.601Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -222,7 +491,7 @@
       "title": "月亮代表我的心",
       "artist": "鄧麗君",
       "language": "zh",
-      "engine": "multilingual-reading-v2:zh",
+      "engine": "multilingual-reading-v3:zh",
       "independentExcerpt": {
         "text": "你問我愛你有多深",
         "expected": "nǐ wèn wǒ ài nǐ yǒu duō shēn",
@@ -233,6 +502,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 10496619,
         "title": "月亮代表我的心",
@@ -252,7 +522,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "7c8a82910ff9cc8dfc4b39b602077418eb800050211519804d1dd1ac9a708060",
-        "capturedAt": "2026-11-13T17:35:18.980Z",
+        "capturedAt": "2026-11-13T22:55:37.074Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -264,7 +534,7 @@
       "title": "世界這麼大還是遇見你",
       "artist": "程響",
       "language": "zh",
-      "engine": "multilingual-reading-v2:zh",
+      "engine": "multilingual-reading-v3:zh",
       "independentExcerpt": {
         "text": "世界這麼大還是遇見你",
         "expected": "shì jiè zhè me dà hái shì yù jiàn nǐ",
@@ -275,6 +545,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 967860842,
         "title": "世界这么大还是遇见你",
@@ -294,8 +565,8 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "40379e3932691da408e23fe5e152f1e51f79e4031d30a80ef8875843fe035dd4",
-        "capturedAt": "2026-11-13T17:40:40.691Z",
-        "replayedCapture": false,
+        "capturedAt": "2026-11-13T22:55:37.755Z",
+        "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
         "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
@@ -306,7 +577,7 @@
       "title": "夜に駆ける",
       "artist": "YOASOBI",
       "language": "ja",
-      "engine": "ja-ipadic-hepburn-v2",
+      "engine": "ja-ipadic-hepburn-v3",
       "independentExcerpt": {
         "text": "沈むように溶けてゆくように",
         "expected": "shizumu you ni tokete yuku you ni",
@@ -317,6 +588,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 824731152,
         "title": "夜に駆ける",
@@ -336,7 +608,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "06b0b5ed6682b3bc3be6e6951b118cdf60af7b1a54cc9d385df07f2c44c32437",
-        "capturedAt": "2026-11-13T17:31:05.968Z",
+        "capturedAt": "2026-11-13T22:55:43.087Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -348,7 +620,7 @@
       "title": "Lemon",
       "artist": "米津玄師",
       "language": "ja",
-      "engine": "ja-ipadic-hepburn-v2",
+      "engine": "ja-ipadic-hepburn-v3",
       "independentExcerpt": {
         "text": "夢ならばどれほどよかったでしょう",
         "expected": "yume naraba dorehodo yokatta deshou",
@@ -359,6 +631,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 1355376732,
         "title": "Lemon",
@@ -378,7 +651,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "31de614742ede83f8c4d691cb0159b4ce9d29a580a27c758fce0f2dfa7cfbb81",
-        "capturedAt": "2026-11-13T17:35:38.602Z",
+        "capturedAt": "2026-11-13T22:55:42.900Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -390,7 +663,7 @@
       "title": "Spring Day",
       "artist": "BTS",
       "language": "ko",
-      "engine": "multilingual-reading-v2:ko",
+      "engine": "multilingual-reading-v3:ko",
       "independentExcerpt": {
         "text": "보고 싶다",
         "expected": "bogo sipda",
@@ -401,6 +674,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 1783253587,
         "title": "Spring Day",
@@ -420,7 +694,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "d3be858339f39c5c171369dedf911473697acd999fcd6fefb7de5567c81c46a9",
-        "capturedAt": "2026-11-13T17:31:05.992Z",
+        "capturedAt": "2026-11-13T22:55:44.565Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -432,7 +706,7 @@
       "title": "Группа крови",
       "artist": "Кино",
       "language": "ru",
-      "engine": "multilingual-reading-v2:ru",
+      "engine": "multilingual-reading-v3:ru",
       "independentExcerpt": {
         "text": "Группа крови на рукаве",
         "expected": "gruppa krovi na rukave",
@@ -443,6 +717,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 448260732,
         "title": "Группа крови",
@@ -462,7 +737,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "3686bd3ab4ed0a5a1af9ed898f46e894e10146a64b508efa3401928231306024",
-        "capturedAt": "2026-11-13T17:35:39.566Z",
+        "capturedAt": "2026-11-13T22:55:44.611Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -474,7 +749,7 @@
       "title": "Червона рута",
       "artist": "Софія Ротару",
       "language": "uk",
-      "engine": "multilingual-reading-v2:uk",
+      "engine": "multilingual-reading-v3:uk",
       "independentExcerpt": {
         "text": "Червону руту не шукай вечорами",
         "expected": "chervonu rutu ne shukai vechoramy",
@@ -484,12 +759,16 @@
         "languageDetected": "uk",
         "hintRequired": true
       },
+      "catalogue": {
+        "status": "unavailable",
+        "reason": "No independently matched original title, artist/credited contributor and edition in the bounded catalogue response."
+      },
       "live": {
         "status": "unavailable",
         "reason": "Multiple editions have different durations; recording metadata is required",
         "candidates": 6,
         "sourceScriptCandidates": 6,
-        "capturedAt": "2026-11-13T17:35:39.002Z",
+        "capturedAt": "2026-11-13T22:55:45.296Z",
         "replayedCapture": true
       }
     },
@@ -498,7 +777,7 @@
       "title": "Δώδεκα",
       "artist": "Άννα Βίσση",
       "language": "el",
-      "engine": "multilingual-reading-v2:el",
+      "engine": "multilingual-reading-v3:el",
       "independentExcerpt": {
         "text": "Δώδεκα κι ούτε ένα τηλεφώνημα",
         "expected": "dodeka ki oute ena tilefonima",
@@ -509,6 +788,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 64500675,
         "title": "Dodeka",
@@ -528,7 +808,7 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "ba3e267f9ec60ef1da0e16a87875b039bc12d5960b4ec86d963e76a21ecaddb4",
-        "capturedAt": "2026-11-13T17:35:39.600Z",
+        "capturedAt": "2026-11-13T22:55:45.345Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -540,17 +820,28 @@
       "title": "Tum Hi Ho",
       "artist": "Arijit Singh",
       "language": "hi",
-      "engine": "multilingual-reading-v2:hi",
+      "engine": "multilingual-reading-v3:hi",
       "independentExcerpt": {
         "text": "हम तेरे बिन अब रह नहीं सकते",
-        "expected": "ham tere bin ab rah nahin sakte",
-        "actual": "ham tere bin ab rah nahīn sakte",
-        "mode": "pronunciation",
+        "expected": "ham tere bin ab rah nahī̃ sakte",
+        "actual": "ham tere bin ab rah nahī̃ sakte",
+        "mode": "script",
         "correct": true,
         "languageDetected": "hi",
-        "hintRequired": false
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://www.lyricsbogie.com/tum-hi-ho/"
+          ],
+          "reading": [
+            "https://www.lyricsbogie.com/tum-hi-ho/"
+          ],
+          "sourceReading": "Hum tere bin ab reh nahi sakte",
+          "convention": "Hindi vowel length and vowel nasalization; retain independently verified spoken schwa deletion."
+        }
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 3191972361,
         "title": "Tum Hi Ho",
@@ -562,7 +853,7 @@
         "reason": "No verified title, artist, language and duration match",
         "candidates": 20,
         "sourceScriptCandidates": 0,
-        "capturedAt": "2026-11-13T17:35:39.931Z",
+        "capturedAt": "2026-11-13T22:55:45.919Z",
         "replayedCapture": true
       }
     },
@@ -571,7 +862,7 @@
       "title": "Tamally Maak",
       "artist": "Amr Diab",
       "language": "ar",
-      "engine": "multilingual-reading-v2:ar",
+      "engine": "multilingual-reading-v3:ar",
       "independentExcerpt": {
         "text": "تملي معاك",
         "expected": "tmly mʿāk",
@@ -582,6 +873,7 @@
         "hintRequired": false
       },
       "catalogue": {
+        "status": "matched",
         "provider": "deezer",
         "id": 81102882,
         "title": "Tamally Maak",
@@ -601,7 +893,689 @@
         "textAndTimingPreserved": true,
         "unconvertedScriptLines": 0,
         "sourceSha256": "791076e3f897eba97007703bdbd0bbd19879b712fb5f15673d927908fa40edb8",
-        "capturedAt": "2026-11-13T17:35:40.017Z",
+        "capturedAt": "2026-11-13T22:55:46.071Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "channa-mereya",
+      "title": "Channa Mereya",
+      "artist": "Arijit Singh",
+      "language": "hi",
+      "engine": "multilingual-reading-v3:hi",
+      "independentExcerpt": {
+        "text": "चलता हूँ दुआओं में याद रखना",
+        "expected": "chaltā hū̃ duāõ mẽ yād rakhnā",
+        "actual": "chaltā hū̃ duāõ mẽ yād rakhnā",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "hi",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://www.lyricsbogie.com/channa-mereya/"
+          ],
+          "reading": [
+            "https://www.lyricsbogie.com/channa-mereya/"
+          ],
+          "sourceReading": "Chalta hoon / Duaaon mein yaad rakhna",
+          "convention": "Hindi macrons and nasalized vowels; n in common hoon/mein spelling marks nasalization, not a consonant. Catalogue Main contributors independently confirm Arijit/Pritam."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 133088188,
+        "title": "Channa Mereya (From \"Ae Dil Hai Mushkil\")",
+        "artist": "Pritam",
+        "contributors": [
+          "Pritam",
+          "Arijit Singh"
+        ],
+        "durationSeconds": 289
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 32098521,
+        "providerTitle": "channa mereya",
+        "providerArtist": "Arijit Singh",
+        "durationSeconds": 290,
+        "timing": "synced",
+        "lines": 40,
+        "languageDetected": "hi",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "f6627ecb53e7ee7178c3d7ed7c88c1b928dca86145f6cf9139c191150075b93b",
+        "capturedAt": "2026-11-13T22:55:46.551Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "inkem-inkem",
+      "title": "Inkem Inkem Inkem Kaavaale",
+      "artist": "Sid Sriram",
+      "language": "te",
+      "engine": "multilingual-reading-v3:te",
+      "independentExcerpt": {
+        "text": "ఇంకేం ఇంకేం ఇంకేం కావాలే",
+        "expected": "iṅkēm iṅkēm iṅkēm kāvālē",
+        "actual": "iṅkēm iṅkēm iṅkēm kāvālē",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "te",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://bharatlyrics.com/inkem-inkem-inkem-kaavaale-lyrics/"
+          ],
+          "reading": [
+            "https://www.lyricswiz.com/sid-sriram-inkem-inkem-lyrics-english-translation/"
+          ],
+          "sourceReading": "Inkem inkem inkem kavale",
+          "convention": "ISO 15919, with homorganic ṅ before k and final anusvara m; written long vowels remain long."
+        }
+      },
+      "catalogue": {
+        "status": "unavailable",
+        "reason": "No independently matched original title, artist/credited contributor and edition in the bounded catalogue response."
+      },
+      "live": {
+        "status": "unavailable",
+        "reason": "Multiple editions have different durations; recording metadata is required",
+        "candidates": 20,
+        "sourceScriptCandidates": 19,
+        "capturedAt": "2026-11-13T22:55:46.816Z",
+        "replayedCapture": true
+      }
+    },
+    {
+      "id": "samajavaragamana",
+      "title": "Samajavaragamana",
+      "artist": "Sid Sriram",
+      "language": "te",
+      "engine": "multilingual-reading-v3:te",
+      "independentExcerpt": {
+        "text": "నిను చూసి ఆగ గలనా",
+        "expected": "ninu cūsi āga galanā",
+        "actual": "ninu cūsi āga galanā",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "te",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://www.telugulyricsguru.com/2020/08/samajavaragamana-song-lyrics-in-telugu-and-english.html"
+          ],
+          "reading": [
+            "https://www.telugulyricsguru.com/2020/08/samajavaragamana-song-lyrics-in-telugu-and-english.html"
+          ],
+          "sourceReading": "Ninu choosi aaga galana",
+          "convention": "ISO 15919 c is the unaspirated ch sound; ū/ā record the independently printed native vowel length."
+        }
+      },
+      "catalogue": {
+        "status": "unavailable",
+        "reason": "No independently matched original title, artist/credited contributor and edition in the bounded catalogue response."
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 16267854,
+        "providerTitle": "Samajavaragamana",
+        "providerArtist": "Sid Sriram",
+        "durationSeconds": 220,
+        "timing": "synced",
+        "lines": 35,
+        "languageDetected": "te",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "a2771828bdc6b4cd90e35bc6c9d21d9ed863a9e7fe978e5e13b01af5bcf633e8",
+        "capturedAt": "2026-11-13T22:55:47.194Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Sakura title/artist/edition gates; catalogue did not supply an independently matched recording duration."
+      }
+    },
+    {
+      "id": "anisuthide",
+      "title": "Anisuthide",
+      "artist": "Sonu Nigam",
+      "language": "kn",
+      "engine": "multilingual-reading-v3:kn",
+      "independentExcerpt": {
+        "text": "ಅನಿಸುತಿದೆ ಯಾಕೋ ಇಂದು",
+        "expected": "anisutide yākō indu",
+        "actual": "anisutide yākō indu",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "kn",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://www.supercinelyrics.com/anisuthide-lyrics-mungaru-male-super-cine-lyrics/"
+          ],
+          "reading": [
+            "https://www.supercinelyrics.com/anisuthide-lyrics-mungaru-male-super-cine-lyrics/"
+          ],
+          "sourceReading": "Anisuthide yako indu",
+          "convention": "ISO 15919; source th writes ordinary dental t, with homorganic n before d and distinct short/long vowels."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 3707259792,
+        "title": "Anisuthide (From \"Mungaru Male\")",
+        "artist": "Sonu Nigam",
+        "contributors": [
+          "Sonu Nigam",
+          "Jayant Kaikini"
+        ],
+        "durationSeconds": 276
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 38111205,
+        "providerTitle": "Anisuthide (From \"Mungaru Male\")",
+        "providerArtist": "Jayanth Kaikini, Sonu Nigam",
+        "durationSeconds": 276,
+        "timing": "synced",
+        "lines": 32,
+        "languageDetected": "kn",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "ab9cd38dce28cc91e5e74e30509864d69c91ea70e0be8423d5c92f0d193e79da",
+        "capturedAt": "2026-11-13T22:55:47.412Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "bombe-helutaite",
+      "title": "Bombe Helutaite",
+      "artist": "Vijay Prakash",
+      "language": "kn",
+      "engine": "multilingual-reading-v3:kn",
+      "independentExcerpt": {
+        "text": "ಬೊಂಬೆ ಹೇಳುತೈತೆ ಮತ್ತೆ ಹೇಳುತೈತೆ",
+        "expected": "bombe hēḷutaite matte hēḷutaite",
+        "actual": "bombe hēḷutaite matte hēḷutaite",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "kn",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://www.kannadalyricshub.com/bombe-helutaite-lyrics/"
+          ],
+          "reading": [
+            "https://www.kannadalyricshub.com/bombe-helutaite-lyrics/"
+          ],
+          "sourceReading": "Bombe Heluthaithe Matte Heluthaithe",
+          "convention": "ISO 15919 with homorganic m before b, geminated tt, long ē and retroflex ḷ. Source and catalogue independently confirm Vijay Prakash/V. Harikrishna credits."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 1988866497,
+        "title": "Bombe Helutaithe",
+        "artist": "V. Harikrishna",
+        "contributors": [
+          "V. Harikrishna",
+          "Santhosh Ananddram",
+          "Vijay Prakash"
+        ],
+        "durationSeconds": 287
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 32021082,
+        "providerTitle": "Bombe Helutaite",
+        "providerArtist": "Vijay Prakash",
+        "durationSeconds": 287,
+        "timing": "synced",
+        "lines": 38,
+        "languageDetected": "kn",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "34987bb7ae3b27a7d5592ee394b85997d9e652612dd6ee9b2256c8663f31fdb2",
+        "capturedAt": "2026-11-13T22:55:47.813Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "malare",
+      "title": "Malare",
+      "artist": "Vijay Yesudas",
+      "language": "ml",
+      "engine": "multilingual-reading-v3:ml",
+      "independentExcerpt": {
+        "text": "മലരേ നിന്നെ കാണാതിരുന്നാൽ",
+        "expected": "malarē ninne kāṇātirunnāl",
+        "actual": "malarē ninne kāṇātirunnāl",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "ml",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://m3db.com/lyric/57114"
+          ],
+          "reading": [
+            "https://paattinteparibhasha.com/2017/02/05/malare/"
+          ],
+          "sourceReading": "Malare ninne kaanathirunnal",
+          "convention": "ISO 15919; retain vowel length, retroflex ṇ, nn gemination and final chillu-l without an inserted vowel."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 101723673,
+        "title": "Malare (From \"Premam\")",
+        "artist": "Vijay Yesudas",
+        "contributors": [
+          "Vijay Yesudas"
+        ],
+        "durationSeconds": 316
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 6146835,
+        "providerTitle": "Malare",
+        "providerArtist": "Vijay Yesudas",
+        "durationSeconds": 316,
+        "timing": "synced",
+        "lines": 36,
+        "languageDetected": "ml",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "580ebe265e7da52a4473cf6a34a1f2aa94802bbd137026581bd2c14f8706ddce",
+        "capturedAt": "2026-11-13T22:55:48.432Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "darshana",
+      "title": "Darshana",
+      "artist": "Hesham Abdul Wahab",
+      "language": "ml",
+      "engine": "multilingual-reading-v3:ml",
+      "independentExcerpt": {
+        "text": "ദർശനാ സർവം സദാ",
+        "expected": "darśanā sarvam sadā",
+        "actual": "darśanā sarvam sadā",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "ml",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://m3db.com/lyric/darshana"
+          ],
+          "reading": [
+            "https://www.lyricsila.com/darshana-song-lyrics/"
+          ],
+          "sourceReading": "Darshana Sarvam Sada",
+          "convention": "ISO 15919 ś is sh; chillu-r and final anusvara m. The following word has conflicting source spellings and is excluded."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 1528362742,
+        "title": "Darshana (From \"Hridayam\")",
+        "artist": "Hesham Abdul Wahab",
+        "contributors": [
+          "Hesham Abdul Wahab",
+          "Darshana Rajendran",
+          "Arun Alat"
+        ],
+        "durationSeconds": 226
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 6729507,
+        "providerTitle": "Darshana (From \"Hridayam\")",
+        "providerArtist": "Hesham Abdul Wahab & Darshana Rajendran",
+        "durationSeconds": 226,
+        "timing": "synced",
+        "lines": 43,
+        "languageDetected": "ml",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "db3989a5769563eaa839390c373d457f84f58a32bfa7e5531c948c86bb7bc48a",
+        "capturedAt": "2026-11-13T22:55:48.460Z",
+        "replayedCapture": true,
+        "independentExcerptFound": false,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "bande-utkala-janani",
+      "title": "Bande Utkala Janani",
+      "artist": "Satyajeet Pradhan",
+      "language": "or",
+      "engine": "multilingual-reading-v3:or",
+      "independentExcerpt": {
+        "text": "ବନ୍ଦେ ଉତ୍କଳ ଜନନୀ",
+        "expected": "bandē utkaḷa jananī",
+        "actual": "bandē utkaḷa jananī",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "or",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://en.wikipedia.org/wiki/Bande_Utkala_Janani"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Bande_Utkala_Janani"
+          ],
+          "sourceReading": "Bandē utkaḷa jananī",
+          "convention": "Independent ISO 15919 table. Odia inherent a represents /ɔ/ and survives medially and finally; this is a spelling guide."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 1031257622,
+        "title": "Bande Utkala Janani",
+        "artist": "Satyajeet Pradhan",
+        "contributors": [
+          "Satyajeet Pradhan",
+          "Aseema Panda"
+        ],
+        "durationSeconds": 281
+      },
+      "live": {
+        "status": "unavailable",
+        "reason": "No verified title, artist, language and duration match",
+        "candidates": 0,
+        "sourceScriptCandidates": 0,
+        "capturedAt": "2026-11-13T22:55:48.992Z",
+        "replayedCapture": true
+      }
+    },
+    {
+      "id": "ahe-nila-saila",
+      "title": "Ahe Nila Saila",
+      "artist": "Kuldeep Pattnaik",
+      "language": "or",
+      "engine": "multilingual-reading-v3:or",
+      "independentExcerpt": {
+        "text": "ମୋ ଆରତ ନଳିନୀ ବନକୁ କର ଦଳନ",
+        "expected": "mō ārata naḷinī banaku kara daḷana",
+        "actual": "mō ārata naḷinī banaku kara daḷana",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "or",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://en.wikipedia.org/wiki/Ahe_Nila_Saila"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Ahe_Nila_Saila"
+          ],
+          "sourceReading": "mo arata naḷinī banaku kara daḷana",
+          "convention": "ISO 15919 vowel length from separately printed native text. The composed-song reference describes Bhikari Bal; live coverage explicitly audits the independently identified Kuldeep rendition, not Bhikari's recording."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 1268022722,
+        "title": "Ahe Nila Saila",
+        "artist": "Kuldeep Pattnaik",
+        "contributors": [
+          "Kuldeep Pattnaik"
+        ],
+        "durationSeconds": 211
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 9483747,
+        "providerTitle": "Ahe Nila Saila",
+        "providerArtist": "Kuldeep Pattnaik",
+        "durationSeconds": 211,
+        "timing": "synced",
+        "lines": 20,
+        "languageDetected": "or",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "d8f53126b61879363a8d3aa9e562603c3d30feab2852685027671fbb4ca69a11",
+        "capturedAt": "2026-11-13T22:55:49.517Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "tamo-daleko",
+      "title": "Tamo daleko",
+      "artist": "Dusan Jaksic",
+      "language": "sr",
+      "engine": "multilingual-reading-v3:sr",
+      "independentExcerpt": {
+        "text": "Без отаџбине, на Крфу живех ја,",
+        "expected": "Bez otadžbine, na Krfu živeh ja,",
+        "actual": "Bez otadžbine, na Krfu živeh ja,",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "sr",
+        "hintRequired": true,
+        "references": {
+          "native": [
+            "https://sr.wikisource.org/wiki/Тамо_далеко",
+            "https://en.wikipedia.org/wiki/Tamo_daleko"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Tamo_daleko"
+          ],
+          "sourceReading": "Bez otadžbine, na Krfu živeh ja,",
+          "convention": "Independently printed Serbian Latin; dž/j also occur in Macedonian Cyrillic, so a verified Serbian hint is required."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 64151841,
+        "title": "Tamo daleko",
+        "artist": "Dusan Jaksic",
+        "durationSeconds": 177
+      },
+      "live": {
+        "status": "unavailable",
+        "reason": "No verified title, artist, language and duration match",
+        "candidates": 0,
+        "sourceScriptCandidates": 0,
+        "capturedAt": "2026-11-13T22:55:49.699Z",
+        "replayedCapture": true
+      }
+    },
+    {
+      "id": "boze-pravde",
+      "title": "Bože pravde",
+      "artist": "Nikola Urosevic Gedza",
+      "language": "sr",
+      "engine": "multilingual-reading-v3:sr",
+      "independentExcerpt": {
+        "text": "Боже правде, ти што спасе",
+        "expected": "Bože pravde, ti što spase",
+        "actual": "Bože pravde, ti što spase",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "sr",
+        "hintRequired": true,
+        "references": {
+          "native": [
+            "https://en.wikipedia.org/wiki/Bože_pravde"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Bože_pravde"
+          ],
+          "sourceReading": "Bože pravde, ti što spase",
+          "convention": "Independently printed Serbian Latin and IPA; this shared Cyrillic passage requires the verified Serbian hint. Distinctive ћ/ђ and č/ć contrasts have separate regressions."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 851044042,
+        "title": "Boze pravde",
+        "artist": "Nikola Urosevic Gedza",
+        "contributors": [
+          "Nikola Urosevic Gedza"
+        ],
+        "durationSeconds": 176
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 12354422,
+        "providerTitle": "Boze pravde",
+        "providerArtist": "Nikola Urosevic Gedza",
+        "durationSeconds": 176,
+        "timing": "synced",
+        "lines": 31,
+        "languageDetected": "sr",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "703c19eb4a76b6a20c101fe8be7fdb63ac191b23ab5c5400ed103f80529c0b20",
+        "capturedAt": "2026-11-13T22:55:50.127Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "suliko",
+      "title": "Suliko",
+      "artist": "Nino Katamadze",
+      "language": "ka",
+      "engine": "multilingual-reading-v3:ka",
+      "independentExcerpt": {
+        "text": "საყვარლის საფლავს ვეძებდი,",
+        "expected": "saq'varlis saplavs vedzebdi,",
+        "actual": "saq'varlis saplavs vedzebdi,",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "ka",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://ka.wikisource.org/wiki/სულიკო"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Romanization_of_Georgian",
+            "https://www.eki.ee/wgrs/v2_2/rom1_ka.htm"
+          ],
+          "sourceReading": "saq'varlis saplavs vedzebdi,",
+          "convention": "Independently applied Georgian national romanization table; q is ejective q', while ფ is aspirated p."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 4094006591,
+        "title": "Suliko",
+        "artist": "Nino Katamadze",
+        "durationSeconds": 231
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 5343454,
+        "providerTitle": "Suliko",
+        "providerArtist": "Nino Katamadze & Insight",
+        "durationSeconds": 231,
+        "timing": "synced",
+        "lines": 13,
+        "languageDetected": "ka",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "8f7ecf0bd520b5f07fb7268fb12df036541ae626dbf1c45bc1f66cbdabf902f7",
+        "capturedAt": "2026-11-13T22:55:50.271Z",
+        "replayedCapture": true,
+        "independentExcerptFound": true,
+        "liveExcerptCorrect": true,
+        "identityScope": "Live Deezer title/artist/duration with Sakura provider identity and edition gates."
+      }
+    },
+    {
+      "id": "tbiliso",
+      "title": "Tbiliso",
+      "artist": "Niaz Diasamidze",
+      "language": "ka",
+      "engine": "multilingual-reading-v3:ka",
+      "independentExcerpt": {
+        "text": "ნეტავ სად არის კიდევ ცა,",
+        "expected": "net'av sad aris k'idev tsa,",
+        "actual": "net'av sad aris k'idev tsa,",
+        "mode": "script",
+        "correct": true,
+        "languageDetected": "ka",
+        "hintRequired": false,
+        "references": {
+          "native": [
+            "https://en.wikipedia.org/wiki/Tbiliso",
+            "https://lyricstranslate.com/en/tbiliso-tbilisi.html"
+          ],
+          "reading": [
+            "https://en.wikipedia.org/wiki/Romanization_of_Georgian",
+            "https://www.eki.ee/wgrs/v2_2/rom1_ka.htm"
+          ],
+          "sourceReading": "net'av sad aris k'idev tsa,",
+          "convention": "Independently applied national table; ტ/კ are ejective t'/k', ც is aspirated ts with no apostrophe."
+        }
+      },
+      "catalogue": {
+        "status": "matched",
+        "provider": "deezer",
+        "id": 832265522,
+        "title": "Tbiliso",
+        "artist": "Niaz Diasamidze",
+        "durationSeconds": 167
+      },
+      "live": {
+        "status": "matched",
+        "provider": "lrclib",
+        "providerId": 15154598,
+        "providerTitle": "Tbiliso",
+        "providerArtist": "Niaz Diasamidze",
+        "durationSeconds": 167,
+        "timing": "synced",
+        "lines": 30,
+        "languageDetected": "ka",
+        "textAndTimingPreserved": true,
+        "unconvertedScriptLines": 0,
+        "sourceSha256": "e3542d56c8c76f9d4d1296bade70e77a976a25a6bc8976ffe955407d790659a2",
+        "capturedAt": "2026-11-13T22:55:50.740Z",
         "replayedCapture": true,
         "independentExcerptFound": true,
         "liveExcerptCorrect": true,
@@ -611,9 +1585,11 @@
   ],
   "limitations": [
     "A live response proves provider text was processed, not that every word of a full song has a manually reviewed reading.",
-    "Short excerpt pronunciation expectations are independent of the engine; Hindi/Greek/Cyrillic word spacing and macrons normalize for comparison.",
+    "Independent ISO/song excerpt checks preserve vowel length, retroflex letters, nasalization and Georgian ejective apostrophes; live comparisons allow source case/punctuation differences only.",
     "Unvowelled Arabic checks script transliteration only; unwritten vowels and dialect cannot be recovered from consonants.",
-    "Cyrillic alone cannot always distinguish Ukrainian from Russian; the Ukrainian excerpt requires a verified language hint.",
+    "Shared Cyrillic and Devanagari require compatible trusted hints or distinguishing text evidence; ambiguous passages stay original.",
+    "Telugu/Kannada/Malayalam/Odia use ISO 15919 with written-script limits. Odia a denotes /ɔ/; Sanskrit conjunct and loan readings can differ.",
+    "Malayalam bare final virama, old ambiguous digraphs and exceptional singer/dialect voicing are not guessed; atomic chillus and explicitly written half-u are handled.",
     "Mandarin Pinyin does not supply Cantonese readings or all singer-specific poetic pronunciations.",
     "Provider matches use known title/artist aliases and edition gates; externally matched Deezer recordings additionally supply the duration gate."
   ]

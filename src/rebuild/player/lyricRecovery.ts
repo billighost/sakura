@@ -5,7 +5,7 @@ import { JAPANESE_READING_VERSION } from "../lyrics/versions";
 /** A refresh of unchanged words must retain the listener's chosen reading language. */
 export function preserveLyricReadingLanguage(previous:PlayerLyrics|undefined,next:PlayerLyrics):PlayerLyrics{
  if(!previous?.readingLanguage||previous.lines.length!==next.lines.length||previous.lines.some((line,index)=>line.text!==next.lines[index].text))return next;
- return {...next,readingLanguage:previous.readingLanguage};
+ return {...next,readingLanguage:previous.readingLanguage,readingLanguageSource:previous.readingLanguageSource,readingLanguageVersion:previous.readingLanguageVersion};
 }
 
 /** Fresh provider data must not discard an already verified pronunciation guide. */

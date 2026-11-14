@@ -16,11 +16,17 @@ test("Greek vowel digraphs and diaeresis remain distinct", () => {
 });
 
 test("Hindi retains inherent vowels, matras and nasals in actual song words", () => {
-  assert.equal(romanizeScriptSpan("हम तेरे बिन अब रह नहीं सकते", "hi").romanized, "ham tere bin ab rah nahīn sakte");
+  assert.equal(romanizeScriptSpan("हम तेरे बिन अब रह नहीं सकते", "hi").romanized, "ham tere bin ab rah nahī̃ sakte");
   assert.equal(romanizeScriptSpan("तुम ही हो", "hi").romanized, "tum hī ho");
   assert.equal(romanizeScriptSpan("एक पल मेरा दिल", "hi").romanized, "ek pal merā dil");
   assert.equal(romanizeScriptSpan("कभी रात ज्ञान ज़िंदगी फ़ासला", "hi").romanized, "kabhī rāt gyān zindagī fāsalā");
   assert.equal(romanizeScriptSpan("अपना सुनना माला", "hi").romanized, "apnā sunnā mālā");
+});
+
+test("Hindi vowel nasalization, homorganic consonants and conjunct controls are distinct", () => {
+  assert.equal(romanizeScriptSpan("चलता हूँ दुआओं में याद रखना", "hi").romanized, "chaltā hū̃ duāõ mẽ yād rakhnā".normalize("NFC"));
+  assert.equal(romanizeScriptSpan("साँस काँटा अंग हिंदी चंचल कंठ संबंध", "hi").romanized, "sā̃s kā̃ṭā aṅg hindī chañchal kaṇṭh sambandh");
+  assert.equal(romanizeScriptSpan("ज्ञान ज्‍ञान ज्‌ञान ज़िंदगी ज़िंदगी", "hi").romanized, "gyān gyān gyān zindagī zindagī");
 });
 
 test("Hindi noun endings do not masquerade as verb inflections or erase explicit vowels", () => {

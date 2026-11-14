@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { prefetchLyrics, prefetchPreferredReadings, prefetchReadings, lyricCacheMemoryStats } from "../src/rebuild/player/useLyrics";
-import { readingEngine } from "../src/rebuild/lyrics/language";
+import { readingEngine, READING_LANGUAGES } from "../src/rebuild/lyrics/language";
+import { READING_SONG_EXCERPTS } from "./fixtures/reading-song-excerpts";
 import type { MusicTrack } from "../src/rebuild/app/types";
 
 const track = (title: string) => ({ id: title, title, artists: ["Fixture"], durationMs: 180000, albumTitle: "Album", language: "ja" }) as MusicTrack;
@@ -52,13 +53,12 @@ test("preferred preparation makes no pronunciation request when disabled and reu
   } finally { globalThis.fetch = original; }
 });
 
-test("one saved reading preference prepares Japanese, Chinese and Korean songs and preserves lyric timing", async () => {
+test("one saved reading preference prepares every supported language and preserves lyric timing", async () => {
   const original = globalThis.fetch;
-  const originals = {
-    ja: [{ text: "君の声", start: 1, end: 3, words: [{ text: "君", start: 1, end: 2 }] }],
-    zh: [{ text: "甜蜜蜜", start: 2, end: 5 }],
-    ko: [{ text: "보고 싶다", start: 3, end: 7 }],
-  };
+  const originals = Object.fromEntries(READING_LANGUAGES.map((language, index) => {
+    const song = READING_SONG_EXCERPTS.find(song => song.language === language)!;
+    return [language, [{ text: song.text, start: index + 1, end: index + 5, words: [{ text: song.text, start: index + 1, end: index + 2 }] }]];
+  }));
   const requested: string[] = [];
   globalThis.fetch = async (url, options) => {
     if (String(url).startsWith("/api/v2/lyrics?")) {
@@ -71,7 +71,7 @@ test("one saved reading preference prepares Japanese, Chinese and Korean songs a
   };
   try {
     const signal = new AbortController().signal;
-    for (const language of ["ja", "zh", "ko"] as const) {
+    for (const language of READING_LANGUAGES) {
       const song = { ...track("shared-preference-" + language), language };
       const disabled = await prefetchPreferredReadings(song, { japaneseReading: false, lyricReading: false }, signal, "fixture-account");
       assert.equal(disabled?.lines[0].romanized, undefined);
@@ -83,7 +83,7 @@ test("one saved reading preference prepares Japanese, Chinese and Korean songs a
       }), originals[language]);
       await prefetchPreferredReadings(song, { lyricReading: true }, signal, "fixture-account");
     }
-    assert.deepEqual(requested, ["ja", "zh", "ko"], "either legacy enabled flag applies across languages and completed readings are reused");
+    assert.deepEqual(requested, [...READING_LANGUAGES], "either legacy enabled flag applies across languages and completed readings are reused");
   } finally { globalThis.fetch = original; }
 });
 
