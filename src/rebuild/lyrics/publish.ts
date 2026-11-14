@@ -33,12 +33,16 @@ export async function requestPublishChallenge(options:{fetch?:typeof fetch;signa
   return {prefix:proof.prefix,target:proof.target,expiresAt:Date.now()+4*60*1000};
 }
 
+export function validateLyricPublishIdentity(identity: LyricIdentity): asserts identity is LyricIdentity & {album:string;durationSeconds:number} {
+  if (!identity.title.trim()||!identity.artist.trim()||!identity.album?.trim()||identity.durationSeconds===undefined||!Number.isFinite(identity.durationSeconds)||identity.durationSeconds<1||identity.durationSeconds>3600) throw new LyricPublishError("This song needs a verified album and duration before it can be published. Your draft is kept.",400,"lyrics-publish-metadata");
+  if (lyricEdition(identity.title,identity.versionLabel).includes("instrumental")) throw new LyricRequestError("Vocal lyrics cannot be published for an instrumental recording");
+}
+
 export function parseLyricSubmission(value: unknown, identity: LyricIdentity) {
   const input = value && typeof value === "object" ? value as Record<string,unknown> : {};
   if (typeof input.text !== "string" || !input.text.trim()) throw new LyricRequestError("Add the lyrics first");
   if (input.text.length > 20_000 || input.text.split(/\r?\n/).length > 400) throw new LyricRequestError("Lyrics exceed 400 lines or 20,000 characters",413);
-  if (!identity.title.trim()||!identity.artist.trim()||!identity.album?.trim()||identity.durationSeconds===undefined||!Number.isFinite(identity.durationSeconds)||identity.durationSeconds<1||identity.durationSeconds>3600) throw new LyricPublishError("This song needs a verified album and duration before it can be published. Your draft is kept.",400,"lyrics-publish-metadata");
-  if (lyricEdition(identity.title,identity.versionLabel).includes("instrumental")) throw new LyricRequestError("Vocal lyrics cannot be published for an instrumental recording");
+  validateLyricPublishIdentity(identity);
   const text = input.text.replace(/\r\n?/g,"\n").trim();
   if (input.format !== "plain" && input.format !== "lrc") throw new LyricRequestError("Choose plain text or synced LRC");
   if (input.format === "lrc") {

@@ -59,6 +59,8 @@ class LyricLoadError extends UserFacingError {
   constructor(error: UserFacingError, readonly retryAfterMs?: number) {super(error.issue, error.status);}
 }
 let database: Promise<IDBDatabase> | undefined;
+// A blocked device database must not hold lyrics or publication acknowledgement.
+const LYRIC_STORAGE_TIMEOUT_MS = 1000;
 function validLines(value: unknown): value is PlayerLyricLine[] {
   return Array.isArray(value) && value.length <= 4000 && value.every((line, index) =>
     line && typeof line.text === "string" && Number.isFinite(line.start) && line.start >= 0 &&
@@ -69,9 +71,13 @@ function openDatabase() {
   if (!database) database = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === "undefined") { reject(new Error("Lyrics storage unavailable")); return; }
     const request = indexedDB.open("sakura-v2-lyrics-v1", 1);
+    let settled = false;
+    const fail = () => { if (settled) return; settled = true; clearTimeout(timer); reject(new Error("Lyrics storage unavailable")); };
+    const timer = setTimeout(fail, LYRIC_STORAGE_TIMEOUT_MS);
     request.onupgradeneeded = () => request.result.createObjectStore("lyrics", { keyPath: "key" });
-    request.onsuccess = () => {const db=request.result;db.onversionchange=()=>{db.close();database=undefined;};resolve(db);};
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {const db=request.result;if(settled){db.close();return;}settled=true;clearTimeout(timer);db.onversionchange=()=>{db.close();database=undefined;};resolve(db);};
+    request.onerror = fail;
+    request.onblocked = fail;
   }).catch((error: unknown) => { database = undefined; throw error; });
   return database;
 }
@@ -116,20 +122,23 @@ async function readCache(key: string) {
   } catch { return undefined; }
   } finally { owner.release(); }
 }
-function cacheRank(value:StoredCacheValue|undefined,key:string){
+function cacheRank(value:CacheValue|MissingCacheValue|undefined,key:string){
  if(!value||stableLyricCacheIdentity(value.key)!==key)return -1;
- if(value.missing===true)return Number.isFinite(value.checkedAt)&&value.issue?.kind==="missing"&&typeof value.issue.message==="string"?0:-1;
+ if(isMissing(value))return Number.isFinite(value.checkedAt)&&value.issue?.kind==="missing"&&typeof value.issue.message==="string"?0:-1;
  if(!Number.isFinite(value.savedAt)||value.data?.schemaVersion!==VERIFIED_LYRICS_VERSION||!validLines(value.data.lines)||!value.data.instrumental&&!value.data.lines.some(line=>line.text.trim()))return -1;
  return value.data.timing==="synced"?2:value.data.timing==="plain"?1:-1;
 }
 function storedCache(db:IDBDatabase,key:string){return new Promise<StoredCacheValue|undefined>(resolve=>{
- const request=db.transaction("lyrics","readonly").objectStore("lyrics").get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>resolve(undefined);
+ const request=db.transaction("lyrics","readonly").objectStore("lyrics").get(key),timer=setTimeout(()=>resolve(undefined),LYRIC_STORAGE_TIMEOUT_MS);request.onsuccess=()=>{clearTimeout(timer);resolve(request.result);};request.onerror=()=>{clearTimeout(timer);resolve(undefined);};
 });}
 function legacyCacheKeys(db:IDBDatabase){return legacyKeys||(legacyKeys=new Promise<Map<string,string[]>>(resolve=>{
- const request=db.transaction("lyrics","readonly").objectStore("lyrics").getAllKeys();request.onsuccess=()=>{const keys=new Map<string,string[]>();for(const raw of request.result)if(typeof raw==="string"){const stable=stableLyricCacheIdentity(raw);if(stable!==raw)keys.set(stable,[...(keys.get(stable)||[]),raw]);}resolve(keys);};request.onerror=()=>{legacyKeys=undefined;resolve(new Map());};
+ const request=db.transaction("lyrics","readonly").objectStore("lyrics").getAllKeys(),timer=setTimeout(()=>{legacyKeys=undefined;resolve(new Map());},LYRIC_STORAGE_TIMEOUT_MS);request.onsuccess=()=>{clearTimeout(timer);const keys=new Map<string,string[]>();for(const raw of request.result)if(typeof raw==="string"){const stable=stableLyricCacheIdentity(raw);if(stable!==raw)keys.set(stable,[...(keys.get(stable)||[]),raw]);}resolve(keys);};request.onerror=()=>{clearTimeout(timer);legacyKeys=undefined;resolve(new Map());};
 }));}
-async function writeCache(value: CacheValue) {
+// Provider results are visible immediately; background persistence keeps its
+// generation lease so a late write cannot replace a publication or reading.
+async function writeCache(value: CacheValue, waitForStorage = true) {
   const owner = cacheMemory.acquire(value.key);
+  let background = false;
   try {
   const previous=memory.get(value.key);
   value={...value,checkedAt:lyricProviderCheckedAt(value,previous)};
@@ -139,18 +148,23 @@ async function writeCache(value: CacheValue) {
   const version = owner.write();
   missingMemory.delete(value.key);
   subscribers.get(value.key)?.forEach(listener => listener(value.data));
-  await persistCache(value,version);
+  const persistence = persistCache(value,version);
+  if (waitForStorage) await persistence;
+  else { background = true; void persistence.finally(() => owner.release()); }
   return value;
-  } finally { owner.release(); }
+  } finally { if (!background) owner.release(); }
 }
-async function writeMissingCache(key:string,issue:UserIssue,checkedAt=Date.now()){
+async function writeMissingCache(key:string,issue:UserIssue,checkedAt=Date.now(),waitForStorage=true){
  const owner = cacheMemory.acquire(key);
+ let background=false;
  try {
  const value:MissingCacheValue={key,savedAt:checkedAt,checkedAt,missing:true,issue};
  missingMemory.set(key,value);
  const version = owner.write();
- await persistCache(value,version);
- } finally { owner.release(); }
+ const persistence=persistCache(value,version);
+ if(waitForStorage)await persistence;
+ else{background=true;void persistence.finally(()=>owner.release());}
+ } finally { if(!background)owner.release(); }
 }
 async function persistCache(value:CacheValue|MissingCacheValue,version:LyricGeneration){
   try {
@@ -158,12 +172,37 @@ async function persistCache(value:CacheValue|MissingCacheValue,version:LyricGene
     if(!cacheMemory.writeCurrent(version))return;
     await new Promise<void>((resolve) => {
       const tx = db.transaction("lyrics", "readwrite");
-      tx.objectStore("lyrics").put(value);
+      const store = tx.objectStore("lyrics");
+      if (typeof store.put !== "function") throw new Error("Lyrics storage unavailable");
+      let active = true;
+      const timer = setTimeout(() => { active = false; try { tx.abort(); } catch {} resolve(); }, LYRIC_STORAGE_TIMEOUT_MS);
+      const read = store.get(value.key);
+      read.onsuccess = () => {
+        if (!active || !cacheMemory.writeCurrent(version)) return;
+        try {
+        const saved = read.result as StoredCacheValue | undefined;
+        // Hydration can time out while valid synced words are still on disk.
+        // Compare and write atomically so a fallback never downgrades them.
+        if (cacheRank(saved,value.key) > cacheRank(value,value.key)) {
+          if (saved && !isMissing(saved)) {
+            const owner = cacheMemory.acquire(value.key);
+            try {
+              const data = preserveLyricReadings(memory.get(value.key)?.data,upgradeCachedLyricReadings(saved.data,value.key));
+              const restored = {...saved,key:value.key,data,guides:rememberReadingGuides(saved.guides,data)};
+              owner.write();memory.set(value.key,restored);missingMemory.delete(value.key);
+              subscribers.get(value.key)?.forEach(listener => listener(data));
+            } finally { owner.release(); }
+          }
+          return;
+        }
+        store.put(value);
+        } catch {
+          active = false; clearTimeout(timer); try { tx.abort(); } catch {} resolve();
+        }
+      };
       // Bound decoded memory, not saved songs: an offline library may contain
       // thousands of lyrics and reading guides that must survive later visits.
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
+      tx.oncomplete = tx.onerror = tx.onabort = () => { active = false; clearTimeout(timer); resolve(); };
     });
   } catch { /* Lyrics still work when device storage is full or disabled. */ }
 }
@@ -185,9 +224,10 @@ export async function invalidateLyricsAfterPublication(track: LyricInput) {
       if (!cacheMemory.writeCurrent(version) || memory.has(key)) return;
       await new Promise<void>(resolve => {
         const tx = db.transaction("lyrics", "readwrite");
+        const timer = setTimeout(() => { try { tx.abort(); } catch {} resolve(); }, LYRIC_STORAGE_TIMEOUT_MS);
         const store = tx.objectStore("lyrics"), read = store.get(key);
         read.onsuccess = () => { if (cacheMemory.writeCurrent(version) && read.result?.missing === true) store.delete(key); };
-        tx.oncomplete = tx.onerror = tx.onabort = () => resolve();
+        tx.oncomplete = tx.onerror = tx.onabort = () => { clearTimeout(timer); resolve(); };
       });
     } catch { /* The shared memory/flight boundary still refreshes without storage. */ }
   }
@@ -201,7 +241,7 @@ export async function prefetchLyrics(track: LyricInput, signal: AbortSignal) {
   const key = lyricInputKey(input);
   const owner = cacheMemory.acquire(key);
   try {
-  const cached = await readCache(key), missing = missingMemory.get(key);
+  const cached = await waitForLyricFlight({promise:readCache(key),release:()=>{}},signal), missing = missingMemory.get(key);
   signal.throwIfAborted();
   if (cached && lyricCacheFresh(cached.data.timing, lyricProviderCheckedAt(cached))) return cached.data;
   if (missing && lyricCacheFresh("missing", missing.checkedAt) || browserOffline()) return cached?.data;
@@ -225,8 +265,8 @@ export async function prefetchLyrics(track: LyricInput, signal: AbortSignal) {
     if (confirmedMissing) {
       sharedSignal.throwIfAborted();
       const previous = memory.get(key) || cached;
-      if (previous) { await writeCache({ ...previous, savedAt: Date.now(), checkedAt: Date.now() }); return previous.data; }
-      if (cacheMemory.publicationCurrent(publicationBefore)) await writeMissingCache(key, responseIssue(404, null, "lyrics"));
+      if (previous) { await writeCache({ ...previous, savedAt: Date.now(), checkedAt: Date.now() },false); return previous.data; }
+      if (cacheMemory.publicationCurrent(publicationBefore)) await writeMissingCache(key, responseIssue(404, null, "lyrics"),Date.now(),false);
     }
     const payload = await readJsonResponse<PlayerLyrics>(response, { context: "lyrics" });
     if (!validLines(payload.lines) || payload.schemaVersion !== VERIFIED_LYRICS_VERSION || !["synced", "plain"].includes(payload.timing) || !payload.instrumental && !payload.lines.some(line => line.text.trim())) throw new Error("Lyrics provider returned an invalid response.");
@@ -236,7 +276,7 @@ export async function prefetchLyrics(track: LyricInput, signal: AbortSignal) {
     const data: PlayerLyrics = { ...sourcePayload,
       ...(typeof publicReadingProof === "string" && publicReadingProof.length <= 1024 ? { publicReadingProof } : {}),
       hasJapanese: payload.lines.some(line => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(line.text)), readingLanguage: lyricReadingLanguage(payload.lines.map(line => line.text).join("\n"), input.language), readingLanguageSource: "detected", readingLanguageVersion: READING_VERSION };
-    return (await writeCache({ key, savedAt: Date.now(), checkedAt: Date.now(), data: preserveLyricReadingLanguage(memory.get(key)?.data, data) })).data;
+    return (await writeCache({ key, savedAt: Date.now(), checkedAt: Date.now(), data: preserveLyricReadingLanguage(memory.get(key)?.data, data) },false)).data;
     } finally { flightOwner.release(); }
   });
   return await waitForLyricFlight(request, signal);
@@ -265,7 +305,7 @@ async function prepareReadings(input: LyricInput, requestedLanguage: ReadingLang
     const provenance = source.readingLanguageSource === "chosen" || source.readingLanguage && source.readingLanguage !== language ? "chosen" : "detected";
     const prepared = chooseReadingLanguage(source, language, rememberReadingGuides(cached?.guides, source), provenance);
     if (prepared.lines.every(line => !line.text.trim() || typeof line.romanized === "string" && line.readingEngine === engine)) {
-      return (await writeCache({ key, savedAt: Date.now(), data: prepared })).data;
+      return (await writeCache({ key, savedAt: Date.now(), data: prepared },false)).data;
     }
     if (browserOffline()) throw new Error("This reading guide has not been saved yet. Reconnect once to prepare it for offline listening.");
     const content = JSON.stringify(source.lines.map(line => line.text));
@@ -282,7 +322,7 @@ async function prepareReadings(input: LyricInput, requestedLanguage: ReadingLang
         const guideData = { ...source, readingLanguage: language, lines: payload.lines };
         const guides = rememberReadingGuides(memory.get(key)?.guides, guideData);
         const data = latest?.readingLanguage && latest.readingLanguage !== language ? latest : chooseReadingLanguage(latest || source, language, guides, provenance);
-        return (await writeCache({ key, savedAt: Date.now(), data, guides })).data;
+        return (await writeCache({ key, savedAt: Date.now(), data, guides },false)).data;
       } finally { flightOwner.release(); }
     });
     return await waitForLyricFlight(request, signal);
@@ -375,8 +415,8 @@ export function useLyrics(track: MusicTrack | null) {
           catch (error) {
             if(response.status===404&&!confirmedMissing)throw new LyricLoadError(new UserFacingError(responseIssue(503,null,"lyrics"),503),lyricRetryAfter(response.headers.get("Retry-After")));
             if(error instanceof UserFacingError&&error.status===404&&confirmedMissing){signal.throwIfAborted();const previous=memory.get(thisKey)||cached;
-              if(previous)await writeCache({...previous,savedAt:Date.now(),checkedAt:Date.now()});
-              else if(cacheMemory.publicationCurrent(publicationBefore))await writeMissingCache(thisKey,error.issue);
+              if(previous)await writeCache({...previous,savedAt:Date.now(),checkedAt:Date.now()},false);
+              else if(cacheMemory.publicationCurrent(publicationBefore))await writeMissingCache(thisKey,error.issue,Date.now(),false);
             }
             throw error instanceof UserFacingError ? new LyricLoadError(error, lyricRetryAfter(response.headers.get("Retry-After"))) : error;
           }
@@ -391,7 +431,7 @@ export function useLyrics(track: MusicTrack | null) {
           // A pre-publication provider request can finish after the upload. It
           // must never overwrite the freshly read LRCLIB result on this device.
           if(!cacheMemory.publicationCurrent(publicationBefore)&&memory.get(thisKey))return memory.get(thisKey)!.data;
-          return (await writeCache({ key: thisKey, savedAt: Date.now(),checkedAt:Date.now(), data:preserveLyricReadingLanguage(memory.get(thisKey)?.data,data) })).data;
+          return (await writeCache({ key: thisKey, savedAt: Date.now(),checkedAt:Date.now(), data:preserveLyricReadingLanguage(memory.get(thisKey)?.data,data) },false)).data;
           } finally { flightOwner.release(); }
         });
         release = request.release;

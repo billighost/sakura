@@ -180,6 +180,16 @@
 /* Keep the lyric transport on the same paper as the surrounding words. */
 .lyricsControls{background:var(--ink-bg);box-shadow:none}
 
+.lyricsMissing{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:17px;flex:1;min-height:300px;padding:42px 20px 48px;text-align:center;color:var(--p-muted)}
+.lyricsMissingBloom{display:flex;align-items:center;gap:17px;color:var(--ink-petal,#bb7b81);margin-bottom:1px}
+.lyricsMissingBloom::before,.lyricsMissingBloom::after{content:"";width:48px;height:1px;background:color-mix(in srgb,var(--ink-petal,#bb7b81) 45%,var(--p-line));transform:rotate(-4deg)}
+.lyricsMissingBloom::after{transform:rotate(4deg)}
+.lyricsMissingBloom>svg{width:34px;height:34px;transform:rotate(-8deg)}
+.lyricsMissing h4{margin:0;max-width:460px;font:italic 36px/1.25 var(--font-fraunces),Georgia,serif;font-weight:400;letter-spacing:-.035em;color:var(--p-text);text-wrap:balance}
+.lyricsMissing p{margin:0;font-size:11px;line-height:1.9;max-width:310px;text-wrap:balance}
+.lyricsMissing .lyricsMissingRetry{min-height:44px;padding:8px 0;margin-top:-10px;border:0;background:none;color:var(--p-muted);font:10px/1.5 var(--font-inter),Arial,sans-serif;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+@media(max-width:760px){.lyricsMissing{min-height:260px;padding:32px 16px 36px;gap:15px}.lyricsMissing h4{max-width:300px;font-size:30px}.lyricsMissingBloom>svg{width:30px;height:30px}.lyricsMissingBloom::before,.lyricsMissingBloom::after{width:35px}}
+
 .dialogHeader>div{min-width:0;flex:1}
 .headerDetail{font-size:11px;line-height:1.4;color:var(--p-muted);margin-top:6px!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Portrait listening keeps the sleeve and essential actions together on the

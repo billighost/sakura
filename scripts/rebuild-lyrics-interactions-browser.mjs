@@ -204,7 +204,7 @@ async function run(width){
     await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});await page.getByRole('searchbox',{name:'Find a liked song'}).fill('Unpublished');await page.getByRole('button',{name:'Play Unpublished fixture',exact:true}).click();
     await page.getByRole('button',{name:'Open now playing',exact:true}).click();player=page.locator('dialog[data-dialog-appearance="player"]');await expect(player).toHaveAttribute('data-dialog-phase','open');
     await player.getByRole('button',{name:'Lyrics',exact:true}).click();lyrics=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(lyrics).toHaveAttribute('data-dialog-phase','open');
-    const openStudio=async()=>{await lyrics.getByRole('button',{name:'Missing lyrics? Add the words',exact:true}).click();const dialog=page.locator('dialog[data-dialog-appearance="note"]').filter({has:page.locator('[data-lyric-studio]')});await expect(dialog).toHaveAttribute('data-dialog-phase','open');return dialog;};
+    const openStudio=async()=>{await lyrics.getByRole('button',{name:'Add the missing words',exact:true}).click();const dialog=page.locator('dialog[data-dialog-appearance="note"]').filter({has:page.locator('[data-lyric-studio]')});await expect(dialog).toHaveAttribute('data-dialog-phase','open');return dialog;};
     const readDraft=()=>page.evaluate(owner=>{const keys=Object.keys(localStorage).filter(key=>key.startsWith('sakura-lyric-studio:'+owner+':'));return keys.map(key=>({key,...JSON.parse(localStorage.getItem(key))}));},account.id);
     let studio=await openStudio(),text=studio.getByRole('textbox',{name:'Lyrics text',exact:true});
     await text.fill('Freshly published words\nAn unfinished second line');

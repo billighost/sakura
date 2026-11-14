@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parseLyricSubmission, publishLyrics, requestPublishChallenge, LyricPublishError } from "../src/rebuild/lyrics/publish";
-import { solveLyricPublishChallenge, publishLyricSubmission } from "../src/rebuild/player/lyricPublish";
+import { solveLyricPublishChallenge, publishLyricSubmission, createLyricPublishPreparation } from "../src/rebuild/player/lyricPublish";
 import { fetchLrcLibLyrics } from "../src/rebuild/lyrics/provider";
 import { createLyricsResolver,LYRICS_WEEKLY_REFRESH_MS } from "../src/rebuild/lyrics/service";
 
@@ -132,3 +132,87 @@ test("a malformed successful publish response produces a recoverable draft error
   try{await assert.rejects(()=>publishLyricSubmission("recording","words","plain",{accountId:"owner",signal:new AbortController().signal}),/publishing response.*draft is kept/);}
   finally{globalThis.fetch=oldFetch;Object.defineProperty(globalThis,"Worker",{value:original,configurable:true,writable:true});}
 });
+
+async function withBrowserPublication(run:(workers:PublicationWorker[])=>Promise<void>){
+  const originalWorker=globalThis.Worker,originalFetch=globalThis.fetch,workers:PublicationWorker[]=[];
+  class StubWorker implements PublicationWorker {
+    onmessage:((event:MessageEvent)=>void)|null=null;onerror:((event:ErrorEvent)=>void)|null=null;terminated=false;
+    constructor(){workers.push(this);}
+    terminate(){this.terminated=true;}
+    postMessage(value:{prefix:string}){queueMicrotask(()=>this.complete(`${value.prefix}:0`));}
+    complete(token:string){this.onmessage?.({data:{type:"complete",token}} as MessageEvent);}
+  }
+  Object.defineProperty(globalThis,"Worker",{value:StubWorker,configurable:true,writable:true});
+  try{await run(workers);}finally{globalThis.fetch=originalFetch;Object.defineProperty(globalThis,"Worker",{value:originalWorker,configurable:true,writable:true});}
+}
+interface PublicationWorker {onmessage:((event:MessageEvent)=>void)|null;onerror:((event:ErrorEvent)=>void)|null;terminated:boolean;postMessage:(value:{prefix:string})=>void;complete:(token:string)=>void}
+
+test("studio preparation requests no manuscript and publication consumes the prefetched proof once",()=>withBrowserPublication(async workers=>{
+  const calls:{url:string;body:Record<string,unknown>}[]=[];
+  globalThis.fetch=async(url,options)=>{calls.push({url:String(url),body:JSON.parse(String(options?.body))});return String(url).endsWith("/challenge")?Response.json({prefix:`prefix${calls.length}`,target:"f".repeat(64),expiresAt:Date.now()+60000}):Response.json({published:true});};
+  const preparation=createLyricPublishPreparation("recording",{accountId:"owner"});await preparation.ready;
+  assert.deepEqual(calls.map(call=>call.body),[{recordingId:"recording"}]);assert.equal(workers.length,1);
+  assert.ok(preparation.expiresAt>Date.now());
+  await publishLyricSubmission("recording","Final revised words","plain",{accountId:"owner",signal:new AbortController().signal,preparation});
+  assert.equal(calls.length,2);assert.equal(workers.length,1);assert.equal(calls[1].body.text,"Final revised words");assert.equal(calls[1].body.publishToken,"prefix1:0");
+  await publishLyricSubmission("recording","Another contribution","plain",{accountId:"owner",signal:new AbortController().signal,preparation});
+  assert.equal(workers.length,2);assert.equal(calls.filter(call=>call.url.endsWith("/challenge")).length,2);
+}));
+
+test("prefetched publication proofs cannot cross accounts or recordings",()=>withBrowserPublication(async()=>{
+  const calls:{url:string;account:string|null;body:Record<string,unknown>}[]=[];
+  globalThis.fetch=async(url,options)=>{calls.push({url:String(url),account:new Headers(options?.headers).get("X-Sakura-Account"),body:JSON.parse(String(options?.body))});return String(url).endsWith("/challenge")?Response.json({prefix:`prefix${calls.length}`,target:"f".repeat(64),expiresAt:Date.now()+60000}):Response.json({published:true});};
+  for(const target of [{recordingId:"different-recording",accountId:"owner"},{recordingId:"recording",accountId:"different-owner"}]){
+    const preparation=createLyricPublishPreparation("recording",{accountId:"owner"});await preparation.ready;
+    await publishLyricSubmission(target.recordingId,"words","plain",{accountId:target.accountId,signal:new AbortController().signal,preparation});
+    assert.equal(calls.at(-2)?.body.recordingId,target.recordingId);assert.equal(calls.at(-2)?.account,target.accountId);assert.equal(calls.at(-2)?.body.text,"words");
+    assert.equal(calls.at(-1)?.body.publishToken,`prefix${calls.length-1}:0`);preparation.cancel();
+  }
+}));
+
+test("failed or canceled background preparations are rebuilt on a publish click",()=>withBrowserPublication(async()=>{
+  for(const cancel of [false,true]){
+    let challenges=0,published=0;
+    globalThis.fetch=async url=>{if(String(url).endsWith("/publish")){published++;return Response.json({published:true});}challenges++;return !cancel&&challenges===1?Response.json({reason:"lyrics-publish-unavailable"},{status:503}):Response.json({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+60000});};
+    const preparation=createLyricPublishPreparation("recording",{accountId:"owner"});
+    if(cancel){await preparation.ready;preparation.cancel();}else await assert.rejects(()=>preparation.ready);
+    assert.equal(published,0);
+    await publishLyricSubmission("recording","words","plain",{accountId:"owner",signal:new AbortController().signal,preparation});
+    assert.equal(challenges,2);assert.equal(published,1);
+  }
+}));
+
+test("expired prepared proofs refresh before publishing instead of submitting stale tokens",()=>withBrowserPublication(async()=>{
+  const originalNow=Date.now;let now=originalNow(),challenges=0,token="";
+  Date.now=()=>now;
+  try{
+    globalThis.fetch=async(url,options)=>String(url).endsWith("/challenge")?Response.json({prefix:`prefix${++challenges}`,target:"f".repeat(64),expiresAt:now+10000}):(token=JSON.parse(String(options?.body)).publishToken,Response.json({published:true}));
+    const preparation=createLyricPublishPreparation("recording",{accountId:"owner"});await preparation.ready;now+=9000;
+    await publishLyricSubmission("recording","words","plain",{accountId:"owner",signal:new AbortController().signal,preparation});
+    assert.equal(challenges,2);assert.equal(token,"prefix2:0");
+  }finally{Date.now=originalNow;}
+}));
+
+test("canceling publication while shared proof work is pending terminates it and never uploads",async()=>{
+  const originalWorker=globalThis.Worker,originalFetch=globalThis.fetch;let terminated=false,published=0;
+  class WaitingWorker {onmessage=null;onerror=null;postMessage(){}terminate(){terminated=true;}}
+  Object.defineProperty(globalThis,"Worker",{value:WaitingWorker,configurable:true,writable:true});
+  globalThis.fetch=async url=>{if(String(url).endsWith("/publish"))published++;return Response.json({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+60000});};
+  try{
+    const preparation=createLyricPublishPreparation("recording",{accountId:"owner"});await new Promise(resolve=>setImmediate(resolve));
+    const controller=new AbortController(),work=publishLyricSubmission("recording","words","plain",{accountId:"owner",signal:controller.signal,preparation});controller.abort();
+    await assert.rejects(()=>work);await assert.rejects(()=>preparation.ready);assert.equal(terminated,true);assert.equal(published,0);
+  }finally{globalThis.fetch=originalFetch;Object.defineProperty(globalThis,"Worker",{value:originalWorker,configurable:true,writable:true});}
+});
+
+test("worker startup and malformed completion fail immediately with a recoverable draft error",()=>withBrowserPublication(async workers=>{
+  globalThis.fetch=async()=>Response.json({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+60000});
+  const prototype=globalThis.Worker.prototype;
+  const originalPost=prototype.postMessage;
+  try{
+    prototype.postMessage=()=>{throw new Error("Cannot start worker");};
+    await assert.rejects(()=>solveLyricPublishChallenge({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+60000},new AbortController().signal),/could not start.*draft is kept/);assert.equal(workers.at(-1)?.terminated,true);
+    prototype.postMessage=function(this:PublicationWorker){queueMicrotask(()=>this.complete("prefix:not-a-nonce"));};
+    await assert.rejects(()=>solveLyricPublishChallenge({prefix:"prefix",target:"f".repeat(64),expiresAt:Date.now()+60000},new AbortController().signal),/incomplete publish challenge/);assert.equal(workers.at(-1)?.terminated,true);
+  }finally{prototype.postMessage=originalPost;}
+}));

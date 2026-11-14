@@ -62,7 +62,7 @@ try {
  }
  await page.goto(base + "/lyric-studio-review-check", { waitUntil: "domcontentloaded", timeout: 90000 }); await page.getByRole("heading", { name: "Lyric studio verification" }).waitFor();
  await page.getByRole("button", { name: "Play studio fixture", exact: true }).click(); await expect.poll(() => page.evaluate(() => window.studioProbe?.status),{timeout:20000}).toBe("playing");
- await page.getByRole("button", { name: "Missing lyrics? Add the words", exact: true }).click();
+ await page.getByRole("button", { name: "Add the missing words", exact: true }).click();
  const studio = page.locator("dialog").last(); await expect(studio).toBeVisible();
  await studio.getByRole("textbox", { name: "Lyrics text" }).fill("First draft line\nSecond draft line");
  await studio.getByRole("button", { name: "Open preview", exact: true }).click(); await expect(studio.getByRole("complementary", { name: "Lyric playback preview" })).toContainText("First draft line");
@@ -70,7 +70,7 @@ try {
  await selectTheme('light');await page.setViewportSize({width:390,height:844});
  await page.screenshot({ path: output + "/phone-editor.png" });
  await studio.getByRole("button", { name: "Close", exact: true }).click(); await expect(page.locator("[data-lyric-studio]")).toHaveCount(0);
- await page.getByRole("button", { name: "Missing lyrics? Add the words", exact: true }).click(); await expect(page.getByRole("textbox", { name: "Lyrics text" })).toHaveValue("First draft line\nSecond draft line"); checks.push("Closing and reopening retains the exact manuscript draft; plain preview shows every line");
+ await page.getByRole("button", { name: "Add the missing words", exact: true }).click(); await expect(page.getByRole("textbox", { name: "Lyrics text" })).toHaveValue("First draft line\nSecond draft line"); checks.push("Closing and reopening retains the exact manuscript draft; plain preview shows every line");
  await page.locator('input[type="file"]').setInputFiles({ name: "garden.lrc", mimeType: "text/plain", buffer: Buffer.from("[00:01.00]The first petals find the light\n[00:03.00]A song is carried on the breeze\n[00:06.00]And every word has room to bloom") });
  await expect(page.getByRole("heading", { name: "Your synced lyrics are ready." })).toBeVisible();
  await expect(page.getByRole("complementary", { name: "Lyric playback preview" })).toContainText("A song is carried on the breeze"); await page.getByRole("button", { name: "Restart song & preview", exact: true }).click();
@@ -87,7 +87,7 @@ try {
  await page.getByRole('button',{name:'Edit the manuscript',exact:true}).click();await page.getByRole('textbox',{name:'Lyrics text'}).fill('Changed first line\nChanged second line\nChanged third line');
  await expect(page.getByRole('button',{name:/Continue your saved timing/})).toHaveCount(0);await page.getByRole('button',{name:'Start tap timing',exact:false}).click();await expect(page.getByRole('button',{name:'Time line 1: Changed first line'})).toBeEnabled();checks.push('Edited manuscript invalidates old timing and capture uses the newly edited words');
  await page.locator('dialog').last().getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('[data-lyric-studio]')).toHaveCount(0);
- await page.getByRole('button',{name:'Missing lyrics? Add the words',exact:true}).click();await page.locator('input[type="file"]').setInputFiles({name:'mixed.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:01]Stamped first\nUnstamped second\n[00:04]Stamped third')});
+ await page.getByRole('button',{name:'Add the missing words',exact:true}).click();await page.locator('input[type="file"]').setInputFiles({name:'mixed.lrc',mimeType:'text/plain',buffer:Buffer.from('[00:01]Stamped first\nUnstamped second\n[00:04]Stamped third')});
  await page.getByRole('button',{name:'Start tap timing',exact:false}).click();await expect(page.getByRole('button',{name:'Time line 2: Unstamped second'})).toHaveCount(1);checks.push('Repairing an incomplete imported LRC preserves the unstamped lines');
  await page.locator('dialog').last().getByRole('button',{name:'Close',exact:true}).click();await expect(page.locator('[data-lyric-studio]')).toHaveCount(0);await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('sakura-lyric-studio:'))localStorage.removeItem(key);});
  await page.getByRole("button", { name: "Sync lyrics", exact: true }).click(); await expect(page.getByRole("heading", { name: "Let the words meet the music." })).toBeVisible();

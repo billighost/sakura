@@ -3,6 +3,7 @@ import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { usePlaybackProgress } from "../app/MusicContext";
 import { useMusicActions, useMusicView } from "../app/musicView";
 import { lyricEdition } from "../lyrics/identity";
+import { Blossom } from "../app/Brand";
 import { LyricsUpload } from "./LyricsUpload";
 import { ReadingLanguageChoice } from "./ReadingLanguageChoice";
 import { AutoSyncButton } from "./AutoSyncButton";
@@ -12,6 +13,7 @@ import { PlaybackRibbon } from "../app/ListeningControls";
 import { requestDialogClose } from "../app/dialogLifecycle";
 import { formatPlaybackTime, IconButton, PlayerButton, PlayerDialog } from "./Primitives";
 import { RecoveryNotice } from "../app/RecoveryNotice";
+import { userIssue } from "../app/errors";
 import { lyricInputKey, useLyrics, type PlayerLyricLine } from "./useLyrics";
 import { useLyricMoment } from "./useLyricProgress";
 import { useLyricFollow } from "./useLyricFollow";
@@ -48,6 +50,8 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
   const active = moment.kind === "line" ? moment.index : -1;
   const { follow, pause, resume } = useLyricFollow({ targetIndex: moment.index, selecting, reducedMotion: music.settings.reducedMotion, viewRef, lineRefs, controlsRef, layoutVersion: `${lineSource}:${reading}` });
   const hasWords = Boolean(data && !data.instrumental && data.lines.some(line => line.text.trim()));
+  const missingWords = Boolean(music.track && !lyrics.loading && !hasWords && !data?.instrumental && !lyricEdition(music.track.title, music.track.versionLabel).includes("instrumental"));
+  const confirmedMissing = Boolean(lyrics.error && userIssue(lyrics.error,"lyrics").kind === "missing");
   const setLineRef = useCallback((index: number, element: HTMLElement | null) => { lineRefs.current[index] = element; }, []);
 
   function followWords() { setSelecting(false); resume(); }
@@ -95,11 +99,17 @@ function LyricsContent({ onClose, onOpenShare }: LyricsViewProps) {
     {message && <p className={s.hint} role="status">{message}</p>}
     {readingGuide.error && <p className={s.readingRecovery} role="status">Your reading choice is saved. {readingGuide.error} <button type="button" onClick={readingGuide.retry}>Try the reading again</button></p>}
     {lyrics.loading && <div className={s.empty}><span className={s.spinner}/><p>Finding the words for this recording…</p></div>}
-    {lyrics.error && <RecoveryNotice error={lyrics.error} context="lyrics" retry={lyrics.retry}/>}
-    {music.track && !lyrics.loading && !hasWords && !data?.instrumental && !lyricEdition(music.track.title,music.track.versionLabel).includes("instrumental") && <LyricsUpload key={lyricInputKey(music.track)} track={music.track} onPublished={lyrics.applyPublishedLyrics}/>}
+    {lyrics.error && !confirmedMissing && <RecoveryNotice error={lyrics.error} context="lyrics" retry={lyrics.retry}/>}
+    {missingWords && music.track && <section className={s.lyricsMissing} aria-label="Missing lyrics" data-lyrics-missing>
+      <div className={s.lyricsMissingBloom} aria-hidden="true"><Blossom/></div>
+      <h4>A song waiting for its words.</h4>
+      <p>Know this song by heart?<br/>Leave its words for the next listener.</p>
+      <LyricsUpload key={lyricInputKey(music.track)} track={music.track} onPublished={lyrics.applyPublishedLyrics}/>
+      {confirmedMissing && <button type="button" className={s.lyricsMissingRetry} onClick={lyrics.retry}>Check for lyrics again</button>}
+    </section>}
     {!music.track && <div className={s.empty}><p>Choose a song to discover its lyrics.</p></div>}
     {data?.instrumental && <div className={s.empty}><h3>Let the instruments speak.</h3><p>This recording is instrumental.</p></div>}
-    {data && !data.instrumental && !hasWords && <div className={s.empty}><p>The words are not available for this recording yet.</p></div>}
+    {data && !data.instrumental && !hasWords && !missingWords && <div className={s.empty}><p>The words are not available for this recording yet.</p></div>}
     {hasWords && data && <>
       <p className={s.hint}>{data.timing === "synced" ? selecting ? "Choose neighbouring lines for an exact lyric card." : "Tap a line or press Enter to listen from that moment. Space plays or pauses. Scroll to explore; bring the current words back into view to follow again." : "These lyrics are not time synced. Select lines to share them."}</p>
       {moment.kind === "intro" && <p className={s.lyricsAwaiting} role="status">A little music before the words.</p>}

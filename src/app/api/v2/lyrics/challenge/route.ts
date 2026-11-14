@@ -2,7 +2,7 @@ import { withApiTiming } from "@/rebuild/server/performance";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRebuildAccount } from "@/rebuild/auth";
 import { sameRequestOrigin } from "@/rebuild/requestOrigin";
-import { LyricPublishError, requestPublishChallenge, parseLyricSubmission } from "@/rebuild/lyrics/publish";
+import { LyricPublishError, requestPublishChallenge, parseLyricSubmission, validateLyricPublishIdentity } from "@/rebuild/lyrics/publish";
 import { LyricRequestError } from "@/rebuild/lyrics/request";
 import { jsonBody } from "@/rebuild/data/http";
 import { cardsForIds } from "@/rebuild/data/catalog";
@@ -20,9 +20,11 @@ export async function POST(request:NextRequest){
     const body=await jsonBody(request),recordingId=uuid(body.recordingId,"recording ID");
     const track=(await cardsForIds(account.id,[recordingId]))[0];
     if(!track)throw new LyricRequestError("Verified recording not found",404);
-    // Validate before work starts, so incomplete song details or an invalid
-    // LRC file cannot waste minutes preparing an unusable publish token.
-    parseLyricSubmission(body,recordingLyricIdentity({ ...track, recordingId }));
+    // Proof is independent of the manuscript. Prepare it while the contributor
+    // edits; the publish endpoint still validates every submitted word and time.
+    const identity=recordingLyricIdentity({ ...track, recordingId });
+    validateLyricPublishIdentity(identity);
+    if(body.text!==undefined||body.format!==undefined)parseLyricSubmission(body,identity);
     return NextResponse.json(await requestPublishChallenge({signal:request.signal}),{headers});
   }catch(error){
     if(error instanceof LyricPublishError)return NextResponse.json({error:error.message,reason:error.reason,retryAfterMs:error.retryAfterMs},{status:error.status,headers:{...headers,...(error.retryAfterMs?{"Retry-After":String(Math.ceil(error.retryAfterMs/1000))}:{})}});

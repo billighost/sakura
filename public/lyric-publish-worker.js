@@ -18,15 +18,11 @@ function nonceHasher(prefix) {
   const words = new Uint32Array(64), block = new Uint32Array(80), digest = new Uint32Array(8);
   for (let i=0;i<prefix.length;i++) block[i>>>2] |= prefix.charCodeAt(i) << (24-(i%4)*8);
   const fixed = block.slice();
-  return nonce => {
-    block.set(fixed); const decimal=String(nonce), length=prefix.length+decimal.length;
-    for(let i=0;i<decimal.length;i++){const at=prefix.length+i;block[at>>>2] |= decimal.charCodeAt(i) << (24-(at%4)*8);}
-    block[length>>>2] |= 0x80 << (24-(length%4)*8);
-    const blocks=Math.ceil((length+9)/64);block[blocks*16-1]=length*8;digest.set(initial);
-    for(let offset=0;offset<blocks*16;offset+=16){
+  function compress(offset){
       for(let i=0;i<16;i++)words[i]=block[offset+i];
       for(let i=16;i<64;i++){const x=words[i-15],y=words[i-2];words[i]=((rotate(x,7)^rotate(x,18)^(x>>>3))+words[i-16]+(rotate(y,17)^rotate(y,19)^(y>>>10))+words[i-7])>>>0;}
-      let [a,b,c,d,e,f,g,h]=digest;
+      // Scalar loads avoid allocating an iterator for every attempted nonce.
+      let a=digest[0],b=digest[1],c=digest[2],d=digest[3],e=digest[4],f=digest[5],g=digest[6],h=digest[7];
       for(let i=0;i<64;i++){
         const one=(h+(rotate(e,6)^rotate(e,11)^rotate(e,25))+((e&f)^(~e&g))+rounds[i]+words[i])>>>0;
         const two=((rotate(a,2)^rotate(a,13)^rotate(a,22))+((a&b)^(a&c)^(b&c)))>>>0;
@@ -34,7 +30,18 @@ function nonceHasher(prefix) {
       }
       digest[0]=(digest[0]+a)>>>0;digest[1]=(digest[1]+b)>>>0;digest[2]=(digest[2]+c)>>>0;digest[3]=(digest[3]+d)>>>0;
       digest[4]=(digest[4]+e)>>>0;digest[5]=(digest[5]+f)>>>0;digest[6]=(digest[6]+g)>>>0;digest[7]=(digest[7]+h)>>>0;
-    }
+  }
+  // Complete prefix blocks never change. Compress them once, then start each
+  // nonce at the saved SHA state instead of hashing the prefix repeatedly.
+  const prefixWords=Math.floor(prefix.length/64)*16;digest.set(initial);
+  for(let offset=0;offset<prefixWords;offset+=16)compress(offset);
+  const prefixDigest=digest.slice();
+  return nonce => {
+    block.set(fixed); const decimal=String(nonce), length=prefix.length+decimal.length;
+    for(let i=0;i<decimal.length;i++){const at=prefix.length+i;block[at>>>2] |= decimal.charCodeAt(i) << (24-(at%4)*8);}
+    block[length>>>2] |= 0x80 << (24-(length%4)*8);
+    const blocks=Math.ceil((length+9)/64);block[blocks*16-1]=length*8;digest.set(prefixDigest);
+    for(let offset=prefixWords;offset<blocks*16;offset+=16)compress(offset);
     return digest;
   };
 }
