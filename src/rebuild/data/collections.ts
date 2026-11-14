@@ -3,6 +3,7 @@ import { CARD_SELECT,VERIFIED,card } from "./catalog";
 import { ProductError,encodeCursor,ids,integer,object,pageInput,text,uuid } from "./validation";
 import {randomUUID} from "node:crypto";
 import type {PoolClient} from "pg";
+import {invalidateFeedCatalog} from "./catalogRefresh";
 
 export async function listPlaylists(accountId:string,sql:Pick<PoolClient,"query">=getRebuildPool()) {
   const rows=await sql.query(`SELECT p.id,p.name,p.description,p.cover_url AS "coverUrl",p.revision,
@@ -97,6 +98,7 @@ export async function setFavorite(accountId:string,value:unknown) {
     await receipt();
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    await invalidateFeedCatalog(accountId,client);
     return {recordingId,liked,revision:revision+1,...(operationId?{operationId,accepted:true,duplicate:false,conflict:false}:{})};
   });
 }

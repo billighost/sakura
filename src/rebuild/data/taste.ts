@@ -2,6 +2,7 @@ import { getRebuildPool, inTransaction } from "./db";
 import type { PoolClient } from "pg";
 import { cardsForIds, VERIFIED } from "./catalog";
 import { ProductError, object, uuid } from "./validation";
+import {invalidateFeedCatalog} from "./catalogRefresh";
 
 export type TasteKind = "love" | "less" | "block" | "snooze";
 export type TasteDuration = "day" | "week" | "month" | "forever";
@@ -50,6 +51,7 @@ export async function setTaste(accountId:string,value:unknown) {
       [accountId,input.target,input.targetId,input.kind,expiresAt,updatedAt]);
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    await invalidateFeedCatalog(accountId,client);
     return {...input,expiresAt,updatedAt,saved:true};
   });
 }
@@ -64,6 +66,7 @@ export async function removeTaste(accountId:string,value:unknown) {
     await client.query(`DELETE FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND target=$2 AND target_id=$3::uuid`,[accountId,raw.target,targetId]);
     await client.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[accountId]);
     await client.query(`DELETE FROM sakura_v2."FeedSession" WHERE account_id=$1::uuid`,[accountId]);
+    await invalidateFeedCatalog(accountId,client);
     return {removed:true,target:raw.target,targetId,mutationAt};
   });
 }

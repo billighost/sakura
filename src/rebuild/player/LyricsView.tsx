@@ -139,8 +139,8 @@ const LyricRow = memo(function LyricRow({ line, index, active, interlude, select
   const ref = useCallback((element: HTMLElement | null) => setLineRef(index, element), [index, setLineRef]);
   if (!line.text.trim()) return <div className={`${s.lyricInterlude} ${interlude ? s.currentInterlude : ""}`} ref={ref} data-lyric-index={index}><span className={s.lyricInterludeDots} aria-hidden="true"><span/><span/><span/></span>{interlude && <small role="status">Instrumental</small>}</div>;
   return <button type="button" ref={ref} data-lyric-index={index} data-playback-shortcuts="listening" className={`${s.lyricLine} ${active ? s.currentLyric : ""} ${selected ? s.selectedLyric : ""}`} aria-pressed={selecting ? selected : undefined} aria-current={active ? "true" : undefined} title={!selecting && synced ? `Listen from ${formatPlaybackTime(line.start * 1000)}` : undefined} onPointerDown={pause} onClick={() => chooseLine(index)}>
-    <span>{line.words?.length && active ? <ActiveLyricWords line={line}/> : line.text}</span>
-    {reading && line.romanized && line.romanized.trim() !== line.text.trim() && <small>{line.romanized}</small>}
+    <span className={s.lyricOriginal} data-lyric-original dir="auto">{line.words?.length && active ? <ActiveLyricWords line={line}/> : line.text}</span>
+    {reading && line.romanized && line.romanized.trim() !== line.text.trim() && <small className={s.lyricReading} data-lyric-reading dir="auto">{line.romanized}</small>}
   </button>;
 });
 

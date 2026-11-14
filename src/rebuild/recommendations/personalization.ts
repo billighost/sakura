@@ -103,7 +103,7 @@ export function rankPersonalizedTracks<T extends TasteTrack>(tracks:readonly T[]
     const exactSeed=selections.some(selection=>keys.includes(`ref:${selection.reference.provider}:${selection.reference.id}`));
     const primaryName=(track.artistCredits?.find(credit=>credit.role==="primary")||track.artistCredits?.find(credit=>credit.role===undefined))?.name||(!track.artistCredits?.length?track.artists[0]:undefined);
     const seededArtist=exactSeed||Boolean(primaryName&&legacySeeded.has(normal(primaryName)))||Boolean(!track.artistCredits?.length&&track.artistId&&legacySeeded.has(normal(track.artistId)));
-    const familiarArtist=artistAffinity>0||seededArtist;
+    const familiarArtist=artistAffinity>0||seededArtist||feedback.some(item=>item.target==="artist"&&item.kind==="love"&&keys.includes(`id:${item.targetId}`));
     const matchingGenre=(track.genres||[]).slice().sort((a,b)=>(genreWeights.get(normal(b))||0)-(genreWeights.get(normal(a))||0))[0];
     const genreAffinity=matchingGenre?(genreWeights.get(normal(matchingGenre))||0)/maximumGenre:0;
     const hourGenre=(track.genres||[]).slice().sort((a,b)=>(hourGenres.get(normal(b))||0)-(hourGenres.get(normal(a))||0))[0];

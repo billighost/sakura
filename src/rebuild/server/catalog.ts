@@ -163,6 +163,38 @@ export class DeezerCatalogService {
       releaseDate: typeof entity.release_date === "string" ? entity.release_date : undefined, genres: Array.isArray(row(entity.genres).data) ? (row(entity.genres).data as unknown[]).map((genre) => String(row(genre).name ?? "")).filter(Boolean) : [],
       tracks, albums: Array.isArray(albums) ? albums.map(row).map((album) => ({ id:`deezer:${album.id}`,reference: { provider: "deezer", id: String(album.id) }, title: String(album.title ?? ""), coverUrl: artwork(album.cover_big ?? album.cover_medium), releaseDate: album.release_date })) : [] };
   }
+  /** Artist album lists can put the entire album catalog before recent singles.
+   * Read bounded pages and sort real dates before expanding their tracks. */
+  async recentArtistReleases(reference: ProviderReference, signal?: AbortSignal, nowMs=Date.now()) {
+    const spotify=reference.provider==="spotify",id=reference.id;
+    if(reference.provider!=="deezer"&&!spotify|| (spotify?!/^[A-Za-z0-9]{22}$/.test(id):!/^[1-9]\d{0,17}$/.test(id)))throw new Error("Invalid artist reference");
+    if(spotify&&!this.spotify)throw new Error("Spotify catalogue is unavailable");
+    const albums=new Map<string,{id:string;releaseDate:string}>(),limit=spotify?50:100;
+    for(let page=0;page<4;page++){
+      signal?.throwIfAborted();
+      const payload=row(spotify?await this.spotify!.getMetadata(`/artists/${id}/albums?include_groups=album,single&limit=${limit}&offset=${page*limit}`,signal):await this.get(`/artist/${id}/albums?limit=${limit}&index=${page*limit}`,signal));
+      const data=spotify?payload.items:payload.data,items=Array.isArray(data)?data:[];
+      for(const item of items.map(row)){
+        const albumId=String(item.id??""),releaseDate=item.release_date;
+        if((spotify?!/^[A-Za-z0-9]{22}$/.test(albumId):!/^[1-9]\d{0,17}$/.test(albumId))||typeof releaseDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate))continue;
+        const stamp=Date.parse(`${releaseDate}T00:00:00Z`);
+        if(Number.isFinite(stamp)&&new Date(stamp).toISOString().slice(0,10)===releaseDate&&stamp<=nowMs&&nowMs-stamp<=90*86400000)albums.set(albumId,{id:albumId,releaseDate});
+      }
+      // Provider-owned URLs are never followed; subsequent pages use validated IDs.
+      if(items.length<limit||Number(payload.total)>0&&Number(payload.total)<=(page+1)*limit||!payload.next)break;
+    }
+    const selected=[...albums.values()].sort((a,b)=>b.releaseDate.localeCompare(a.releaseDate)||a.id.localeCompare(b.id)).slice(0,3);
+    const details=await Promise.allSettled(selected.map(album=>this.detail("album",spotify?`spotify:${album.id}`:album.id,signal)));
+    signal?.throwIfAborted();
+    if(details.some(result=>result.status==="rejected"))throw new Error("Recent release details are temporarily unavailable");
+    return details.flatMap((result,index)=>{
+      if(result.status!=="fulfilled")return [];
+      const detail=result.value;
+      // A same-name artist or a misleading search result supplies no identity proof.
+      const tracks=detail.tracks.filter(track=>track.artistReference?.provider===reference.provider&&track.artistReference.id===id);
+      return tracks.length?[{reference:detail.reference,title:detail.title,releaseDate:selected[index].releaseDate,genres:detail.genres,tracks}]:[];
+    });
+  }
   private async spotifyDetail(kind:"artist"|"album"|"playlist",id:string,signal?:AbortSignal){
     if(!this.spotify||! /^[A-Za-z0-9]{22}$/.test(id)||kind==="playlist")throw new Error("This Spotify collection is unavailable.");
     const provider=this.spotify,entity=row(await provider.getMetadata(`/${kind}s/${id}`,signal));

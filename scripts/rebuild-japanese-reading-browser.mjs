@@ -17,6 +17,7 @@ wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wa
 for(let i=0;i<samples;i++)wav.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*330/8000)*800),44+i*2);
 const sha=createHash('sha256').update(wav).digest('hex');
 const transliterationOnly=process.argv.includes('--transliteration');
+const typographyOnly=process.argv.includes('--typography');
 const japaneseVersion=(await fs.readFile('src/rebuild/lyrics/versions.ts','utf8')).match(/JAPANESE_READING_VERSION\s*=\s*["']([^"']+)/)[1];
 const multilingualVersion=(await fs.readFile('src/rebuild/lyrics/language.ts','utf8')).match(/READING_VERSION\s*=\s*["']([^"']+)/)[1];
 const fixtureReadingEngine=language=>language==='ja'?japaneseVersion:`${multilingualVersion}:${language}`;
@@ -30,11 +31,11 @@ const readings={'君の声':'kimi no koe','未来の光':'mirai no hikari','花�
 const desktopHeaderOnly=process.argv.includes('--desktop-header');
 const viewportOnly=process.argv.includes('--viewport')||desktopHeaderOnly;
 const miniArtworkOnly=process.argv.includes('--mini-artwork');
-const output=transliterationOnly?'.local/transliteration':miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
+const output=typographyOnly?'.local/lyrics-typography':transliterationOnly?'.local/transliteration':miniArtworkOnly?'.local/mini-player-artwork':desktopHeaderOnly?'.local/mobile-player-header':viewportOnly?'.local/mobile-player-viewport':'.local/japanese-reading';
 const report={checkedAt:new Date().toISOString(),scope:'Real app; synthetic songs, local generated audio, intercepted account mutations; no provider/account writes',checks:[],errors:[]};
 let browser,latestPage;
 
-async function room(theme,width,sharedSettings,height=900){
+async function room(theme,width,sharedSettings,height=900,lyricFixture){
  const context=await browser.newContext({viewport:{width,height},isMobile:width<700,hasTouch:width<700,colorScheme:theme,serviceWorkers:'block'});
  await context.addCookies([{name:'authjs.session-token',value:token,url:base}]);
  await context.addInitScript(()=>{sessionStorage.setItem('sakura-ink-opening','1');const NativeAudio=window.Audio;window.Audio=function(...args){const audio=new NativeAudio(...args);window.readingFixtureAudio=audio;return audio;};window.Audio.prototype=NativeAudio.prototype;document.addEventListener('DOMContentLoaded',()=>{const style=document.createElement('style');style.textContent='nextjs-portal{display:none!important}';document.head.append(style);},{once:true});});
@@ -60,8 +61,8 @@ async function room(theme,width,sharedSettings,height=900){
    return route.fulfill({json:{session,serverTime:Date.now()}});
   }
   if(path==='/api/v2/recordings/resolve'){const track=tracks.find(item=>item.reference.id===request.postDataJSON().reference.id)||tracks[0];return route.fulfill({json:{status:'resolved',recording:{...track,recordingId:track.id,metadata:{title:track.title,artists:track.artists,artistsComplete:true,durationMs:track.durationMs,albumTitle:track.albumTitle}},playback:track.readyPlayback}});}
-  if(path==='/api/v2/lyrics'){counts.lyrics++;const index=Math.max(0,tracks.findIndex(track=>track.title===url.searchParams.get('title')));return route.fulfill({json:{status:'matched',lines:sourceLines[index],timing:'synced',provider:'synthetic Japanese fixture',providerTrackId:401+index,schemaVersion:'verified-lyrics-v3'}});}
-  if(path==='/api/v2/readings'){counts.readings++;const data=request.postDataJSON(),engine=fixtureReadingEngine(data.language);counts.languages.push(data.language);return route.fulfill({json:{engine,lines:data.lines.map(line=>({...line,romanized:readings[line.text],readingReviewNeeded:transliterationOnly,readingEngine:engine}))}});}
+  if(path==='/api/v2/lyrics'){counts.lyrics++;const index=Math.max(0,tracks.findIndex(track=>track.title===url.searchParams.get('title')));return route.fulfill({json:{status:'matched',lines:lyricFixture?.lines||sourceLines[index],timing:'synced',provider:'synthetic Japanese fixture',providerTrackId:401+index,schemaVersion:'verified-lyrics-v3'}});}
+  if(path==='/api/v2/readings'){counts.readings++;const data=request.postDataJSON(),engine=fixtureReadingEngine(data.language);counts.languages.push(data.language);return route.fulfill({json:{engine,lines:data.lines.map(line=>({...line,romanized:lyricFixture?.readings?.[line.text]||readings[line.text],readingReviewNeeded:transliterationOnly,readingEngine:engine}))}});}
   if(/^\/api\/v2\/recordings\/[^/]+$/.test(path))return route.fulfill({json:{recording:tracks.find(track=>track.id===path.split('/').at(-1))||tracks[0]}});
   return route.fulfill({json:{items:[],recordings:[],schedule:{timeZone:'Africa/Lagos'}}});
  });
@@ -343,10 +344,50 @@ async function testGlobalTransliteration(theme,width){
  }catch(error){report.pageState={url:page.url(),text:(await page.locator('body').innerText()).slice(0,6000)};await page.screenshot({path:output+'/failure.png'}).catch(()=>{});throw error;}finally{await context.close();}
 }
 
+async function checkLyricTypography(words,page,label){
+ await page.evaluate(()=>document.fonts.ready);
+ const measurements=await words.locator('[data-lyric-reading]').evaluateAll(nodes=>nodes.map(reading=>{
+  const row=reading.closest('[data-lyric-index]'),original=row.querySelector('[data-lyric-original]'),style=getComputedStyle(reading),bounds=reading.getBoundingClientRect(),rowBounds=row.getBoundingClientRect();
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');
+  ctx.fillStyle=getComputedStyle(row.closest('dialog')).getPropertyValue('--p-bg');ctx.fillRect(0,0,1,1);ctx.fillStyle=getComputedStyle(row).backgroundColor;ctx.fillRect(0,0,1,1);
+  const background=[...ctx.getImageData(0,0,1,1).data].slice(0,3);ctx.fillStyle=style.color;ctx.fillRect(0,0,1,1);const foreground=[...ctx.getImageData(0,0,1,1).data].slice(0,3);
+  const luminance=rgb=>rgb.map(value=>value/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0),a=luminance(background),b=luminance(foreground);
+  return {text:reading.textContent,size:parseFloat(style.fontSize),originalSize:parseFloat(getComputedStyle(original).fontSize),fontStyle:style.fontStyle,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),readingOverflow:reading.scrollWidth-reading.clientWidth,rowOverflow:row.scrollWidth-row.clientWidth,bounds:{left:bounds.left,right:bounds.right,rowLeft:rowBounds.left,rowRight:rowBounds.right},direction:reading.getAttribute('dir'),originalDirection:original.getAttribute('dir')};
+ }));
+ assert.ok(measurements.length>0,'There are rendered pronunciation lines to measure.');
+ for(const reading of measurements){
+  assert.ok(reading.size>=21.9&&reading.size/reading.originalSize>=.6,`${label}: pronunciation is readable beside the original (${reading.size}px / ${reading.originalSize}px).`);
+  assert.ok(reading.contrast>=4.5,`${label}: pronunciation contrast ${reading.contrast.toFixed(2)} is below 4.5:1.`);
+  assert.equal(reading.fontStyle,'italic');assert.equal(reading.direction,'auto');assert.equal(reading.originalDirection,'auto');
+  assert.ok(reading.readingOverflow<=1&&reading.rowOverflow<=1&&reading.bounds.left>=reading.bounds.rowLeft-1&&reading.bounds.right<=reading.bounds.rowRight+1,`${label}: pronunciation wraps within its lyric row.`);
+ }
+ assert.equal(await words.evaluate(element=>element.scrollWidth>element.clientWidth+1),false,`${label}: the lyric dialog has no horizontal overflow.`);
+ report.typography||=[];report.typography.push({label,measurements});
+}
+
+async function testTypography(theme,width,height){
+ const longText='風に乗せて遠くの空へこの想いを届けたい';
+ const fixture={lines:[{text:'君の声',start:0,end:15},{text:longText,start:15,end:40}],readings:{'君の声':'kimi no koe',[longText]:'kaze ni nosete tooku no sora e kono omoi o todoketai, kimi no koe ga yasashiku hibiku'}};
+ const {context,page,counts}=await room(theme,width,undefined,height,fixture);
+ try{
+  await page.goto(base+'/liked',{waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'Play 君の声',exact:true}).click();
+  const player=await openPlayer(page);await pausePlayer(player);await player.getByRole('button',{name:'Japanese reading guide',exact:true}).click();await expect(player.locator('[data-player-reading]')).toHaveText('kimi no koe');
+  await player.getByRole('button',{name:'Open lyrics',exact:true}).click();const words=page.locator('dialog[data-dialog-appearance="lyrics"]');await expect(words).toHaveAttribute('data-dialog-phase','open');
+  await expect(words.locator('[data-lyric-reading]')).toHaveCount(2);await checkLyricTypography(words,page,`${theme}/${width}: current and upcoming lines`);
+  await page.screenshot({path:`${output}/lyrics-${theme}-${width}.png`,animations:'disabled'});
+  await words.locator('[data-lyric-index="1"]').click();await expect(words.locator('[data-lyric-index="1"]')).toHaveAttribute('aria-current','true');await checkLyricTypography(words,page,`${theme}/${width}: long current line`);
+  await page.screenshot({path:`${output}/lyrics-long-${theme}-${width}.png`,animations:'disabled'});
+  await words.getByRole('button',{name:'Japanese reading guide',exact:true}).click();await expect(words.locator('[data-lyric-reading]')).toHaveCount(0);await expect(words.locator('[data-lyric-original]')).toHaveText(['君の声',longText]);
+  assert.equal(counts.readings,1,'Pronunciation display and seeking reuse the same shared response.');
+  report.checks.push(`${theme}/${width}: original and pronunciation text stay readable, at least 4.5:1 contrast, naturally wrapped within the modal; long-line seeking and reading toggle preserve the original.`);
+ }finally{await context.close();}
+}
+
 try{
  await fs.mkdir(output,{recursive:true});
  browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- if(transliterationOnly){await testGlobalTransliteration('light',1440);await testGlobalTransliteration('dark',390);}
+ if(typographyOnly){for(const theme of ['light','dark'])for(const [width,height] of [[320,640],[390,844],[1440,900]])await testTypography(theme,width,height);}
+ else if(transliterationOnly){await testGlobalTransliteration('light',1440);await testGlobalTransliteration('dark',390);}
  else if(miniArtworkOnly)for(const theme of ['light','dark'])for(const width of [1440,390])await testMiniArtwork(theme,width);
  else if(desktopHeaderOnly)await testViewport('dark',1440,900);
  else if(viewportOnly){

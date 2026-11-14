@@ -26,6 +26,7 @@ export const SITUATIONAL_MIXES:readonly SituationalMixSpec[]=[
   {...base,id:"forgotten",kind:"repeat",name:"Found in the margins",description:"Liked songs you have not played for more than a month.",situation:"forgotten-favorites",rules:["explicit-like","audible-history","thirty-day-gap"]},
   {...base,id:"recent-discoveries",kind:"repeat",name:"New leaves",description:"Songs you first played here in the last seven days.",situation:"recent-discoveries",rules:["first-audible-history","seven-day-window"]},
   {...base,id:"late-night",kind:"repeat",name:"After the lights",description:"Songs from your recorded listening between 10 pm and 4 am.",situation:"late-night-history",rules:["actual-local-listening-hours"]},
+  {...base,id:"latest-releases",kind:"daily",selection:"latest-releases",name:"Fresh from your artists",description:"The latest songs and singles from artists you have chosen, liked or listened to.",size:16,minimum:1,maxPerArtist:16,maximumOverlap:1,situation:"latest-releases",surfaces:["home","discover"],rules:["published-release-date","familiar-primary-artist","newest-first"]},
 ];
 export interface SituationRecording {id:string;artists:readonly string[];genres?:readonly string[];durationMs?:number|null;metadata?:Record<string,unknown>;liked?:boolean;popularity?:number;version?:{kinds:readonly string[]};explicit?:boolean;coverUrl?:string|null}
 export interface SituationHistory {audibleMs?:number;lastPlayedAt?:number;firstPlayedAt?:number;lateNight?:boolean}

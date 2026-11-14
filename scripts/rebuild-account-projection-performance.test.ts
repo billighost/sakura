@@ -12,14 +12,15 @@ const account="11111111-1111-4111-8111-111111111111",now=Date.parse("2026-11-12T
 const uuid=(index:number)=>`55555555-5555-4555-8555-${String(index).padStart(12,"0")}`;
 function fixture(t:TestContext,count=632){
  const runtime=globalThis as unknown as {sakuraV2ProductPool?:unknown},previous=runtime.sakuraV2ProductPool;
- const statements:{text:string;args:unknown[]}[]=[],sessions=new Map<string,Record<string,unknown>>();let seeds:string[]=[],boost:string|undefined;
+ const statements:{text:string;args:unknown[]}[]=[],sessions=new Map<string,Record<string,unknown>>();let seeds:string[]=[],boost:string|undefined,catalogMarker:unknown;
  const recordings=Array.from({length:40},(_,index)=>({id:uuid(index+1),metadata:{title:`Song ${index}`,artists:[`Artist ${index%9}`],artistsComplete:true,durationMs:180000,genres:[index%2?"Jazz":"Pop"]},provenance:{},references:[{provider:"deezer",id:String(index+1)}],ready:true}));
  const deletions=Array.from({length:725},(_,index)=>({periodStart:`2026-10-${String(index%28+1).padStart(2,"0")}T00:00:00Z`,clearedAt:`2026-11-12T${String(index%24).padStart(2,"0")}:00:00Z`}));
  const evidence=Array.from({length:count},(_,index)=>({recordingId:uuid(index+1),audibleMs:String((count-index)*1000),playCount:"2",completedCount:"1",skippedCount:"0",lastPlayedAt:"2026-11-11T12:00:00Z",hourWeights:[{hour:12,audibleMs:1000}]}));
  const feedback=[{target:"recording",targetId:uuid(1),kind:"less",expiresAt:"2026-11-01T00:00:00Z",updatedAt:"2026-10-31T00:00:00.000001Z",active:false}];
  const sql={async query(text:string,args:unknown[]=[]){
   statements.push({text,args});let rows:unknown[]=[];
-  if(text.includes('FROM sakura_v2."AccountPreferences"'))rows=[{preferences:{},seed_artists:seeds,seed_genres:[],onboarded:true,revision:8,field_revisions:{}}];
+  if(text.startsWith("SELECT preferences->'feedCatalogRefresh'"))rows=[{marker:catalogMarker}];
+  else if(text.includes('FROM sakura_v2."AccountPreferences"'))rows=[{preferences:{},seed_artists:seeds,seed_genres:[],onboarded:true,revision:8,field_revisions:{}}];
   else if(text.includes("SELECT songs.recording_id"))rows=[];
   else if(text.startsWith('UPDATE sakura_v2."AccountPreferences"'))rows=[{account_id:account}];
   else if(text.startsWith("WITH selected AS")){
@@ -36,7 +37,7 @@ function fixture(t:TestContext,count=632){
   return{rows:structuredClone(rows),rowCount:rows.length};
  },async connect(){return{query:this.query,release(){}};}};
  runtime.sakuraV2ProductPool=sql;t.after(()=>{runtime.sakuraV2ProductPool=previous;});
- return{sql:sql as unknown as {query:PoolClient["query"]},statements,recordings,deletions,evidence,setSeeds:(value:string[])=>{seeds=value;},boost:(id:string)=>{boost=id;}};
+ return{sql:sql as unknown as {query:PoolClient["query"]},statements,recordings,deletions,evidence,setSeeds:(value:string[])=>{seeds=value;},boost:(id:string)=>{boost=id;},setCatalogMarker:(value:unknown)=>{catalogMarker=value;}};
 }
 
 test("pure settings snapshots derive missing initial taste without UPDATE while legacy repair remains durable",async t=>{
@@ -75,10 +76,11 @@ test("combined initial hero is identical to standalone and acquires context and 
  }
 });
 
-test("an after-response compatible settings snapshot bypasses all SQL on a warm catalog cooldown",async t=>{
+test("an after-response settings snapshot needs only the authoritative private marker on a warm catalog cooldown",async t=>{
  const f=fixture(t),settings={...DEFAULT_SETTINGS,seedArtists:[],seedGenres:[],revision:1,fieldRevisions:{},onboarded:true};
  const runtime=globalThis as unknown as {sakuraFeedCatalogRefreshes?:Map<string,{at:number;signature:string}>},previous=runtime.sakuraFeedCatalogRefreshes;
  runtime.sakuraFeedCatalogRefreshes=new Map([[account,{at:Date.now(),signature:JSON.stringify([settings.seedArtists,settings.seedGenres,settings.seedArtistSelections,settings.learnFromListening])}]]);
  t.after(()=>{runtime.sakuraFeedCatalogRefreshes=previous;});
- await refreshFeedCatalog(account,settings);assert.equal(f.statements.length,0);
+ f.setCatalogMarker({signature:JSON.stringify([settings.seedArtists,settings.seedGenres,settings.seedArtistSelections,settings.learnFromListening]),pendingUntil:0,completedAt:Date.now()});
+ await refreshFeedCatalog(account,settings);assert.equal(f.statements.length,1);assert.ok(f.statements[0].text.startsWith("SELECT preferences->'feedCatalogRefresh'"));
 });

@@ -13,6 +13,7 @@ export interface MusicTrack {
  artistId: string | null;
  albumId: string | null;
  albumTitle: string | null;
+ releaseDate?: string;
  albumReference?: ProviderReference;
  alternateTitles?: string[];
  language?: string;
@@ -57,5 +58,6 @@ export function musicTrack(raw:Record<string,unknown>):MusicTrack {
  albumReference:(raw.albumReference||metadata.albumReference) as ProviderReference|undefined,alternateTitles:alternateTitles.length?alternateTitles:undefined,language:typeof metadata.language==="string"?metadata.language:undefined,
  artistId:raw.artistId?String(raw.artistId):null,albumId:raw.albumId?String(raw.albumId):null,albumTitle:raw.albumTitle||metadata.albumTitle?String(raw.albumTitle||metadata.albumTitle):null,
  durationMs:Number(metadata.durationMs)||0,coverUrl:typeof (raw.coverUrl||metadata.coverUrl)==="string"?String(raw.coverUrl||metadata.coverUrl):null,versionLabel:typeof raw.versionLabel==="string"?raw.versionLabel:version?.labels?.length?version.labels.join(" · "):version?.kinds?.length?version.kinds.join(" · "):"Original recording",
- reference,references:references.length?references:[reference],explicit:metadata.explicit==="explicit",version:version as RecordingVersion|undefined,genres:Array.isArray(raw.genres)?raw.genres.map(String):[],readyPlayback:raw.readyPlayback as ReadyPlayback|undefined,addedAt:collectionDate(raw.addedAt)};
+ reference,references:references.length?references:[reference],explicit:metadata.explicit==="explicit",version:version as RecordingVersion|undefined,genres:Array.isArray(raw.genres)?raw.genres.map(String):[],readyPlayback:raw.readyPlayback as ReadyPlayback|undefined,addedAt:collectionDate(raw.addedAt),
+ releaseDate:typeof raw.releaseDate==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(raw.releaseDate)&&Number.isFinite(Date.parse(raw.releaseDate))?raw.releaseDate:undefined};
 }

@@ -35,7 +35,10 @@
 .queueItem{position:relative}.draggingQueue{background:var(--p-surface);opacity:.65}.queueDropBefore:before{content:"";position:absolute;top:0;left:30px;right:0;height:2px;background:var(--p-accent)}
 .lyricsDialog .dialogBody{padding:0 28px calc(24px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 0 30%,color-mix(in srgb,var(--p-surface) 70%,transparent),transparent 65%),var(--p-bg)}
 .lyricsView{max-width:980px;margin:0 auto}.lyricsTrack{padding-top:24px}.lyricsView>.chips{justify-content:center}.lyricsView>.hint{text-align:center}
-.lyricsDialog .lyricLines{gap:22px;padding:35px 0 80px}.lyricsDialog .lyricLine{font-size:clamp(27px,3.3vw,48px)!important;padding:18px 20px;line-height:1.6;border-radius:7px 25px 5px 20px;opacity:.75}
+.lyricsDialog .lyricLines{gap:22px;padding:35px 0 80px}.lyricsDialog .lyricLine{font-size:clamp(27px,3.3vw,48px)!important;padding:18px 20px;line-height:1.6;border-radius:7px 25px 5px 20px}
+.lyricOriginal{text-wrap:balance}
+.lyricLine .lyricReading{font:italic 400 clamp(22px,.72em,34px)/1.55 var(--font-fraunces),Georgia,serif;color:color-mix(in srgb,var(--p-text) 80%,var(--p-muted));margin:10px auto 0;max-width:42ch;letter-spacing:.005em;text-wrap:balance;overflow-wrap:anywhere}
+.currentLyric .lyricReading{color:var(--p-accent)}
 .lyricsDialog .currentLyric{opacity:1;background:color-mix(in srgb,var(--p-surface) 75%,transparent);position:relative}
 .lyricsDialog .currentLyric:before{content:"";position:absolute;left:2px;top:50%;width:4px;height:30px;background:var(--p-accent);border-radius:60% 20% 70% 30%;transform:translateY(-50%) rotate(5deg)}
 .lyricsControls{display:flex;flex-direction:column;gap:9px;z-index:2;padding:12px 16px;background:var(--p-bg);box-shadow:0 -12px 28px var(--p-bg);border-top:1px solid var(--p-line)}

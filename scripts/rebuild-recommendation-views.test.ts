@@ -7,6 +7,7 @@ import { SharedFlight } from "../src/rebuild/app/sharedFlight";
 import { musicTrack } from "../src/rebuild/app/types";
 import { appendUniqueFeedItems } from "../src/rebuild/app/feedItems";
 import { HERO_REFRESH_MS } from "../src/rebuild/recommendations/hero";
+import { parseFeedCatalogRefresh } from "../src/rebuild/app/feedCatalogRefresh";
 import type { JsonOptions } from "../src/rebuild/app/errors";
 import type { FeedState } from "../src/rebuild/app/recommendationViews";
 
@@ -87,6 +88,7 @@ function fixture() {
   const views = moduleFrom<Views>("src/rebuild/app/recommendationViews.ts", {
     "./types": { musicTrack }, "./recommendationTransport": transport, "./resourcePolicy": policy,
     "../recommendations/hero": { HERO_REFRESH_MS }, "./recommendationCache": cache,
+    "./feedCatalogRefresh": { parseFeedCatalogRefresh },
   }, globals);
   return {
     views, cache, transport, requests, writes, storageWrites,

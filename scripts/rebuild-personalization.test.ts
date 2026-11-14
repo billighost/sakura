@@ -91,6 +91,11 @@ describe("Personalized feed and queue ranking",()=>{
     const ranked=rankPersonalizedTracks([{...track("new","A"),releaseDate:"2026-10-24"},track("old","A")],{settings:{seedArtists:["A"]},nowMs:now});
     assert.equal(ranked.find(item=>item.track.id==="new")!.lane,"fresh");assert.match(ranked.find(item=>item.track.id==="new")!.reason,/recent album/);
   });
+  it("deliberately loving an artist makes their recent single familiar without listening history",()=>{
+    const song={...track("new","A"),releaseDate:"2026-11-07"};
+    const entry=rankPersonalizedTracks([song],{feedback:[{target:"artist",targetId:"artist-A",kind:"love"}],nowMs:now})[0];
+    assert.equal(entry.familiarArtist,true);assert.equal(entry.lane,"fresh");
+  });
   it("local queues are unique subsets and enforce explicit/exclusion rules",()=>{
     const songs=[track("one"),track("two"),{...track("explicit"),explicit:true},track("blocked"),track("one")];
     const result=planLocalQueue(songs,{settings:{explicitContent:false},feedback:[{target:"recording",targetId:"blocked",kind:"block"}],limit:80,nowMs:now});

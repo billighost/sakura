@@ -171,8 +171,11 @@ describe("Fresh v2 product with isolated PostgreSQL fixtures",()=>{
     const loaded=await Promise.all(ready.map(m=>getMix(first,m.id)));
     assert.equal(mixes.length,SITUATIONAL_MIXES.length);
     for(const mix of loaded){assert.equal(mix.playability,"resolvable");assert.ok(mix.recordings.length>=(SITUATIONAL_MIXES.find(s=>s.id===mix.slot)!.minimum));assert.equal(new Set(mix.recordings.map((r:{recordingId:string})=>r.recordingId)).size,mix.recordings.length);}
-    for(let i=0;i<loaded.length;i++)for(let j=i+1;j<loaded.length;j++){
-      const left=new Set(loaded[i].recordings.map((r:{recordingId:string})=>r.recordingId)),right=loaded[j].recordings;
+    // The dedicated newest-release collection intentionally includes new songs
+    // that also belong in a daily mix. Other collections keep their 20% budget.
+    const distinct=loaded.filter(mix=>mix.slot!=="latest-releases");
+    for(let i=0;i<distinct.length;i++)for(let j=i+1;j<distinct.length;j++){
+      const left=new Set(distinct[i].recordings.map((r:{recordingId:string})=>r.recordingId)),right=distinct[j].recordings;
       const overlap=right.filter((r:{recordingId:string})=>left.has(r.recordingId)).length/Math.min(left.size,right.length);assert.ok(overlap<=0.2);
     }
     await assert.rejects(getMix(second,ready[0].id),e=>e instanceof ProductError&&e.status===404);

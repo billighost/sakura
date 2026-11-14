@@ -34,7 +34,8 @@ async function tasteContext(accountId:string,pool:Queryable=getRebuildPool()){
   const recordings=await pool.query(`WITH known AS (
       SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND
         (EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id) OR
-         ($2::boolean AND EXISTS(SELECT 1 FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id AND s.audible_ms>0)))
+         ($2::boolean AND EXISTS(SELECT 1 FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id AND s.audible_ms>0)) OR
+         EXISTS(SELECT 1 FROM sakura_v2."TasteFeedback" f WHERE f.account_id=$1::uuid AND f.target='recording' AND f.target_id=r.id AND f.kind='love' AND (f.expires_at IS NULL OR f.expires_at>now())))
       ORDER BY EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id) DESC,
         CASE WHEN $2::boolean THEN COALESCE((SELECT s.audible_ms FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id),0) ELSE 0 END DESC,
         r.created_at DESC,r.id LIMIT 1000
@@ -43,7 +44,25 @@ async function tasteContext(accountId:string,pool:Queryable=getRebuildPool()){
         AND NOT EXISTS(SELECT 1 FROM sakura_v2."Favorite" f WHERE f.account_id=$1::uuid AND f.recording_id=r.id)
         AND (NOT $2::boolean OR NOT EXISTS(SELECT 1 FROM sakura_v2."ListeningRecordingSummary" s WHERE s.account_id=$1::uuid AND s.recording_id=r.id AND s.audible_ms>0))
       ORDER BY r.created_at DESC,r.id LIMIT 1500
-    ) ${CANDIDATE_SELECT} WHERE ${VERIFIED} AND r.id IN (SELECT id FROM known UNION SELECT id FROM unexplored UNION SELECT unnest($3::uuid[])) ORDER BY r.id`,[accountId,settings.learnFromListening!==false,[...new Set((settings.initialTasteProfile?.artists||[]).flatMap((artist:{recordings:{id:string}[]})=>artist.recordings.map(recording=>recording.id)))]]);
+    ), selected_artists AS (
+      SELECT a.id FROM sakura_v2."Artist" a WHERE lower(a.name)=ANY($5::text[])
+      UNION SELECT a.id FROM jsonb_to_recordset($4::jsonb) chosen(reference jsonb) JOIN sakura_v2."Artist" a
+        ON a.provider=chosen.reference->>'provider' AND a.external_id=chosen.reference->>'id'
+      UNION SELECT credit.artist_id FROM sakura_v2."Favorite" f JOIN sakura_v2."RecordingArtist" credit ON credit.recording_id=f.recording_id AND credit.position=0 WHERE f.account_id=$1::uuid
+      UNION SELECT credit.artist_id FROM sakura_v2."ListeningRecordingSummary" listen JOIN sakura_v2."RecordingArtist" credit ON credit.recording_id=listen.recording_id AND credit.position=0 WHERE listen.account_id=$1::uuid AND $2::boolean AND listen.audible_ms>0
+      UNION SELECT credit.artist_id FROM sakura_v2."TasteFeedback" f JOIN sakura_v2."RecordingArtist" credit ON credit.recording_id=f.target_id AND credit.position=0 WHERE f.account_id=$1::uuid AND f.target='recording' AND f.kind='love' AND (f.expires_at IS NULL OR f.expires_at>now())
+      UNION SELECT f.target_id FROM sakura_v2."TasteFeedback" f WHERE f.account_id=$1::uuid AND f.target='artist' AND f.kind='love' AND (f.expires_at IS NULL OR f.expires_at>now())
+    ), recent_interests AS (
+      SELECT songs.id FROM selected_artists interested CROSS JOIN LATERAL (
+        SELECT r.id,MIN(a.release_date) AS latest FROM sakura_v2."RecordingArtist" credit
+        JOIN sakura_v2."Recording" r ON r.id=credit.recording_id
+        JOIN sakura_v2."RecordingAlbum" ra ON ra.recording_id=r.id JOIN sakura_v2."Album" a ON a.id=ra.album_id
+        WHERE credit.artist_id=interested.id AND credit.position=0 AND ${VERIFIED}
+          AND a.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$'
+        GROUP BY r.id HAVING MIN(a.release_date) BETWEEN to_char(now()-interval '90 days','YYYY-MM-DD') AND to_char(now(),'YYYY-MM-DD')
+        ORDER BY latest DESC,r.id LIMIT 24
+      ) songs
+    ) ${CANDIDATE_SELECT} WHERE ${VERIFIED} AND r.id IN (SELECT id FROM known UNION SELECT id FROM unexplored UNION SELECT id FROM recent_interests UNION SELECT unnest($3::uuid[])) ORDER BY r.id`,[accountId,settings.learnFromListening!==false,[...new Set((settings.initialTasteProfile?.artists||[]).flatMap((artist:{recordings:{id:string}[]})=>artist.recordings.map(recording=>recording.id)))],JSON.stringify(settings.seedArtistSelections||[]),(settings.seedArtists||[]).filter((name:string)=>!(settings.seedArtistSelections||[]).some((selection:{name:string})=>selection.name.toLocaleLowerCase("en")===name.toLocaleLowerCase("en"))).map((name:string)=>name.toLocaleLowerCase("en"))]);
   // Independent evidence reads share one statement and snapshot, rather than
   // queueing four remote round trips on the same transaction client.
   const evidence=(await pool.query(`SELECT
@@ -77,7 +96,7 @@ async function tasteContext(accountId:string,pool:Queryable=getRebuildPool()){
 function sectionsFor(ranked:RankedTrack<FeedCard>[],context:Awaited<ReturnType<typeof tasteContext>>,now:number):FeedSection[]{
   const sections:FeedSection[]=[],likedIds=new Set(context.likedIds);
   const add=(id:string,title:string,description:string,tracks:FeedCard[])=>{if(tracks.length)sections.push({id,title,description,tracks:tracks.slice(0,6)});};
-  add("fresh-voices","From recent albums","Recent albums by artists you have chosen or heard here, where dates are available.",ranked.filter(item=>item.familiarArtist&&recentRelease(item.track.releaseDate,now)).map(item=>item.track));
+  add("fresh-voices","New from your artists","Recent songs and singles from artists you have chosen, liked or listened to.",ranked.filter(item=>item.familiarArtist&&recentRelease(item.track.releaseDate,now)).sort((a,b)=>b.track.releaseDate!.localeCompare(a.track.releaseDate!)||b.score-a.score).map(item=>item.track));
   add("another-side","More from familiar artists","Songs you have not heard here, from artists in your listening or selected preferences.",ranked.filter(item=>item.familiarArtist&&!item.heard&&!likedIds.has(item.track.id)).map(item=>item.track));
   const history=new Map(context.history.map(item=>[item.recordingId,item]));
   add("return-to","Favorites to revisit",context.settings.learnFromListening===false?"A mix from your liked songs.":"Liked songs with no saved listening in the last two weeks.",ranked.filter(item=>likedIds.has(item.track.id)&&

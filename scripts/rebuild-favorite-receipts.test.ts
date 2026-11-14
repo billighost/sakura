@@ -5,6 +5,7 @@ import vm from "node:vm";
 import {test} from "node:test";
 import ts from "typescript";
 import {integer,object,uuid,ProductError} from "../src/rebuild/data/validation";
+import {invalidateFeedCatalog} from "../src/rebuild/data/catalogRefresh";
 
 const compiled=ts.transpileModule(readFileSync("src/rebuild/data/collections.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const owner=randomUUID(),other=randomUUID(),recordingId=randomUUID();
@@ -26,14 +27,14 @@ function fixture(triggers=false){
   else if(sql.startsWith('DELETE FROM sakura_v2."Favorite"')){rowCount=favorites.delete(key)?1:0;mutations+=rowCount;if(triggers&&rowCount)triggerChoice(key);}
   else if(sql.startsWith('INSERT INTO sakura_v2."FavoriteChoice"')){choices.set(key,{revision:Number(args[2]),liked:args[3] as boolean,updated_at:transactionTime});rowCount=1;}
   else if(sql.startsWith('INSERT INTO sakura_v2."FavoriteOperationReceipt"')){receipts.set(key,{recording_id:String(args[2]),liked:args[3] as boolean,conflict:args[5]===true});rowCount=1;const choiceKey=args[0]+":"+args[2];if(triggers&&args[4]==null&&args[5]!==true&&choices.get(choiceKey)?.updated_at!==transactionTime)triggerChoice(choiceKey);}
-  else if(!sql.startsWith('UPDATE sakura_v2."Mix"')&&!sql.startsWith('DELETE FROM sakura_v2."FeedSession"'))throw new Error("Unexpected transaction query: "+sql);
+  else if(!sql.startsWith('UPDATE sakura_v2."Mix"')&&!sql.startsWith('DELETE FROM sakura_v2."FeedSession"')&&!sql.includes("preferences-'feedCatalogRefresh'"))throw new Error("Unexpected transaction query: "+sql);
   return {rows,rowCount};
  }};
  const transact=(operation:(connection:typeof client)=>Promise<unknown>)=>{
   const request=tail.catch(()=>{}).then(async()=>{transactionTime++;const beforeFavorites=new Set(favorites),beforeReceipts=new Map(receipts),beforeChoices=new Map(choices);try{return await operation(client);}catch(error){favorites.clear();for(const key of beforeFavorites)favorites.add(key);receipts.clear();for(const [key,value]of beforeReceipts)receipts.set(key,value);choices.clear();for(const [key,value]of beforeChoices)choices.set(key,value);throw error;}});tail=request;return request;
  };
  const exports:Record<string,unknown>={};
- vm.runInNewContext(compiled,{exports,require:(name:string)=>name==="./validation"?{integer,object,uuid,ProductError,pageInput:()=>({limit:100,cursor:null})}:name==="./catalog"?{VERIFIED:"r.state='verified'",CARD_SELECT:'SELECT r.id FROM sakura_v2."Recording" r',card:(value:unknown)=>value}:name==="./db"?{getRebuildPool:()=>client,inIdempotentTransaction:transact,inTransaction:transact}:name==="node:crypto"?{randomUUID}:{}});
+ vm.runInNewContext(compiled,{exports,require:(name:string)=>name==="./validation"?{integer,object,uuid,ProductError,pageInput:()=>({limit:100,cursor:null})}:name==="./catalogRefresh"?{invalidateFeedCatalog}:name==="./catalog"?{VERIFIED:"r.state='verified'",CARD_SELECT:'SELECT r.id FROM sakura_v2."Recording" r',card:(value:unknown)=>value}:name==="./db"?{getRebuildPool:()=>client,inIdempotentTransaction:transact,inTransaction:transact}:name==="node:crypto"?{randomUUID}:{}});
  return {favorites,receipts,choices,legacySet:(account:string,liked:boolean)=>transact(async connection=>{await connection.query(liked?'INSERT INTO sakura_v2."Favorite"(account_id,recording_id) VALUES($1::uuid,$2::uuid) ON CONFLICT DO NOTHING':'DELETE FROM sakura_v2."Favorite" WHERE account_id=$1::uuid AND recording_id=$2::uuid',[account,recordingId]);await connection.query('INSERT INTO sakura_v2."FavoriteOperationReceipt"(account_id,operation_id,recording_id,liked) VALUES($1::uuid,$2::uuid,$3::uuid,$4)',[account,randomUUID(),recordingId,liked]);}),get mutations(){return mutations;},set:exports.setFavorite as (account:string,value:unknown)=>Promise<{liked:boolean;revision:number;accepted?:boolean;duplicate?:boolean;conflict?:boolean;operationId?:string}>,revisions:exports.getFavoriteRevisions as (account:string)=>Promise<Record<string,number>>,library:exports.getLibrary as (account:string,url:URL)=>Promise<{recordings:Array<{recordingId:string}>;favoriteRevisions:Record<string,number>;favoriteStates:Record<string,{liked:boolean;revision:number}>}>};
 }
 

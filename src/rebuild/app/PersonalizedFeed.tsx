@@ -19,6 +19,8 @@ import {recommendationCacheVersion} from "./recommendationCache";
 import {cachedFeed,emptyFeed,saveFeed,parseFeed,restoreFeed,freshFeed,loadFirstFeed,invalidateRecommendationViews,FEED_PAGE_SIZE as PAGE_SIZE,type FeedItem,type FeedState} from "./recommendationViews";
 import type { SongMenuAnchor } from "./TrackActions";
 import { appendUniqueFeedItems } from "./feedItems";
+import { waitForFeedCatalog } from "./feedCatalogRefresh";
+import { invalidateResources } from "./resources";
 import { HeroGarden } from "./HeroGarden";
 import {useHeroRecommendation} from "./useHeroRecommendation";
 import {useVisibleMotion} from "./useVisibleMotion";
@@ -33,7 +35,7 @@ const lanes: Record<Lane, { label: string; icon: IconName }> = {
   familiar: { label: "A familiar song", icon: "heart" },
   similar: { label: "Related to your listening", icon: "discover" },
   explore: { label: "Something new", icon: "discover" },
-  fresh: { label: "From a recent album", icon: "sun" },
+  fresh: { label: "A recent release", icon: "sun" },
 };
 
 /** Warm the exact initial request shared by the mounted feed and hero. */
@@ -113,7 +115,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
       const page = parseFeed(raw);
       const unique = appendUniqueFeedItems(reset ? [] : previous.items, page.items);
       const next: FeedState = { ...page, items: unique,
-        sections: reset || !previous.ready ? page.sections : previous.sections,
+        sections: reset || !previous.ready ? page.sections : feedRef.current.sections,
+        catalogRefresh: reset || !previous.ready ? page.catalogRefresh : feedRef.current.catalogRefresh,
         ready: true, busy: false, error: null, refreshRequired: false };
       // A repeated cursor cannot keep an observer making the same request.
       if (!reset && previous.nextCursor) seenCursors.current.add(previous.nextCursor);
@@ -144,6 +147,27 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
     const online=()=>{if(!feedRef.current.ready||feedRef.current.error)void load(true);};window.addEventListener("online",online);
     return () => {active=false;request.current?.abort();request.current=null;window.removeEventListener("online",online);};
   }, [load,accountId,cacheKey]);
+  const catalogPending = feed.catalogRefresh?.pending === true;
+  const catalogCompletedAt = feed.catalogRefresh?.completedAt;
+  useEffect(() => {
+    const hint = feedRef.current.catalogRefresh;
+    if (!accountId || !hint?.pending) return;
+    const controller = new AbortController(), version = recommendationCacheVersion(accountId);
+    void (async () => {
+      const ready = await waitForFeedCatalog(hint, controller.signal, signal => recommendationJson(accountId,
+        "/api/v2/feed?catalogRefreshStatus=1", signal, { force: true, identity: cacheKey }));
+      if (!ready) return;
+      const updated = parseFeed(await recommendationJson(accountId, "/api/v2/feed?" + new URLSearchParams({ surface, mode, limit: String(PAGE_SIZE) }),
+        controller.signal, { force: true, identity: cacheKey }));
+      if (controller.signal.aborted || recommendationCacheVersion(accountId) !== version) return;
+      // Fresh shelves arrive without moving paginated cards or replacing their
+      // cursor. The independently rotating hero keeps its current selection.
+      const next = { ...feedRef.current, sections: updated.sections, catalogRefresh: updated.catalogRefresh };
+      feedRef.current = next; setFeed(next); saveFeed(accountId, cacheKey, next, version);
+      invalidateResources(accountId, "/api/v2/mixes");
+    })().catch(() => {});
+    return () => controller.abort();
+  }, [accountId, cacheKey, surface, mode, catalogPending, catalogCompletedAt]);
   useEffect(() => {
     const node = sentinel.current;
     if (!node || !feed.ready || !feed.nextCursor || feed.error || feed.refreshRequired||music.offline) return;
@@ -235,8 +259,8 @@ function FeedView({ surface, mode, onMode, cacheKey, children }: {
 
     {children}
 
-    {feed.sections.slice(0, 3).map((section, index) => <section key={section.id} className={s.spotlight} aria-label={section.title} data-motion-region>
-      <div className={s.sectionHeading}><div><span className={s.eyebrow}>{index === 0 ? "FROM YOUR LISTENING" : "MORE TO EXPLORE"}</span><h2>{section.title}</h2><p>{section.description}</p></div>
+    {feed.sections.slice(0, 3).map((section, index) => <section key={section.id} className={`${s.spotlight} ${section.id === "fresh-voices" ? s.releaseSpotlight : ""}`} aria-label={section.title} data-feed-section={section.id} data-motion-region>
+      <div className={s.sectionHeading}><div><span className={s.eyebrow}>{section.id === "fresh-voices" ? <><Icon name="sun" size={13}/>NEW FROM YOUR ARTISTS</> : index === 0 ? "FROM YOUR LISTENING" : "MORE TO EXPLORE"}</span><h2>{section.title}</h2><p>{section.description}</p></div>
         <SmartQueueButton scope="collection" tracks={section.tracks} label="Play a mix"/></div>
       <div className={s.shelf} tabIndex={0} aria-label={section.title + " songs; scroll for more"}>{section.tracks.slice(0, 8).map((track, position) => <ShelfSong key={track.id} track={track}
         tracks={section.tracks} position={position} source={{ ...source, contextId: section.id }} onOptions={openMenu}/>)}</div>
@@ -309,9 +333,11 @@ function HeroPick({ item, tracks, source, onOptions }: { item: FeedItem; tracks:
 }
 function ShelfSong({ track, tracks, position, source, onOptions }: { track: MusicTrack; tracks: MusicTrack[]; position: number; source: FeedSource; onOptions: (track: MusicTrack, anchor: SongMenuAnchor) => void }) {
   const music = useMusic(), state = songState(music, track);
+  const releaseDate = source.contextId === "fresh-voices" ? track.releaseDate : undefined;
   return <SongGesture id={state.id} className={s.shelfSong} onOptions={anchor => onOptions(track, anchor)}>
     <div className={s.shelfArtwork}><Artwork url={track.coverUrl} title={track.albumTitle || track.title}/><span aria-hidden="true">{String(position + 1).padStart(2, "0")}</span><SongPlay track={track} tracks={tracks} source={source} className={s.shelfPlay}/></div>
     <Link className={s.shelfTitle} href={"/track/" + encodeURIComponent(state.id)} dir="auto">{track.title}</Link><ArtistLinks track={track} className={s.shelfArtist}/>
+    {releaseDate && <time className={s.releaseDate} dateTime={releaseDate}>Released {new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(releaseDate))}</time>}
     <div className={s.shelfBottom}><span>{time(track.durationMs)}</span><SongTools track={track} onOptions={onOptions}/></div>
   </SongGesture>;
 }

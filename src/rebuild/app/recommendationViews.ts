@@ -1,6 +1,7 @@
 import { musicTrack, type MusicTrack } from "./types";
 import { recommendationJson } from "./recommendationTransport";
 import { browserOffline } from "./resourcePolicy";
+import { parseFeedCatalogRefresh, type FeedCatalogRefresh } from "./feedCatalogRefresh";
 import { HERO_REFRESH_MS } from "../recommendations/hero";
 import { clearRecommendationCache, readRecommendationCache, recommendationCacheValid, recommendationCacheVersion, writeRecommendationCache } from "./recommendationCache";
 
@@ -13,6 +14,7 @@ export interface FeedState {
   items: FeedItem[]; sections: FeedSection[]; nextCursor: string | null; ready: boolean;
   busy: boolean; error: unknown; refreshRequired: boolean; personalized: boolean;
   totalCandidates: number; generatedAt: string;
+  catalogRefresh?: FeedCatalogRefresh;
 }
 export type HeroRecommendation = FeedItem;
 export interface HeroState { item: HeroRecommendation | null; ready: boolean; refreshAt: number; generatedAt?: number }
@@ -119,7 +121,8 @@ export function parseFeed(raw: Record<string, unknown>): FeedState {
   }) : [];
   return { items, sections, nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null,
     personalized: raw.personalized === true, totalCandidates: Math.max(0, Number(raw.totalCandidates) || 0),
-    generatedAt: typeof raw.generatedAt === "string" ? raw.generatedAt : "", ready: true, busy: false, error: null, refreshRequired: false };
+    generatedAt: typeof raw.generatedAt === "string" ? raw.generatedAt : "", catalogRefresh: parseFeedCatalogRefresh(raw.catalogRefresh),
+    ready: true, busy: false, error: null, refreshRequired: false };
 }
 function parseHero(raw: Record<string, unknown>): HeroState {
   if (raw.item !== null && (!raw.item || typeof raw.item !== "object")) throw new Error("Hero response unavailable");

@@ -20,7 +20,9 @@ export function getSettingsSnapshot(accountId:string,sql:{query:PoolClient["quer
 async function readSettings(accountId:string,sql:{query:PoolClient["query"]},persistDerived=true) {
   const row=(await sql.query(`SELECT preferences,seed_artists,seed_genres,onboarded,revision,field_revisions
     FROM sakura_v2."AccountPreferences" WHERE account_id=$1::uuid`,[accountId])).rows[0];
-  const settings={ ...DEFAULT_SETTINGS,...row?.preferences,seedArtists:row?.seed_artists||[],seedGenres:row?.seed_genres||[],
+  const {feedCatalogRefresh:_feedCatalogRefresh,...preferences}=row?.preferences||{};
+  void _feedCatalogRefresh;
+  const settings={ ...DEFAULT_SETTINGS,...preferences,seedArtists:row?.seed_artists||[],seedGenres:row?.seed_genres||[],
     onboarded:Boolean(row?.onboarded),revision:Number(row?.revision||0),fieldRevisions:(row?.field_revisions||{}) as Record<string,number> };
   const stored=normalizeInitialTasteProfile(settings.initialTasteProfile);
   settings.initialTasteProfile=stored?.signature===initialTasteSignature(settings)?stored:undefined;

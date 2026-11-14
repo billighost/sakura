@@ -99,6 +99,36 @@ describe("Personalization service with isolated PostgreSQL fixtures",()=>{
       assert.doesNotMatch(page.items.find(item=>item.track.id===recordings[0])!.reason,/recent album/);
     }finally{await pool.query(`DELETE FROM sakura_v2."Album" WHERE id=$1::uuid`,[original]);}
   });
+  it("the newest single appears first in both artist release shelves despite ranking variety",async()=>{
+    const latest=new Date(Date.now()-86400000).toISOString().slice(0,10),earlier=new Date(Date.now()-9*86400000).toISOString().slice(0,10);
+    await pool.query(`UPDATE sakura_v2."Album" SET release_date=CASE WHEN external_id=$1 THEN $2 ELSE $3 END WHERE external_id=ANY($4::text[])`,[`fixture-${prefix}-album-10`,latest,earlier,[`fixture-${prefix}-album-10`,`fixture-${prefix}-album-0`]]);
+    try{
+      for(const surface of ["home","discover"]){
+        const page=await getPersonalizedFeed(first,feed(null,surface)),shelf=page.sections.find(section=>section.id==="fresh-voices");
+        assert.equal(shelf?.title,"New from your artists");assert.equal(shelf?.tracks[0].id,recordings[10]);assert.equal(shelf?.tracks[0].releaseDate,latest);
+        assert.ok(shelf?.tracks.some(track=>track.id===recordings[0]));
+      }
+    }finally{await pool.query(`UPDATE sakura_v2."Album" SET release_date=CASE WHEN external_id=$1 THEN '2099-01-01' ELSE $2 END WHERE external_id=ANY($3::text[])`,[`fixture-${prefix}-album-10`,latest,[`fixture-${prefix}-album-10`,`fixture-${prefix}-album-0`]]);}
+  });
+  it("persists a small newest-release mix and regenerates its membership when new catalog songs arrive",async()=>{
+    const latest=new Date(Date.now()-86400000).toISOString().slice(0,10),earlier=new Date(Date.now()-2*86400000).toISOString().slice(0,10),original=randomUUID();
+    await pool.query(`UPDATE sakura_v2."Album" SET release_date=$1 WHERE external_id=ANY($2::text[])`,[latest,[`fixture-${prefix}-album-0`,`fixture-${prefix}-album-10`]]);
+    await pool.query(`INSERT INTO sakura_v2."Album"(id,provider,external_id,title,release_date) VALUES($1::uuid,'deezer',$2,'Original edition','2001-01-01')`,[original,`fixture-${prefix}-mix-original`]);
+    await pool.query(`INSERT INTO sakura_v2."RecordingAlbum"(recording_id,album_id,position) VALUES($1::uuid,$2::uuid,99)`,[recordings[0],original]);
+    try{
+      const mixes=await ensureMixes(first,true),fresh=mixes.find(mix=>mix.slot==="latest-releases");
+      assert.ok(fresh);assert.equal(fresh.status,"ready");assert.equal(fresh.trackCount,1);assert.deepEqual(fresh.surfaces,["home","discover"]);
+      assert.deepEqual((await getMix(first,fresh.id)).recordings.map((track:RecordingCard)=>track.id),[recordings[10]]);
+      await pool.query(`UPDATE sakura_v2."Album" SET release_date=$1 WHERE external_id=$2`,[earlier,`fixture-${prefix}-album-20`]);
+      await pool.query(`UPDATE sakura_v2."Mix" SET expires_at=now() WHERE account_id=$1::uuid`,[first]);
+      const refreshed=(await ensureMixes(first)).find(mix=>mix.slot==="latest-releases");
+      assert.equal(refreshed?.id,fresh.id);assert.equal(refreshed?.trackCount,2);
+      assert.deepEqual((await getMix(first,fresh.id)).recordings.map((track:RecordingCard)=>track.id),[recordings[10],recordings[20]]);
+    }finally{
+      await pool.query(`DELETE FROM sakura_v2."Album" WHERE id=$1::uuid`,[original]);
+      await pool.query(`UPDATE sakura_v2."Album" SET release_date=CASE WHEN external_id=$1 THEN '2099-01-01' WHEN external_id=$2 THEN NULL ELSE $3 END WHERE external_id=ANY($4::text[])`,[`fixture-${prefix}-album-10`,`fixture-${prefix}-album-20`,latest,[`fixture-${prefix}-album-0`,`fixture-${prefix}-album-10`,`fixture-${prefix}-album-20`]]);
+    }
+  });
   it("smart queues stay inside chosen downloads, collections and liked songs",async()=>{
     const selected=recordings.slice(0,5),queue=await generateSmartQueue(first,{scope:"downloads",recordingIds:selected,limit:80});
     assert.equal(queue.tracks.length,5);assert.ok(queue.tracks.every(track=>selected.includes(track.id)));assert.equal(new Set(queue.tracks.map(track=>track.id)).size,5);

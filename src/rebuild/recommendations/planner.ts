@@ -1,6 +1,7 @@
 /** Provider-neutral recommendation selection. IDs refer to canonical recordings,
  * so a catalog result and an already-downloaded song cannot occupy two slots.
  * Candidate acquisition and persistence belong to separate server adapters. */
+import {recentRelease} from "./personalization";
 export interface Candidate {
   recordingId: string;
   artistId: string;
@@ -10,6 +11,8 @@ export interface Candidate {
   durationMs?:number|null;
   /** Absent means eligible for every specification (legacy generic pools). */
   eligibleMixIds?:readonly string[];
+  releaseDate?:string|null;
+  familiarArtist?:boolean;
 }
 export interface MixSpec {
   id: string;
@@ -21,6 +24,7 @@ export interface MixSpec {
   /** Fraction shared with ANY prior mix, measured against the shorter mix. */
   maximumOverlap: number;
   maximumDurationMs?:number;
+  selection?:"latest-releases";
 }
 export interface ListeningContext {
   seed: string;
@@ -55,7 +59,8 @@ function eligible(candidate: Candidate, spec: MixSpec, context: ListeningContext
   if (context.blockedRecordings.has(id) || context.blockedArtists.has(candidate.artistId)) return false;
   if ((context.snoozedUntil.get(id) ?? 0) > context.nowMs) return false;
   if (spec.genres.length && !candidate.genres.some(g => spec.genres.some(s => genre(g) === genre(s)))) return false;
-  if (spec.kind !== 'repeat' && context.nowMs - (context.recentPlays.get(id) ?? -Infinity) < context.recentWindowMs) return false;
+  if(spec.selection==="latest-releases"&&(!candidate.familiarArtist||!recentRelease(candidate.releaseDate,context.nowMs)))return false;
+  if (spec.selection!=="latest-releases"&&spec.kind !== 'repeat' && context.nowMs - (context.recentPlays.get(id) ?? -Infinity) < context.recentWindowMs) return false;
   if (spec.kind === 'discover' && (context.heardRecordings.has(id) || context.familiarArtists.has(candidate.artistId))) return false;
   if (spec.kind === 'deep-cuts' && (context.heardRecordings.has(id) || !context.familiarArtists.has(candidate.artistId))) return false;
   if (spec.kind === 'repeat' && !context.heardRecordings.has(id)) return false;
@@ -86,7 +91,7 @@ export function planMixes(specs: readonly MixSpec[], candidates: readonly Candid
   for (const spec of specs) {
     validate(spec);
     const choices = [...canonical.values()].filter(c => eligible(c, spec, context));
-    choices.sort((a,b) => score(b,spec,context.seed) - score(a,spec,context.seed) || a.recordingId.localeCompare(b.recordingId));
+    choices.sort((a,b) => (spec.selection==="latest-releases"?b.releaseDate!.localeCompare(a.releaseDate!):0)||score(b,spec,context.seed) - score(a,spec,context.seed) || a.recordingId.localeCompare(b.recordingId));
     const previous = completed.map(list => new Set(list.map(c => c.recordingId)));
     const usedArtists = new Map<string, number>();
     const overlaps = previous.map(() => 0);
@@ -119,13 +124,14 @@ export function planMixes(specs: readonly MixSpec[], candidates: readonly Candid
     }
     if (selected.length < spec.minimum) {
       result.push({ id: spec.id, recordingIds: [], status: 'insufficient-candidates', eligibleCount: choices.length, uniqueArtists: 0,
-        reason: 'Too few distinct recordings satisfy the genre, listening, artist and overlap constraints.' });
+        reason: spec.selection==="latest-releases"?'No recent releases from your artists are available in the catalog yet.':'Too few distinct recordings satisfy the genre, listening, artist and overlap constraints.' });
       continue;
     }
     // Prefer changing artists between adjacent songs without changing membership.
     const ordered: Candidate[] = [];
     const remaining = [...selected];
     while (remaining.length) {
+      if(spec.selection==="latest-releases"){ordered.push(...remaining);break;}
       const index = remaining.findIndex(c => c.artistId !== ordered.at(-1)?.artistId);
       ordered.push(...remaining.splice(Math.max(0,index),1));
     }

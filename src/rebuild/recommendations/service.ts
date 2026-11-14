@@ -10,6 +10,9 @@ import {playlistArtworkSources} from "../app/playlistArtwork";
 import {FEED_DEFAULTS} from "../app/feedPreferences";
 
 const MIXES=SITUATIONAL_MIXES;
+const MIX_CANDIDATE_SELECT=RANKING_CARD_SELECT.replace("SELECT r.id,r.metadata,r.provenance,",()=>`SELECT r.id,r.metadata,r.provenance,
+  (SELECT MIN(a.release_date) FROM sakura_v2."RecordingAlbum" ra JOIN sakura_v2."Album" a ON a.id=ra.album_id
+    WHERE ra.recording_id=r.id AND a.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$') AS "releaseDate",`);
 type Queryable=Pick<PoolClient,"query">;
 export async function listMixes(accountId:string,sql:Queryable=getRebuildPool()) {
   const rows=(await sql.query(`SELECT m.id,m.slot,m.kind,m.name,m.description,m.status,m.reason,
@@ -19,7 +22,7 @@ export async function listMixes(accountId:string,sql:Queryable=getRebuildPool())
       JOIN sakura_v2."Recording" r ON r.id=x.recording_id WHERE x.mix_id=m.id AND NULLIF(r.metadata->>'coverUrl','') IS NOT NULL
       GROUP BY r.metadata->>'coverUrl' ORDER BY MIN(x.position) LIMIT 4) art) AS "coverUrls",
     (SELECT COUNT(*)::integer FROM sakura_v2."MixRecording" x WHERE x.mix_id=m.id) AS "trackCount"
-    FROM sakura_v2."Mix" m WHERE m.account_id=$1::uuid ORDER BY CASE m.slot WHEN 'daily' THEN 0 WHEN 'discover' THEN 1 WHEN 'deep-cuts' THEN 2 ELSE 3 END`,[accountId])).rows;
+    FROM sakura_v2."Mix" m WHERE m.account_id=$1::uuid ORDER BY CASE m.slot WHEN 'latest-releases' THEN 0 WHEN 'daily' THEN 1 WHEN 'discover' THEN 2 WHEN 'deep-cuts' THEN 3 ELSE 4 END`,[accountId])).rows;
   return rows.map(row=>{const definition=MIXES.find(m=>m.id===row.slot);return {...row,situation:definition?.situation,surfaces:definition?.surfaces||["discover"],rules:definition?.rules||[],coverUrls:(row.coverUrls||[]).filter(Boolean),playability:row.status==="ready"?"resolvable":"unavailable"};});
 }
 
@@ -36,14 +39,36 @@ async function ensureMixesFor(accountId:string,refresh:boolean,client:PoolClient
   if(!refresh&&existing.length===MIXES.length&&existing.every(m=>new Date(m.expiresAt).getTime()>Date.now()))return existing;
     const settings=await getSettings(accountId,client);
     const startingIds=[...new Set((settings.initialTasteProfile?.artists||[]).flatMap((artist:{recordings:{id:string}[]})=>artist.recordings.map(recording=>recording.id)))];
-    const rows=(await client.query(`${RANKING_CARD_SELECT} WHERE ${VERIFIED} ORDER BY (r.id=ANY($2::uuid[])) DESC,r.created_at DESC,r.id LIMIT 2500`,[accountId,startingIds])).rows;
-    const allCards=rows.map(card).filter(c=>settings.explicitContent||c.metadata.explicit!=="explicit");
     const listens=settings.learnFromListening===false?[]:(await client.query(`SELECT recording_id,audible_ms,play_count,completed_count,skipped_count,last_played_at
       FROM sakura_v2."ListeningRecordingSummary" WHERE account_id=$1::uuid`,[accountId])).rows;
     const favoriteIds=new Set((await client.query(`SELECT recording_id FROM sakura_v2."Favorite" WHERE account_id=$1::uuid`,[accountId])).rows.map(r=>r.recording_id));
     const feedback=(await client.query(`SELECT target,target_id,kind,expires_at FROM sakura_v2."TasteFeedback" WHERE account_id=$1::uuid AND (expires_at IS NULL OR expires_at>now())`,[accountId])).rows;
     const normalizedFeedback:TasteFeedback[]=feedback.map(f=>({target:f.target,targetId:f.target_id,kind:f.kind,expiresAt:f.expires_at?new Date(f.expires_at).toISOString():null}));
     const history:ListeningEvidence[]=listens.map(l=>({recordingId:l.recording_id,audibleMs:Number(l.audible_ms),playCount:Number(l.play_count),completedCount:Number(l.completed_count),skippedCount:Number(l.skipped_count),...(l.last_played_at?{lastPlayedAt:new Date(l.last_played_at).toISOString()}:{} )}));
+    const selections=settings.seedArtistSelections||[],exactNames=new Set(selections.map((selection:{name:string})=>selection.name.toLocaleLowerCase("en")));
+    const legacyNames=(settings.seedArtists||[]).filter((name:string)=>!exactNames.has(name.toLocaleLowerCase("en"))).map((name:string)=>name.toLocaleLowerCase("en"));
+    const knownIds=[...new Set([...startingIds,...favoriteIds,...history.filter(item=>item.audibleMs>0).map(item=>item.recordingId),...normalizedFeedback.filter(item=>item.target==="recording"&&item.kind==="love").map(item=>item.targetId)])];
+    const rows=(await client.query(`WITH known AS (
+      SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND r.id=ANY($2::uuid[])
+      ORDER BY (r.id=ANY($3::uuid[])) DESC,(r.id=ANY($4::uuid[])) DESC,r.created_at DESC,r.id LIMIT 1000
+    ), interested_artists AS (
+      SELECT a.id FROM sakura_v2."Artist" a WHERE lower(a.name)=ANY($5::text[]) OR
+        EXISTS(SELECT 1 FROM jsonb_to_recordset($6::jsonb) chosen(reference jsonb) WHERE chosen.reference->>'provider'=a.provider AND chosen.reference->>'id'=a.external_id)
+      UNION SELECT ra.artist_id FROM sakura_v2."RecordingArtist" ra WHERE ra.position=0 AND ra.recording_id IN (SELECT id FROM known)
+      UNION SELECT unnest($7::uuid[])
+    ), recent AS (
+      SELECT r.id,MIN(a.release_date) AS release_date FROM interested_artists interested
+      JOIN sakura_v2."RecordingArtist" credit ON credit.artist_id=interested.id AND credit.position=0
+      JOIN sakura_v2."Recording" r ON r.id=credit.recording_id JOIN sakura_v2."RecordingAlbum" ra ON ra.recording_id=r.id
+      JOIN sakura_v2."Album" a ON a.id=ra.album_id WHERE ${VERIFIED} AND a.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$'
+      GROUP BY r.id HAVING MIN(a.release_date) BETWEEN to_char(now()-interval '90 days','YYYY-MM-DD') AND to_char(now(),'YYYY-MM-DD')
+      ORDER BY release_date DESC,r.id LIMIT 500
+    ), other AS (
+      SELECT r.id FROM sakura_v2."Recording" r WHERE ${VERIFIED} AND r.id NOT IN (SELECT id FROM known UNION SELECT id FROM recent)
+      ORDER BY r.created_at DESC,r.id LIMIT 1000
+    ) ${MIX_CANDIDATE_SELECT} WHERE ${VERIFIED} AND r.id IN (SELECT id FROM known UNION SELECT id FROM recent UNION SELECT id FROM other) ORDER BY r.id`,
+      [accountId,knownIds,startingIds,[...favoriteIds],legacyNames,JSON.stringify(selections),normalizedFeedback.filter(item=>item.target==="artist"&&item.kind==="love").map(item=>item.targetId)])).rows;
+    const allCards=rows.map(row=>({...card(row),releaseDate:typeof row.releaseDate==="string"?row.releaseDate:null})).filter(c=>settings.explicitContent||c.metadata.explicit!=="explicit");
     const ranked=rankPersonalizedTracks(allCards,{settings:settings as TasteSettings,history,feedback:normalizedFeedback,likedIds:[...favoriteIds] as string[],seed:accountId});
     const heard=new Set(ranked.filter(item=>item.heard).map(item=>item.track.id));
     const occurrence=settings.learnFromListening===false?[]:(await client.query(`SELECT l.recording_id,MIN(c.occurred_at) first_played_at,
@@ -65,8 +90,8 @@ async function ensureMixesFor(accountId:string,refresh:boolean,client:PoolClient
       const history={audibleMs:Number(listened?.audible_ms||0),lastPlayedAt:listened?.last_played_at?new Date(listened.last_played_at).getTime():undefined,
         firstPlayedAt:occurrence?.first_played_at?new Date(occurrence.first_played_at).getTime():undefined,lateNight:Boolean(occurrence?.late_night)};
       return {recordingId:c.recordingId,artistId,genres:c.genres,popularity:c.popularity,durationMs:c.durationMs,
-        eligibleMixIds:eligibleSituations({...c,liked:favoriteIds.has(c.recordingId)},history),
-        affinity:item.score};
+        eligibleMixIds:[...eligibleSituations({...c,liked:favoriteIds.has(c.recordingId)},history),"latest-releases"],
+        affinity:item.score,releaseDate:c.releaseDate,familiarArtist:item.familiarArtist};
     });
     const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
     const planned=planMixes(MIXES,candidates,{seed:`${accountId}:${day}`,nowMs:now,heardRecordings:heard,familiarArtists:familiarity,
