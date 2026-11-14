@@ -20,7 +20,7 @@ const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 assert.ok(secret, 'Local auth signing configuration is required');
 const account = {id:'94000000-0000-4000-8000-000000000611',username:'Indic reading fixture',email:'indic-readings@example.invalid'};
 const token = await encode({token:{id:account.id,name:account.username},secret,salt:'authjs.session-token'});
-const languages = ['ja','hi','te','kn','ml','or','sr','ka'];
+const languages = ['ja','hi','te','kn','ml','or','sr','ta','ka'];
 const songs = languages.map(language => {
   const song = READING_SONG_EXCERPTS.find(item => item.language === language);
   assert.ok(song, `An independently checked actual-song excerpt is required for ${language}`);
@@ -77,13 +77,21 @@ async function room(theme,width,sharedSettings) {
     Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>localStorage.getItem('indic-provider-offline')!=='1'});
     if(holdOriginalWrites){
       const put=IDBObjectStore.prototype.put;
+      const heldTransactions=new WeakSet();
       IDBObjectStore.prototype.put=function(value,...rest){
         const request=put.call(this,value,...rest);
-        if(this.name==='lyrics'&&value?.data?.readingLanguage==='ml'&&value.data.lines.every(line=>line.romanized===undefined)){
+        if(this.name==='lyrics'&&value?.data?.readingLanguage==='ml'&&value.data.lines.every(line=>line.romanized===undefined)&&!heldTransactions.has(this.transaction)){
           const tx=this.transaction;
-          Object.defineProperty(tx,'oncomplete',{configurable:true,set(callback){
-            tx.addEventListener('complete',event=>(window.indicHeldLyricWrites||=[]).push(()=>callback.call(tx,event)),{once:true});
-          }});
+          heldTransactions.add(tx);
+          // Atomic persistence installs its completion handler before its
+          // asynchronous read reaches put. Retain that existing handler too.
+          let callback=tx.oncomplete;
+          tx.oncomplete=null;
+          Object.defineProperty(tx,'oncomplete',{configurable:true,get:()=>callback,set:value=>{callback=value;}});
+          tx.addEventListener('complete',event=>{
+            const handler=callback;
+            if(typeof handler==='function')(window.indicHeldLyricWrites||=[]).push(()=>handler.call(tx,event));
+          },{once:true});
         }
         return request;
       };
@@ -178,11 +186,16 @@ async function assertGuide(page,dialog,index) {
   await expect(page.locator('[data-mini-lyric] i')).toHaveAttribute('lang',`${songs[index].language}-Latn`);
 }
 async function assertSavedOriginals(page) {
-  const stored=await page.evaluate(async()=>{
+  let stored=[];
+  await expect.poll(async()=>{
+    stored=await page.evaluate(async()=>{
     const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('sakura-v2-lyrics-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
     const rows=await new Promise((resolve,reject)=>{const request=db.transaction('lyrics','readonly').objectStore('lyrics').getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
     db.close();return rows;
-  });
+    });
+    report.savedLyrics=stored.map(row=>({providerTrackId:row.data?.providerTrackId,language:row.data?.readingLanguage,text:row.data?.lines[0]?.text}));
+    return songs.every((_,index)=>stored.some(row=>row.data?.providerTrackId===611+index));
+  },{message:'Every played song must finish persisting its verified original lyrics'}).toBe(true);
   for (let index=0;index<songs.length;index++) {
     const saved=stored.find(row=>row.data?.providerTrackId===611+index);
     assert.ok(saved,`${songs[index].language}: native lyrics must be persisted`);
@@ -216,7 +229,7 @@ async function verifyFreshDeviceRace() {
     const beforeRelease=await readingState(r.page,r.counts,4);
     assert.deepEqual(beforeRelease.miniGuide,[expectedReadings[4][0]],'The guide must reach the mini view before releasing its older load');
     const heldWrites=await r.page.evaluate(()=>{const held=window.indicHeldLyricWrites;window.indicHeldLyricWrites=[];for(const release of held)release();return held.length;});
-    // Let the deliberately delayed original result complete and publish its view.
+    // Release the delayed persistence callback and verify the guide survives.
     await r.page.waitForTimeout(1000);
     await expect(r.page.locator('[data-mini-lyric] i')).toHaveText(expectedReadings[4][0]);
     await expect(dialog.locator('[data-player-reading]')).toHaveText(expectedReadings[4][0]);
@@ -233,8 +246,8 @@ async function verifyFreshDeviceRace() {
     const afterCachePublish=await readingState(r.page,r.counts,4);
     assert.equal(afterCachePublish.counts.readings,beforeRelease.counts.readings,'Reopening and same-language cache publication reuse the completed guide');
     await r.page.screenshot({path:output+'/fresh-device-after-publish.png',animations:'disabled'});
-    report.freshDeviceRace={instrumentation:'Deferred only the initial originals-only Malayalam IndexedDB transaction completion callback until after its reading guide published; native transaction locks complete normally.',heldWrites,beforeRelease,afterRelease,afterReopen,afterCachePublish,extraReadingsAfterLateCompletion:afterCachePublish.counts.readings-beforeRelease.counts.readings};
-    report.checks.push('Fresh enabled device: a late original-lyrics completion retains Roman mini/full/saved guides with unchanged native text/word timing and zero extra reading requests.');
+    report.freshDeviceRace={instrumentation:'Deferred only the initial originals-only Malayalam IndexedDB persistence completion callback until after its reading guide published; native transaction locks complete normally. Provider result publication and the bounded storage timeout are not held.',heldWrites,beforeRelease,afterRelease,afterReopen,afterCachePublish,extraReadingsAfterLateCompletion:afterCachePublish.counts.readings-beforeRelease.counts.readings};
+    report.checks.push('Fresh enabled device: a late original cache persistence completion retains Roman mini/full/saved guides with unchanged native text/word timing and zero extra reading requests.');
   } catch(error) {
     report.freshDeviceRace={failure:error.message,...await readingState(r.page,r.counts,4),heldWrites:await r.page.evaluate(()=>window.indicHeldLyricWrites?.length||0)};
     await r.page.screenshot({path:output+'/fresh-device-race-failure.png',animations:'disabled'}).catch(()=>{});
@@ -262,7 +275,7 @@ async function verify(theme,width) {
       await expect(words.locator('[data-lyric-index="1"] > span')).toHaveText(sourceLines[index][1].text);
       await expect(words.locator('[data-lyric-index="1"] > small')).toHaveText(expectedReadings[index][1]);
       await expect(words.getByText(/reading needs review/i)).toHaveCount(0);
-      if (index===2||index===4||index===6) await words.screenshot({path:`${output}/lyrics-${theme}-${width}-${songs[index].language}.png`,animations:'disabled'});
+      if (index===2||index===4||index===6||songs[index].language==='ta') await words.screenshot({path:`${output}/lyrics-${theme}-${width}-${songs[index].language}.png`,animations:'disabled'});
       await closeDialog(page,words);
       report.checks.push(`${prefix}: ${songs[index].language} guide agrees across mini player, full player and full lyrics; native/mixed text and punctuation retained; review label absent.`);
     }
@@ -303,39 +316,45 @@ async function verify(theme,width) {
       await closeDialog(page,dialog);
     }
     report.checks.push(`${prefix}: reliable Marathi and Nepali hints keep Devanagari originals and produce no guessed Hindi guide.`);
-    dialog=await selectSong(page,2);await assertGuide(page,dialog,2);await closeDialog(page,dialog);
+    const tamilIndex=songs.findIndex(song=>song.language==='ta');
+    dialog=await selectSong(page,tamilIndex);await assertGuide(page,dialog,tamilIndex);await closeDialog(page,dialog);
     const beforeOffline={readings:counts.readings,lyrics:counts.lyrics};
     await page.evaluate(()=>localStorage.setItem('indic-provider-offline','1'));r.providers(false);
-    await page.reload({waitUntil:'domcontentloaded'});dialog=await openPlayer(page);await assertGuide(page,dialog,2);
+    await page.reload({waitUntil:'domcontentloaded'});dialog=await openPlayer(page);await assertGuide(page,dialog,tamilIndex);
     assert.equal(counts.readings,beforeOffline.readings);assert.equal(counts.lyrics,beforeOffline.lyrics);assert.equal(counts.blocked,0);
     await dialog.screenshot({path:`${output}/offline-${theme}-${width}.png`,animations:'disabled'});
-    report.checks.push(`${prefix}: cold reload with navigator offline and lyric providers disconnected retains saved Telugu words/readings and makes no lyric/reading requests.`);
+    report.checks.push(`${prefix}: cold reload with navigator offline and lyric providers disconnected retains saved Tamil words/readings and makes no lyric/reading requests.`);
     await closeDialog(page,dialog);
-    await page.evaluate(async()=>{
+    await page.evaluate(async providerId=>{
       const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('sakura-v2-lyrics-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
       await new Promise((resolve,reject)=>{
         const tx=db.transaction('lyrics','readwrite'),store=tx.objectStore('lyrics'),request=store.openCursor();
         request.onsuccess=()=>{const cursor=request.result;if(!cursor)return;const value=cursor.value;
-          if(value.data?.providerTrackId===613){
-            value.data.readingLanguageVersion='multilingual-reading-v2';
-            value.data.lines=value.data.lines.map(line=>({...line,romanized:'obsolete guide',readingEngine:'multilingual-reading-v2:te'}));
-            if(value.guides?.te){value.guides.te.engine='multilingual-reading-v2:te';value.guides.te.lines=value.guides.te.lines.map(line=>({...line,romanized:'obsolete guide',readingEngine:'multilingual-reading-v2:te'}));}
+          if(value.data?.providerTrackId===providerId){
+            value.data.readingLanguage=null;
+            value.data.readingLanguageSource='detected';
+            value.data.readingLanguageVersion='multilingual-reading-v3';
+            value.data.lines=value.data.lines.map(line=>{
+              const {romanized,readingEngine,readingReviewNeeded,...original}=line;
+              void romanized;void readingEngine;void readingReviewNeeded;return original;
+            });
+            delete value.guides;
             cursor.update(value);
           }cursor.continue();};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
       });db.close();
-    });
+    },611+tamilIndex);
     await page.reload({waitUntil:'domcontentloaded'});dialog=await openPlayer(page);
-    await expect(dialog.getByRole('button',{name:'Open lyrics',exact:true})).toContainText(songs[2].text);
+    await expect(dialog.getByRole('button',{name:'Open lyrics',exact:true})).toContainText(songs[tamilIndex].text);
+    await expect(dialog.getByRole('button',{name:READING_LABELS.ta,exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(dialog.locator('[data-player-reading]')).toHaveCount(0);
-    await expect(page.getByText('obsolete guide',{exact:true})).toHaveCount(0);
     assert.equal(counts.readings,beforeOffline.readings);assert.equal(counts.lyrics,beforeOffline.lyrics);assert.equal(counts.blocked,0);
     r.providers(true);
     await page.evaluate(()=>{localStorage.removeItem('indic-provider-offline');window.dispatchEvent(new Event('online'));});
-    await assertGuide(page,dialog,2);
-    assert.equal(counts.readings,beforeOffline.readings+1,'Reconnect regenerates exactly the obsolete current reading guide');
+    await assertGuide(page,dialog,tamilIndex);
+    assert.equal(counts.readings,beforeOffline.readings+1,'Reconnect prepares exactly one newly supported Tamil guide');
     assert.equal(counts.lyrics,beforeOffline.lyrics,'Pronunciation upgrades do not refetch verified original lyrics');
     await assertSavedOriginals(page);
-    report.checks.push(`${prefix}: an obsolete engine guide is withheld offline while native text survives; reconnect regenerates one guide without lyric refetch or text/timing loss.`);
+    report.checks.push(`${prefix}: native Tamil lyrics saved under v3 gain Tamil detection offline; reconnect prepares one guide without lyric refetch or text/timing loss.`);
     await closeDialog(page,dialog);await page.goto(base+'/settings',{waitUntil:'domcontentloaded'});
     toggle=page.getByRole('button',{name:'Enable transliteration',exact:true});await expect(toggle).toHaveAttribute('aria-pressed','true');await toggle.click();
     await expect.poll(()=>settings.lyricReading===false&&settings.japaneseReading===false).toBe(true);
@@ -349,7 +368,7 @@ async function verify(theme,width) {
       await expect(page.locator('[data-mini-lyric] i')).toHaveCount(0);await closeDialog(page,dialog);
     }
     assert.equal(counts.readings,beforeDisabled,'A saved global disable prepares no new reading requests across languages');
-    report.checks.push(`${prefix}: persisted global disable remains off across all eight languages and prepares no pronunciation work.`);
+    report.checks.push(`${prefix}: persisted global disable remains off across all nine languages and prepares no pronunciation work.`);
     report.rooms.push({theme,width,counts});
   } catch(error) {
     report.pageState={url:page.url(),text:(await page.locator('body').innerText()).slice(0,6000)};

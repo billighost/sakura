@@ -1,0 +1,1110 @@
+{
+  "schema": "tamil-reviewed-initials-v1",
+  "scope": "Individually reviewed exact native forms and preferred initial consonants. Published source tokens establish the chosen variants; metadata distinguishes dictionary or second-source corroboration from published preferred variants without such corroboration. Only initials are used by the engine; native vowel length, nasals, consonants and suffixes are still parsed. No stems or full Roman outputs.",
+  "reviewedAt": "2026-11-14T03:02:25.100555+00:00",
+  "license": "CC-BY-SA-4.0",
+  "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "licenseFile": "CC-BY-SA-4.0.txt",
+  "attribution": "Source publishers and Wiktionary contributors are credited by each entry URL. This collection contains factual lexical choices and source evidence, not complete lyric quotations.",
+  "counts": {
+    "newPreferredForms": 47,
+    "corroboratedPreferredForms": 44,
+    "publishedPreferredFormsWithoutIndependentCorroboration": 3,
+    "protectedCVariants": 2
+  },
+  "entries": [
+    {
+      "word": "குண்டான",
+      "initial": "g",
+      "lemma": "குண்டு",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/donu-donu-donu-song-lyrics/",
+          "sha256": "1113fceca67b7590eb27ff45d85776edaad9efcc1a27e0d4e596400a3734368e",
+          "printedToken": "Gundaana"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%95%E0%AF%81%E0%AE%A3%E0%AF%8D%E0%AE%9F%E0%AF%81",
+          "sha256": "4901031c95608e73c2d81daaa5990b7f46625c91dc884593c9c33d1c993a7ef0",
+          "initialEvidence": [
+            "/kʊɳɖɯ/",
+            "/ɡʊɳɖɯ/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "கெட்டியாக",
+      "initial": "g",
+      "lemma": "கெட்டி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/ottagatha-kattikko-song-lyrics/",
+          "sha256": "2873f78fae3f4c1e292b073073b705d9ca1394a8143a89be8716163e15b042a5",
+          "printedToken": "gettiyaaga"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%95%E0%AF%86%E0%AE%9F%E0%AF%8D%E0%AE%9F%E0%AE%BF",
+          "sha256": "43057ece97cb82577ccb4c7895c9dc83b8887390e0f7b4985269a799b756489a",
+          "initialEvidence": [
+            "/keʈːiː/",
+            "/ɡeʈːiː/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சங்கிலி",
+      "initial": "s",
+      "lemma": "சங்கிலி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/anjali-anjali-song-lyrics-2/",
+          "sha256": "faa5e04949c0d387c20d76208654d6e56cd59bd1e93dc55c5143ec493e3a4c35",
+          "printedToken": "sangili"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%99%E0%AF%8D%E0%AE%95%E0%AE%BF%E0%AE%B2%E0%AE%BF",
+          "sha256": "2bcc9b4273f950b63f5a69baba161faefe86c93c89fa4a355ee9380c7d51c066",
+          "initialEvidence": [
+            "/tʃɐŋɡɪliː/",
+            "[sɐŋɡɪliː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சதிராடுது",
+      "initial": "s",
+      "confidence": "published preferred variant; no independent IPA/second-source corroboration established",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/poongaatru-puthithaanathu-song-lyrics/",
+          "sha256": "24a89c9dfbc14bf04517119bce864a2f91d93bced30307e6e12b53ada74a8538",
+          "printedToken": "sathiraduthu"
+        }
+      ],
+      "corroboration": []
+    },
+    {
+      "word": "சந்தனப்",
+      "initial": "s",
+      "lemma": "சந்தனம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/yaaro-yaarodi-song-lyrics/",
+          "sha256": "5c21abe84ac81c2773f3b68209d4a619d2933da52a86c78dbd05cc3e62c23982",
+          "printedToken": "Sandhana"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%A8%E0%AF%8D%E0%AE%A4%E0%AE%A9%E0%AE%AE%E0%AF%8D",
+          "sha256": "e31b3ddc851e48ed615b54a4dd4293d78205ba59de02d0d43d1ddd6cd0456883",
+          "initialEvidence": [
+            "/tʃɐnd̪ɐnɐm/",
+            "[sɐn̪d̪ɐnɐm]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சந்தோஷம்",
+      "initial": "s",
+      "lemma": "சந்தோஷம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/mudhal-mudhalai-song-lyrics/",
+          "sha256": "7d42d5320f0d087d46d1b1f785b1f2100a731884c8a9acf51854fbc752cc8071",
+          "printedToken": "santhosham"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%A8%E0%AF%8D%E0%AE%A4%E0%AF%8B%E0%AE%B7%E0%AE%AE%E0%AF%8D",
+          "sha256": "b56003aaae60ff233b4ebece067562c6ff3a152093f0919d32452f2818b3cc65",
+          "initialEvidence": [
+            "/tʃɐnd̪oːʃɐm/",
+            "[sɐn̪d̪oːʃɐm]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சமத்து",
+      "initial": "c",
+      "variant": "Reviewed c/ch preferred variant",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/iyengaaru-veetu-azhage-song-lyrics/",
+          "sha256": "46777db8aee810bce68bc78b37b08a9d85c9331b3f9ec82b530504a1ecbf51ad",
+          "printedToken": "chamathu"
+        }
+      ]
+    },
+    {
+      "word": "சலசல",
+      "initial": "s",
+      "lemma": null,
+      "sources": [
+        {
+          "url": "https://bharatlyrics.com/kannodu-kanbathellam-lyrics/",
+          "sha256": "d5a532bcec7cec784c9b95648e9e2d38fdeb51ea3db6eeb7b1feb4551f1c41c8",
+          "printedToken": "Salasala"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Tamil2Lyrics",
+          "url": "https://www.tamil2lyrics.com/lyrics/kannodu-kanbathellam-song-lyrics/",
+          "sha256": "0f70b7aa0f3d9e5c6d7b9630efa135e295dad4b7dc174425577bb1fb7731a762",
+          "initialEvidence": [
+            "Salasala"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சாஞ்ச",
+      "initial": "s",
+      "lemma": "சாய்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/yaaro-yaarodi-song-lyrics/",
+          "sha256": "5c21abe84ac81c2773f3b68209d4a619d2933da52a86c78dbd05cc3e62c23982",
+          "printedToken": "Saanja"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BE%E0%AE%AF%E0%AF%8D",
+          "sha256": "96bf3564ae26e857540bd924fa0c4a59e485af83d2a33da9baa68d10d5130f08",
+          "initialEvidence": [
+            "/tʃɑːj/",
+            "[sɑːj]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சாமி",
+      "initial": "s",
+      "lemma": "சாமி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/suthuthe-suthuthe-bhoomi-song-lyrics/",
+          "sha256": "2cc7d03ffc5ddb6f3f9e24d28e47c096969d4def90637a44b1e6cad8e9f6dde5",
+          "printedToken": "saami"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BE%E0%AE%AE%E0%AE%BF",
+          "sha256": "a1dacb55263ea4c9fd1ae93305b6d18fdb833a0b9a586eeffb267ff6a7440648",
+          "initialEvidence": [
+            "/tʃɑːmiː/",
+            "[sɑːmiː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சாரல்",
+      "initial": "s",
+      "lemma": "சாரல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/megham-karukkatha-song-lyrics/",
+          "sha256": "08ab3143e23ee399179f2074809c0e1b9ed3166988eaf076f8630815137c5b95",
+          "printedToken": "Saaral"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BE%E0%AE%B0%E0%AE%B2%E0%AF%8D",
+          "sha256": "2402540d669971b3ea94cb8fa4c63d61dfa0a5a00ae943d56f64462fd5e6da24",
+          "initialEvidence": [
+            "/tʃɑːɾɐl/",
+            "[sɑːɾɐl]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிதைக்கிறதே",
+      "initial": "s",
+      "lemma": "சிதை",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/nee-illamal-valvathu-lesa-song-lyrics/",
+          "sha256": "d5b628b0e8d3d705e647d8bfa78c626de3af26ce6ef6ae590be8ff2a9ec61966",
+          "printedToken": "sithaikiradhae"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%A4%E0%AF%88",
+          "sha256": "2a420e99344df23d04ef5acf68910c211df1c08f89c111519f44e050ca3c6bd6",
+          "initialEvidence": [
+            "/tʃɪd̪ɐɪ̯/",
+            "[sɪd̪ɐɪ̯]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிநேகிதனே",
+      "initial": "s",
+      "lemma": "சிநேகிதன்",
+      "sources": [
+        {
+          "url": "https://bharatlyrics.com/snehithane-snehithane-lyrics/",
+          "sha256": "f71d403df935bc334995ae19dfc198561943aef5fcae1f1be07bc4975bdcd868",
+          "printedToken": "snehidhanae"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%A8%E0%AF%87%E0%AE%95%E0%AE%BF%E0%AE%A4%E0%AE%A9%E0%AF%8D",
+          "sha256": "903a91605f10464fb0f9a681b8186072b4cdbc57920c1c4495d3c4e76ef432dc",
+          "initialEvidence": [
+            "/tʃɪneːɡɪd̪ɐn/",
+            "[sɪneːɡɪd̪ɐn]",
+            "/sneːhɪd̪ɐn/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிரிச்சா",
+      "initial": "s",
+      "lemma": "சிரி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/kanja-poovu-kannala-song-lyrics/",
+          "sha256": "50a056c6f5d0b02a8e3289b51dde58770c50a6f7e2d25a4c09f5bd9c64081c44",
+          "printedToken": "siricha"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%B0%E0%AE%BF",
+          "sha256": "fcf2c2eada841391a73ccd2fa93e0380125829ac7fc85b1b89b3656f0b8a4cc6",
+          "initialEvidence": [
+            "/tʃɪɾiː/",
+            "[sɪɾiː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிரிப்பவள்",
+      "initial": "s",
+      "lemma": "சிரி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/telephone-manipol-song-lyrics/",
+          "sha256": "eeddbd818a98e2b2a61575cf7edeaa7e18ff3adf105c290f5bce34a9b51cd1c5",
+          "printedToken": "sirippaval"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%B0%E0%AE%BF",
+          "sha256": "fcf2c2eada841391a73ccd2fa93e0380125829ac7fc85b1b89b3656f0b8a4cc6",
+          "initialEvidence": [
+            "/tʃɪɾiː/",
+            "[sɪɾiː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிரிப்பிலும்",
+      "initial": "s",
+      "lemma": "சிரி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/hasili-fisiliye-song-lyrics/",
+          "sha256": "da57bc647127656812aea10cdba7841f6fec45f7fde6a2c7f0c439147f4c08e6",
+          "printedToken": "sirippilum"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%B0%E0%AE%BF",
+          "sha256": "fcf2c2eada841391a73ccd2fa93e0380125829ac7fc85b1b89b3656f0b8a4cc6",
+          "initialEvidence": [
+            "/tʃɪɾiː/",
+            "[sɪɾiː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிலிர்த்து",
+      "initial": "s",
+      "lemma": "சிலிர்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/innisai-alapedaye-song-lyrics/",
+          "sha256": "5e62e936d9446434a001fb8684dbd3ccf4ff1f88d547dc125bcdc1c70d8d64b1",
+          "printedToken": "silirthu"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AE%BF%E0%AE%B2%E0%AE%BF%E0%AE%B0%E0%AF%8D",
+          "sha256": "85bc2bb20cf5aa7fce5322f5e591b00b6a4944c5b430a18d318127b5bbc2bb5f",
+          "initialEvidence": [
+            "/tʃɪlɪɾ/",
+            "[sɪlɪɾ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சிலுசிலுப்பாக",
+      "initial": "s",
+      "confidence": "published preferred variant; no independent IPA/second-source corroboration established",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/aga-naga-song-lyrics/",
+          "sha256": "6920303278dace140577aac55415c16f47b55359eb079b375e8f8e0464902aeb",
+          "printedToken": "Silu silupaaga"
+        }
+      ],
+      "corroboration": []
+    },
+    {
+      "word": "சில்மிஷம்",
+      "initial": "s",
+      "confidence": "published preferred variant; no independent IPA/second-source corroboration established",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/aga-naga-song-lyrics/",
+          "sha256": "6920303278dace140577aac55415c16f47b55359eb079b375e8f8e0464902aeb",
+          "printedToken": "silmisham"
+        }
+      ],
+      "corroboration": []
+    },
+    {
+      "word": "சுட",
+      "initial": "s",
+      "lemma": "சுடு",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/thuli-thuli-thuli-mazhaiyaai-song-lyrics/",
+          "sha256": "cc1eb5c9cf76ef08fa5c8458e6e58faaa73c4c32eb980e3790caf1c0afdc3ea0",
+          "printedToken": "Suda"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%81%E0%AE%9F%E0%AF%81",
+          "sha256": "8f19665ed497e9c61f1f1c6f92d9e413f12f593dbe80fce8fd5bb4f9e940c030",
+          "initialEvidence": [
+            "/tʃʊɖɯ/",
+            "[sʊɖɯ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சுத்துதே",
+      "initial": "s",
+      "lemma": "சுத்து",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/suthuthe-suthuthe-bhoomi-song-lyrics/",
+          "sha256": "2cc7d03ffc5ddb6f3f9e24d28e47c096969d4def90637a44b1e6cad8e9f6dde5",
+          "printedToken": "Suthudhae"
+        },
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/boomi-enna-suthudhae-song-lyrics/",
+          "sha256": "30145eb7dabecd452c2cfdb2508ddcfa1d552c15e45b33161a4103e2145275fd",
+          "printedToken": "Suthudhae"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%81%E0%AE%A4%E0%AF%8D%E0%AE%A4%E0%AF%81",
+          "sha256": "39a0b226b3ccec986a4650f3fb53e6fc7d464f8e8b1669422a359d868c5fd914",
+          "initialEvidence": [
+            "/tʃʊt̪ːɯ/",
+            "[sʊt̪ːɯ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "செஞ்சிட்டாளே",
+      "initial": "s",
+      "lemma": "செய்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/senjitaley-song-lyrics/",
+          "sha256": "ae320ed5dd3ac5f4f590ec7c68fb1991915a9af9b23603cd9c9128e6d17c35e4",
+          "printedToken": "senjitaley"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%AF%E0%AF%8D",
+          "sha256": "438dc616ba066395c6c25482187d501be72d1f31eb9962e1cd0ca8ae1f1d439d",
+          "initialEvidence": [
+            "/tʃej/",
+            "[sej]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சென்டிமீட்டர்",
+      "initial": "s",
+      "lemma": "centimetre",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/smayiyai-song-lyrics/",
+          "sha256": "28a2665b500f79f0dcbf0e18bddb1bc661d8320275911553c704d2a527227090",
+          "printedToken": "centimetre"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/centimetre",
+          "sha256": "4b5b597661a25e9e3ddb5b965d10a6af7ee8be269c86eacca244acd6dd3a8c3e",
+          "initialEvidence": [
+            "/ˈsɛn.tɪ.miː.tə/",
+            "/ˈsɑ̃.-/",
+            "/ˈsɒn.-/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சென்று",
+      "initial": "s",
+      "lemma": "செல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/lolita-ha-lolita-song-lyrics/",
+          "sha256": "85e7e875bf14cedd88e39cd545301b9f0ae2b35b2a62559d41c70608e2ae7a02",
+          "printedToken": "sendru"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%B2%E0%AF%8D",
+          "sha256": "664ba512afb1c1a8d02dfa2999c4b8e204ba65b356a7bddf4b9991f0ea960274",
+          "initialEvidence": [
+            "/tʃel/",
+            "[sel]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "செய்தாய்",
+      "initial": "s",
+      "lemma": "செய்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/po-nee-po-song-lyrics/",
+          "sha256": "32691433819bd76dc731c112948d0b9c225f319ec022bd9fa5ebe189ce0ac8cc",
+          "printedToken": "seidhaai"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%AF%E0%AF%8D",
+          "sha256": "438dc616ba066395c6c25482187d501be72d1f31eb9962e1cd0ca8ae1f1d439d",
+          "initialEvidence": [
+            "/tʃej/",
+            "[sej]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "செய்யும்",
+      "initial": "s",
+      "lemma": "செய்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/maya-machindhra-song-lyrics/",
+          "sha256": "631d4e2c2f7fa434418816709cee8231c82b1106a656dbe766fda4378d13fbfb",
+          "printedToken": "seiyum"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%AF%E0%AF%8D",
+          "sha256": "438dc616ba066395c6c25482187d501be72d1f31eb9962e1cd0ca8ae1f1d439d",
+          "initialEvidence": [
+            "/tʃej/",
+            "[sej]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "செல்கிறாய்",
+      "initial": "s",
+      "lemma": "செல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/lolita-ha-lolita-song-lyrics/",
+          "sha256": "85e7e875bf14cedd88e39cd545301b9f0ae2b35b2a62559d41c70608e2ae7a02",
+          "printedToken": "selgiraai"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%B2%E0%AF%8D",
+          "sha256": "664ba512afb1c1a8d02dfa2999c4b8e204ba65b356a7bddf4b9991f0ea960274",
+          "initialEvidence": [
+            "/tʃel/",
+            "[sel]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "செவி",
+      "initial": "s",
+      "lemma": "செவி",
+      "sources": [
+        {
+          "url": "https://bharatlyrics.com/snehithane-snehithane-lyrics/",
+          "sha256": "f71d403df935bc334995ae19dfc198561943aef5fcae1f1be07bc4975bdcd868",
+          "printedToken": "Sevikodu"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%86%E0%AE%B5%E0%AE%BF",
+          "sha256": "a42149f1431c3cc629ebb0e53bce3210c34187915a319f410bd74539632e3379",
+          "initialEvidence": [
+            "/tʃeʋiː/",
+            "[seʋiː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சேதி",
+      "initial": "s",
+      "lemma": "சேதி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/sundari-kannaal-oru-song-lyrics/",
+          "sha256": "9054b99e1e1baf7ead3c27a7d8258efb48297db9d7654ec26dd1e3cacd562947",
+          "printedToken": "seithi"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%87%E0%AE%A4%E0%AE%BF",
+          "sha256": "d68c0edfe84ec6eca574fe3f384fe0d001fd41cf9b37db606ccf0eb2ed53a704",
+          "initialEvidence": [
+            "/tʃeːd̪iː/",
+            "[seːd̪iː]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சேரட்டும்",
+      "initial": "s",
+      "lemma": "சேர்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/neeyum-naanum-song-lyrics/",
+          "sha256": "1dfd92d6670f493728608244db94098c861bb3389d2199175ae27c8d6074af3c",
+          "printedToken": "serattum"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%87%E0%AE%B0%E0%AF%8D",
+          "sha256": "0f6f4c646489b454e517cfd98b519b008b62665ea70ffef5266dc96a9b3c42f5",
+          "initialEvidence": [
+            "/tʃeːɾ/",
+            "[seːɾ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சேராமலே",
+      "initial": "s",
+      "lemma": "சேர்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/po-indru-neeyaga-song-lyrics/",
+          "sha256": "1567c68daec1db46e4627abb0c847d7659738c4f5cc1f1b9d69c71da3ef82232",
+          "printedToken": "seramalae"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%87%E0%AE%B0%E0%AF%8D",
+          "sha256": "0f6f4c646489b454e517cfd98b519b008b62665ea70ffef5266dc96a9b3c42f5",
+          "initialEvidence": [
+            "/tʃeːɾ/",
+            "[seːɾ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சைவ",
+      "initial": "s",
+      "lemma": "சைவம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/andangkaka-song-lyrics/",
+          "sha256": "424f5b84fd8d9464c25e691c0e46d5c1269707e09145e24920e4042f551157ef",
+          "printedToken": "saiva"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%88%E0%AE%B5%E0%AE%AE%E0%AF%8D",
+          "sha256": "935408874f090691a3a6a179086def5a1af38214d7fdf1e67fb4178400271fa2",
+          "initialEvidence": [
+            "/tʃɐɪ̯ʋɐm/",
+            "[sɐɪ̯ʋɐm]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொட்டும்",
+      "initial": "s",
+      "lemma": "சொட்டு",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/aga-naga-song-lyrics/",
+          "sha256": "6920303278dace140577aac55415c16f47b55359eb079b375e8f8e0464902aeb",
+          "printedToken": "sottum"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%9F%E0%AF%8D%E0%AE%9F%E0%AF%81",
+          "sha256": "ee239b04e5c9b830030d49793aba4dea9b89eabca2d1a6066614d8a7bf405f3a",
+          "initialEvidence": [
+            "/tʃoʈːɯ/",
+            "[soʈːɯ]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொன்னானா",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/thillaana-thillaana-song-lyrics/",
+          "sha256": "6423aafc36204e75309d722532127eaea118a359181cb250ff0318d260ebb4f1",
+          "printedToken": "sonnanaa"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/kadhal-rojavae-song-lyrics/",
+          "sha256": "2a8ea0225f8e20ed2a076fec937b147eabe141026a161cf34ef415a6e0688e88",
+          "printedToken": "sol"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்கிறாய்",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/kannazhaga-the-kiss-of-love-song-lyrics/",
+          "sha256": "41f2b5c0cb71a7578776c24f46a064a382999bd04f216befca19cd95a7977e87",
+          "printedToken": "solgiraai"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்ல",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://bharatlyrics.com/kadhal-sadugudu-lyrics/",
+          "sha256": "310c4f93d071d4fb0e19b50e699d30ea327b83192ada05f932588fd73f2cb7c4",
+          "printedToken": "solla"
+        },
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/en-kaadhal-solla-song-lyrics/",
+          "sha256": "73b2f4d1b17e0597df9023747855a91fb51cd844023708d5c71040ed072594f7",
+          "printedToken": "solla"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்லடா",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/thamizha-thamizha-song-lyrics/",
+          "sha256": "0c5b924c96c9985ea3639d919040b27134131d1f23c1f8b7a03f887650244f83",
+          "printedToken": "sollada"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்லடி",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/sundari-kannaal-oru-song-lyrics/",
+          "sha256": "9054b99e1e1baf7ead3c27a7d8258efb48297db9d7654ec26dd1e3cacd562947",
+          "printedToken": "Solladi"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்லவே",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/ondra-renda-aasaigal-song-lyrics/",
+          "sha256": "dbc90db744dcf850b3a37fec177a9616cd1d63f7b3c7d35693103e84ea3e1944",
+          "printedToken": "sollavae"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்லாமல்",
+      "initial": "s",
+      "lemma": "சொல்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/nee-illamal-valvathu-lesa-song-lyrics/",
+          "sha256": "d5b628b0e8d3d705e647d8bfa78c626de3af26ce6ef6ae590be8ff2a9ec61966",
+          "printedToken": "Sollaamal"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%9A%E0%AF%8A%E0%AE%B2%E0%AF%8D",
+          "sha256": "fcf9ce1bcc4f9188719d29325724a3fadc2c80e75108c1a2634d72974b24956a",
+          "initialEvidence": [
+            "/tʃol/",
+            "[sol]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "சொல்வது",
+      "initial": "c",
+      "variant": "Reviewed c/ch preferred variant",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/oh-sukumari-song-lyrics/",
+          "sha256": "6c8e4399968b465753f85180df27d480eed49a36c5dbb7ac8fab766dd98932eb",
+          "printedToken": "cholvadhillai"
+        }
+      ]
+    },
+    {
+      "word": "தேகம்",
+      "initial": "d",
+      "lemma": "தேகம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/megham-karukkatha-song-lyrics/",
+          "sha256": "08ab3143e23ee399179f2074809c0e1b9ed3166988eaf076f8630815137c5b95",
+          "printedToken": "Dhegam"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%A4%E0%AF%87%E0%AE%95%E0%AE%AE%E0%AF%8D",
+          "sha256": "2584e7f4e9b11a5dee05363fe0c6cd79efbd39c073315df6125cdf7dbf5f0ea7",
+          "initialEvidence": [
+            "/t̪eːɡam/",
+            "[d̪eːɡam]",
+            "[d̪eːham]",
+            "[t̪eːham]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "தேசம்",
+      "initial": "d",
+      "lemma": "தேசம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/raja-raja-chozhan-song-lyrics/",
+          "sha256": "4e7fa305d3c0ee27242599837808c9eca5b5d79d4b9c65c298f980642d6176c6",
+          "printedToken": "dhesam"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%A4%E0%AF%87%E0%AE%9A%E0%AE%AE%E0%AF%8D",
+          "sha256": "479ca9b1fe53d788887796c1d0ead40ecfb67cbd33445a8b6cbf38cb3e166c0f",
+          "initialEvidence": [
+            "/d̪eːtʃɐm/",
+            "[d̪eːsɐm]",
+            "/t̪eːtʃɐm/",
+            "[t̪eːsɐm]"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "தேவன்",
+      "initial": "d",
+      "lemma": "தேவன்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/ethir-neechal-adi-song-lyrics/",
+          "sha256": "2365de2ea63905cc6b1ab0e5e3219f3dc5e42447270bb26f42ca5e5d81d3132a",
+          "printedToken": "Devan"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%A4%E0%AF%87%E0%AE%B5%E0%AE%A9%E0%AF%8D",
+          "sha256": "e69b8c23d4a4303c75b509cd93d006ed540a5a0643d03b93a434029f49267431",
+          "initialEvidence": [
+            "/t̪eːʋɐn/",
+            "/d̪eːʋɐn/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "பதில்",
+      "initial": "b",
+      "lemma": "பதில்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/mukkabla-song-lyrics/",
+          "sha256": "64ca043e51494342d31b9823ec45b04e94fffca31f8b8a078070d1332b643f10",
+          "printedToken": "Badhil"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%AA%E0%AE%A4%E0%AE%BF%E0%AE%B2%E0%AF%8D",
+          "sha256": "be2ad6b144f87675c75e797d7650133be5aaaef4d1d65327a47366324c2da5a0",
+          "initialEvidence": [
+            "/pɐd̪ɪl/",
+            "/bɐd̪ɪl/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "பிம்ப",
+      "initial": "b",
+      "lemma": "பிம்பம்",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/nenjil-nenjil-idho-idho-song-lyrics/",
+          "sha256": "1210ea53850b33c4e6cd75b347230a764bf91561fec8dcd6083d6a9091520894",
+          "printedToken": "bimba"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%AA%E0%AE%BF%E0%AE%AE%E0%AF%8D%E0%AE%AA%E0%AE%AE%E0%AF%8D",
+          "sha256": "e19fbd8e7212d2842eedf0aa287f23007f6de06cbcfeae1a35a018c7fe29e274",
+          "initialEvidence": [
+            "/bɪmbɐm/",
+            "/pɪmbɐm/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "பூமி",
+      "initial": "b",
+      "lemma": "பூமி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/suthuthe-suthuthe-bhoomi-song-lyrics/",
+          "sha256": "2cc7d03ffc5ddb6f3f9e24d28e47c096969d4def90637a44b1e6cad8e9f6dde5",
+          "printedToken": "boomi"
+        },
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/boomi-enna-suthudhae-song-lyrics/",
+          "sha256": "30145eb7dabecd452c2cfdb2508ddcfa1d552c15e45b33161a4103e2145275fd",
+          "printedToken": "boomi"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%AA%E0%AF%82%E0%AE%AE%E0%AE%BF",
+          "sha256": "bd28051453bbf835da12165e4c571f134b2bfeaf976c464ca0b9e2fd67a972b5",
+          "initialEvidence": [
+            "/buːmiː/"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "பூமியை",
+      "initial": "b",
+      "lemma": "பூமி",
+      "sources": [
+        {
+          "url": "https://www.tamil2lyrics.com/lyrics/oruvan-oruvan-song-lyrics/",
+          "sha256": "7f4a3fc06c275797a2db3c1e867e87b22cf8dedc473fbf00dbc3656a22ff1789",
+          "printedToken": "Boomiyai"
+        }
+      ],
+      "corroboration": [
+        {
+          "publisher": "Wiktionary contributors",
+          "url": "https://en.wiktionary.org/wiki/%E0%AE%AA%E0%AF%82%E0%AE%AE%E0%AE%BF",
+          "sha256": "bd28051453bbf835da12165e4c571f134b2bfeaf976c464ca0b9e2fd67a972b5",
+          "initialEvidence": [
+            "/buːmiː/"
+          ]
+        }
+      ]
+    }
+  ]
+}

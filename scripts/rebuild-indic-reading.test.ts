@@ -10,7 +10,7 @@ import { upgradeCachedLyricReadings } from "../src/rebuild/player/readingCacheUp
 import { READING_SONG_EXCERPTS } from "./fixtures/reading-song-excerpts";
 import type { PlayerLyrics } from "../src/rebuild/player/useLyrics";
 
-const added = ["te", "kn", "ml", "or", "sr", "ka"] as const;
+const added = ["te", "kn", "ml", "or", "sr", "ka", "ta"] as const;
 const cacheKey = (hint?: string) => JSON.stringify(["verified-lyrics-v3", "song", ["artist"], "album", 180, "Original recording", hint, null]);
 const saved = (text: string): PlayerLyrics => ({ schemaVersion: "verified-lyrics-v3", lines: [{ text, start: 12, end: 16, words: [{ text, start: 12.2, end: 15.8 }] }], timing: "synced", provider: "verified fixture", providerTrackId: 451, hasJapanese: false });
 
@@ -60,8 +60,8 @@ test("native scripts and reliable ISO/name/BCP 47 hints resolve languages withou
     const song = READING_SONG_EXCERPTS.find(song => song.language === language)!;
     for (const hint of hints) assert.equal(lyricReadingLanguage(song.text, hint), null, `${language}/${hint}: the script is shared`);
   }
-  for (const text of ["தமிழ் பாடல் வரிகள்", "বাংলা গান", "ਪੰਜਾਬੀ ਗੀਤ", "ગુજરાતી ગીત", "เพลงไทย", "עברית", "հայերեն"]) assert.equal(lyricReadingLanguage(text), null, text);
-  assert.equal(lyricReadingLanguage("தமிழ் பாடல் வரிகள் தமிழ் பாடல் வரிகள் हम", "ta"), null, "an unsupported primary script outweighs a short Hindi refrain");
+  for (const text of ["বাংলা গান", "ਪੰਜਾਬੀ ਗੀਤ", "ગુજરાતી ગીત", "เพลงไทย", "עברית", "հայերեն"]) assert.equal(lyricReadingLanguage(text), null, text);
+  assert.equal(lyricReadingLanguage("தமிழ் பாடல் வரிகள் தமிழ் பாடல் வரிகள் हम", "ta"), "ta", "Tamil primary lyrics outweigh a short Hindi refrain");
   assert.equal(lyricReadingLanguage("Hello Latin lyrics", "te"), null);
 });
 
@@ -135,7 +135,7 @@ test("reliable original-language hints survive mixed scripts and distinguish cac
 test("reading request validation accepts every added language and bounds optional hint evidence", () => {
   for (const language of added) assert.equal(parseReadingRequest({ language, lines: ["native fixture"] }).language, language);
   assert.equal(parseReadingRequest({ language: "te", languageHint: "Marathi", lines: ["అమ్మ मन"] }).languageHint, "mr");
-  for (const language of ["ta", "bn", "pa", "gu", "mr", "ne", "bg", "mk", "hy", "th", "he", "fa"]) assert.throws(() => parseReadingRequest({ language, lines: ["fixture"] }), LyricRequestError);
+  for (const language of ["bn", "pa", "gu", "mr", "ne", "bg", "mk", "hy", "th", "he", "fa"]) assert.throws(() => parseReadingRequest({ language, lines: ["fixture"] }), LyricRequestError);
   for (const languageHint of [42, {}, "a".repeat(49)]) assert.throws(() => parseReadingRequest({ language: "te", languageHint, lines: ["అమ్మ"] }), LyricRequestError);
   assert.notEqual(japaneseReadingCacheKey(["東京 мова"], "song", "review-1", "uk"), japaneseReadingCacheKey(["東京 мова"], "song", "review-1", "ru"));
   assert.notEqual(japaneseReadingCacheKey(["炎"], "song", "review-1", "ja"), japaneseReadingCacheKey(["炎"], "song", "review-2", "ja"));

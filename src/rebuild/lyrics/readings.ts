@@ -110,6 +110,7 @@ export async function romanizeLyricLines<T extends { text: string }>(lines: read
       [indicReadingLanguage("kn", hinted), /\p{Script=Kannada}[\p{Script=Kannada}\p{M}\u200c\u200d]*/gu],
       [indicReadingLanguage("ml", hinted), /\p{Script=Malayalam}[\p{Script=Malayalam}\p{M}\u200c\u200d]*/gu],
       [indicReadingLanguage("or", hinted), /\p{Script=Oriya}[\p{Script=Oriya}\p{M}\u200c\u200d]*/gu],
+      [indicReadingLanguage("ta", hinted), /\p{Script=Tamil}[\p{Script=Tamil}\p{M}\u200c\u200d]*/gu],
       [hinted === "xmf" || hinted === "sva" || hinted === "lzz" ? null : "ka", /\p{Script=Georgian}[\p{Script=Georgian}\p{M}]*/gu],
     ];
     for (const [spanLanguage, expression] of scripts) {

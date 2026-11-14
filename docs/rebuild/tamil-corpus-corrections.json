@@ -1,0 +1,22 @@
+[
+  {
+    "songId": "telephone-manipol",
+    "nativeWord": "மெல்பௌன்",
+    "originalExpectedExcerpt": "maṇi pōl sirippavaḷ ivaḷā melpauṉ malar pōl melliya magaḷā",
+    "correctedExpectedExcerpt": "maṇi pōl sirippavaḷ ivaḷā melbauṉ malar pōl melliya magaḷā",
+    "reason": "The hybrid guide convention already voices singleton ப after medial ல். Printed Melbourne independently selects b for this borrowed name; expected p is an unsupported exception to the stated conventional rule. Keep written e/au/ṉ and do not substitute the English spelling.",
+    "sourceURL": "https://www.tamil2lyrics.com/lyrics/telephone-manipol-song-lyrics/",
+    "sourceBodySha256": "eeddbd818a98e2b2a61575cf7edeaa7e18ff3adf105c290f5bce34a9b51cd1c5",
+    "printedToken": "Melbourne"
+  },
+  {
+    "songId": "kan-pesum-varthaigal",
+    "nativeWord": "கனிவதில்லை",
+    "originalExpectedExcerpt": "kaṇ pēsum vārttaigaḷ purivadillai kāttirundāl peṇ kanivadillai",
+    "correctedExpectedExcerpt": "kaṇ pēsum vārttaigaḷ purivadillai kāttirundāl peṇ kaṉivadillai",
+    "reason": "Written ன is literal alveolar ṉ. Popular kanivadhillai does not distinguish ந/ன and cannot override the declared ISO letter distinction.",
+    "sourceURL": "https://www.tamil2lyrics.com/lyrics/kan-pesum-varthaigal-song-lyrics/",
+    "sourceBodySha256": "b3a6fd09c7d5709c701fe34760d0615beca0344df193da794092ac2996c4a555",
+    "printedToken": "kanivadhillai"
+  }
+]

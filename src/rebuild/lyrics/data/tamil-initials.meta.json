@@ -1,0 +1,9052 @@
+{
+  "schema": "tamil-initials-v1",
+  "dataset": "Dakshina v1.0 (2020)",
+  "authors": "Brian Roark, Lawrence Wolf-Sonkin, Christo Kirov, Sabrina J. Mielke, Cibu Johny, Işın Demirşahin and Keith Hall",
+  "source": "https://github.com/google-research-datasets/dakshina",
+  "archive": "https://storage.googleapis.com/gresearch/dakshina/dakshina_dataset_v1.0.tar",
+  "paper": "https://aclanthology.org/2020.lrec-1.294/",
+  "license": "CC-BY-SA-4.0",
+  "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "licenseFile": "CC-BY-SA-4.0.txt",
+  "adaptation": "Exact NFC words reduced to preferred initial consonant only. Whole-word coarse vowel/consonant alignment validates human annotations; all original attestations must agree with at least three votes. No stemming, majority lookup or complete Roman-output substitution.",
+  "validation": "Coarse vowel identity (length ignored for validation only); aa/ii/uu/ae/oa, ee→i, oo→u; conventional consonant digraphs and stop voicing folded for validation only; explicit Tamil alveolar clusters may match ttr/ndr. Unknown and rejected votes remain in the denominator.",
+  "reproducibility": "node scripts/rebuild-tamil-lexicon.mjs --input .local/tamil-dakshina --check",
+  "inputs": {
+    "ta.translit.sampled.dev.tsv": {
+      "archivePath": "dakshina_dataset_v1.0/ta/lexicons/ta.translit.sampled.dev.tsv",
+      "sha256": "c5bb92e01c7a2a1d1b8d18463d690519a8100fa14dbde7b38ea3e366df7a0bf8",
+      "bytes": 260529,
+      "rows": 6827
+    },
+    "ta.translit.sampled.test.tsv": {
+      "archivePath": "dakshina_dataset_v1.0/ta/lexicons/ta.translit.sampled.test.tsv",
+      "sha256": "062fdc82d1d8cb035edfc92895e794de2b8491c287ba285cabe22930a8ea2c3c",
+      "bytes": 265530,
+      "rows": 6864
+    },
+    "ta.translit.sampled.train.tsv": {
+      "archivePath": "dakshina_dataset_v1.0/ta/lexicons/ta.translit.sampled.train.tsv",
+      "sha256": "085760e523562b46103b16cfb60a0fd2c5c703bc93e57d9ed2e949e428d172b1",
+      "bytes": 2771596,
+      "rows": 68218
+    }
+  },
+  "counts": {
+    "nativeWords": 30000,
+    "annotationRows": 81909,
+    "attestations": 127982,
+    "candidateWords": 13886,
+    "approvedWords": 5541,
+    "changedInitials": 1123,
+    "alignedForms": 27087,
+    "rejectedForms": 14034
+  },
+  "evidence": {
+    "கங்கையைப்": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "gangaiyaip": 3,
+        "gangaiyaiph": 1
+      }
+    },
+    "கணபதி": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganapathi": 3
+      }
+    },
+    "கணபதிக்கு": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "ganabathikku": 1,
+        "ganapathikku": 3
+      }
+    },
+    "கணபதிப்பிள்ளை": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganapathippillai": 3
+      }
+    },
+    "கணபதியின்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganapathiyin": 3
+      }
+    },
+    "கணபதியே": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganapathiyae": 1,
+        "ganapathiye": 2
+      }
+    },
+    "கணேசன்": {
+      "initial": "g",
+      "attestations": 5,
+      "romanizations": {
+        "ganesan": 5
+      }
+    },
+    "கணேசர்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganesar": 3
+      }
+    },
+    "கணேஸ்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "ganes": 1,
+        "ganesh": 2
+      }
+    },
+    "கருடன்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "garudan": 3
+      }
+    },
+    "கருடா": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "garuda": 3
+      }
+    },
+    "காந்தியடிகளின்": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "gandhiyadigalin": 3,
+        "ganthiyadikalin": 1
+      }
+    },
+    "காந்தியடிகள்": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "gandhiyadigal": 3,
+        "gandhiyadikal": 1
+      }
+    },
+    "காந்தியம்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gandhiyam": 3
+      }
+    },
+    "காந்தியால்": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "gandhiyaal": 3,
+        "ganthiyaal": 1
+      }
+    },
+    "காந்தியின்": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "gandhiyin": 3,
+        "ganthiyin": 1
+      }
+    },
+    "கிரிதரன்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "giridharan": 2,
+        "giritharan": 1
+      }
+    },
+    "குணசித்திர": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gunachiththira": 2,
+        "gunasiththira": 1
+      }
+    },
+    "குணத்தைக்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gunaththaik": 3
+      }
+    },
+    "குணா": {
+      "initial": "g",
+      "attestations": 4,
+      "romanizations": {
+        "guna": 2,
+        "gunaa": 2
+      }
+    },
+    "குண்டர்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gundar": 3
+      }
+    },
+    "குருநாதர்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gurunaadhar": 1,
+        "gurunaathar": 1,
+        "gurunathar": 1
+      }
+    },
+    "குருமார்கள்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "gurumaargal": 1,
+        "gurumaarkal": 1,
+        "gurumargal": 1
+      }
+    },
+    "குருவாக": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "guruvaaga": 1,
+        "guruvaaka": 1,
+        "guruvaka": 1
+      }
+    },
+    "குருவான": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "guruvaana": 1,
+        "guruvana": 2
+      }
+    },
+    "குருவின்": {
+      "initial": "g",
+      "attestations": 3,
+      "romanizations": {
+        "guruvin": 3
+      }
+    },
+    "சக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saga": 3,
+        "saka": 1
+      }
+    },
+    "சகல": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sagala": 2,
+        "sakala": 2
+      }
+    },
+    "சகா": {
+      "initial": "s",
+      "attestations": 7,
+      "romanizations": {
+        "saaga": 1,
+        "saga": 1,
+        "sagaa": 4,
+        "sakaa": 1
+      }
+    },
+    "சக்திகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sakthigal": 3,
+        "sakthikal": 1
+      }
+    },
+    "சங்கீத": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sangeetha": 3
+      }
+    },
+    "சட்டசபை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattasabai": 3
+      }
+    },
+    "சட்டசபைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattasabaikku": 3
+      }
+    },
+    "சட்டத்தரணி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththarani": 3
+      }
+    },
+    "சட்டத்தால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththaal": 2,
+        "sattaththal": 1
+      }
+    },
+    "சட்டத்தினால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththinaal": 1,
+        "sattaththinal": 2
+      }
+    },
+    "சட்டத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththin": 3
+      }
+    },
+    "சட்டத்தின்படி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththinpadi": 3
+      }
+    },
+    "சட்டத்திற்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththirku": 3
+      }
+    },
+    "சட்டத்திலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththilum": 3
+      }
+    },
+    "சட்டத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththil": 3
+      }
+    },
+    "சட்டத்துக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththukku": 3
+      }
+    },
+    "சட்டத்துறையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththuraiyil": 3
+      }
+    },
+    "சட்டத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththai": 3
+      }
+    },
+    "சட்டத்தையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaththaiyum": 3
+      }
+    },
+    "சட்டபூர்வ": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattapoorva": 2,
+        "sattapurva": 1
+      }
+    },
+    "சட்டப்படி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattappadi": 3
+      }
+    },
+    "சட்டப்பிரிவு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattappirivu": 3
+      }
+    },
+    "சட்டப்பூர்வமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattappoorvamaaga": 2,
+        "sattappoorvamaga": 1
+      }
+    },
+    "சட்டப்பேரவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattappaeravai": 1,
+        "sattapperavai": 2
+      }
+    },
+    "சட்டப்பேரவையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattappaeravaiyil": 1,
+        "sattapperavaiyil": 2
+      }
+    },
+    "சட்டமன்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamandra": 2,
+        "sattamanra": 1
+      }
+    },
+    "சட்டமன்றத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamandrath": 2,
+        "sattamantrath": 1
+      }
+    },
+    "சட்டமன்றத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamandraththin": 2,
+        "sattamantraththin": 1
+      }
+    },
+    "சட்டமன்றத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamandraththil": 2,
+        "sattamantraththil": 1
+      }
+    },
+    "சட்டமன்றம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamandram": 3
+      }
+    },
+    "சட்டமா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattama": 1,
+        "sattamaa": 2
+      }
+    },
+    "சட்டமானது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sattamaanadhu": 1,
+        "sattamaanathu": 3
+      }
+    },
+    "சட்டமும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattamum": 3
+      }
+    },
+    "சட்டம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattam": 3
+      }
+    },
+    "சட்டரீதியான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattareethiyaana": 3
+      }
+    },
+    "சட்டென்று": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattendru": 2,
+        "sattentru": 1
+      }
+    },
+    "சட்டை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattai": 3
+      }
+    },
+    "சட்டைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaikku": 3
+      }
+    },
+    "சட்டையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaiyin": 3
+      }
+    },
+    "சட்டையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaiyil": 3
+      }
+    },
+    "சட்டையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sattaiyai": 3
+      }
+    },
+    "சணல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sanal": 3
+      }
+    },
+    "சண்டைகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sandaigal": 3,
+        "sandaikal": 1
+      }
+    },
+    "சண்டைக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaik": 3
+      }
+    },
+    "சண்டைக்காட்சியில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaikkaatchiyil": 3
+      }
+    },
+    "சண்டையிடும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyidum": 3
+      }
+    },
+    "சண்டையிட்டனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyittanar": 3
+      }
+    },
+    "சண்டையிட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyittu": 3
+      }
+    },
+    "சண்டையிட்டுக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyittuk": 3
+      }
+    },
+    "சண்டையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyin": 3
+      }
+    },
+    "சண்டையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandaiyil": 3
+      }
+    },
+    "சதம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sadham": 2,
+        "satham": 1
+      }
+    },
+    "சதவிகித": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhavigidha": 1,
+        "sadhavigitha": 1,
+        "sathavigitha": 2
+      }
+    },
+    "சதவிகிதம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhavigidham": 1,
+        "sadhavigitham": 1,
+        "sathavigitham": 2
+      }
+    },
+    "சதவீத": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sadhaveedha": 1,
+        "sathaveetha": 2
+      }
+    },
+    "சதவீதத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sadhaveedhaththil": 1,
+        "sathaveethaththil": 2
+      }
+    },
+    "சதவீதத்தை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhaveedhaththai": 2,
+        "sathaveedhaththai": 1,
+        "sathaveethaththai": 1
+      }
+    },
+    "சதவீதம்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sadhaveedham": 2,
+        "sadhaveetham": 1,
+        "sathaveetham": 2
+      }
+    },
+    "சதா": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sada": 2,
+        "sadaa": 1,
+        "sadha": 1,
+        "sadhaa": 2
+      }
+    },
+    "சதாசிவ": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadasiva": 1,
+        "sadhaasiva": 1,
+        "sadhasiva": 2
+      }
+    },
+    "சதாசிவம்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sadasivam": 1,
+        "sadhaasivam": 1,
+        "sadhasivam": 3
+      }
+    },
+    "சதுக்கத்தில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhukkaththil": 1,
+        "sathukkaththil": 3
+      }
+    },
+    "சதுக்கம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhukkam": 1,
+        "sathukkam": 3
+      }
+    },
+    "சதுப்பு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhuppu": 1,
+        "sathuppu": 3
+      }
+    },
+    "சதுர": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sadhura": 1,
+        "sathura": 3
+      }
+    },
+    "சதுரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sathuram": 3
+      }
+    },
+    "சதைத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sathaith": 3
+      }
+    },
+    "சத்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saththa": 3
+      }
+    },
+    "சத்தி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saththi": 3
+      }
+    },
+    "சத்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saththu": 3
+      }
+    },
+    "சத்துக்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saththukkal": 3
+      }
+    },
+    "சத்யன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sathyan": 3
+      }
+    },
+    "சத்யராஜ்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sathyaraaj": 1,
+        "sathyaraj": 3
+      }
+    },
+    "சத்யா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sathya": 3
+      }
+    },
+    "சத்யாவின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sathyaavin": 2,
+        "sathyavin": 1
+      }
+    },
+    "சந்ததி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhadhi": 1,
+        "santhathi": 2
+      }
+    },
+    "சந்ததிகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sandhadhigal": 2,
+        "santhathikal": 2
+      }
+    },
+    "சந்ததியினர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhadiyinar": 1,
+        "santhathiyinar": 2
+      }
+    },
+    "சந்தன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhana": 1,
+        "santhana": 2
+      }
+    },
+    "சந்தனம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sandhanam": 1,
+        "santhanam": 3
+      }
+    },
+    "சந்தனு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhanu": 1,
+        "santhanu": 2
+      }
+    },
+    "சந்தர்ப்ப": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santharppa": 3
+      }
+    },
+    "சந்தர்ப்பத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santharppaththil": 3
+      }
+    },
+    "சந்தர்ப்பத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santharppaththai": 3
+      }
+    },
+    "சந்தர்ப்பம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santharppam": 3
+      }
+    },
+    "சந்தா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaa": 1,
+        "santha": 1,
+        "santhaa": 1
+      }
+    },
+    "சந்தான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaana": 1,
+        "santhaana": 1,
+        "santhana": 1
+      }
+    },
+    "சந்தானம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaanam": 1,
+        "santhanam": 2
+      }
+    },
+    "சந்தி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhi": 3
+      }
+    },
+    "சந்திக்கின்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhikkinra": 1,
+        "santhikkindra": 2
+      }
+    },
+    "சந்திக்கின்றனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhikkindranar": 1,
+        "sandhikkinranar": 1,
+        "santhikkindranar": 1
+      }
+    },
+    "சந்திக்கிறார்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhikkiraargal": 2,
+        "santhikkiraarkal": 1
+      }
+    },
+    "சந்திக்கும்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sandhikkum": 3,
+        "santhikkum": 3
+      }
+    },
+    "சந்தித்தது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhiththadhu": 1,
+        "sandhiththadu": 1,
+        "santhiththathu": 1
+      }
+    },
+    "சந்தித்தன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhiththana": 2,
+        "santhiththana": 1
+      }
+    },
+    "சந்தித்தனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhiththanar": 2,
+        "santhiththanar": 1
+      }
+    },
+    "சந்தித்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhiththaar": 1,
+        "santhiththaar": 1,
+        "santhitthaar": 1
+      }
+    },
+    "சந்தித்து": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sandhiththu": 1,
+        "santhiththu": 4,
+        "santhitthu": 1
+      }
+    },
+    "சந்திப்பது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhippadhu": 1,
+        "santhippathu": 2
+      }
+    },
+    "சந்திப்பில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhippil": 1,
+        "sandippil": 1,
+        "santhippil": 1
+      }
+    },
+    "சந்திப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhippu": 1,
+        "sandippu": 1,
+        "santhippu": 1
+      }
+    },
+    "சந்திப்புக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhippukku": 2,
+        "sandippukku": 1
+      }
+    },
+    "சந்தியில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhiyil": 2,
+        "santhiyil": 1
+      }
+    },
+    "சந்தேகமே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaegamae": 1,
+        "santhaekamae": 1,
+        "santhekame": 1
+      }
+    },
+    "சந்தேகம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaegam": 1,
+        "santhaekam": 1,
+        "santhekam": 1
+      }
+    },
+    "சந்தேகிக்கின்றனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaekikkindranar": 1,
+        "santhaekikkinranar": 1,
+        "santhekikkindranar": 1
+      }
+    },
+    "சந்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhai": 3
+      }
+    },
+    "சந்தைகளில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaigalil": 1,
+        "santhaikalil": 2
+      }
+    },
+    "சந்தைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaigal": 1,
+        "santhaikal": 2
+      }
+    },
+    "சந்தைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaikku": 3
+      }
+    },
+    "சந்தைப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaip": 1,
+        "santhaip": 2
+      }
+    },
+    "சந்தைப்படுத்தல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "santhaippaduththal": 3
+      }
+    },
+    "சந்தைப்படுத்துதல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaippaduththudhal": 1,
+        "sandhaippaduththuthal": 1,
+        "santhaippaduththuthal": 1
+      }
+    },
+    "சந்தைப்படுத்தும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaippaduththum": 1,
+        "santhaippaduththum": 2
+      }
+    },
+    "சந்தையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaiyin": 2,
+        "santhaiyin": 1
+      }
+    },
+    "சந்தையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaiyil": 1,
+        "santhaiyil": 2
+      }
+    },
+    "சந்தையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sandhaiyai": 1,
+        "santhaiyai": 2
+      }
+    },
+    "சந்தோஷமாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sandhoshamaaga": 1,
+        "sandhoshamaga": 1,
+        "santhoshamaaga": 2
+      }
+    },
+    "சந்தோஷின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sandhoshin": 1,
+        "santhoshin": 3
+      }
+    },
+    "சந்நிதி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sannidhi": 2,
+        "sannithi": 2
+      }
+    },
+    "சனா": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sana": 3,
+        "sanaa": 3
+      }
+    },
+    "சனி": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sanee": 1,
+        "sani": 4,
+        "sanii": 1
+      }
+    },
+    "சனியின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saniyin": 3
+      }
+    },
+    "சன்னதி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sannadhi": 1,
+        "sannathi": 2
+      }
+    },
+    "சன்னதிகள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sannadhigal": 1,
+        "sannathigal": 3,
+        "sannathikal": 1
+      }
+    },
+    "சன்னதிக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sannadhikku": 1,
+        "sannathikku": 3
+      }
+    },
+    "சன்மார்க்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sanmaarkka": 3
+      }
+    },
+    "சபதம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sabadham": 1,
+        "sabatham": 3
+      }
+    },
+    "சபரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabari": 3
+      }
+    },
+    "சபர்மதி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sabarmadhi": 1,
+        "sabarmathi": 3
+      }
+    },
+    "சபாநாயகராக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaanaayagaraaga": 1,
+        "sabaanaayakaraaka": 1,
+        "sabhanaayakaraaga": 1
+      }
+    },
+    "சபாநாயகரை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaanaayagarai": 1,
+        "sabaanaayakarai": 2
+      }
+    },
+    "சபாநாயகர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaanaayagar": 1,
+        "sabaanaayakar": 2
+      }
+    },
+    "சபாபதி": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sabaapadhi": 1,
+        "sabaapathi": 3,
+        "sabapathi": 1
+      }
+    },
+    "சபாவின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaavin": 3
+      }
+    },
+    "சபாவில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaavil": 3
+      }
+    },
+    "சபை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabai": 3
+      }
+    },
+    "சபைகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sabaigal": 3,
+        "sabaikal": 1
+      }
+    },
+    "சபைக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaik": 3
+      }
+    },
+    "சபைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaikku": 3
+      }
+    },
+    "சபைத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaith": 3
+      }
+    },
+    "சபையினர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaiyinar": 3
+      }
+    },
+    "சபையினால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaiyinaal": 3
+      }
+    },
+    "சபையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaiyin": 3
+      }
+    },
+    "சபையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sabaiyil": 3
+      }
+    },
+    "சப்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saptha": 3
+      }
+    },
+    "சப்தம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saptham": 3
+      }
+    },
+    "சப்தரிஷிகள்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sabdharishigal": 1,
+        "sabtharishigal": 1,
+        "sapdharishigal": 1,
+        "saptharishigal": 2,
+        "saptharishikal": 1
+      }
+    },
+    "சமகாலத்தில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samagaalaththil": 1,
+        "samakaalaththil": 3
+      }
+    },
+    "சமண": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samana": 3
+      }
+    },
+    "சமத்துவப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaththuvap": 2,
+        "samatthuvap": 1
+      }
+    },
+    "சமத்துவம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaththuvam": 2,
+        "samatthuvam": 1
+      }
+    },
+    "சமநிலை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samanilai": 3
+      }
+    },
+    "சமநிலைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samanilaikku": 3
+      }
+    },
+    "சமனாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samanaaga": 1,
+        "samanaaka": 1,
+        "samanaka": 1
+      }
+    },
+    "சமனான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samanaana": 2,
+        "samanana": 1
+      }
+    },
+    "சமன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saman": 3
+      }
+    },
+    "சமன்பாடு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samanpaadu": 2,
+        "samanpadu": 1
+      }
+    },
+    "சமன்பாடுகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samanpaadugal": 1,
+        "samanpaadukal": 1,
+        "samanpadugal": 1,
+        "samanpadukal": 1
+      }
+    },
+    "சமமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samamaaga": 1,
+        "samamaga": 1,
+        "samamaka": 1
+      }
+    },
+    "சமமாகவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samamaagavum": 1,
+        "samamagavum": 1,
+        "samamakavum": 1
+      }
+    },
+    "சமமாகவே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samamaagavae": 1,
+        "samamagave": 1,
+        "samamakave": 1
+      }
+    },
+    "சமமாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samamaagum": 1,
+        "samamagum": 1,
+        "samamakum": 1
+      }
+    },
+    "சமமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samamaana": 1,
+        "samamana": 2
+      }
+    },
+    "சமம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samam": 3
+      }
+    },
+    "சமய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaya": 3
+      }
+    },
+    "சமயத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayath": 3
+      }
+    },
+    "சமயத்தவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththavar": 3
+      }
+    },
+    "சமயத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththin": 3
+      }
+    },
+    "சமயத்திற்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththirku": 3
+      }
+    },
+    "சமயத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththil": 3
+      }
+    },
+    "சமயத்துக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththukku": 3
+      }
+    },
+    "சமயத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayaththai": 3
+      }
+    },
+    "சமயப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayap": 3
+      }
+    },
+    "சமயம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samayam": 3
+      }
+    },
+    "சமரசம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samarasam": 3
+      }
+    },
+    "சமரில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaril": 3
+      }
+    },
+    "சமர்ப்பித்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samarppiththa": 3
+      }
+    },
+    "சமர்ப்பித்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samarppiththaar": 3
+      }
+    },
+    "சமர்ப்பித்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samarppiththu": 3
+      }
+    },
+    "சமர்ப்பித்துள்ளார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samarppiththullaar": 3
+      }
+    },
+    "சமற்கிருதம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samargirudham": 1,
+        "samargirutham": 1,
+        "samarkirutham": 2
+      }
+    },
+    "சமவுரிமை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samavurimai": 3
+      }
+    },
+    "சமவெளி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaveli": 3
+      }
+    },
+    "சமவெளியில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaveliyil": 3
+      }
+    },
+    "சமஸ்கிருத": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samasgirudha": 1,
+        "samasgirutha": 1,
+        "samashkirutha": 1,
+        "samaskirutha": 1
+      }
+    },
+    "சமஸ்கிருதத்தில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samasgirudhaththil": 1,
+        "samasgiruthaththil": 1,
+        "samashkiruthaththil": 1,
+        "samaskiruthaththil": 1
+      }
+    },
+    "சமஸ்கிருதம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samasgirudham": 1,
+        "samasgirutham": 1,
+        "samashkirutham": 1,
+        "samaskirutham": 1
+      }
+    },
+    "சமஸ்தானத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samashthaanaththil": 1,
+        "samasthaanaththil": 1,
+        "samasthanaththil": 1
+      }
+    },
+    "சமஸ்தானம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samashthaanam": 1,
+        "samasthaanam": 1,
+        "samasthanam": 1
+      }
+    },
+    "சமாஜ்வாடி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samaajvaadi": 1,
+        "samajvadi": 2,
+        "samajwadi": 1
+      }
+    },
+    "சமாதான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaadhaana": 1,
+        "samadhana": 1,
+        "samathana": 1
+      }
+    },
+    "சமாதானக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaadhaanak": 1,
+        "samadhanak": 1,
+        "samathanak": 1
+      }
+    },
+    "சமாதானம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaadhaanam": 1,
+        "samadhanam": 1,
+        "samathanam": 1
+      }
+    },
+    "சமாதி": {
+      "initial": "s",
+      "attestations": 9,
+      "romanizations": {
+        "samaadhi": 2,
+        "samaadhii": 1,
+        "samaadi": 1,
+        "samaadii": 1,
+        "samadhi": 2,
+        "samadhii": 1,
+        "samathi": 1
+      }
+    },
+    "சமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaana": 2,
+        "samana": 1
+      }
+    },
+    "சமாளிக்கும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaalikkum": 2,
+        "samalikkum": 1
+      }
+    },
+    "சமீப": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sameeba": 2,
+        "sameepa": 1
+      }
+    },
+    "சமீபத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sameebaththil": 2,
+        "sameepaththil": 1
+      }
+    },
+    "சமீரா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sameera": 3
+      }
+    },
+    "சமுக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samuga": 2,
+        "samuka": 1
+      }
+    },
+    "சமுதாய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaaya": 1,
+        "samudhaya": 1,
+        "samuthaaya": 1
+      }
+    },
+    "சமுதாயக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayak": 2,
+        "samudhayak": 1
+      }
+    },
+    "சமுதாயச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayach": 1,
+        "samudhayach": 1,
+        "samuthayach": 1
+      }
+    },
+    "சமுதாயத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayath": 1,
+        "samudhayath": 1,
+        "samuthayath": 1
+      }
+    },
+    "சமுதாயத்தால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayaththaal": 1,
+        "samudhayaththal": 1,
+        "samuthayaththaal": 1
+      }
+    },
+    "சமுதாயத்தினர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayaththinar": 1,
+        "samudhayaththinar": 1,
+        "samuthayaththinar": 1
+      }
+    },
+    "சமுதாயத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhayaththin": 2,
+        "samuthayaththin": 1
+      }
+    },
+    "சமுதாயத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayaththil": 1,
+        "samudhayaththil": 1,
+        "samuthayaththil": 1
+      }
+    },
+    "சமுதாயத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayaththai": 1,
+        "samudhayaththai": 1,
+        "samuthayaththai": 1
+      }
+    },
+    "சமுதாயத்தைச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayaththaich": 1,
+        "samudhayaththaich": 1,
+        "samuthayaththaich": 1
+      }
+    },
+    "சமுதாயமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayamaaga": 1,
+        "samudhayamaga": 1,
+        "samuthayamaka": 1
+      }
+    },
+    "சமுதாயம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samudhaayam": 1,
+        "samudhayam": 1,
+        "samuthayam": 1
+      }
+    },
+    "சமூகக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogak": 1,
+        "samookak": 1,
+        "samugak": 1
+      }
+    },
+    "சமூகச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogach": 1,
+        "samookach": 1,
+        "samugach": 1
+      }
+    },
+    "சமூகத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogath": 1,
+        "samookath": 1,
+        "samugath": 1
+      }
+    },
+    "சமூகத்தினர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogaththinar": 1,
+        "samookaththinar": 1,
+        "samugaththinar": 1
+      }
+    },
+    "சமூகத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogaththin": 1,
+        "samookaththin": 1,
+        "samugaththin": 1
+      }
+    },
+    "சமூகத்திற்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samoogaththirku": 1,
+        "samookaththirku": 1,
+        "samugaththirku": 1
+      }
+    },
+    "சமூகத்திலும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samoogaththilum": 1,
+        "samookaththilum": 2,
+        "samookatthilum": 1
+      }
+    },
+    "சமூகத்தில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samoogaththil": 1,
+        "samookaththil": 2,
+        "samookatthil": 1
+      }
+    },
+    "சமூகத்துக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samoogaththukku": 1,
+        "samookaththukku": 2,
+        "samookatthukku": 1
+      }
+    },
+    "சமூகப்": {
+      "initial": "s",
+      "attestations": 7,
+      "romanizations": {
+        "samoogap": 4,
+        "samookap": 3
+      }
+    },
+    "சமூகம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samoogam": 2,
+        "samookam": 2
+      }
+    },
+    "சமூகவியல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "samoogaviyal": 2,
+        "samookaviyal": 2
+      }
+    },
+    "சமேத": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "samaedha": 2,
+        "samaetha": 1,
+        "samedha": 1,
+        "sametha": 1
+      }
+    },
+    "சமையலறை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaiyalarai": 3
+      }
+    },
+    "சமையலில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaiyalil": 3
+      }
+    },
+    "சமையலுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samaiyalukku": 3
+      }
+    },
+    "சம்சாரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "samsaaram": 2,
+        "samsaram": 1
+      }
+    },
+    "சம்பத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambath": 1,
+        "sampath": 2
+      }
+    },
+    "சம்பத்தின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sambaththin": 1,
+        "sambatthin": 1,
+        "sampaththin": 2
+      }
+    },
+    "சம்பந்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambandha": 1,
+        "sambantha": 1,
+        "sambhandha": 1
+      }
+    },
+    "சம்பந்தன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambandhan": 1,
+        "sambanthan": 1,
+        "sambhanthan": 1
+      }
+    },
+    "சம்பந்தமாகவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambandhamaagavum": 1,
+        "sambanthamaagavum": 1,
+        "sambanthamagavum": 1
+      }
+    },
+    "சம்பந்தம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambantham": 2,
+        "sampantham": 1
+      }
+    },
+    "சம்பந்தரின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sambandarin": 1,
+        "sambantharin": 2,
+        "sampantharin": 1
+      }
+    },
+    "சம்பந்தர்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sambandar": 1,
+        "sambanthar": 2,
+        "sampanthar": 1
+      }
+    },
+    "சம்பல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambal": 2,
+        "sampal": 1
+      }
+    },
+    "சம்பளம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambalam": 1,
+        "sambazham": 1,
+        "sampalam": 1
+      }
+    },
+    "சம்பவத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambavaththil": 3
+      }
+    },
+    "சம்பவத்துடன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambavaththudan": 3
+      }
+    },
+    "சம்பவம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambavam": 3
+      }
+    },
+    "சம்பா": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saambaa": 1,
+        "samba": 1,
+        "sambaa": 2,
+        "sampaa": 1
+      }
+    },
+    "சம்பாதிக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sambaathikka": 2,
+        "sampathikka": 1
+      }
+    },
+    "சம்பூர்ண": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sampoorna": 3
+      }
+    },
+    "சம்மதம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sammatham": 3
+      }
+    },
+    "சம்மதிக்க": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sammadhikka": 1,
+        "sammathikka": 3
+      }
+    },
+    "சம்மேளனம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sammaelanam": 2,
+        "sammelanam": 1
+      }
+    },
+    "சரக்குகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarakkukalai": 3
+      }
+    },
+    "சரக்குகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarakkugal": 1,
+        "sarakkukal": 2
+      }
+    },
+    "சரசு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarasu": 3
+      }
+    },
+    "சரணடைந்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadaintha": 3
+      }
+    },
+    "சரணடைந்தது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadainthathu": 3
+      }
+    },
+    "சரணடைந்தனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadainthanar": 3
+      }
+    },
+    "சரணடைந்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadainthaar": 2,
+        "saranadainthar": 1
+      }
+    },
+    "சரணடைந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadainthu": 3
+      }
+    },
+    "சரணடையச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranadaiyach": 3
+      }
+    },
+    "சரணம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranam": 3
+      }
+    },
+    "சரணாலயம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saranaalayam": 2,
+        "saranalayam": 1
+      }
+    },
+    "சரத்குமார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarathkumar": 3
+      }
+    },
+    "சரபோஜி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarabhoji": 1,
+        "saraboji": 1,
+        "sarapoji": 1
+      }
+    },
+    "சரயு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarayu": 3
+      }
+    },
+    "சரளமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saralamaaga": 1,
+        "saralamaaka": 1,
+        "saralamaka": 1
+      }
+    },
+    "சரளா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarala": 3
+      }
+    },
+    "சரவணபவன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saravanabavan": 1,
+        "saravanabhavan": 1,
+        "saravanapavan": 1
+      }
+    },
+    "சரவாக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saravak": 1,
+        "sarawak": 1,
+        "sarawaq": 1
+      }
+    },
+    "சராசரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saraasari": 2,
+        "sarasari": 1
+      }
+    },
+    "சராசரியாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saraasariyaaga": 1,
+        "saraasariyaaka": 1,
+        "sarasariyaka": 1
+      }
+    },
+    "சராசரியை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saraasariyai": 2,
+        "sarasariyai": 1
+      }
+    },
+    "சரிதம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saritham": 3
+      }
+    },
+    "சரிதா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saritha": 3
+      }
+    },
+    "சரித்திர": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariththira": 2,
+        "saritthira": 1
+      }
+    },
+    "சரித்திரத்தையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariththiraththaiyum": 2,
+        "saritthiratthaiyum": 1
+      }
+    },
+    "சரித்திரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariththiram": 2,
+        "saritthiram": 1
+      }
+    },
+    "சரிப்படுத்தும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarippaduththum": 2,
+        "sarippadutthum": 1
+      }
+    },
+    "சரியல்ல": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyalla": 3
+      }
+    },
+    "சரியா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaa": 3
+      }
+    },
+    "சரியாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaaga": 1,
+        "sariyaaka": 1,
+        "sariyaka": 1
+      }
+    },
+    "சரியாகச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaagach": 1,
+        "sariyaakach": 1,
+        "sariyakach": 1
+      }
+    },
+    "சரியாகப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaagap": 1,
+        "sariyaakap": 1,
+        "sariyakap": 1
+      }
+    },
+    "சரியான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaana": 2,
+        "sariyana": 1
+      }
+    },
+    "சரியானதா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyaanathaa": 2,
+        "sariyanatha": 1
+      }
+    },
+    "சரியென": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyena": 3
+      }
+    },
+    "சரியே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sariyae": 1,
+        "sariye": 2
+      }
+    },
+    "சரிவர": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarivara": 3
+      }
+    },
+    "சரிவிகித": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarivikitha": 3
+      }
+    },
+    "சரிவு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarivu": 3
+      }
+    },
+    "சரிவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarivai": 3
+      }
+    },
+    "சருக்கம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarukkam": 3
+      }
+    },
+    "சரும": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saruma": 3
+      }
+    },
+    "சரோஜா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saroja": 3
+      }
+    },
+    "சர்க்கரையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarkkaraiyai": 3
+      }
+    },
+    "சர்க்காரின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarkkaarin": 3
+      }
+    },
+    "சர்ச்சை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchai": 1,
+        "sarchchai": 2
+      }
+    },
+    "சர்ச்சைகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaikalai": 1,
+        "sarchchaigalai": 1,
+        "sarchchaikalai": 1
+      }
+    },
+    "சர்ச்சைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaikal": 1,
+        "sarchchaigal": 1,
+        "sarchchaikal": 1
+      }
+    },
+    "சர்ச்சைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaikku": 1,
+        "sarchchaikku": 2
+      }
+    },
+    "சர்ச்சைக்குரிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaikkuriya": 1,
+        "sarchchaikkuriya": 2
+      }
+    },
+    "சர்ச்சையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaiyil": 1,
+        "sarchchaiyil": 2
+      }
+    },
+    "சர்ச்சையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaiyum": 1,
+        "sarchchaiyum": 2
+      }
+    },
+    "சர்ச்சையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarcchaiyai": 1,
+        "sarchchaiyai": 2
+      }
+    },
+    "சர்வதேச": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvadesa": 1,
+        "sarvadhesa": 1,
+        "sarvathesa": 1
+      }
+    },
+    "சர்வதேசக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvadesak": 1,
+        "sarvadhesak": 1,
+        "sarvathesak": 1
+      }
+    },
+    "சர்வாதிகார": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvaadhigaara": 1,
+        "sarvaathikaara": 2
+      }
+    },
+    "சர்வாதிகாரத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvaadhigaaraththai": 1,
+        "sarvaathikaaraththai": 1,
+        "sarvaathikaaratthai": 1
+      }
+    },
+    "சர்வாதிகாரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvaadhigaaram": 1,
+        "sarvaathikaaram": 2
+      }
+    },
+    "சர்வாதிகாரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarvaadigaari": 1,
+        "sarvaathikaari": 2
+      }
+    },
+    "சறுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sarukku": 3
+      }
+    },
+    "சற்று": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "satru": 1,
+        "sattru": 2
+      }
+    },
+    "சற்றுத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "satruth": 1,
+        "sattruth": 2
+      }
+    },
+    "சற்றுப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "satrup": 1,
+        "sattrup": 2
+      }
+    },
+    "சற்றும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "satrum": 1,
+        "sattrum": 2
+      }
+    },
+    "சற்றே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "satre": 1,
+        "sattrae": 1,
+        "sattre": 1
+      }
+    },
+    "சலனம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "salanam": 3
+      }
+    },
+    "சலாம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "salaam": 3
+      }
+    },
+    "சலிப்பை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "salippai": 3
+      }
+    },
+    "சலிம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saleem": 1,
+        "salim": 2
+      }
+    },
+    "சலீம்": {
+      "initial": "s",
+      "attestations": 7,
+      "romanizations": {
+        "saleem": 3,
+        "saliim": 2,
+        "salim": 2
+      }
+    },
+    "சலுகை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "salugai": 1,
+        "salukai": 2
+      }
+    },
+    "சலுகைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "salugaigal": 1,
+        "salukaikal": 2
+      }
+    },
+    "சல்மான்": {
+      "initial": "s",
+      "attestations": 9,
+      "romanizations": {
+        "salmaan": 2,
+        "salman": 7
+      }
+    },
+    "சளி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sali": 2,
+        "sazhi": 1
+      }
+    },
+    "சவாரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "savaari": 2,
+        "savari": 1
+      }
+    },
+    "சவாலாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "savaalaaga": 1,
+        "savalaaga": 1,
+        "savalaga": 1
+      }
+    },
+    "சவால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "savaal": 2,
+        "saval": 1
+      }
+    },
+    "சவால்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "savaalgal": 1,
+        "savaalkal": 1,
+        "savalgal": 1
+      }
+    },
+    "சவுக்கடி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "savukkadi": 3,
+        "savukkati": 1
+      }
+    },
+    "சாகசங்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saagasangal": 2,
+        "saakasankal": 1,
+        "sagasankal": 1
+      }
+    },
+    "சாகசம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saagasam": 2,
+        "saakasam": 1,
+        "sagasam": 1
+      }
+    },
+    "சாகரம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saagaram": 1,
+        "saakaram": 1,
+        "sagaram": 2
+      }
+    },
+    "சாகா": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saaga": 1,
+        "saagaa": 2,
+        "saaka": 1,
+        "saga": 2
+      }
+    },
+    "சாகுபடி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saagupadi": 2,
+        "sagupadi": 1
+      }
+    },
+    "சாக்கடை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saakkadai": 2,
+        "sakkadai": 1
+      }
+    },
+    "சாக்கடைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saakkadaigal": 2,
+        "sakkadaikal": 1
+      }
+    },
+    "சாக்கிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saakkiya": 2,
+        "sakkiya": 1
+      }
+    },
+    "சாக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saakku": 2,
+        "sakku": 1
+      }
+    },
+    "சாங்கியம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saangiyam": 2,
+        "saankiyam": 1,
+        "sankiyam": 1
+      }
+    },
+    "சாசன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saasana": 2,
+        "sasana": 1
+      }
+    },
+    "சாசனங்கள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saasanangal": 2,
+        "saasanankal": 1,
+        "sasanangal": 1,
+        "sasanankal": 1
+      }
+    },
+    "சாசனத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saasanaththin": 2,
+        "sasanaththin": 1
+      }
+    },
+    "சாசனத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saasanaththil": 2,
+        "sasanaththil": 1
+      }
+    },
+    "சாசனம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saasanam": 2,
+        "sasanam": 1
+      }
+    },
+    "சாடினார்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadinaar": 2,
+        "saatinaar": 1,
+        "sadinar": 1
+      }
+    },
+    "சாட்சி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saatchi": 2,
+        "satchi": 1
+      }
+    },
+    "சாட்டப்பட்ட": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saattappatta": 3
+      }
+    },
+    "சாட்டப்பட்டது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saattappattadhu": 2,
+        "saattappattathu": 3
+      }
+    },
+    "சாட்டப்பட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saattappattu": 2,
+        "sattappattu": 1
+      }
+    },
+    "சாட்டினார்கள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saattinaargal": 2,
+        "saattinaarkal": 2,
+        "saattinargal": 1
+      }
+    },
+    "சாட்டியது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saattiyadhu": 2,
+        "saattiyathu": 3
+      }
+    },
+    "சாட்டியிருந்தார்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saattiyirundhaar": 2,
+        "saattiyirunthaar": 1,
+        "saattiyirunthar": 1
+      }
+    },
+    "சாண்டோ": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saandoa": 1,
+        "sando": 1,
+        "santo": 1
+      }
+    },
+    "சாதகமற்ற": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhagamatra": 1,
+        "saathakamatra": 2,
+        "sathakamatra": 1
+      }
+    },
+    "சாதகமாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhagamaaga": 1,
+        "saathakamaaka": 2,
+        "sathakamaka": 1
+      }
+    },
+    "சாதகமாகப்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhagamaagap": 1,
+        "saathakamaakap": 2,
+        "sathakamakap": 1
+      }
+    },
+    "சாதகமான": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhagamaana": 1,
+        "saathakamaana": 2,
+        "sathakamana": 1
+      }
+    },
+    "சாதகம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhagam": 1,
+        "saathakam": 2,
+        "sathakam": 1
+      }
+    },
+    "சாதன": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhana": 1,
+        "saathana": 2,
+        "sathana": 1
+      }
+    },
+    "சாதனத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaththil": 3
+      }
+    },
+    "சாதனமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanamaaga": 1,
+        "saathanamaaka": 2
+      }
+    },
+    "சாதனம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanam": 3
+      }
+    },
+    "சாதனா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saathanaa": 3,
+        "sadhana": 1
+      }
+    },
+    "சாதனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanai": 3
+      }
+    },
+    "சாதனைகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaikalai": 3
+      }
+    },
+    "சாதனைகளையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaigalaiyum": 1,
+        "saathanaikalaiyum": 2
+      }
+    },
+    "சாதனைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaigal": 1,
+        "saathanaikal": 2
+      }
+    },
+    "சாதனையாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaiyaagum": 1,
+        "saathanaiyaakum": 2
+      }
+    },
+    "சாதனையாளர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaiyaalar": 3
+      }
+    },
+    "சாதனையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathanaiyai": 3
+      }
+    },
+    "சாதம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadham": 1,
+        "saatham": 2
+      }
+    },
+    "சாதாரண": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadhaarana": 1,
+        "saathaarana": 2
+      }
+    },
+    "சாதாரணமாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saadhaaranamaaga": 1,
+        "saathaaranamaaga": 1,
+        "saathaaranamaaka": 2
+      }
+    },
+    "சாதாரணமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadhaaranamaana": 1,
+        "saathaaranamaana": 2
+      }
+    },
+    "சாதாரணமானது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadhaaranamaanathu": 1,
+        "saathaaranamaanathu": 2
+      }
+    },
+    "சாதி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathi": 3
+      }
+    },
+    "சாதிகளின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathigalin": 1,
+        "saathikalin": 2
+      }
+    },
+    "சாதிகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathigal": 1,
+        "saathikal": 2
+      }
+    },
+    "சாதிக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathikka": 3
+      }
+    },
+    "சாதிப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathip": 3
+      }
+    },
+    "சாதிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiya": 3
+      }
+    },
+    "சாதியம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiyam": 3
+      }
+    },
+    "சாதியினரின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiyinarin": 3
+      }
+    },
+    "சாதியினரும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiyinarum": 3
+      }
+    },
+    "சாதியினர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiyinar": 3
+      }
+    },
+    "சாதியை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saathiyai": 3
+      }
+    },
+    "சாதுக்களின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadhukkalin": 1,
+        "saathukkalin": 2
+      }
+    },
+    "சாதுக்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saadhukkal": 1,
+        "saathukkal": 2
+      }
+    },
+    "சாத்தன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththan": 3
+      }
+    },
+    "சாத்தியக்கூறுகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyakkoorugalai": 1,
+        "saaththiyakkoorukalai": 2
+      }
+    },
+    "சாத்தியக்கூறுகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyakkoorugal": 1,
+        "saaththiyakkoorukal": 2
+      }
+    },
+    "சாத்தியத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyaththai": 3
+      }
+    },
+    "சாத்தியமற்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamatra": 2,
+        "saaththiyamattra": 1
+      }
+    },
+    "சாத்தியமா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamaa": 3
+      }
+    },
+    "சாத்தியமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamaaga": 1,
+        "saaththiyamaaka": 2
+      }
+    },
+    "சாத்தியமாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamaagum": 1,
+        "saaththiyamaakum": 2
+      }
+    },
+    "சாத்தியமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamaana": 3
+      }
+    },
+    "சாத்தியமும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamum": 3
+      }
+    },
+    "சாத்தியமுள்ள": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamulla": 3
+      }
+    },
+    "சாத்தியமே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiyamae": 1,
+        "saaththiyame": 2
+      }
+    },
+    "சாத்திரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaththiram": 3
+      }
+    },
+    "சாந்தன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saanthan": 1,
+        "santhan": 2
+      }
+    },
+    "சாந்தா": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saanthaa": 2,
+        "santha": 3
+      }
+    },
+    "சான்றாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandraaka": 1,
+        "saanraaga": 1,
+        "saantraaga": 2
+      }
+    },
+    "சான்றாகும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandraakum": 1,
+        "saanraagum": 1,
+        "saantraagum": 1,
+        "santragum": 1
+      }
+    },
+    "சான்றிதழின்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandrithalin": 1,
+        "saanrithalin": 1,
+        "saanrithazhin": 1,
+        "saantrithalin": 1,
+        "saantrithazhin": 1,
+        "santrithazhin": 1
+      }
+    },
+    "சான்றிதழும்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandrithalum": 1,
+        "saanrithalum": 1,
+        "saanrithazhum": 1,
+        "saantrithalum": 1,
+        "saantrithazhum": 2
+      }
+    },
+    "சான்றிதழ்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandrithal": 1,
+        "saanrithal": 1,
+        "saanrithazh": 1,
+        "saantrithal": 1,
+        "saantrithazh": 2
+      }
+    },
+    "சான்றிதழ்களை": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandrithalkalai": 1,
+        "saanrithalgalai": 1,
+        "saanrithazhgalai": 1,
+        "saantrithalgalai": 1,
+        "saantrithazhgalai": 2
+      }
+    },
+    "சான்றிதழ்களையும்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandrithalkalaiyum": 1,
+        "saanrithalgalaiyum": 1,
+        "saanrithazhgalaiyum": 1,
+        "saantrithalgalaiyum": 1,
+        "saantrithazhgalaiyum": 2
+      }
+    },
+    "சான்று": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandru": 1,
+        "saanru": 1,
+        "saantru": 2
+      }
+    },
+    "சான்றுகளாகும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandrukalaakum": 1,
+        "saanrugalaagum": 1,
+        "saantrugalaagum": 2
+      }
+    },
+    "சான்றுகளை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandrukalai": 1,
+        "saanrugalai": 1,
+        "saantrugalai": 2
+      }
+    },
+    "சான்றுகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saandrukal": 1,
+        "saanrugal": 1,
+        "saantrugal": 2
+      }
+    },
+    "சான்றோன்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saandron": 1,
+        "saanroan": 1,
+        "saanron": 1,
+        "saantroan": 1,
+        "saantron": 2
+      }
+    },
+    "சாபம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saabam": 3
+      }
+    },
+    "சாப்பிட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saappittu": 3
+      }
+    },
+    "சாம": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saama": 3,
+        "sama": 1
+      }
+    },
+    "சாமந்தி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saamandhi": 1,
+        "saamanthi": 2,
+        "samanthi": 1
+      }
+    },
+    "சாமா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saamaa": 3,
+        "sama": 1
+      }
+    },
+    "சாமானிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saamaaniya": 3
+      }
+    },
+    "சாம்பலானது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saambalaanadhu": 1,
+        "saambalaanathu": 2,
+        "sambalanathu": 1
+      }
+    },
+    "சாம்பல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saambal": 3
+      }
+    },
+    "சாம்பார்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saambaar": 3,
+        "saambar": 1,
+        "sambar": 1
+      }
+    },
+    "சாம்ராட்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saamraat": 3,
+        "samrat": 1
+      }
+    },
+    "சாயப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saayap": 3
+      }
+    },
+    "சாயம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saayam": 3
+      }
+    },
+    "சாயலில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saayalil": 3
+      }
+    },
+    "சாரங்கபாணி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saarangabaani": 1,
+        "saarangapaani": 1,
+        "sarangapani": 1
+      }
+    },
+    "சாரங்கி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saarangi": 3
+      }
+    },
+    "சாரணர்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saaranar": 3,
+        "saranar": 1
+      }
+    },
+    "சாரதா": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saaradhaa": 1,
+        "saarathaa": 1,
+        "saradha": 2,
+        "saratha": 1
+      }
+    },
+    "சாரதிகள்": {
+      "initial": "s",
+      "attestations": 7,
+      "romanizations": {
+        "saaradhigal": 2,
+        "saarathigal": 1,
+        "saarathikal": 1,
+        "saradhigal": 1,
+        "sarathigal": 1,
+        "sarathikal": 1
+      }
+    },
+    "சாரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saaram": 3
+      }
+    },
+    "சாராத": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saaraadha": 1,
+        "saaraatha": 2,
+        "saratha": 1
+      }
+    },
+    "சார்புடைய": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saarbudaiya": 2,
+        "saarpudaiya": 3
+      }
+    },
+    "சாலட்": {
+      "initial": "s",
+      "attestations": 8,
+      "romanizations": {
+        "saalad": 3,
+        "salaad": 1,
+        "salad": 4
+      }
+    },
+    "சாலை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saalai": 2,
+        "salai": 1
+      }
+    },
+    "சாலைகளில்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saalaigalil": 2,
+        "saalaikalil": 1,
+        "salaigalil": 1,
+        "salaikalil": 1
+      }
+    },
+    "சாலைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saalaigal": 2,
+        "salaikal": 1
+      }
+    },
+    "சாலைக்கும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saalaikkum": 2,
+        "salaikkum": 1
+      }
+    },
+    "சாலைப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saalaip": 2,
+        "salaip": 1
+      }
+    },
+    "சாலையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saalaiyin": 2,
+        "salaiyin": 1
+      }
+    },
+    "சாவித்ரி": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saavithri": 2,
+        "savithri": 2,
+        "savitri": 1
+      }
+    },
+    "சாவின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saavin": 3
+      }
+    },
+    "சாவிலிருந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saavilirundhu": 1,
+        "saavilirunthu": 2
+      }
+    },
+    "சாவு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saavu": 3
+      }
+    },
+    "சாவுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saavukku": 3
+      }
+    },
+    "சாவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saavai": 3
+      }
+    },
+    "சாஸ்தா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saashthaa": 1,
+        "saasthaa": 2,
+        "sastha": 1
+      }
+    },
+    "சிகப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sigappu": 3
+      }
+    },
+    "சிகரத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sigaraththil": 2,
+        "sikaraththil": 1
+      }
+    },
+    "சிகரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sigaram": 3
+      }
+    },
+    "சிக்கி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sikki": 3
+      }
+    },
+    "சிக்கிக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sikkik": 3
+      }
+    },
+    "சிக்கியிருந்த": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sikkiyirundha": 2,
+        "sikkiyiruntha": 2
+      }
+    },
+    "சிடு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sidu": 3
+      }
+    },
+    "சிதைவு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sidhaivu": 1,
+        "sithaivu": 2
+      }
+    },
+    "சித்தருக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siththarukku": 2,
+        "sittharukku": 1
+      }
+    },
+    "சித்தர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siththar": 2,
+        "sitthar": 1
+      }
+    },
+    "சித்தர்களின்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "siththargalin": 2,
+        "siththarkalin": 2,
+        "sittharkalin": 1
+      }
+    },
+    "சித்தர்கள்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "sidhdhargal": 1,
+        "sidhdharkal": 1,
+        "siththargal": 2,
+        "siththarkal": 1,
+        "sittharkal": 1
+      }
+    },
+    "சித்தாந்தம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siththaantham": 2,
+        "sitthaantham": 1
+      }
+    },
+    "சித்தார்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sithdhaar": 1,
+        "siththaar": 2,
+        "sitthaar": 1
+      }
+    },
+    "சிந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sindhu": 2,
+        "sinthu": 1
+      }
+    },
+    "சிந்தும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sindhum": 3
+      }
+    },
+    "சிந்துவின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sindhuvin": 3
+      }
+    },
+    "சிந்துவெளி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sindhuveli": 3
+      }
+    },
+    "சிந்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sindhai": 2,
+        "sinthai": 1
+      }
+    },
+    "சினம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sinam": 3
+      }
+    },
+    "சிபி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sibi": 3
+      }
+    },
+    "சிரமப்பட்டனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siramappattanar": 3
+      }
+    },
+    "சிரமமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siramamaana": 2,
+        "siramamana": 1
+      }
+    },
+    "சிரமம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siramam": 3
+      }
+    },
+    "சிரமும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siramum": 3
+      }
+    },
+    "சிரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siram": 3
+      }
+    },
+    "சிராஜ்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraaj": 1,
+        "siraj": 2
+      }
+    },
+    "சிரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siri": 3
+      }
+    },
+    "சிரிக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirikka": 3
+      }
+    },
+    "சிரிப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirippu": 3
+      }
+    },
+    "சிறகடிக்கும்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "siragadikkum": 3,
+        "sirakadikkum": 2
+      }
+    },
+    "சிறகு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siragu": 3,
+        "siraku": 1
+      }
+    },
+    "சிறகுகள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "siragugal": 3,
+        "siragukal": 1,
+        "sirakukal": 1
+      }
+    },
+    "சிறக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirakka": 3
+      }
+    },
+    "சிறந்த": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sirandha": 3,
+        "sirantha": 1
+      }
+    },
+    "சிறந்ததாகும்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sirandhadhaagum": 2,
+        "sirandhadhagum": 1,
+        "sirandhathakum": 1,
+        "siranthathaakum": 1
+      }
+    },
+    "சிறந்தது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sirandhadhu": 3,
+        "sirandhathu": 1,
+        "siranthathu": 1
+      }
+    },
+    "சிறந்தவை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sirandhavai": 3,
+        "siranthavai": 1
+      }
+    },
+    "சிறந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirandhu": 3
+      }
+    },
+    "சிறப்பம்சங்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappamsangal": 3
+      }
+    },
+    "சிறப்பம்சம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappamsam": 3
+      }
+    },
+    "சிறப்பாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sirappaaga": 2,
+        "sirappaga": 1,
+        "sirappaka": 1
+      }
+    },
+    "சிறப்பாகக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappaagak": 2,
+        "sirappagak": 1
+      }
+    },
+    "சிறப்பாகப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappaagap": 2,
+        "sirappagap": 1
+      }
+    },
+    "சிறப்பாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappaagum": 2,
+        "sirappagum": 1
+      }
+    },
+    "சிறப்பான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappaana": 2,
+        "sirappana": 1
+      }
+    },
+    "சிறப்பானது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sirappaanadhu": 1,
+        "sirappaanathu": 1,
+        "sirappanadhu": 2,
+        "sirappanathu": 1
+      }
+    },
+    "சிறப்பிக்கும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappikkum": 3
+      }
+    },
+    "சிறப்பித்தது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappiththadhu": 1,
+        "sirappiththadu": 1,
+        "sirappiththathu": 1
+      }
+    },
+    "சிறப்பித்துப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappiththup": 3
+      }
+    },
+    "சிறப்பின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappin": 3
+      }
+    },
+    "சிறப்பியல்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappiyalbu": 3
+      }
+    },
+    "சிறப்பியல்புகள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sirappiyalbugal": 3,
+        "sirappiyalbukal": 1,
+        "sirappiyalpukal": 1
+      }
+    },
+    "சிறப்புகளையும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sirappugalaiyum": 2,
+        "sirappukalaiyum": 2
+      }
+    },
+    "சிறப்புகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappugal": 3
+      }
+    },
+    "சிறப்புக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappuk": 3
+      }
+    },
+    "சிறப்புடன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappudan": 3
+      }
+    },
+    "சிறப்புடைய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappudaiya": 3
+      }
+    },
+    "சிறப்புத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirapputh": 3
+      }
+    },
+    "சிறப்புமிக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappumikka": 3
+      }
+    },
+    "சிறப்பை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirappai": 3
+      }
+    },
+    "சிறாருக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraarukku": 2,
+        "sirarukku": 1
+      }
+    },
+    "சிறார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraar": 2,
+        "sirar": 1
+      }
+    },
+    "சிறார்களுக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siraargalukku": 2,
+        "sirargalukku": 1,
+        "sirarkalukku": 1
+      }
+    },
+    "சிறிதளவு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhalavu": 2,
+        "siridhazhavu": 1,
+        "sirithalavu": 1
+      }
+    },
+    "சிறிதளவும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhalavum": 3,
+        "sirithalavum": 1
+      }
+    },
+    "சிறிதளவே": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhalavae": 1,
+        "siridhalave": 2,
+        "sirithalave": 1
+      }
+    },
+    "சிறிதாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhaaga": 2,
+        "siridhaga": 1,
+        "sirithaga": 1
+      }
+    },
+    "சிறிது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "siridhu": 3,
+        "sirithu": 2
+      }
+    },
+    "சிறிதுசிறிதாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhusiridhaaga": 2,
+        "siridhusiridhaga": 1,
+        "sirithusirithaga": 1
+      }
+    },
+    "சிறிதும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siridhum": 2,
+        "sirithum": 2
+      }
+    },
+    "சிறியதாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siriyadhaaga": 1,
+        "siriyadhaga": 1,
+        "siriyathaga": 1,
+        "siriyathaka": 1
+      }
+    },
+    "சிறியதாகவும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siriyadhagavum": 1,
+        "siriyathaagavum": 2,
+        "siriyathagavum": 1
+      }
+    },
+    "சிறியது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siriyadhu": 2,
+        "siriyathu": 2
+      }
+    },
+    "சிறியவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siriyavai": 3
+      }
+    },
+    "சிறீ": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siree": 2,
+        "siri": 2
+      }
+    },
+    "சிறுத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruththai": 3
+      }
+    },
+    "சிறுத்தைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruththaigal": 3
+      }
+    },
+    "சிறுத்தொண்டர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruththondar": 3
+      }
+    },
+    "சிறுநீரக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeraga": 3
+      }
+    },
+    "சிறுநீரகக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeragak": 3
+      }
+    },
+    "சிறுநீரகச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeragach": 3
+      }
+    },
+    "சிறுநீரகத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeragaththin": 3
+      }
+    },
+    "சிறுநீரகம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeragam": 3
+      }
+    },
+    "சிறுநீரின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneerin": 3
+      }
+    },
+    "சிறுநீரில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneeril": 3
+      }
+    },
+    "சிறுநீர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruneer": 3
+      }
+    },
+    "சிறுபான்மை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirupaanmai": 3
+      }
+    },
+    "சிறுபான்மைத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sirupaanmaith": 3
+      }
+    },
+    "சிறுபான்மையினராக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sirupaanmaiyinaraaga": 3,
+        "sirupaanmaiyinaraaka": 1
+      }
+    },
+    "சிறுவனாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruvanaaga": 3
+      }
+    },
+    "சிறுவன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruvan": 3
+      }
+    },
+    "சிறுவயதிலிருந்தே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruvayadhilirundhae": 1,
+        "siruvayathilirundhe": 1,
+        "siruvayathilirunthae": 1
+      }
+    },
+    "சிறுவயதிலேயே": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siruvayadhilaeyae": 1,
+        "siruvayathilaeyae": 2,
+        "siruvayathileye": 1
+      }
+    },
+    "சிறுவயதில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siruvayadhil": 1,
+        "siruvayathil": 3
+      }
+    },
+    "சிறுவயது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siruvayadhu": 1,
+        "siruvayathu": 3
+      }
+    },
+    "சிறுவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siruvar": 3
+      }
+    },
+    "சிறுவர்களுக்கான": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siruvargalukkaana": 3,
+        "siruvarkalukkaana": 1
+      }
+    },
+    "சிறுவர்களுக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "siruvargalukku": 3,
+        "siruvarkalukku": 1
+      }
+    },
+    "சிறைக்குச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraikkuch": 3
+      }
+    },
+    "சிறைத்தண்டனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraiththandanai": 3
+      }
+    },
+    "சிறையிலிருந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siraiyilirundhu": 1,
+        "siraiyilirunthu": 2
+      }
+    },
+    "சிற்றிலக்கிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sitrilakkiya": 1,
+        "sittrilakkiya": 2
+      }
+    },
+    "சிற்றிலக்கியம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sitrilakkiyam": 1,
+        "sittrilakkiyam": 2
+      }
+    },
+    "சிலகாலம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silakaalam": 3
+      }
+    },
+    "சிலந்தி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silanthi": 3
+      }
+    },
+    "சிலந்திகளின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silanthigalin": 1,
+        "silanthikalin": 2
+      }
+    },
+    "சிலம்பாட்டம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silambaattam": 1,
+        "silambattam": 1,
+        "silampaattam": 1
+      }
+    },
+    "சிலம்பின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silambin": 2,
+        "silampin": 1
+      }
+    },
+    "சிலம்பில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silambil": 2,
+        "silampil": 1
+      }
+    },
+    "சிலரால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaraal": 3
+      }
+    },
+    "சிலரிடம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaridam": 3
+      }
+    },
+    "சிலருக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silarukku": 3
+      }
+    },
+    "சிலருடன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silarudan": 3
+      }
+    },
+    "சிலரும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silarum": 3
+      }
+    },
+    "சிலவகை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavagai": 2,
+        "silavakai": 1
+      }
+    },
+    "சிலவற்றின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavatrin": 1,
+        "silavattrin": 2
+      }
+    },
+    "சிலவற்றில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavatril": 1,
+        "silavattril": 2
+      }
+    },
+    "சிலவற்றை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavatrai": 1,
+        "silavattrai": 2
+      }
+    },
+    "சிலவாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavaagum": 2,
+        "silavaakum": 1
+      }
+    },
+    "சிலவேளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavelai": 3
+      }
+    },
+    "சிலவேளைகளில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silavaelaikalil": 1,
+        "silavelaigalil": 1,
+        "silavelaikalil": 1
+      }
+    },
+    "சிலுவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siluvai": 3
+      }
+    },
+    "சிலுவைப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siluvaip": 3
+      }
+    },
+    "சிலுவையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "siluvaiyil": 3
+      }
+    },
+    "சிலை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silai": 3
+      }
+    },
+    "சிலைகளும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaigalum": 2,
+        "silaikalum": 1
+      }
+    },
+    "சிலைகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaigalai": 2,
+        "silaikalai": 1
+      }
+    },
+    "சிலைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaigal": 2,
+        "silaikal": 1
+      }
+    },
+    "சிலையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaiyin": 3
+      }
+    },
+    "சிலையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaiyum": 3
+      }
+    },
+    "சிலையே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "silaiye": 3
+      }
+    },
+    "சில்லரை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sillarai": 3
+      }
+    },
+    "சில்லுகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sillugal": 2,
+        "sillukal": 1
+      }
+    },
+    "சிவகங்கை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivagangai": 3
+      }
+    },
+    "சிவகாசி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivakasi": 3
+      }
+    },
+    "சிவகாமி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sivagami": 2,
+        "sivakami": 2
+      }
+    },
+    "சிவகிரி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivagiri": 3
+      }
+    },
+    "சிவகுமார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivakumar": 3
+      }
+    },
+    "சிவகுருநாதன்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sivagurunadhan": 1,
+        "sivagurunathan": 3
+      }
+    },
+    "சிவஞான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivagnana": 3
+      }
+    },
+    "சிவஞானம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivagnanam": 3
+      }
+    },
+    "சிவந்த": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sivandha": 1,
+        "sivantha": 3
+      }
+    },
+    "சிவந்து": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sivandhu": 1,
+        "sivanthu": 3
+      }
+    },
+    "சிவனடியார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanadiyaar": 2,
+        "sivanadiyar": 1
+      }
+    },
+    "சிவனது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sivanadhu": 1,
+        "sivanathu": 3
+      }
+    },
+    "சிவனால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanaal": 2,
+        "sivanal": 1
+      }
+    },
+    "சிவனிடம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanidam": 3
+      }
+    },
+    "சிவனின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanin": 3
+      }
+    },
+    "சிவனுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanukku": 3
+      }
+    },
+    "சிவனுக்கும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanukkum": 3
+      }
+    },
+    "சிவனும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanum": 3
+      }
+    },
+    "சிவனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivanai": 3
+      }
+    },
+    "சிவபெருமானிடம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanidam": 2,
+        "sivaperumanidam": 1
+      }
+    },
+    "சிவபெருமானின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanin": 1,
+        "sivaperumanin": 2
+      }
+    },
+    "சிவபெருமானுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanukku": 1,
+        "sivaperumanukku": 2
+      }
+    },
+    "சிவபெருமானும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanum": 1,
+        "sivaperumanum": 2
+      }
+    },
+    "சிவபெருமானே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanae": 1,
+        "sivaperumane": 2
+      }
+    },
+    "சிவபெருமானை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaanai": 1,
+        "sivaperumanai": 2
+      }
+    },
+    "சிவபெருமான்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaperumaan": 1,
+        "sivaperuman": 2
+      }
+    },
+    "சிவப்பாகவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivappaakavum": 1,
+        "sivappagavum": 2
+      }
+    },
+    "சிவப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivappu": 3
+      }
+    },
+    "சிவம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivam": 3
+      }
+    },
+    "சிவராஜ்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sivaraaj": 2,
+        "sivaraj": 3
+      }
+    },
+    "சிவாச்சாரியார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sivaachchaariyaar": 2,
+        "sivachchariyar": 1
+      }
+    },
+    "சீடராக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedaraaga": 3,
+        "seedaraaka": 1
+      }
+    },
+    "சீடரும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seedarum": 3
+      }
+    },
+    "சீடர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seedar": 3
+      }
+    },
+    "சீடர்களின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedargalin": 3,
+        "seedarkalin": 1
+      }
+    },
+    "சீடர்களில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedargalil": 3,
+        "seedarkalil": 1
+      }
+    },
+    "சீடர்களும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedargalum": 2,
+        "seedarkalum": 2
+      }
+    },
+    "சீடர்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedargal": 2,
+        "seedarkal": 2
+      }
+    },
+    "சீதாராமன்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seedharaaman": 1,
+        "seethaaraaman": 1,
+        "seetharaman": 3
+      }
+    },
+    "சீதாராம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedharaam": 1,
+        "seethaaraam": 1,
+        "seetharam": 2
+      }
+    },
+    "சீதை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seedhai": 1,
+        "seethai": 3
+      }
+    },
+    "சீதையை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seethaiyai": 3,
+        "sithaiyai": 1
+      }
+    },
+    "சீமா": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seema": 4,
+        "siima": 1
+      }
+    },
+    "சீரான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seeraana": 2,
+        "seerana": 1
+      }
+    },
+    "சீரிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seeriya": 3
+      }
+    },
+    "சீர்படுத்தும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seerpaduththum": 3
+      }
+    },
+    "சீர்மிகு": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seermigu": 3,
+        "seermiku": 2
+      }
+    },
+    "சீர்மை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seermai": 3
+      }
+    },
+    "சீறி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seeri": 3
+      }
+    },
+    "சீலம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seelam": 3
+      }
+    },
+    "சீவி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seevi": 3
+      }
+    },
+    "சுகந்தன்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sugandhan": 1,
+        "suganthan": 2,
+        "sukanthan": 1
+      }
+    },
+    "சுசீலா": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sucheelaa": 1,
+        "suseela": 1,
+        "suseelaa": 1,
+        "susheela": 1,
+        "sushila": 1
+      }
+    },
+    "சுடுதல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sududhal": 1,
+        "suduthal": 3
+      }
+    },
+    "சுதந்திரப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sudhandhirap": 2,
+        "suthanthirap": 1
+      }
+    },
+    "சுதந்திரமாக": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sudhandhiramaaga": 1,
+        "sudhandhiramaga": 1,
+        "sudhanthiramaga": 1,
+        "suthanthiramaaga": 1,
+        "suthanthiramaaka": 1
+      }
+    },
+    "சுதந்திரமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sudhandhiramaana": 1,
+        "sudhanthiramana": 1,
+        "suthanthiramaana": 1
+      }
+    },
+    "சுதந்திரம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sudhandhiram": 2,
+        "sudhanthiram": 1,
+        "suthanthiram": 1
+      }
+    },
+    "சுதந்திரா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sudhandhira": 1,
+        "sudhandhiraa": 1,
+        "suthanthiraa": 1
+      }
+    },
+    "சுதா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sudha": 3,
+        "sutha": 1
+      }
+    },
+    "சுத்திகரிக்கப்பட்ட": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sudhthikarikkappatta": 1,
+        "suththikarikkappatta": 3
+      }
+    },
+    "சுத்திகரிப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suththikarippu": 3
+      }
+    },
+    "சுத்தியல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sudhthiyal": 1,
+        "suththiyal": 2,
+        "sutthiyal": 1
+      }
+    },
+    "சுந்தர": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sundara": 1,
+        "sundhara": 3,
+        "sunthara": 1
+      }
+    },
+    "சுந்தரம்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sundaram": 1,
+        "sundharam": 3,
+        "suntharam": 1
+      }
+    },
+    "சுந்தரரின்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sundararin": 2,
+        "sundhararin": 2,
+        "sunthararin": 1
+      }
+    },
+    "சுந்தரர்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sundarar": 2,
+        "sundharar": 2,
+        "suntharar": 1
+      }
+    },
+    "சுந்தராம்பாள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sundaraampaal": 1,
+        "sundharambal": 2,
+        "suntharaampaal": 1
+      }
+    },
+    "சுந்தரி": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sundari": 2,
+        "sundhari": 2,
+        "sunthari": 1
+      }
+    },
+    "சுபத்ரா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "subathra": 3
+      }
+    },
+    "சுபா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suba": 1,
+        "subaa": 1,
+        "subha": 2
+      }
+    },
+    "சுபாஷ்": {
+      "initial": "s",
+      "attestations": 11,
+      "romanizations": {
+        "subaash": 1,
+        "subas": 1,
+        "subash": 4,
+        "subhash": 2,
+        "suubas": 1,
+        "suubhas": 1,
+        "suubhash": 1
+      }
+    },
+    "சுமதி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sumathi": 3
+      }
+    },
+    "சுமித்ரா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sumithra": 3,
+        "sumithraa": 1
+      }
+    },
+    "சுமூகமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sumoogamaana": 1,
+        "sumugamaana": 2
+      }
+    },
+    "சுமேரியர்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sumaeriyargal": 2,
+        "sumeriyargal": 2
+      }
+    },
+    "சுமை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sumai": 3
+      }
+    },
+    "சுமைகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sumaigalai": 3
+      }
+    },
+    "சுமையை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sumaiyai": 3
+      }
+    },
+    "சுயசரிதை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suyasaridhai": 1,
+        "suyasarithai": 2
+      }
+    },
+    "சுயநிர்ணய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suyanirnaya": 3
+      }
+    },
+    "சுயமரியாதை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suyamariyaadhai": 1,
+        "suyamariyaathai": 2,
+        "suyamariyathai": 1
+      }
+    },
+    "சுயமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suyamaaga": 3
+      }
+    },
+    "சுரங்கப்பாதை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surangappaadhai": 1,
+        "surangappaathai": 2
+      }
+    },
+    "சுரண்டலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surandalum": 3
+      }
+    },
+    "சுரண்டல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surandal": 3
+      }
+    },
+    "சுரதா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suradhaa": 1,
+        "suratha": 2
+      }
+    },
+    "சுரந்து": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surandhu": 2,
+        "suranthu": 2
+      }
+    },
+    "சுரப்பி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surappi": 3
+      }
+    },
+    "சுரப்பிகளில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surappigalil": 3,
+        "surappikalil": 1
+      }
+    },
+    "சுரப்பிகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surappigal": 3
+      }
+    },
+    "சுரப்பியின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surappiyin": 3
+      }
+    },
+    "சுரப்பியில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surappiyil": 3
+      }
+    },
+    "சுருக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukka": 3
+      }
+    },
+    "சுருக்கமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukkamaaga": 2,
+        "surukkamaga": 1
+      }
+    },
+    "சுருக்கமாகவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukkamaagavum": 2,
+        "surukkamagavum": 1
+      }
+    },
+    "சுருக்கமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukkamaana": 2,
+        "surukkamana": 1
+      }
+    },
+    "சுருக்கம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukkam": 3
+      }
+    },
+    "சுருக்கி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surukki": 3
+      }
+    },
+    "சுருள்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surulgal": 3,
+        "suruzhgal": 1
+      }
+    },
+    "சுறா": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sura": 2,
+        "suraa": 2
+      }
+    },
+    "சுறாக்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suraakkal": 3
+      }
+    },
+    "சுறாமீன்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suraameen": 3,
+        "surameen": 1
+      }
+    },
+    "சுறுசுறுப்பாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surusuruppaaga": 3
+      }
+    },
+    "சுறுசுறுப்பான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "surusuruppaana": 3
+      }
+    },
+    "சுற்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suttra": 3
+      }
+    },
+    "சுற்று": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surru": 1,
+        "sutru": 1,
+        "suttru": 2
+      }
+    },
+    "சுற்றுகின்றன": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surruginrana": 1,
+        "sutruginrana": 1,
+        "suttrukindrana": 1,
+        "suttrukintrana": 1
+      }
+    },
+    "சுற்றுச்சுழல்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "surruchchulal": 1,
+        "surruchchuzhal": 1,
+        "sutruchchulal": 1,
+        "sutruchchuzhal": 1,
+        "suttruchchoolal": 1,
+        "suttruchchuzhal": 1
+      }
+    },
+    "சுற்றுச்சூழலில்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "surruchchoolalil": 1,
+        "surruchchoozhalil": 1,
+        "sutruchchoolalil": 1,
+        "sutruchchoozhalil": 1,
+        "suttruchchoolalil": 1,
+        "suttruchchoozhalil": 1
+      }
+    },
+    "சுற்றுச்சூழல்": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "surruchchoolal": 1,
+        "surruchchoozhal": 1,
+        "sutruchchoolal": 1,
+        "sutruchchoozhal": 1,
+        "suttruchchoolal": 1,
+        "suttruchchuzhal": 1
+      }
+    },
+    "சுற்றுப்பயணம்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surruppayanam": 1,
+        "sutruppayanam": 1,
+        "suttruppayanam": 2
+      }
+    },
+    "சுற்றுப்பாதை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surruppaathai": 1,
+        "sutruppaathai": 1,
+        "suttruppaathai": 2
+      }
+    },
+    "சுற்றுப்பாதையில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surruppaathaiyil": 1,
+        "sutruppaathaiyil": 1,
+        "suttruppaathaiyil": 2
+      }
+    },
+    "சுற்றுப்புற": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surruppura": 1,
+        "sutruppura": 1,
+        "suttruppura": 2
+      }
+    },
+    "சுற்றுலாவின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surrulaavin": 1,
+        "sutrulaavin": 1,
+        "suttrulaavin": 2
+      }
+    },
+    "சுற்றுலாவை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surrulaavai": 1,
+        "sutrulaavai": 1,
+        "suttrulaavai": 2
+      }
+    },
+    "சுற்றை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "surrai": 1,
+        "sutrai": 1,
+        "suttrai": 2
+      }
+    },
+    "சுலபமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sulabamaaga": 2,
+        "sulabamaaka": 1
+      }
+    },
+    "சுலோகத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suloagaththil": 1,
+        "sulogaththil": 1,
+        "sulokaththil": 1
+      }
+    },
+    "சுல்தானின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sultanin": 1,
+        "sulthaanin": 3
+      }
+    },
+    "சுல்தான்": {
+      "initial": "s",
+      "attestations": 8,
+      "romanizations": {
+        "sultaan": 2,
+        "sultan": 2,
+        "sulthaan": 2,
+        "suultaan": 1,
+        "suultan": 1
+      }
+    },
+    "சுல்தான்கள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sultangal": 1,
+        "sulthaangal": 2,
+        "sulthaankal": 1,
+        "sulthangal": 1
+      }
+    },
+    "சுழன்று": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sulanru": 1,
+        "suzhandru": 2,
+        "suzhanru": 1
+      }
+    },
+    "சுழற்சி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sularchi": 1,
+        "suzharchi": 3
+      }
+    },
+    "சுழற்சிகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sularchigal": 1,
+        "suzharchigal": 3
+      }
+    },
+    "சுழற்சிக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sularchikku": 1,
+        "suzharchikku": 3
+      }
+    },
+    "சுழற்சியில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sularchiyil": 1,
+        "suzharchiyil": 3
+      }
+    },
+    "சுழலில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sulalil": 1,
+        "suzhalil": 3
+      }
+    },
+    "சுழலும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sulalum": 1,
+        "suzhalum": 3
+      }
+    },
+    "சுழல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sulal": 1,
+        "suzhal": 3
+      }
+    },
+    "சுழல்கிறது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sulalgirathu": 1,
+        "suzhalgiradhu": 1,
+        "suzhalgirathu": 2
+      }
+    },
+    "சுவாசக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suvaasak": 3
+      }
+    },
+    "சுவாசத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suvaasaththai": 3
+      }
+    },
+    "சுவாசம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "suvaasam": 2,
+        "suvasam": 1
+      }
+    },
+    "சுவாசிக்க": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suvaasikka": 1,
+        "suvachikka": 1,
+        "suvasikka": 2
+      }
+    },
+    "சுவாசிக்கத்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suvaasikkath": 1,
+        "suvachikkath": 1,
+        "suvasikkath": 2
+      }
+    },
+    "சுவிசேஷ": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "suveesesha": 1,
+        "suvichesha": 1,
+        "suvishesha": 2
+      }
+    },
+    "சூரசம்ஹாரம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soorasamhaaram": 2,
+        "surasamharam": 1
+      }
+    },
+    "சூரியன்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sooriyan": 2,
+        "suriyan": 2
+      }
+    },
+    "சூரியப்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sooriyap": 2,
+        "suriyap": 2
+      }
+    },
+    "சூறாவளி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sooraavali": 2,
+        "sooravazhi": 1
+      }
+    },
+    "சூறாவளிகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sooraavaligal": 1,
+        "sooraavalikal": 2,
+        "sooravazhigal": 1
+      }
+    },
+    "சூறாவளியாக": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sooraavaliyaaga": 2,
+        "sooraavaliyaaka": 2,
+        "sooravazhiyaga": 1
+      }
+    },
+    "சூறாவளியில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sooraavaliyil": 1,
+        "sooravaliyil": 1,
+        "suravaliyil": 1,
+        "suravazhiyil": 1
+      }
+    },
+    "சூளாமணி": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolaamani": 1,
+        "soolamani": 2,
+        "soozhamani": 1
+      }
+    },
+    "சூழ": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soola": 1,
+        "soozha": 2,
+        "suzha": 1
+      }
+    },
+    "சூழப்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolap": 2,
+        "soozhap": 2
+      }
+    },
+    "சூழப்பட்ட": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolappatta": 2,
+        "soozhappatta": 2
+      }
+    },
+    "சூழப்பட்டது": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "soolappattadhu": 1,
+        "soolappattathu": 2,
+        "soozhappattadhu": 1,
+        "soozhappattathu": 1
+      }
+    },
+    "சூழப்பட்டு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolappattu": 2,
+        "soozhappattu": 2
+      }
+    },
+    "சூழப்பட்டுள்ளது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolappattullathu": 2,
+        "soozhappattullathu": 1,
+        "suzhappattullathu": 1
+      }
+    },
+    "சூழலால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soolalaal": 1,
+        "soozhalaal": 1,
+        "suzhalal": 1
+      }
+    },
+    "சூழலின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolalin": 1,
+        "soozhalin": 1,
+        "sulalin": 1,
+        "suzhalin": 1
+      }
+    },
+    "சூழலியல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolaleeyal": 1,
+        "soolaliyal": 1,
+        "soozhaliyal": 1,
+        "suzhaliyal": 1
+      }
+    },
+    "சூழலில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soolalil": 1,
+        "soozhalil": 2
+      }
+    },
+    "சூழலுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soolalukku": 1,
+        "soozhalukku": 1,
+        "suzhalukku": 1
+      }
+    },
+    "சூழலுக்குள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolalukkul": 2,
+        "soozhalukkul": 2
+      }
+    },
+    "சூழலும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolalum": 2,
+        "soozhalum": 2
+      }
+    },
+    "சூழல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soolal": 2,
+        "soozhal": 1
+      }
+    },
+    "சூழ்நிலையை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soolnilaiyai": 2,
+        "soozhnilaiyai": 2
+      }
+    },
+    "சூழ்நிலையைப்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "soolnilaiyaip": 1,
+        "soozhnilaiyaip": 2,
+        "sulnilaiyaip": 1,
+        "suzhnilaiyaip": 1
+      }
+    },
+    "செண்டிமெண்ட்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sentimend": 1,
+        "sentiment": 2
+      }
+    },
+    "செதில்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sethilgal": 1,
+        "sethilkal": 2
+      }
+    },
+    "செதுக்கப்பட்ட": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sethukkappatta": 3
+      }
+    },
+    "செத்தாலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seththaalum": 2,
+        "setthaalum": 1
+      }
+    },
+    "செந்தமிழ்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "sentamil": 1,
+        "senthamil": 2,
+        "senthamizh": 2
+      }
+    },
+    "சென்றதால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrathaal": 1,
+        "senrathaal": 1,
+        "sentrathaal": 1
+      }
+    },
+    "சென்றது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrathu": 1,
+        "senrathu": 1,
+        "sentrathu": 1
+      }
+    },
+    "சென்றன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrana": 1,
+        "senrana": 1,
+        "sentrana": 1
+      }
+    },
+    "சென்றனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendranar": 1,
+        "senranar": 1,
+        "sentranar": 1
+      }
+    },
+    "சென்றவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendravar": 1,
+        "senravar": 1,
+        "sentravar": 1
+      }
+    },
+    "சென்றவள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraval": 1,
+        "senraval": 1,
+        "sentraval": 1
+      }
+    },
+    "சென்றான்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraan": 1,
+        "senraan": 1,
+        "sentraan": 1
+      }
+    },
+    "சென்றார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraar": 1,
+        "senraar": 1,
+        "sentraar": 1
+      }
+    },
+    "சென்றார்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraargal": 1,
+        "senraarkal": 1,
+        "sentraargal": 1
+      }
+    },
+    "சென்றாலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraalum": 1,
+        "senraalum": 1,
+        "sentraalum": 1
+      }
+    },
+    "சென்றால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraal": 1,
+        "senraal": 1,
+        "sentraal": 1
+      }
+    },
+    "சென்றாள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendraal": 1,
+        "senraal": 1,
+        "sentraal": 1
+      }
+    },
+    "சென்றிருந்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrirunthaar": 1,
+        "senrirunthaar": 1,
+        "sentrirunthaar": 1
+      }
+    },
+    "சென்றுள்ளனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrullanar": 1,
+        "senrullanar": 2
+      }
+    },
+    "சென்றுள்ளார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendrullaar": 1,
+        "senrullaar": 2
+      }
+    },
+    "சென்றுவிட்டனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendruvittanar": 1,
+        "senruvittanar": 2
+      }
+    },
+    "சென்றுவிட்டார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sendruvittaar": 1,
+        "senruvittaar": 2
+      }
+    },
+    "செம்மறி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "semmaree": 1,
+        "semmari": 2
+      }
+    },
+    "செம்மலர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "semmalar": 3
+      }
+    },
+    "செம்மொழி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "semmoli": 2,
+        "semmozhi": 1
+      }
+    },
+    "செம்மொழியாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "semmoliyaaga": 1,
+        "semmoliyaaka": 1,
+        "semmozhiyaaga": 1
+      }
+    },
+    "செயற்குழு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarkulu": 2,
+        "seyarkuzhu": 1
+      }
+    },
+    "செயற்கை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarkai": 3
+      }
+    },
+    "செயற்கைச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarkaich": 3
+      }
+    },
+    "செயற்படுகிறது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpadugiradhu": 2,
+        "seyarpadugirathu": 2
+      }
+    },
+    "செயற்படுகிறார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpadugiraar": 3
+      }
+    },
+    "செயற்படும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpadum": 3
+      }
+    },
+    "செயற்பட்டனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpattanar": 3
+      }
+    },
+    "செயற்பட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpattu": 3
+      }
+    },
+    "செயற்பாடு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadu": 3,
+        "seyarpadu": 1
+      }
+    },
+    "செயற்பாடுகளினால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalinaal": 3
+      }
+    },
+    "செயற்பாடுகளின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalin": 3
+      }
+    },
+    "செயற்பாடுகளிலும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadugalilum": 3,
+        "seyarpadugalilum": 1
+      }
+    },
+    "செயற்பாடுகளில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalil": 3
+      }
+    },
+    "செயற்பாடுகளுக்கான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalukkaana": 3
+      }
+    },
+    "செயற்பாடுகளுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalukku": 3
+      }
+    },
+    "செயற்பாடுகளும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadugalum": 3,
+        "seyarpadugalum": 1
+      }
+    },
+    "செயற்பாடுகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaadugalai": 3
+      }
+    },
+    "செயற்பாடுகளைக்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadugalaik": 3,
+        "seyarpadugalaik": 1
+      }
+    },
+    "செயற்பாடுகளையும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadugalaiyum": 3,
+        "seyarpadugalaiyum": 1
+      }
+    },
+    "செயற்பாடுகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadugal": 3,
+        "seyarpadugal": 1
+      }
+    },
+    "செயற்பாடும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyarpaadum": 3,
+        "seyarpadum": 1
+      }
+    },
+    "செயற்பாட்டாளர்களும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaattaalargalum": 3
+      }
+    },
+    "செயற்பாட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyarpaattu": 3
+      }
+    },
+    "செயலகத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalagaththil": 3
+      }
+    },
+    "செயலகம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalagam": 3
+      }
+    },
+    "செயலர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalar": 3
+      }
+    },
+    "செயலற்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalatra": 1,
+        "seyalattra": 2
+      }
+    },
+    "செயலற்று": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalatru": 1,
+        "seyalattru": 2
+      }
+    },
+    "செயலற்றுப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalatrup": 1,
+        "seyalattrup": 2
+      }
+    },
+    "செயலாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaaga": 2,
+        "seyalaaka": 1,
+        "seyalaga": 1
+      }
+    },
+    "செயலாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaagum": 2,
+        "seyalagum": 1
+      }
+    },
+    "செயலாக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaakka": 2,
+        "seyalakka": 1
+      }
+    },
+    "செயலாக்கம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaakkam": 2,
+        "seyalakkam": 1
+      }
+    },
+    "செயலாற்ற": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaatra": 1,
+        "seyalaattra": 1,
+        "seyalatra": 1
+      }
+    },
+    "செயலாற்றி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaatri": 1,
+        "seyalaattri": 1,
+        "seyalattri": 1
+      }
+    },
+    "செயலாற்றுகிறது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaatrukirathu": 1,
+        "seyalaattrukirathu": 1,
+        "seyalattrugiradhu": 1,
+        "seyalattrukirathu": 1
+      }
+    },
+    "செயலாற்றும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaatrum": 1,
+        "seyalaattrum": 1,
+        "seyalattrum": 1
+      }
+    },
+    "செயலாற்றுவது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaatruvathu": 1,
+        "seyalaattruvathu": 1,
+        "seyalattruvadhu": 1,
+        "seyalattruvathu": 1
+      }
+    },
+    "செயலால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaal": 2,
+        "seyalal": 1
+      }
+    },
+    "செயலாளராக": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seyalaalaraaga": 2,
+        "seyalaalaraaka": 1,
+        "seyalalaraga": 1,
+        "seyalazharaga": 1
+      }
+    },
+    "செயலாளராகவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaalaraagavum": 2,
+        "seyalazharagavum": 1
+      }
+    },
+    "செயலாளரான": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaalaraana": 2,
+        "seyalalarana": 1,
+        "seyalazharana": 1
+      }
+    },
+    "செயலாளரும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaalarum": 2,
+        "seyalalarum": 1,
+        "seyalazharum": 1
+      }
+    },
+    "செயலாளர்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalaalar": 2,
+        "seyalalar": 1,
+        "seyalazhar": 1
+      }
+    },
+    "செயலி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyali": 3
+      }
+    },
+    "செயலிகளை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyaligalai": 3
+      }
+    },
+    "செயலிகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyaligal": 3
+      }
+    },
+    "செயலின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalin": 3
+      }
+    },
+    "செயலியில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyaliyil": 3
+      }
+    },
+    "செயலில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalil": 3
+      }
+    },
+    "செயலிழக்க": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seyalilakka": 2,
+        "seyalizhakka": 3
+      }
+    },
+    "செயலிழக்கச்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seyalilakkach": 2,
+        "seyalizhakkach": 3
+      }
+    },
+    "செயலிழப்பு": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seyalilappu": 2,
+        "seyalizhappu": 3
+      }
+    },
+    "செயலுக்காக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalukkaaga": 2,
+        "seyalukkaga": 1
+      }
+    },
+    "செயலுக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalukku": 3
+      }
+    },
+    "செயலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalum": 3
+      }
+    },
+    "செயலை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalai": 3
+      }
+    },
+    "செயலைச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaich": 3
+      }
+    },
+    "செயலைத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalaith": 3
+      }
+    },
+    "செயல்களால்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalaal": 2,
+        "seyalgazhal": 1,
+        "seyalkalaal": 1
+      }
+    },
+    "செயல்களின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalin": 3,
+        "seyalgazhin": 1
+      }
+    },
+    "செயல்களில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalil": 3,
+        "seyalkalil": 1
+      }
+    },
+    "செயல்களுக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalukku": 3,
+        "seyalkalukku": 1
+      }
+    },
+    "செயல்களை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalai": 3,
+        "seyalkalai": 1
+      }
+    },
+    "செயல்களைத்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalaith": 3,
+        "seyalkalaith": 1
+      }
+    },
+    "செயல்களையும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgalaiyum": 3,
+        "seyalkalaiyum": 1
+      }
+    },
+    "செயல்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalgal": 3,
+        "seyalkal": 1
+      }
+    },
+    "செயல்திறனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalthiranai": 3
+      }
+    },
+    "செயல்திறன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalthiran": 3
+      }
+    },
+    "செயல்பட": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpada": 3
+      }
+    },
+    "செயல்படக்கூடிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpadakkoodiya": 2,
+        "seyalpadakkudiya": 1
+      }
+    },
+    "செயல்படத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpadath": 3
+      }
+    },
+    "செயல்படவில்லை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpadavillai": 3
+      }
+    },
+    "செயல்படாத": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "seyalpadaatha": 1,
+        "seyalpadadha": 1,
+        "seyalpadatha": 2,
+        "seyalpatatha": 1
+      }
+    },
+    "செயல்படாமல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpadaamal": 2,
+        "seyalpadamal": 1
+      }
+    },
+    "செயல்படு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpadu": 3
+      }
+    },
+    "செயல்படுகின்ற": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaduginra": 1,
+        "seyalpadugintra": 1,
+        "seyalpadukinra": 2
+      }
+    },
+    "செயல்படுகின்றது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaduginradhu": 1,
+        "seyalpadukinrathu": 2,
+        "seyalpadukintrathu": 1
+      }
+    },
+    "செயல்படுகின்றன": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaduginrana": 1,
+        "seyalpadukinrana": 2,
+        "seyalpadukintrana": 1
+      }
+    },
+    "செயல்படுகிறது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpadugiradhu": 1,
+        "seyalpadukirathu": 3
+      }
+    },
+    "செயல்படுகிறார்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpadugirar": 1,
+        "seyalpadukiraar": 2,
+        "seyalpadukirar": 1
+      }
+    },
+    "செயல்படுதல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpadudhal": 1,
+        "seyalpaduthal": 3
+      }
+    },
+    "செயல்படுத்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpaduththa": 3
+      }
+    },
+    "செயல்பட்ட": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpatta": 3
+      }
+    },
+    "செயல்பட்டது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpattadhu": 1,
+        "seyalpattathu": 3
+      }
+    },
+    "செயல்பட்டன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattana": 3
+      }
+    },
+    "செயல்பட்டனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattanar": 3
+      }
+    },
+    "செயல்பட்டவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattavar": 3
+      }
+    },
+    "செயல்பட்டார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattaar": 2,
+        "seyalpattar": 1
+      }
+    },
+    "செயல்பட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattu": 3
+      }
+    },
+    "செயல்பட்டுள்ளார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattullaar": 2,
+        "seyalpattullar": 1
+      }
+    },
+    "செயல்பட்டுவருகிறது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpattuvarugiradhu": 1,
+        "seyalpattuvarugirathu": 2,
+        "seyalpattuvarukirathu": 1
+      }
+    },
+    "செயல்பட்டுவரும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpattuvarum": 3
+      }
+    },
+    "செயல்பாடு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpaadu": 2,
+        "seyalpadu": 1
+      }
+    },
+    "செயல்பாடுகளின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugalin": 2,
+        "seyalpadugalin": 1,
+        "seyalpadukalin": 1
+      }
+    },
+    "செயல்பாடுகளில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugalil": 2,
+        "seyalpadugalil": 1,
+        "seyalpadukalil": 1
+      }
+    },
+    "செயல்பாடுகளுக்கான": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugalukkaana": 1,
+        "seyalpadugalukkaana": 1,
+        "seyalpadugalukkana": 1,
+        "seyalpadukalukkana": 1
+      }
+    },
+    "செயல்பாடுகளுக்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugalukku": 2,
+        "seyalpadugalukku": 1,
+        "seyalpadukalukku": 1
+      }
+    },
+    "செயல்பாடுகளை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugalai": 2,
+        "seyalpadugalai": 1,
+        "seyalpadukalai": 1
+      }
+    },
+    "செயல்பாடுகளைக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpaadugalaik": 2,
+        "seyalpadugalaik": 1
+      }
+    },
+    "செயல்பாடுகள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "seyalpaadugal": 2,
+        "seyalpadugal": 1,
+        "seyalpadukal": 1
+      }
+    },
+    "செயல்பாடும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "seyalpaadum": 2,
+        "seyalpadum": 1
+      }
+    },
+    "செல்லுதல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selluthal": 3
+      }
+    },
+    "செல்லுபடியாகாது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sellupadiyaagaathu": 2,
+        "sellupadiyaakaathu": 1
+      }
+    },
+    "செல்லுபடியாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sellupadiyaagum": 2,
+        "sellupadiyaakum": 1
+      }
+    },
+    "செல்லுமாறு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sellumaaru": 3
+      }
+    },
+    "செல்லூர்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selloor": 2,
+        "sellur": 2
+      }
+    },
+    "செல்வதற்கான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvatharkaana": 2,
+        "selvatharkana": 1
+      }
+    },
+    "செல்வதற்கு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadharku": 1,
+        "selvatharku": 3
+      }
+    },
+    "செல்வதாகவும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhagavum": 1,
+        "selvathaagavum": 2,
+        "selvathagavum": 1
+      }
+    },
+    "செல்வதால்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhal": 1,
+        "selvathaal": 2,
+        "selvathal": 1
+      }
+    },
+    "செல்வதிலும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhilum": 1,
+        "selvathilum": 3
+      }
+    },
+    "செல்வதில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhil": 1,
+        "selvathil": 3
+      }
+    },
+    "செல்வதில்லை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhillai": 1,
+        "selvathillai": 3
+      }
+    },
+    "செல்வது": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhu": 1,
+        "selvathu": 3
+      }
+    },
+    "செல்வதுதான்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhudhan": 1,
+        "selvathuthaan": 2,
+        "selvathuthan": 1
+      }
+    },
+    "செல்வதை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhai": 1,
+        "selvathai": 3
+      }
+    },
+    "செல்வதைத்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "selvadhaith": 1,
+        "selvathaith": 3
+      }
+    },
+    "செல்வத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvaththin": 3
+      }
+    },
+    "செல்வத்தையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvaththaiyum": 3
+      }
+    },
+    "செல்வாக்குச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvaakkuch": 3
+      }
+    },
+    "செல்வாக்குப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvaakkup": 3
+      }
+    },
+    "செல்வான்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvaan": 3
+      }
+    },
+    "செல்வி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "selvi": 3
+      }
+    },
+    "செவ்வானம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sevvaanam": 3
+      }
+    },
+    "சேகரிக்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saegarikka": 1,
+        "sekarikka": 2
+      }
+    },
+    "சேகரிக்கப்படும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saegarikkappadum": 1,
+        "sekarikkappadum": 2
+      }
+    },
+    "சேகரிக்கும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segarikkum": 1,
+        "sekarikkum": 2
+      }
+    },
+    "சேகரித்தல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segariththal": 1,
+        "sekariththal": 2
+      }
+    },
+    "சேகரித்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segariththu": 1,
+        "sekariththu": 2
+      }
+    },
+    "சேகரிப்பதில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segarippadhil": 1,
+        "sekarippathil": 2
+      }
+    },
+    "சேகரிப்பது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segarippadhu": 1,
+        "sekarippathu": 2
+      }
+    },
+    "சேகரிப்பில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segarippil": 1,
+        "sekarippil": 2
+      }
+    },
+    "சேகரிப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segarippu": 1,
+        "sekarippu": 2
+      }
+    },
+    "சேகரிப்புத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "segaripputh": 1,
+        "sekaripputh": 2
+      }
+    },
+    "சேத": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sedha": 1,
+        "setha": 2
+      }
+    },
+    "சேதங்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sedhangal": 1,
+        "sethangal": 2
+      }
+    },
+    "சேதத்தை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sedhaththai": 1,
+        "sethaththai": 2
+      }
+    },
+    "சேதனம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sedhanam": 1,
+        "sethanam": 2
+      }
+    },
+    "சேனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saenai": 1,
+        "senai": 2
+      }
+    },
+    "சேனையை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saenaiyai": 3,
+        "senaiyai": 1
+      }
+    },
+    "சேமிக்க": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saemikka": 3,
+        "semikka": 1
+      }
+    },
+    "சேமிக்கும்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saemikkum": 3,
+        "semikkum": 2
+      }
+    },
+    "சேமிப்பில்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saemippil": 3,
+        "semippil": 2
+      }
+    },
+    "சேமிப்பு": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saemippu": 3,
+        "semippu": 2
+      }
+    },
+    "சேமிப்புத்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saemipputh": 3,
+        "semipputh": 2
+      }
+    },
+    "சேரவில்லை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saeravillai": 2,
+        "seravillai": 2
+      }
+    },
+    "சேரவேண்டும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saeravaendum": 1,
+        "seravendum": 2
+      }
+    },
+    "சேருகின்றன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerukindrana": 1,
+        "saerukintrana": 1,
+        "serukindrana": 1
+      }
+    },
+    "சேர்கின்றன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saergintrana": 1,
+        "saerkindrana": 1,
+        "serkindrana": 1
+      }
+    },
+    "சேர்க்க": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkka": 2,
+        "serkka": 1
+      }
+    },
+    "சேர்க்கப்படலாம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappadalaam": 2,
+        "serkkappadalaam": 1
+      }
+    },
+    "சேர்க்கப்படுகின்றன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappadukintrana": 1,
+        "serkkappadukindrana": 1,
+        "serkkappadukinrana": 1
+      }
+    },
+    "சேர்க்கப்படுகிறது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappadukirathu": 1,
+        "serkkappadukirathu": 2
+      }
+    },
+    "சேர்க்கப்பட்ட": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappatta": 1,
+        "serkkappatta": 2
+      }
+    },
+    "சேர்க்கப்பட்டது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattathu": 1,
+        "serkkappattathu": 2
+      }
+    },
+    "சேர்க்கப்பட்டன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattana": 1,
+        "serkkappattana": 2
+      }
+    },
+    "சேர்க்கப்பட்டார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattaar": 1,
+        "serkkappattaar": 2
+      }
+    },
+    "சேர்க்கப்பட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattu": 1,
+        "serkkappattu": 2
+      }
+    },
+    "சேர்க்கப்பட்டுள்ள": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattulla": 1,
+        "serkkappattulla": 2
+      }
+    },
+    "சேர்க்கப்பட்டுள்ளது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattullathu": 1,
+        "serkkappattullathu": 2
+      }
+    },
+    "சேர்க்கப்பட்டுள்ளன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkappattullana": 1,
+        "serkkappattullana": 2
+      }
+    },
+    "சேர்க்கவும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkavum": 1,
+        "serkkavum": 2
+      }
+    },
+    "சேர்க்கை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkai": 1,
+        "serkkai": 2
+      }
+    },
+    "சேர்க்கைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkaigal": 1,
+        "serkkaikal": 2
+      }
+    },
+    "சேர்க்கைக்கான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkaikkaana": 1,
+        "serkkaikkaana": 2
+      }
+    },
+    "சேர்க்கைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerkkaikku": 1,
+        "serkkaikku": 2
+      }
+    },
+    "சேர்தல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerthal": 1,
+        "serthal": 2
+      }
+    },
+    "சேர்த்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththa": 1,
+        "serththa": 2
+      }
+    },
+    "சேர்த்தல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththal": 1,
+        "serththal": 2
+      }
+    },
+    "சேர்த்தவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththavar": 1,
+        "serththavar": 2
+      }
+    },
+    "சேர்த்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththaar": 1,
+        "serththaar": 2
+      }
+    },
+    "சேர்த்தால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththaal": 1,
+        "serththaal": 2
+      }
+    },
+    "சேர்த்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththu": 1,
+        "serththu": 2
+      }
+    },
+    "சேர்த்துக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththuk": 1,
+        "serththuk": 2
+      }
+    },
+    "சேர்த்துக்கொண்டார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththukkondaar": 1,
+        "serththukkondaar": 2
+      }
+    },
+    "சேர்த்துக்கொள்வதன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththukkolvathan": 1,
+        "serththukkolvathan": 2
+      }
+    },
+    "சேர்த்துச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththuch": 1,
+        "serththuch": 2
+      }
+    },
+    "சேர்த்துத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththuth": 1,
+        "serththuth": 2
+      }
+    },
+    "சேர்த்துப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththup": 1,
+        "serththup": 2
+      }
+    },
+    "சேர்த்தும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerththum": 1,
+        "serththum": 2
+      }
+    },
+    "சேர்ந்த": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerntha": 1,
+        "serndha": 1,
+        "serntha": 1
+      }
+    },
+    "சேர்ந்ததாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthathaaga": 1,
+        "serndhathaaka": 1,
+        "sernthathaaga": 1
+      }
+    },
+    "சேர்ந்ததாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthathaagum": 1,
+        "serndhathaakum": 1,
+        "sernthathaagum": 1
+      }
+    },
+    "சேர்ந்தது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthathu": 1,
+        "serndhathu": 1,
+        "sernthathu": 1
+      }
+    },
+    "சேர்ந்ததும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthathum": 1,
+        "serndhathum": 1,
+        "sernthathum": 1
+      }
+    },
+    "சேர்ந்தன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthana": 1,
+        "serndhana": 1,
+        "sernthana": 1
+      }
+    },
+    "சேர்ந்தனர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthanar": 1,
+        "serndhanar": 1,
+        "sernthanar": 1
+      }
+    },
+    "சேர்ந்தவரும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavarum": 1,
+        "serndhavarum": 1,
+        "sernthavarum": 1
+      }
+    },
+    "சேர்ந்தவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavar": 1,
+        "serndhavar": 1,
+        "sernthavar": 1
+      }
+    },
+    "சேர்ந்தவர்களாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavargalaaga": 1,
+        "serndhavarkalaaka": 1,
+        "sernthavarkalaaka": 1
+      }
+    },
+    "சேர்ந்தவர்களால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavargalaal": 1,
+        "serndhavarkalaal": 1,
+        "sernthavarkalaal": 1
+      }
+    },
+    "சேர்ந்தவர்களாவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavargalaavar": 1,
+        "serndhavarkalaavar": 1,
+        "sernthavarkalaavar": 1
+      }
+    },
+    "சேர்ந்தவர்களும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavargalum": 1,
+        "serndhavarkalum": 1,
+        "sernthavarkalum": 1
+      }
+    },
+    "சேர்ந்தவர்கள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavargal": 1,
+        "serndhavarkal": 1,
+        "sernthavarkal": 1
+      }
+    },
+    "சேர்ந்தவை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthavai": 1,
+        "serndhavai": 1,
+        "sernthavai": 1
+      }
+    },
+    "சேர்ந்தான்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthaan": 1,
+        "serndhaan": 1,
+        "sernthaan": 1
+      }
+    },
+    "சேர்ந்தார்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthaar": 1,
+        "serndhaar": 1,
+        "sernthaar": 1
+      }
+    },
+    "சேர்ந்தாலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthaalum": 1,
+        "serndhaalum": 1,
+        "sernthaalum": 1
+      }
+    },
+    "சேர்ந்து": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthu": 1,
+        "serndhu": 1,
+        "sernthu": 1
+      }
+    },
+    "சேர்ந்துள்ள": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saernthulla": 1,
+        "serndhulla": 1,
+        "sernthulla": 1
+      }
+    },
+    "சேர்ப்பதன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerppathan": 1,
+        "serppathan": 2
+      }
+    },
+    "சேர்ப்பது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerppathu": 1,
+        "serppathu": 2
+      }
+    },
+    "சேர்ப்பதும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerppathum": 1,
+        "serppathum": 2
+      }
+    },
+    "சேர்ப்பு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saerppu": 1,
+        "serppu": 2
+      }
+    },
+    "சேலை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saelai": 2,
+        "selai": 1
+      }
+    },
+    "சேவகன்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevagan": 3,
+        "sevagan": 2
+      }
+    },
+    "சேவகர்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevagar": 3,
+        "sevagar": 2
+      }
+    },
+    "சேவகர்கள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevagargal": 2,
+        "saevakargal": 1,
+        "sevagargal": 1,
+        "sevakargal": 1
+      }
+    },
+    "சேவல்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saeval": 2,
+        "seval": 2
+      }
+    },
+    "சேவல்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevalgal": 1,
+        "sevalgal": 2,
+        "sevalkal": 1
+      }
+    },
+    "சேவை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevai": 1,
+        "sevai": 3
+      }
+    },
+    "சேவைகளின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevaigalin": 1,
+        "sevaigalin": 2,
+        "sevaikalin": 1
+      }
+    },
+    "சேவைகளில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevaigalil": 1,
+        "sevaigalil": 2,
+        "sevaikalil": 1
+      }
+    },
+    "சேவைகளுக்கும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevaigalukkum": 1,
+        "sevaigalukkum": 2,
+        "sevaikalukkum": 1
+      }
+    },
+    "சேவைகளும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saevaigalum": 1,
+        "sevaigalum": 2,
+        "sevaikalum": 1
+      }
+    },
+    "சேவைகளை": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevaigalai": 2,
+        "sevaigalai": 2,
+        "sevaikalai": 1
+      }
+    },
+    "சேவைகளையும்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevaigalaiyum": 2,
+        "sevaigalaiyum": 2,
+        "sevaikalaiyum": 1
+      }
+    },
+    "சேவைகள்": {
+      "initial": "s",
+      "attestations": 5,
+      "romanizations": {
+        "saevaigal": 2,
+        "sevaigal": 2,
+        "sevaikal": 1
+      }
+    },
+    "சேவைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sevaikku": 3
+      }
+    },
+    "சேவைத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sevaith": 3
+      }
+    },
+    "சேவையாகும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sevaiyaagum": 1,
+        "sevaiyaakum": 2
+      }
+    },
+    "சேவையாளர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saevaiyaalar": 1,
+        "sevaiyaalar": 2
+      }
+    },
+    "சேவையின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saevaiyin": 1,
+        "sevaiyin": 2
+      }
+    },
+    "சேவையிலும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saevaiyilum": 1,
+        "sevaiyilum": 2
+      }
+    },
+    "சேவையில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saevaiyil": 1,
+        "sevaiyil": 2
+      }
+    },
+    "சைகைகளை": {
+      "initial": "s",
+      "attestations": 6,
+      "romanizations": {
+        "saigaigalai": 2,
+        "saigaikalai": 1,
+        "saikaigalai": 1,
+        "saikaikalai": 2
+      }
+    },
+    "சைகைகள்": {
+      "initial": "s",
+      "attestations": 7,
+      "romanizations": {
+        "saigaigal": 3,
+        "saigaikal": 1,
+        "saikaigal": 1,
+        "saikaikal": 2
+      }
+    },
+    "சைவக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saivak": 3
+      }
+    },
+    "சைவத்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saivath": 3
+      }
+    },
+    "சைவத்தின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saivaththin": 3
+      }
+    },
+    "சைவம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saivam": 3
+      }
+    },
+    "சைவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "saivar": 3
+      }
+    },
+    "சைவர்களின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saivargalin": 3,
+        "saivarkalin": 1
+      }
+    },
+    "சைவர்கள்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "saivargal": 3,
+        "saivarkal": 1
+      }
+    },
+    "சொதி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sothi": 3
+      }
+    },
+    "சொந்தக்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sondhak": 1,
+        "sonthak": 3
+      }
+    },
+    "சொந்தப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonthap": 3
+      }
+    },
+    "சொந்தமா": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonthamaa": 3
+      }
+    },
+    "சொந்தமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonthamaaga": 2,
+        "sonthamaaka": 1
+      }
+    },
+    "சொந்தமான": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonthamaana": 3
+      }
+    },
+    "சொந்தமானது": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonthamaanathu": 3
+      }
+    },
+    "சொந்தம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sontham": 3
+      }
+    },
+    "சொன்ன": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonna": 3
+      }
+    },
+    "சொன்னதாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonnathaaga": 2,
+        "sonnathaaka": 1
+      }
+    },
+    "சொன்னார்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sonnaar": 3,
+        "sonnar": 1
+      }
+    },
+    "சொன்னால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sonnaal": 3
+      }
+    },
+    "சொம்பு": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "sombu": 3,
+        "sompu": 1
+      }
+    },
+    "சொர்க்கத்தில்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sorkkaththil": 2,
+        "sorkkatthil": 1
+      }
+    },
+    "சொல்லக்கூடிய": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollakkoodiya": 3
+      }
+    },
+    "சொல்லப்பட்டு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollappattu": 3
+      }
+    },
+    "சொல்லலாம்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollalaam": 3
+      }
+    },
+    "சொல்லால்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollaal": 3
+      }
+    },
+    "சொல்லிக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollik": 3
+      }
+    },
+    "சொல்லித்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollith": 3
+      }
+    },
+    "சொல்லின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollin": 3
+      }
+    },
+    "சொல்லிப்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollip": 3
+      }
+    },
+    "சொல்லிற்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollirku": 3
+      }
+    },
+    "சொல்லுவர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "solluvar": 3
+      }
+    },
+    "சொல்லே": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollae": 2,
+        "solle": 1
+      }
+    },
+    "சொல்லை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollai": 3
+      }
+    },
+    "சொல்லைக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollaik": 3
+      }
+    },
+    "சொல்லையும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "sollaiyum": 3
+      }
+    },
+    "சொல்வதாக": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "solvadhaga": 1,
+        "solvathaaga": 1,
+        "solvathaaka": 1,
+        "solvathaga": 1
+      }
+    },
+    "சொல்வதானால்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "solvadhanal": 1,
+        "solvathaanaal": 2,
+        "solvathanal": 1
+      }
+    },
+    "சோடி": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soadi": 1,
+        "sodi": 2
+      }
+    },
+    "சோதனை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanai": 1,
+        "sothanai": 2
+      }
+    },
+    "சோதனைகளின்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soathanaikalin": 1,
+        "sothanaigalin": 1,
+        "sothanaikalin": 2
+      }
+    },
+    "சோதனைகளில்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soathanaikalil": 1,
+        "sodhanaigalil": 1,
+        "sothanaikalil": 2
+      }
+    },
+    "சோதனைகளும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soathanaikalum": 1,
+        "sothanaigalum": 1,
+        "sothanaikalum": 2
+      }
+    },
+    "சோதனைகளை": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soathanaikalai": 1,
+        "sothanaigalai": 1,
+        "sothanaikalai": 2
+      }
+    },
+    "சோதனைகளையும்": {
+      "initial": "s",
+      "attestations": 4,
+      "romanizations": {
+        "soathanaikalaiyum": 1,
+        "sothanaigalaiyum": 1,
+        "sothanaikalaiyum": 2
+      }
+    },
+    "சோதனைகள்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanaigal": 1,
+        "sothanaigal": 1,
+        "sothanaikal": 1
+      }
+    },
+    "சோதனைக்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanaik": 1,
+        "sothanaik": 2
+      }
+    },
+    "சோதனைக்காக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanaikkaaga": 1,
+        "sothanaikkaaka": 1,
+        "sothanaikkaga": 1
+      }
+    },
+    "சோதனைக்கு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanaikku": 1,
+        "sothanaikku": 2
+      }
+    },
+    "சோதனைச்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soathanaich": 1,
+        "sothanaich": 2
+      }
+    },
+    "சோம": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soama": 1,
+        "soma": 2
+      }
+    },
+    "சோமசுந்தர": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soamasundara": 1,
+        "somasundara": 2
+      }
+    },
+    "சோமநாதர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soamanaathar": 1,
+        "somanathar": 2
+      }
+    },
+    "சோமன்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soaman": 1,
+        "soman": 2
+      }
+    },
+    "சோமாஸ்கந்தர்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soamaaskanthar": 1,
+        "somaskandar": 1,
+        "somaskandhar": 1
+      }
+    },
+    "சோமுவின்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soamuvin": 2,
+        "somuvin": 1
+      }
+    },
+    "சோம்பல்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soambal": 3
+      }
+    },
+    "சோம்பேறித்தனமாக": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soambaeriththanamaaga": 1,
+        "soamberiththanamaga": 1,
+        "soampaeriththanamaaga": 1
+      }
+    },
+    "சோர்வு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soarvu": 2,
+        "sorvu": 1
+      }
+    },
+    "சோறு": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soaru": 1,
+        "soru": 2
+      }
+    },
+    "சோறும்": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soarum": 1,
+        "sorum": 2
+      }
+    },
+    "சோற்றை": {
+      "initial": "s",
+      "attestations": 3,
+      "romanizations": {
+        "soarrai": 1,
+        "sotrai": 1,
+        "sottrai": 1
+      }
+    },
+    "டூம்": {
+      "initial": "ḍ",
+      "attestations": 3,
+      "romanizations": {
+        "doom": 1,
+        "dum": 1,
+        "duum": 1
+      }
+    },
+    "டெவில்": {
+      "initial": "ḍ",
+      "attestations": 3,
+      "romanizations": {
+        "devil": 3
+      }
+    },
+    "தர்மபுரி": {
+      "initial": "d",
+      "attestations": 3,
+      "romanizations": {
+        "dharmapuri": 3
+      }
+    },
+    "தர்மபுரியில்": {
+      "initial": "d",
+      "attestations": 3,
+      "romanizations": {
+        "dharmapuriyil": 3
+      }
+    },
+    "தர்மலிங்கம்": {
+      "initial": "d",
+      "attestations": 3,
+      "romanizations": {
+        "dharmalingam": 3
+      }
+    },
+    "தாதர்": {
+      "initial": "d",
+      "attestations": 5,
+      "romanizations": {
+        "dadar": 2,
+        "dhaadar": 1,
+        "dhaadhar": 1,
+        "dhadhar": 1
+      }
+    },
+    "தானம்": {
+      "initial": "d",
+      "attestations": 3,
+      "romanizations": {
+        "dhaanam": 3
+      }
+    },
+    "தானியங்கள்": {
+      "initial": "d",
+      "attestations": 4,
+      "romanizations": {
+        "dhaaniyangal": 3,
+        "dhaaniyankal": 1
+      }
+    },
+    "தீபாவளிக்கு": {
+      "initial": "d",
+      "attestations": 4,
+      "romanizations": {
+        "deepaavalikku": 1,
+        "deepavalikku": 1,
+        "dheepaavalikku": 2
+      }
+    },
+    "தீப்தி": {
+      "initial": "d",
+      "attestations": 4,
+      "romanizations": {
+        "deepthi": 2,
+        "deepti": 1,
+        "dheepthi": 1
+      }
+    },
+    "தேவகாந்தாரி": {
+      "initial": "d",
+      "attestations": 5,
+      "romanizations": {
+        "devagandhari": 2,
+        "devaganthari": 1,
+        "devakaandhaari": 1,
+        "devakanthari": 1
+      }
+    },
+    "தேவயானி": {
+      "initial": "d",
+      "attestations": 4,
+      "romanizations": {
+        "devayaani": 2,
+        "devayani": 2
+      }
+    },
+    "தேவலோக": {
+      "initial": "d",
+      "attestations": 3,
+      "romanizations": {
+        "devaloga": 2,
+        "devaloka": 1
+      }
+    },
+    "பவானி": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "bavani": 1,
+        "bhavaani": 1,
+        "bhavani": 1
+      }
+    },
+    "பாகவத": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "baagavadha": 1,
+        "baagavatha": 1,
+        "bhaagavadha": 1,
+        "bhagavatha": 1
+      }
+    },
+    "பாகவதர்": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "bagavathar": 1,
+        "bhaagavadhar": 1,
+        "bhagavathar": 1
+      }
+    },
+    "பாஜக": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "baajaka": 3
+      }
+    },
+    "பாபா": {
+      "initial": "b",
+      "attestations": 9,
+      "romanizations": {
+        "baaba": 1,
+        "baabaa": 4,
+        "baba": 3,
+        "babaa": 1
+      }
+    },
+    "பாபாவின்": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "baabaavin": 3
+      }
+    },
+    "பாரத": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "baaratha": 2,
+        "bhaaratha": 1,
+        "bharatha": 1
+      }
+    },
+    "பாரதப்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "baarathap": 1,
+        "bhaarathap": 2,
+        "bharathap": 1
+      }
+    },
+    "பாரதம்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "baaratham": 1,
+        "baratham": 1,
+        "bhaaratham": 1,
+        "bharatham": 1
+      }
+    },
+    "பாரதிதாசன்": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathithaasan": 1,
+        "baarathithasan": 1,
+        "bhaarathithaasan": 1,
+        "bharathidhasan": 1,
+        "bharathithasan": 1
+      }
+    },
+    "பாரதிய": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathiya": 2,
+        "bhaarathiya": 1,
+        "bharathiya": 2
+      }
+    },
+    "பாரதியாரின்": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathiyaarin": 2,
+        "bhaarathiyaarin": 1,
+        "bharathiyaarin": 2
+      }
+    },
+    "பாரதியார்": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathiyaar": 2,
+        "bhaarathiyaar": 1,
+        "bharathiyaar": 2
+      }
+    },
+    "பாரதியின்": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathiyin": 2,
+        "bhaarathiyin": 1,
+        "bharathiyin": 2
+      }
+    },
+    "பாரதியும்": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baarathiyum": 2,
+        "bhaarathiyum": 1,
+        "bharathiyum": 2
+      }
+    },
+    "பாரதீய": {
+      "initial": "b",
+      "attestations": 5,
+      "romanizations": {
+        "baaratheeya": 2,
+        "bhaaratheeya": 2,
+        "bharathiya": 1
+      }
+    },
+    "பீடா": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "beeda": 1,
+        "beedaa": 2
+      }
+    },
+    "பீமன்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "beeman": 3,
+        "bheeman": 1
+      }
+    },
+    "புத்தரின்": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "buddharin": 1,
+        "budhdharin": 1,
+        "buththarin": 1
+      }
+    },
+    "புத்தருக்கு": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "buddharukku": 1,
+        "budhdharukku": 1,
+        "buththarukku": 1
+      }
+    },
+    "புத்தர்": {
+      "initial": "b",
+      "attestations": 3,
+      "romanizations": {
+        "buddhar": 1,
+        "budhdhar": 1,
+        "buththar": 1
+      }
+    },
+    "புத்தியால்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "budhdhiyaal": 3,
+        "buththiyaal": 1
+      }
+    },
+    "போகம்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "bhoagam": 1,
+        "boagam": 2,
+        "bogam": 1
+      }
+    },
+    "போகர்": {
+      "initial": "b",
+      "attestations": 4,
+      "romanizations": {
+        "bhoagar": 1,
+        "boagar": 1,
+        "bogar": 2
+      }
+    }
+  }
+}

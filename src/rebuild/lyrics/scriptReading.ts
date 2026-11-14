@@ -2,7 +2,7 @@
 import { transliterate } from "transliteration";
 import { romanizeIndicSpan } from "./indicReading";
 
-export type ScriptReadingLanguage = "ru" | "uk" | "el" | "hi" | "ar" | "te" | "kn" | "ml" | "or" | "sr" | "ka";
+export type ScriptReadingLanguage = "ru" | "uk" | "el" | "hi" | "ar" | "te" | "kn" | "ml" | "or" | "sr" | "ka" | "ta";
 export interface ScriptReading { romanized: string; reviewNeeded: boolean }
 
 const CYRILLIC: Record<string, string> = {

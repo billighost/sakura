@@ -1,14 +1,14 @@
 import { JAPANESE_READING_VERSION } from "./versions";
 
-export const READING_LANGUAGES = ["ja", "zh", "ko", "ru", "uk", "el", "hi", "ar", "te", "kn", "ml", "or", "sr", "ka"] as const;
+export const READING_LANGUAGES = ["ja", "zh", "ko", "ru", "uk", "el", "hi", "ar", "te", "kn", "ml", "or", "sr", "ka", "ta"] as const;
 export type ReadingLanguage = typeof READING_LANGUAGES[number];
-export const READING_VERSION = "multilingual-reading-v3";
+export const READING_VERSION = "multilingual-reading-v5";
 export const READING_LABELS: Record<ReadingLanguage, string> = {
   ja: "Japanese reading guide", zh: "Chinese Pinyin", ko: "Korean romanization",
   ru: "Russian transliteration", uk: "Ukrainian transliteration", el: "Greek transliteration",
   hi: "Hindi transliteration", ar: "Arabic transliteration", te: "Telugu transliteration",
   kn: "Kannada transliteration", ml: "Malayalam transliteration", or: "Odia transliteration",
-  sr: "Serbian Latin", ka: "Georgian transliteration",
+  sr: "Serbian Latin", ka: "Georgian transliteration", ta: "Tamil transliteration",
 };
 export const READING_SCRIPTS: Record<ReadingLanguage, RegExp> = {
   ja: /[\p{Script=Hiragana}\p{Script=Katakana}]/u, zh: /\p{Script=Han}/u,
@@ -16,6 +16,7 @@ export const READING_SCRIPTS: Record<ReadingLanguage, RegExp> = {
   sr: /\p{Script=Cyrillic}/u, el: /\p{Script=Greek}/u, hi: /\p{Script=Devanagari}/u,
   ar: /\p{Script=Arabic}/u, te: /\p{Script=Telugu}/u, kn: /\p{Script=Kannada}/u,
   ml: /\p{Script=Malayalam}/u, or: /\p{Script=Oriya}/u, ka: /\p{Script=Georgian}/u,
+  ta: /\p{Script=Tamil}/u,
 };
 export function readingEngine(language: ReadingLanguage) { return language === "ja" ? JAPANESE_READING_VERSION : READING_VERSION + ":" + language; }
 
@@ -28,7 +29,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   tel: "te", telugu: "te", kan: "kn", kannada: "kn", mal: "ml", malayalam: "ml",
   ori: "or", ory: "or", odia: "or", oriya: "or", srp: "sr", serbian: "sr",
   kat: "ka", geo: "ka", georgian: "ka", mingrelian: "xmf", megrelian: "xmf", svan: "sva", laz: "lzz",
-  tam: "ta", tamil: "ta", ben: "bn", bengali: "bn",
+  tam: "ta", tamil: "ta", badaga: "bfq", irula: "iru", ben: "bn", bengali: "bn",
   pan: "pa", punjabi: "pa", guj: "gu", gujarati: "gu", mar: "mr", marathi: "mr",
   nep: "ne", nepali: "ne", npi: "ne", san: "sa", sanskrit: "sa", asm: "as", assamese: "as",
   konkani: "kok", tulu: "tcy", gondi: "gon", koya: "kff", santali: "sat",
@@ -49,11 +50,12 @@ export function normalizeLyricLanguageHint(hint?: string): string | undefined {
 const DEVANAGARI_LANGUAGES = new Set(["hi", "mr", "ne", "sa", "kok", "mai", "bho", "doi", "awa", "brx", "new"]);
 const CYRILLIC_LANGUAGES = new Set(["ru", "uk", "sr", "bg", "mk", "be", "kk", "ky", "mn", "tg", "bs", "cnr", "tt", "ba", "cv", "sh"]);
 const ARABIC_LANGUAGES = new Set(["ar", "fa", "ur", "pa", "ps", "sd", "ug", "ku", "ckb", "ks", "bal"]);
-type IndicLanguage = "te" | "kn" | "ml" | "or";
+type IndicLanguage = "te" | "kn" | "ml" | "or" | "ta";
 const INDIC_SCRIPT_LANGUAGES: Record<IndicLanguage, ReadonlySet<string>> = {
   te: new Set(["te", "sa", "gon", "ggo", "gno", "kff"]),
   kn: new Set(["kn", "sa", "kok", "tcy"]),
   ml: new Set(["ml", "sa"]), or: new Set(["or", "sa", "sat"]),
+  ta: new Set(["ta", "sa", "bfq", "iru"]),
 };
 // Shared possessives (Hindi/Marathi तुझे, Hindi/Nepali मेरा, Russian/Ukrainian
 // моя) do not establish a language. Require more distinctive vocabulary.
@@ -114,9 +116,10 @@ export function lyricReadingLanguage(text: string, hint?: string): ReadingLangua
     [arabicReadingLanguage(text, hinted), count(/\p{Script=Arabic}/gu)],
     [indicReadingLanguage("te", hinted), count(/\p{Script=Telugu}/gu)], [indicReadingLanguage("kn", hinted), count(/\p{Script=Kannada}/gu)],
     [indicReadingLanguage("ml", hinted), count(/\p{Script=Malayalam}/gu)], [indicReadingLanguage("or", hinted), count(/\p{Script=Oriya}/gu)],
+    [indicReadingLanguage("ta", hinted), count(/\p{Script=Tamil}/gu)],
     [hinted === "xmf" || hinted === "sva" || hinted === "lzz" ? null : "ka", count(/\p{Script=Georgian}/gu)],
     // Unsupported primary lyrics must not become a reading for a short refrain.
-    [null, count(/\p{Script=Tamil}/gu)], [null, count(/\p{Script=Bengali}/gu)],
+    [null, count(/\p{Script=Bengali}/gu)],
     [null, count(/\p{Script=Gurmukhi}/gu)], [null, count(/\p{Script=Gujarati}/gu)],
     [null, count(/\p{Script=Armenian}/gu)], [null, count(/\p{Script=Thai}/gu)],
     [null, count(/\p{Script=Hebrew}/gu)],

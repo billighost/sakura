@@ -1,13 +1,15 @@
-/** Server-only ISO 15919 spelling rules, backed by maintained Sanscript maps. */
+/** Server-only Indic guides: maintained ISO maps and Tamil contextual readings. */
 import Sanscript from "@indic-transliteration/sanscript";
+import { romanizeTamilWord } from "./tamilReading";
 
-export type IndicReadingLanguage = "te" | "kn" | "ml" | "or";
-const SCHEMES: Record<IndicReadingLanguage, string> = { te: "telugu", kn: "kannada", ml: "malayalam", or: "oriya" };
+export type IndicReadingLanguage = "te" | "kn" | "ml" | "or" | "ta";
+const SCHEMES: Record<IndicReadingLanguage, string> = { te: "telugu", kn: "kannada", ml: "malayalam", or: "oriya", ta: "tamil" };
 const WORDS: Record<IndicReadingLanguage, RegExp> = {
   te: /\p{Script=Telugu}[\p{Script=Telugu}\p{M}\u200c\u200d]*/gu,
   kn: /\p{Script=Kannada}[\p{Script=Kannada}\p{M}\u200c\u200d]*/gu,
   ml: /\p{Script=Malayalam}[\p{Script=Malayalam}\p{M}\u200c\u200d]*/gu,
   or: /\p{Script=Oriya}[\p{Script=Oriya}\p{M}\u200c\u200d]*/gu,
+  ta: /\p{Script=Tamil}[\p{Script=Tamil}\p{M}\u200c\u200d]*/gu,
 };
 const CHILLUS: Record<string, string> = { "ൺ": "ണ്", "ൻ": "ന്", "ർ": "ര്", "ൽ": "ല്", "ൾ": "ള്", "ൿ": "ക്", "ൔ": "മ്", "ൕ": "യ്", "ൖ": "ഴ്" };
 
@@ -47,6 +49,7 @@ export function romanizeIndicSpan(text: string, language: IndicReadingLanguage):
   // Pass native words only. Literal punctuation, digits, Latin fragments and
   // Sanscript's ##/backslash controls in lyrics must never become instructions.
   return text.replace(WORDS[language], word => {
+    if (language === "ta") return romanizeTamilWord(word);
     const normalized = word.normalize("NFC");
     const native = language === "or" ? normalized.replace(/ଡ଼/gu, "ଡ଼").replace(/ଢ଼/gu, "ଢ଼") : normalized;
     const reading = language === "ml" ? malayalamWord(native)

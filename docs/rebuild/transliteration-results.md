@@ -1,5 +1,9 @@
 # Lyric transliteration expansion, 2026-11-14
 
+This report records the original 14-language expansion. Tamil has since been
+added with a researched hybrid reading engine; see the newer
+[Tamil implementation and 15-song check](tamil-transliteration-results.md).
+
 Added **Telugu, Kannada, Malayalam, Odia, Serbian and Georgian**, bringing the
 supported reading languages to 14. Hindi now distinguishes nasalized vowels
 from consonant nasals and handles equivalent nukta and conjunct spellings.

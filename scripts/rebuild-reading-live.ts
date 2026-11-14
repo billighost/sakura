@@ -8,7 +8,7 @@ import { parseTimedLyrics, type TimedLyric } from '../src/rebuild/lyrics/parse';
 import { lyricEdition, lyricText, lyricTitleVariants } from '../src/rebuild/lyrics/identity';
 import { READING_SONG_EXCERPTS, pronunciationLetters, type ReadingSongExcerpt } from './fixtures/reading-song-excerpts';
 
-const maximumRequests=64,maximumBytes=8*1024*1024,maximumResponseBytes=1024*1024;
+const maximumRequests=96,maximumBytes=8*1024*1024,maximumResponseBytes=1024*1024;
 const refresh=process.argv.includes('--refresh');
 const totalTimeoutMs=240000,totalSignal=AbortSignal.timeout(totalTimeoutMs);
 let requests=0,bytes=0;
@@ -135,12 +135,17 @@ async function main() {
  await Promise.all(Array.from({length:2},async()=>{while(next<READING_SONG_EXCERPTS.length){const song=READING_SONG_EXCERPTS[next++];const result=await audit(song);results.push(result);console.log(JSON.stringify({id:song.id,excerptCorrect:(result.independentExcerpt as {correct:boolean}).correct,live:result.live}));}}));
  results.sort((a,b)=>READING_SONG_EXCERPTS.findIndex(song=>song.id===a.id)-READING_SONG_EXCERPTS.findIndex(song=>song.id===b.id));
  const excerptFailures=results.filter(result=>!(result.independentExcerpt as {correct:boolean}).correct);
- const failed=results.filter(result=>!(result.independentExcerpt as {correct:boolean}).correct||(result.live as {liveExcerptCorrect?:boolean}).liveExcerptCorrect===false||(result.live as {textAndTimingPreserved?:boolean}).textAndTimingPreserved===false);
+ const failed=results.filter(result=>{
+  const live=result.live as {status:string;liveExcerptCorrect?:boolean;textAndTimingPreserved?:boolean;languageDetected?:string|null;unconvertedScriptLines?:number};
+  return !(result.independentExcerpt as {correct:boolean}).correct||live.liveExcerptCorrect===false||live.textAndTimingPreserved===false
+   ||live.status==='matched'&&(live.languageDetected!==result.language||Boolean(live.unconvertedScriptLines));
+ });
  const byLanguage=Object.fromEntries([...new Set(READING_SONG_EXCERPTS.map(song=>song.language))].map(language=>{
   const cases=results.filter(result=>result.language===language);
   return [language,{excerpts:cases.length,excerptChecksPassed:cases.filter(result=>(result.independentExcerpt as {correct:boolean}).correct).length,liveMatched:cases.filter(result=>(result.live as {status:string}).status==='matched').length,liveExcerptChecksPassed:cases.filter(result=>(result.live as {liveExcerptCorrect?:boolean}).liveExcerptCorrect===true).length}];
  }));
  const report={checkedAt:new Date().toISOString(),scope:'Read-only live Deezer/LRCLIB original lyric captures and independently checked short song excerpts; no audio/account/publication requests.',limits:{maximumRequests,maximumBytes,maximumResponseBytes,totalTimeoutMs},traffic:{newRequests:requests,newBytes:bytes,requests:traffic},summary:{songs:results.length,excerptChecksPassed:results.length-excerptFailures.length,liveMatched:results.filter(result=>(result.live as {status:string}).status==='matched').length,liveExcerptChecksPassed:results.filter(result=>(result.live as {liveExcerptCorrect?:boolean}).liveExcerptCorrect===true).length,correctnessFailures:failed.map(result=>result.id),byLanguage},cases:results,limitations:['A live response proves provider text was processed, not that every word of a full song has a manually reviewed reading.','Independent ISO/song excerpt checks preserve vowel length, retroflex letters, nasalization and Georgian ejective apostrophes; live comparisons allow source case/punctuation differences only.','Unvowelled Arabic checks script transliteration only; unwritten vowels and dialect cannot be recovered from consonants.','Shared Cyrillic and Devanagari require compatible trusted hints or distinguishing text evidence; ambiguous passages stay original.','Telugu/Kannada/Malayalam/Odia use ISO 15919 with written-script limits. Odia a denotes /ɔ/; Sanskrit conjunct and loan readings can differ.','Malayalam bare final virama, old ambiguous digraphs and exceptional singer/dialect voicing are not guessed; atomic chillus and explicitly written half-u are handled.','Mandarin Pinyin does not supply Cantonese readings or all singer-specific poetic pronunciations.','Provider matches use known title/artist aliases and edition gates; externally matched Deezer recordings additionally supply the duration gate.']};
+ report.limitations.push('Tamil uses a conventional hybrid guide: written vowel/consonant distinctions, supported contextual voicing, 62 exact reviewed initial choices and 1,123 strictly filtered Dakshina initial preferences. Other loans, compounds, c/s choices, dialects and singer elisions retain conservative spelling readings; full-song processing does not certify every sung word.');
  await writeFile('.local/reading-live-report.json',JSON.stringify(report,null,2));
  await mkdir('docs/rebuild',{recursive:true});
  await writeFile('docs/rebuild/transliteration-report.json',JSON.stringify(report,null,2));
